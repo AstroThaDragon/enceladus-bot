@@ -125,45 +125,51 @@ class Leveling(commands.Cog):
         await ctx.defer() 
         member = member or ctx.author
         
-        
-        self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
-        result = self.cursor.fetchone()
-        
-        if not result:
-            return await ctx.send("This user hasn't earned any XP yet!")
-
-        xp, level, bar_color, bg_url = result
-        next_lvl_xp = (level + 1) * 500
-        xp_within_level = xp - (level * 500)
-        
-        # 1. Create Background
+        # Wrapped in a try/except to ensure errors show up in logs
         try:
-            if bg_url:
-                bg_image = await load_image_async(bg_url)
-                background = Editor(bg_image).resize((900, 270))
-            else:
+            self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
+            result = self.cursor.fetchone()
+            
+            if not result:
+                return await ctx.send("This user hasn't earned any XP yet!")
+
+            xp, level, bar_color, bg_url = result
+            next_lvl_xp = (level + 1) * 500
+            xp_within_level = xp - (level * 500)
+            
+            # 1. Create Background
+            try:
+                if bg_url:
+                    bg_image = await load_image_async(bg_url)
+                    background = Editor(bg_image).resize((900, 270))
+                else:
+                    background = Editor(Canvas((900, 270), color="#23272a"))
+            except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
-        except:
-            background = Editor(Canvas((900, 270), color="#23272a"))
 
-        # 2. Draw Avatar
-        avatar_image = await load_image_async(str(member.display_avatar.url))
-        avatar = Editor(avatar_image).resize((150, 150)).circle_image()
-        background.paste(avatar, (50, 50))
-        
-        # 3. Text and Progress Bar
-        font_large = Font("fonts/Poppins-Bold.ttf", size=40)
-        font_small = Font("fonts/Poppins-Regular.ttf", size=30)
+            # 2. Draw Avatar (Forced to PNG for stability)
+            avatar_url = member.display_avatar.replace(format="png", size=256).url
+            avatar_image = await load_image_async(avatar_url)
+            avatar = Editor(avatar_image).resize((150, 150)).circle_image()
+            background.paste(avatar, (50, 50))
+            
+            # 3. Text and Progress Bar
+            font_large = Font("fonts/Poppins-Bold.ttf", size=40)
+            font_small = Font("fonts/Poppins-Regular.ttf", size=30)
 
-        background.text((230, 50), f"{member.name}", font=font_large, color="white")
-        background.text((230, 120), f"Level: {level}   XP: {xp}/{next_lvl_xp}", font=font_small, color="white")
-        
-        # Percentage calculation based on your 500xp-per-level rule
-        percentage = (xp_within_level / 500) * 100
-        background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, back_fill="#484b4e")
+            background.text((230, 50), f"{member.name}", font=font_large, color="white")
+            background.text((230, 120), f"Level: {level}   XP: {xp}/{next_lvl_xp}", font=font_small, color="white")
+            
+            # Percentage calculation based on your 500xp-per-level rule
+            percentage = (xp_within_level / 500) * 100
+            background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, back_fill="#484b4e")
 
-        file = discord.File(fp=background.image_bytes, filename="rank.png")
-        await ctx.send(file=file)
+            file = discord.File(fp=background.image_bytes, filename="rank.png")
+            await ctx.send(file=file)
+        except Exception as e:
+            # This will force the error into your Railway logs if it crashes
+            print(f"Error generating rank card: {e}")
+            await ctx.send("There was an error generating the rank card. Check logs.")
 
     @commands.hybrid_command(name="customize", description="Change your rank card bar color or background!")
     async def customize(self, ctx, color_hex: str = None, background_url: str = None):
