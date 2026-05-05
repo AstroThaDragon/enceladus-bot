@@ -162,7 +162,7 @@ class Leveling(commands.Cog):
             
             # Percentage calculation based on your 500xp-per-level rule
             percentage = (xp_within_level / 500) * 100
-            background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, back_fill="#484b4e")
+            background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, outline="#484b4e")
 
             file = discord.File(fp=background.image_bytes, filename="rank.png")
             await ctx.send(file=file)
