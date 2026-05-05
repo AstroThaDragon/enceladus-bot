@@ -8,9 +8,13 @@ from easy_pil import Editor, Canvas, Font, load_image_async
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Connects to your Railway volume
-        self.conn = sqlite3.connect('/data/levels.db')
+        # 1. Added timeout=10 to prevent the "Silent Freeze"
+        self.conn = sqlite3.connect('/data/levels.db', timeout=10)
         self.cursor = self.conn.cursor()
+        
+        # 2. Optimization: Helps with concurrent reads/writes on Railway volumes
+        self.cursor.execute('PRAGMA journal_mode=WAL')
+        
         # Updated table to support customization: bar_color and bg_url
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                             (user_id INTEGER PRIMARY KEY, 
