@@ -451,9 +451,16 @@ async def resetbump(ctx):
     bump_timer_active = False
     await ctx.send("Bump timer safety has been reset! 🔄")
 
+async def load_extensions():
+    # This tells the bot to load your new leveling.py file
+    await bot.load_extension('leveling')
+
 async def main():
     async with bot:
         token = os.getenv('DISCORD_TOKEN') 
+        
+        # Load the leveling system before starting
+        await load_extensions()
         await bot.start(token)
 
 if __name__ == "__main__":
