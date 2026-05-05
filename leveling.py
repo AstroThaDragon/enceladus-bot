@@ -118,7 +118,9 @@ class Leveling(commands.Cog):
 
     @commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
+        await ctx.defer() 
         member = member or ctx.author
+        
         
         self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
         result = self.cursor.fetchone()
@@ -146,9 +148,11 @@ class Leveling(commands.Cog):
         background.paste(avatar, (50, 50))
         
         # 3. Text and Progress Bar
-        font_large = Font.poppins(size=40, variant="bold")
+        font_large = Font("fonts/Poppins-Bold.ttf", size=40)
+        font_small = Font("fonts/Poppins-Regular.ttf", size=30)
+
         background.text((230, 50), f"{member.name}", font=font_large, color="white")
-        background.text((230, 120), f"Level: {level}   XP: {xp}/{next_lvl_xp}", font=Font.poppins(size=30), color="white")
+        background.text((230, 120), f"Level: {level}   XP: {xp}/{next_lvl_xp}", font=font_small, color="white")
         
         # Percentage calculation based on your 500xp-per-level rule
         percentage = (xp_within_level / 500) * 100
