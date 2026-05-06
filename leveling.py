@@ -156,36 +156,32 @@ class Leveling(commands.Cog):
                     current_role_name = role.name
                     break
 
-            # --- UPDATED DRACONOVA RANKING LOGIC ---
+            # --- UPDATED DRACONOVA RANKING LOGIC (DB VERSION) ---
             dragon_rank = "0"
-            target_path = '/app/data/hoard.json'
+            db_path = '/app/data/draconova.db'
 
-            # Diagnostic logging
-            if not os.path.exists(target_path):
-                print(f"Diagnostic: Cannot find {target_path}")
-                if os.path.exists('/app/data'):
-                    print(f"Diagnostic: Folder /app/data exists. Contents: {os.listdir('/app/data')}")
-                else:
-                    print("Diagnostic: The folder /app/data does not exist at all.")
-            
-            try:
-                if os.path.exists(target_path):
-                    with open(target_path, 'r') as f:
-                        hoard_data = json.load(f)
-
-                    # Sort by monthly points for the current season rank
-                    sorted_list = sorted(
-                        hoard_data.items(), 
-                        key=lambda x: x[1].get('monthly', 0), 
-                        reverse=True
-                    )
-
-                    for i, (u_id, stats) in enumerate(sorted_list):
-                        if u_id == str(member.id):
+            if os.path.exists(db_path):
+                try:
+                    # Connect to the Draconova database to find the rank
+                    d_conn = sqlite3.connect(db_path)
+                    d_curr = d_conn.cursor()
+                    
+                    # Sorting by monthly_points to determine position
+                    d_curr.execute("SELECT user_id FROM hoard ORDER BY monthly_points DESC")
+                    rows = d_curr.fetchall()
+                    
+                    for i, (u_id,) in enumerate(rows):
+                        if u_id == member.id:
                             dragon_rank = str(i + 1)
                             break
-            except Exception as e:
-                print(f"Ranking Error: {e}")
+                    d_conn.close()
+                except Exception as e:
+                    print(f"Draconova DB Ranking Error: {e}")
+            else:
+                # Keep your diagnostic logging if the DB isn't found
+                print(f"Diagnostic: Cannot find {db_path}")
+                if os.path.exists('/app/data'):
+                    print(f"Diagnostic: Contents: {os.listdir('/app/data')}")
             # --- END UPDATED LOGIC ---
 
             try:
