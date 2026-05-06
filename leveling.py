@@ -156,42 +156,37 @@ class Leveling(commands.Cog):
                     current_role_name = role.name
                     break
 
+            # --- UPDATED DRACONOVA RANKING LOGIC ---
             dragon_rank = "0"
+            target_path = '/app/data/hoard.json'
+
+            # Diagnostic logging
+            if not os.path.exists(target_path):
+                print(f"Diagnostic: Cannot find {target_path}")
+                if os.path.exists('/app/data'):
+                    print(f"Diagnostic: Folder /app/data exists. Contents: {os.listdir('/app/data')}")
+                else:
+                    print("Diagnostic: The folder /app/data does not exist at all.")
+            
             try:
-                # 1. Load the Draconova JSON file
-                # Ensure this path correctly points to where the other bot's data lives
-                data_path = '/app/data/hoard.json' 
-                
-                if os.path.exists(data_path):
-                    with open(data_path, 'r') as f:
+                if os.path.exists(target_path):
+                    with open(target_path, 'r') as f:
                         hoard_data = json.load(f)
 
-                    # 2. Sort all users by 'monthly' points from high to low
-                    # We use .get('monthly', 0) to handle users who might have no points
+                    # Sort by monthly points for the current season rank
                     sorted_list = sorted(
                         hoard_data.items(), 
                         key=lambda x: x[1].get('monthly', 0), 
                         reverse=True
                     )
 
-                    # 3. Find the member's rank in that list
-                    for i, (user_id, stats) in enumerate(sorted_list):
-                        if user_id == str(member.id):
+                    for i, (u_id, stats) in enumerate(sorted_list):
+                        if u_id == str(member.id):
                             dragon_rank = str(i + 1)
                             break
-                else:
-                    print(f"File Not Found: {data_path}")
-
             except Exception as e:
                 print(f"Ranking Error: {e}")
-
-                path = '/app/data/hoard.json'
-            if os.path.exists(path):
-                print("File exists! Checking readability...")
-                print(f"Readable: {os.access(path, os.R_OK)}")
-            else:
-                print(f"Still can't find {path}. Currently in: {os.getcwd()}")
-                print(f"Folder contents: {os.listdir('/app/data') if os.path.exists('/app/data') else 'Folder missing'}")
+            # --- END UPDATED LOGIC ---
 
             try:
                 if bg_url:
