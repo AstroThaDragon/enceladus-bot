@@ -49,40 +49,61 @@ class Leveling(commands.Cog):
         self.NO_XP_CATEGORIES = [593406939111751721, 593413698085978132]
 
         self.level_roles = {
-            100: 1296961266627121223, 50: 1296959776667730143, 45: 1296959689367617660, 40: 1296959665455890483, 35: 1296959633436708897, 30: 1296959584820264980, 
-            25: 1295861213695311935, 20: 1295861175388475463, 15: 1295861144996806726, 10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615
+            100: 1296961266627121223, 
+            95: 1501609710573453324, 
+            90: 1501609557804187781, 
+            85: 1501609375318675657, 
+            80: 1501609179566313522, 
+            75: 1501608976507211920, 
+            70: 1501608777613312020, 
+            65: 1501608443356643328, 
+            60: 1501608145582031000, 
+            55: 1501607815893094552, 
+            50: 1296959776667730143, 
+            45: 1296959689367617660, 
+            40: 1296959665455890483, 
+            35: 1296959633436708897, 
+            30: 1296959584820264980, 
+            25: 1295861213695311935, 
+            20: 1295861175388475463, 
+            15: 1295861144996806726, 
+            10: 1295861102483210260, 
+            5: 1295861061995597844, 
+            1: 1295860897532608615
         }
 
         self.cooldowns = {}
+
+    def get_xp_for_level(self, level):
+        """Calculates the total XP required to reach a specific level."""
+        if level <= 0: return 0
+        return 5 * (level**2) + 50 * level + 100
 
     async def _update_member_roles(self, member, new_level):
         """Helper function to manage roles and announcements for level-ups/manual sets."""
         guild = member.guild
         new_role_id = None
         
-        # Find the highest eligible role for the new level
         for lvl, rid in sorted(self.level_roles.items(), reverse=True):
             if new_level >= lvl:
                 new_role_id = rid
                 break
 
-        if new_role_id:
+        if new_role_id and new_role_id != 0:
             new_role = guild.get_role(new_role_id)
             if new_role and new_role not in member.roles:
                 await member.add_roles(new_role)
                 
-                # Announcement
                 announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
                 if announcement_channel:
                     await announcement_channel.send(
                         f"🌌 **Congratulations, {member.mention}!** "
-                        f"You've reached level {new_level} and earned the {new_role.name} role! Keep soaring through the ranks! 🚀"
+                        f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring through the ranks! 🚀"
                     )
 
-            # Cleanup old roles
             roles_to_remove = [
                 guild.get_role(rid) for lvl, rid in self.level_roles.items() 
-                if rid != new_role_id and guild.get_role(rid) in member.roles
+                if rid != new_role_id and rid != 0 and guild.get_role(rid) in member.roles
             ]
             if roles_to_remove:
                 await member.remove_roles(*[r for r in roles_to_remove if r])
@@ -113,7 +134,7 @@ class Leveling(commands.Cog):
                 if role_id != 0 and message.author.get_role(role_id):
                     starting_level = level
                     break 
-            xp, level = starting_level * 500, starting_level
+            xp, level = self.get_xp_for_level(starting_level), starting_level
             self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
         else:
             xp, level = result
@@ -123,7 +144,11 @@ class Leveling(commands.Cog):
             base_xp = int(base_xp * 1.15) 
         
         new_xp = xp + base_xp
-        new_level = new_xp // 500 
+        
+        temp_level = level
+        while new_xp >= self.get_xp_for_level(temp_level + 1):
+            temp_level += 1
+        new_level = temp_level
 
         if new_level > level:
             await self._update_member_roles(message.author, new_level)
@@ -146,19 +171,22 @@ class Leveling(commands.Cog):
                 return await ctx.send("This user hasn't earned any XP yet!")
 
             xp, level, bar_color, bg_url = result
-            xp_within_level = xp - (level * 500)
-            percentage = (xp_within_level / 500) * 100
+            
+            xp_start = self.get_xp_for_level(level)
+            xp_end = self.get_xp_for_level(level + 1)
+            xp_within_level = xp - xp_start
+            needed_for_level = xp_end - xp_start
+            percentage = (xp_within_level / needed_for_level) * 100
 
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
+                if rid == 0: continue
                 role = member.get_role(rid)
                 if role:
                     current_role_name = role.name
                     break
 
-            # --- API LOGIC FOR DRACONOVA RANK ---
             dragon_rank = "0"
-            # Replace the link below with your actual Draconova API link
             api_url = "https://draconova-production.up.railway.app/leaderboard" 
 
             try:
@@ -167,14 +195,12 @@ class Leveling(commands.Cog):
                     async with session.get(api_url, timeout=5) as response:
                         if response.status == 200:
                             data = await response.json()
-                            # Assuming the API returns a list of users sorted by points
                             for i, entry in enumerate(data):
                                 if str(entry.get('user_id')) == str(member.id):
                                     dragon_rank = str(i + 1)
                                     break
             except Exception as e:
                 print(f"Draconova API Fetch Error: {e}")
-            # --- END API LOGIC ---
 
             try:
                 if bg_url:
@@ -217,8 +243,7 @@ class Leveling(commands.Cog):
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
             if percentage > 0: background.bar((230, 185), max_width=600, height=35, percentage=percentage, fill=bar_color, radius=20)
 
-            next_level_total_xp = (level + 1) * 500
-            background.text((830, 155), f"{xp} / {next_level_total_xp} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+            background.text((830, 155), f"{xp} / {xp_end} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
         except Exception as e:
@@ -238,16 +263,19 @@ class Leveling(commands.Cog):
     @discord.app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
-        new_level = amount // 500
-        self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, amount, new_level))
+        temp_level = 0
+        while amount >= self.get_xp_for_level(temp_level + 1):
+            temp_level += 1
+        
+        self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, amount, temp_level))
         self.conn.commit()
-        await self._update_member_roles(member, new_level)
-        await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {new_level}).", ephemeral=True)
+        await self._update_member_roles(member, temp_level)
+        await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
 
     @discord.app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
-        new_xp = level * 500
+        new_xp = self.get_xp_for_level(level)
         self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, new_xp, level))
         self.conn.commit()
         await self._update_member_roles(member, level)
@@ -265,7 +293,7 @@ class Leveling(commands.Cog):
                 if role_id != 0 and member.get_role(role_id):
                     starting_level = level
                     break 
-            xp = starting_level * 500
+            xp = self.get_xp_for_level(starting_level)
             self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET xp = MAX(xp, excluded.xp), level = MAX(level, excluded.level)", (member.id, xp, starting_level))
             synced_count += 1
         self.conn.commit()
