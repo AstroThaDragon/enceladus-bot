@@ -87,7 +87,7 @@ class Fun(commands.Cog):
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
                     if response.status == 200:
@@ -138,7 +138,7 @@ class Fun(commands.Cog):
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod"
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
                     if response.status == 200:
@@ -171,7 +171,7 @@ class Fun(commands.Cog):
                     else:
                         await interaction.followup.send("The rhythm was interrupted (API Error). Try again!")
             except Exception:
-                await interaction.followup.send("Search timed out. The stars are a bit fuzzy right now!")
+                await interaction.followup.send("Search timed out.")
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
