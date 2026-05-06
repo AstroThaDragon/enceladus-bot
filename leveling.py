@@ -215,7 +215,7 @@ class Leveling(commands.Cog):
         self.conn.commit()
         await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {new_level}).", ephemeral=True)
 
-        @discord.app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
+    @discord.app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -249,7 +249,7 @@ class Leveling(commands.Cog):
         self.conn.commit()
         await interaction.followup.send(f"✅ Successfully synced XP for {synced_count} members!", ephemeral=True)
 
-        @discord.app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
+    @discord.app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
         new_xp = level * 500
@@ -260,7 +260,7 @@ class Leveling(commands.Cog):
         self.conn.commit()
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
 
-        @discord.app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
+    @discord.app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def reset(self, interaction: discord.Interaction, member: discord.Member):
         view = ResetConfirm(self, member)
