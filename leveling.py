@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands
 import sqlite3
@@ -154,18 +155,47 @@ class Leveling(commands.Cog):
             xp, level, bar_color, bg_url = result
             next_lvl_xp = (level + 1) * 500
             xp_within_level = xp - (level * 500)
-            
+            xp_needed = 500 - xp_within_level
+
+            # --- NEW: Get Rank Title from highest level role ---
+            current_role_name = "No Rank"
+            for lvl, rid in sorted(self.level_roles.items(), reverse=True):
+                role = member.get_role(rid)
+                if role:
+                    current_role_name = role.name
+                    break
+
+            # --- NEW: Peek at Draconova Data ---
+            dragon_rank = "Unranked"
+            try:
+                d_conn = sqlite3.connect('/app/data/draconova.db')
+                d_curr = d_conn.cursor()
+                d_curr.execute("""
+                    SELECT pos FROM (
+                        SELECT user_id, RANK() OVER (ORDER BY catches DESC) as pos 
+                        FROM dragon_stats
+                    ) WHERE user_id = ?""", (member.id,))
+                d_res = d_curr.fetchone()
+                if d_res:
+                    dragon_rank = f"#{d_res[0]}"
+                d_conn.close()
+            except:
+                pass 
+
             # 1. Create Background
             try:
                 if bg_url:
                     bg_image = await load_image_async(bg_url)
                     background = Editor(bg_image).resize((900, 270))
+                elif os.path.exists("images/rank_template.png"):
+                    background = Editor("images/rank_template.png")
                 else:
+                    # FALLBACK: Solid color so you can see text placement
                     background = Editor(Canvas((900, 270), color="#23272a"))
             except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
 
-            # 2. Draw Avatar (Forced to PNG for stability)
+            # 2. Draw Avatar
             avatar_url = member.display_avatar.replace(format="png", size=256).url
             avatar_image = await load_image_async(avatar_url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
@@ -173,19 +203,43 @@ class Leveling(commands.Cog):
             
             # 3. Text and Progress Bar
             font_large = Font("fonts/Poppins-Bold.ttf", size=40)
-            font_small = Font("fonts/Poppins-Regular.ttf", size=30)
+            font_small = Font("fonts/Poppins-Regular.ttf", size=25)
+            font_tiny = Font("fonts/Poppins-Regular.ttf", size=20)
 
-            background.text((230, 50), f"{member.name}", font=font_large, color="white")
-            background.text((230, 120), f"Level: {level}   XP: {xp}/{next_lvl_xp}", font=font_small, color="white")
+            background.text((230, 40), f"{member.name}", font=font_large, color="white")
+            background.text((230, 90), f"Rank: {current_role_name}", font=font_small, color="#aaaaaa")
+            background.text((230, 130), f"Level: {level} | Dragon Rank: {dragon_rank}", font=font_small, color="white")
             
-            # Percentage calculation based on your 500xp-per-level rule
+            # XP remaining text
+            background.text((830, 145), f"{xp_needed} XP to next level", font=font_tiny, color="white", align="right")
+            
+            # Percentage calculation
             percentage = (xp_within_level / 500) * 100
             background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, outline="#484b4e")
 
+            # --- NEW: Safe Icon Logic ---
+            special_roles = {
+                1496031062218772510: "icons/starborn.png", 
+                1500011207929892884: "icons/dragon_champion.png",
+                1500010986835542138: "icons/dragon_lord.png"
+            }
+
+            icon_x = 230
+            for role_id, icon_path in special_roles.items():
+                if member.get_role(role_id):
+                    # Only try to paste if the file actually exists in your repo
+                    if os.path.exists(icon_path):
+                        try:
+                            icon = Editor(icon_path).resize((35, 35))
+                            background.paste(icon, (icon_x, 225))
+                            icon_x += 45 
+                        except:
+                            continue
+
             file = discord.File(fp=background.image_bytes, filename="rank.png")
             await ctx.send(file=file)
+            
         except Exception as e:
-            # This will force the error into your Railway logs if it crashes
             print(f"Error generating rank card: {e}")
             await ctx.send("There was an error generating the rank card. Check logs.")
 
