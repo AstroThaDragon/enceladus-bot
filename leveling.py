@@ -5,11 +5,29 @@ import random
 import time
 from easy_pil import Editor, Canvas, Font, load_image_async
 
+class ResetConfirm(discord.ui.View):
+    def __init__(self, cog, member):
+        super().__init__(timeout=30)
+        self.cog = cog
+        self.member = member
+
+    @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.cog.cursor.execute("DELETE FROM users WHERE user_id = ?", (self.member.id,))
+        self.cog.conn.commit()
+        await interaction.response.edit_message(content=f"♻️ **{self.member.name}** has been reset to Level 0.", view=None)
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="❌ Reset cancelled.", view=None)
+        self.stop()
+
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         # 1. Added timeout=10 to prevent the "Silent Freeze"
-        self.conn = sqlite3.connect('/data/levels.db', timeout=10)
+        self.conn = sqlite3.connect('/app/data/levels.db', timeout=10)
         self.cursor = self.conn.cursor()
         
         # 2. Optimization: Helps with concurrent reads/writes on Railway volumes
@@ -196,6 +214,61 @@ class Leveling(commands.Cog):
         self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, amount, new_level))
         self.conn.commit()
         await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {new_level}).", ephemeral=True)
+
+        @discord.app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
+    @commands.has_permissions(administrator=True)
+    async def sync_levels(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        synced_count = 0
+        # Iterate through every member the bot can see in the server
+        for member in interaction.guild.members:
+            if member.bot:
+                continue
+
+            # Determine starting level based on roles (same logic as on_message)
+            starting_level = 0
+            for level, role_id in sorted(self.level_roles.items(), reverse=True):
+                if role_id != 0 and member.get_role(role_id):
+                    starting_level = level
+                    break 
+            
+            # Calculate XP (Level * 500)
+            xp = starting_level * 500
+            
+            # Upsert into database (Insert if new, update if exists)
+            self.cursor.execute("""
+                INSERT INTO users (user_id, xp, level) 
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                xp = MAX(xp, excluded.xp),
+                level = MAX(level, excluded.level)
+            """, (member.id, xp, starting_level))
+            synced_count += 1
+
+        self.conn.commit()
+        await interaction.followup.send(f"✅ Successfully synced XP for {synced_count} members!", ephemeral=True)
+
+        @discord.app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
+    @commands.has_permissions(administrator=True)
+    async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
+        new_xp = level * 500
+        self.cursor.execute("""
+            INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET xp = ?, level = ?
+        """, (member.id, new_xp, level, new_xp, level))
+        self.conn.commit()
+        await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
+
+        @discord.app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
+    @commands.has_permissions(administrator=True)
+    async def reset(self, interaction: discord.Interaction, member: discord.Member):
+        view = ResetConfirm(self, member)
+        await interaction.response.send_message(
+            content=f"⚠️ Are you sure you want to reset all data for **{member.mention}**? This cannot be undone.",
+            view=view,
+            ephemeral=True
+        )
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))
