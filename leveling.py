@@ -156,33 +156,36 @@ class Leveling(commands.Cog):
                     current_role_name = role.name
                     break
 
-            # --- UPDATED DRACONOVA RANKING LOGIC (DB VERSION) ---
+            # --- UPDATED INVESTIGATOR LOGIC ---
             dragon_rank = "0"
             db_path = '/app/data/draconova.db'
 
             if os.path.exists(db_path):
                 try:
-                    # Connect to the Draconova database to find the rank
                     d_conn = sqlite3.connect(db_path)
                     d_curr = d_conn.cursor()
                     
-                    # Sorting by monthly_points to determine position
-                    d_curr.execute("SELECT user_id FROM hoard ORDER BY monthly_points DESC")
-                    rows = d_curr.fetchall()
+                    # This line checks what tables actually exist in Draconova's DB
+                    d_curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                    tables = d_curr.fetchall()
+                    print(f"Investigator: Tables found in draconova.db: {tables}")
                     
-                    for i, (u_id,) in enumerate(rows):
-                        if u_id == member.id:
-                            dragon_rank = str(i + 1)
-                            break
+                    # We will try 'users' as a common alternative to 'hoard'
+                    # If this fails, the print statement above will tell us the real name!
+                    try:
+                        d_curr.execute("SELECT user_id FROM users ORDER BY monthly_points DESC")
+                        rows = d_curr.fetchall()
+                        for i, (u_id,) in enumerate(rows):
+                            if u_id == member.id:
+                                dragon_rank = str(i + 1)
+                                break
+                    except:
+                        pass
+                        
                     d_conn.close()
                 except Exception as e:
                     print(f"Draconova DB Ranking Error: {e}")
-            else:
-                # Keep your diagnostic logging if the DB isn't found
-                print(f"Diagnostic: Cannot find {db_path}")
-                if os.path.exists('/app/data'):
-                    print(f"Diagnostic: Contents: {os.listdir('/app/data')}")
-            # --- END UPDATED LOGIC ---
+            # --- END INVESTIGATOR LOGIC ---
 
             try:
                 if bg_url:
