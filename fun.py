@@ -87,49 +87,50 @@ class Fun(commands.Cog):
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(search_url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    
-                    if not data.get('aResults'):
-                        await interaction.followup.send(f"Skrrrrp. I couldn't find any mods for '{search_query}'. Maybe try a different name?")
-                        return
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+            try:
+                async with session.get(search_url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        if not data.get('aResults'):
+                            await interaction.followup.send(f"Skrrrrp. I couldn't find any mods for '{search_query}'. Maybe try a different name?")
+                            return
 
-                    # Filter for FNF Game ID (8694)
-                    best_match = None
-                    for result in data['aResults']:
-                        if result.get('_idGameRow') == 8694:
-                            best_match = result
-                            break
-                    
-                    if not best_match:
-                        best_match = data['aResults'][0]
+                        best_match = None
+                        for result in data['aResults']:
+                            if result.get('_idGameRow') == 8694:
+                                best_match = result
+                                break
+                        
+                        if not best_match:
+                            best_match = data['aResults'][0]
 
-                    mod_id = best_match['_idRow']
-                    mod_name = best_match['_sName']
-                    mod_url = f"https://gamebanana.com/mods/{mod_id}"
-                    
-                    view = discord.ui.View()
-                    button = discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤")
-                    view.add_item(button)
+                        mod_id = best_match['_idRow']
+                        mod_name = best_match['_sName']
+                        mod_url = f"https://gamebanana.com/mods/{mod_id}"
+                        
+                        view = discord.ui.View()
+                        button = discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤")
+                        view.add_item(button)
 
-                    embed = discord.Embed(
-                        title=f"🎤 Mod Found: {mod_name}",
-                        description=f"Beep! I've found a match for your search! Click the button below to see files, credits, and more!",
-                        color=discord.Color.from_rgb(255, 0, 77)
-                    )
-                    
-                    if '_aPreviewMedia' in best_match:
-                        img_data = best_match['_aPreviewMedia']['_aImages'][0]
-                        img_url = f"{img_data['_sBaseUrl']}/{img_data['_sFile']}"
-                        embed.set_image(url=img_url)
+                        embed = discord.Embed(
+                            title=f"🎤 Mod Found: {mod_name}",
+                            description=f"Beep! I've found a match for your search! Click the button below to see files, credits, and more!",
+                            color=discord.Color.from_rgb(255, 0, 77)
+                        )
+                        
+                        if '_aPreviewMedia' in best_match:
+                            img_data = best_match['_aPreviewMedia']['_aImages'][0]
+                            img_url = f"{img_data['_sBaseUrl']}/{img_data['_sFile']}"
+                            embed.set_image(url=img_url)
 
-                    embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
-                    
-                    await interaction.followup.send(embed=embed, view=view)
-                else:
-                    await interaction.followup.send("The rap battle stage is currently closed. Try again later!")
+                        embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
+                        await interaction.followup.send(embed=embed, view=view)
+                    else:
+                        await interaction.followup.send("GameBanana is acting up. Try again in a bit!")
+            except Exception:
+                await interaction.followup.send("The connection to the mod vault timed out. Try again!")
 
     @app_commands.command(name="fnfsong", description="Get info on a specific FNF song!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
@@ -137,47 +138,46 @@ class Fun(commands.Cog):
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(search_url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    
-                    if not data.get('aResults'):
-                        await interaction.followup.send(f"Skrrrrp. I couldn't find a song or mod for '{song_name}'! Maybe try a different name?")
-                        return
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+            try:
+                async with session.get(search_url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        if not data.get('aResults'):
+                            await interaction.followup.send(f"Skrrrrp. I couldn't find a song or mod for '{song_name}'! Maybe try a different name?")
+                            return
 
-                    # Filter for FNF Game ID (8694)
-                    result = None
-                    for item in data['aResults']:
-                        if item.get('_idGameRow') == 8694:
-                            result = item
-                            break
-                    
-                    if not result:
-                        result = data['aResults'][0]
+                        result = None
+                        for item in data['aResults']:
+                            if item.get('_idGameRow') == 8694:
+                                result = item
+                                break
+                        
+                        if not result:
+                            result = data['aResults'][0]
 
-                    name = result['_sName']
-                    res_id = result['_idRow']
-                    
-                    embed = discord.Embed(
-                        title=f"🎵 Song/Mod Info: {name}",
-                        description=f"Beep! I've found a match for **{song_name}**! Check out the details here!:",
-                        color=discord.Color.from_rgb(255, 0, 77)
-                    )
-                    embed.add_field(name="Link", value=f"https://gamebanana.com/mods/{res_id}")
-                    embed.set_footer(text="Keep the rhythm going! 🎶")
-                    
-                    await interaction.followup.send(embed=embed)
+                        name = result['_sName']
+                        res_id = result['_idRow']
+                        
+                        embed = discord.Embed(
+                            title=f"🎵 Song/Mod Info: {name}",
+                            description=f"Beep! I've found a match for **{song_name}**! Check out the details here!:",
+                            color=discord.Color.from_rgb(255, 0, 77)
+                        )
+                        embed.add_field(name="Link", value=f"https://gamebanana.com/mods/{res_id}")
+                        embed.set_footer(text="Keep the rhythm going! 🎶")
+                        await interaction.followup.send(embed=embed)
+                    else:
+                        await interaction.followup.send("The rhythm was interrupted (API Error). Try again!")
+            except Exception:
+                await interaction.followup.send("Search timed out. The stars are a bit fuzzy right now!")
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
     async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
-        # This line makes it optional. If 'channel' is None, it uses interaction.channel.
         target_channel = channel or interaction.channel
-        
         await target_channel.send(message)
-        
-        # Confirms it worked only to you, so the 'magic' isn't ruined for others
         await interaction.response.send_message(f"Echoed into {target_channel.mention}", ephemeral=True)
 
 async def setup(bot: commands.Bot):
