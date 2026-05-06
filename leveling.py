@@ -5,6 +5,7 @@ import sqlite3
 import random
 import time
 from easy_pil import Editor, Canvas, Font, load_image_async
+import json
 
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member):
@@ -157,15 +158,32 @@ class Leveling(commands.Cog):
 
             dragon_rank = "0"
             try:
-                # Linking to Draconova's catching leaderboard
-                d_conn = sqlite3.connect('/app/data/draconova.db')
-                d_curr = d_conn.cursor()
-                # Query to find member's rank position based on total catches
-                d_curr.execute("SELECT pos FROM (SELECT user_id, RANK() OVER (ORDER BY catches DESC) as pos FROM dragon_stats) WHERE user_id = ?", (member.id,))
-                d_res = d_curr.fetchone()
-                if d_res: dragon_rank = str(d_res[0])
-                d_conn.close()
-            except: pass 
+                # 1. Load the Draconova JSON file
+                # Ensure this path correctly points to where the other bot's data lives
+                data_path = '/app/data/hoard.json' 
+                
+                if os.path.exists(data_path):
+                    with open(data_path, 'r') as f:
+                        hoard_data = json.load(f)
+
+                    # 2. Sort all users by 'monthly' points from high to low
+                    # We use .get('monthly', 0) to handle users who might have no points
+                    sorted_list = sorted(
+                        hoard_data.items(), 
+                        key=lambda x: x[1].get('monthly', 0), 
+                        reverse=True
+                    )
+
+                    # 3. Find the member's rank in that list
+                    for i, (user_id, stats) in enumerate(sorted_list):
+                        if user_id == str(member.id):
+                            dragon_rank = str(i + 1)
+                            break
+                else:
+                    print(f"File Not Found: {data_path}")
+
+            except Exception as e:
+                print(f"Ranking Error: {e}")
 
             try:
                 if bg_url:
