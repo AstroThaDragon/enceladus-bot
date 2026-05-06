@@ -76,7 +76,7 @@ class Leveling(commands.Cog):
                 if announcement_channel:
                     await announcement_channel.send(
                         f"🌌 **Congratulations, {member.mention}!** "
-                        f"You've reached Level {new_level} and earned the {new_role.mention} role!"
+                        f"You've reached level {new_level} and earned the {new_role.name} role! Keep soaring through the ranks! 🚀"
                     )
 
             # Cleanup old roles
