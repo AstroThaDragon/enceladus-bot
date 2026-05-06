@@ -185,6 +185,14 @@ class Leveling(commands.Cog):
             except Exception as e:
                 print(f"Ranking Error: {e}")
 
+                path = '/app/data/hoard.json'
+            if os.path.exists(path):
+                print("File exists! Checking readability...")
+                print(f"Readable: {os.access(path, os.R_OK)}")
+            else:
+                print(f"Still can't find {path}. Currently in: {os.getcwd()}")
+                print(f"Folder contents: {os.listdir('/app/data') if os.path.exists('/app/data') else 'Folder missing'}")
+
             try:
                 if bg_url:
                     bg_image = await load_image_async(bg_url)
