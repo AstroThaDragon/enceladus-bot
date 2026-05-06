@@ -145,7 +145,6 @@ class Leveling(commands.Cog):
         member = member or ctx.author
         
         try:
-            # Use the cursor from your class
             self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
             result = self.cursor.fetchone()
             
@@ -192,69 +191,60 @@ class Leveling(commands.Cog):
             except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
 
-            # --- 3. The "Scrim" (Transparent Box) ---
-            scrim = Editor(Canvas((680, 200), color=(0, 0, 0, 153)))
-            background.paste(scrim, (210, 35))
-
-            # --- 4. Draw Avatar ---
+            # --- 3. Draw Avatar ---
             avatar_url = member.display_avatar.replace(format="png", size=256).url
             avatar_image = await load_image_async(avatar_url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
             background.paste(avatar, (50, 60))
             
-            # --- 5. Fonts ---
+            # --- 4. Fonts ---
             font_large = Font("fonts/Poppins-Bold.ttf", size=45)
             font_medium = Font("fonts/Poppins-Bold.ttf", size=32)
             font_small = Font("fonts/Poppins-Regular.ttf", size=22)
+            font_tiny = Font("fonts/Poppins-Regular.ttf", size=18)
 
-            # --- 6. Stats Placement ---
-            # Rank & Level (Big numbers like the reference)
-            background.text((550, 50), "Rank", font=font_small, color="white")
-            background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white")
+            # --- 5. Text Drawing with Outlines ---
+            # Define stroke settings for readability on any background
+            st_col = (0, 0, 0) # Black outline
+            st_width = 2       # Outline thickness
+
+            # Rank & Level (Top Right)
+            background.text((550, 50), "Rank", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
+            background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white", stroke_width=st_width, stroke_fill=st_col)
             
-            background.text((750, 50), "Level", font=font_small, color="#a97dd1") # Light purple
-            background.text((820, 42), f"{level}", font=font_large, color="#a97dd1")
+            background.text((750, 50), "Level", font=font_small, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
+            background.text((820, 42), f"{level}", font=font_large, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
 
-            # Name and Role
-            background.text((230, 130), f"{member.name}", font=font_medium, color="white")
-            background.text((230, 95), f"{current_role_name}", font=font_small, color="#aaaaaa")
+            # Name and Role Title
+            background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
+            background.text((230, 95), f"{current_role_name}", font=font_small, color="#aaaaaa", stroke_width=st_width, stroke_fill=st_col)
 
-            # --- 7. The Progress Bar (Rounded & Showing Empty bit) ---
-            # Draw the background of the bar (the "empty" bit)
-            background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
-            
-            # Draw the actual progress
-            if percentage > 0:
-                # We use a nested bar or rectangle with radius for that rounded look
-                background.bar(
-                    (230, 185), 
-                    max_width=600, 
-                    height=35, 
-                    percentage=percentage, 
-                    fill=bar_color, 
-                    radius=20
-                )
-
-            # XP Text (Top right of the bar)
-            background.text((830, 155), f"{xp_within_level} / 500 XP", font=font_small, color="white", align="right")
-
-            # --- 8. Special Role Icons (Top Right) ---
+            # --- 6. Special Role Icons (Above the Role Title) ---
             special_roles = {
                 1496031062218772510: "icons/starborn.png", 
                 1500011207929892884: "icons/dragon_champion.png",
                 1500010986835542138: "icons/dragon_lord.png"
             }
 
-            icon_x = 450 # Placing these more toward the center-top
+            icon_x = 230 # Start icons aligned with the text
             for role_id, icon_path in special_roles.items():
                 if member.get_role(role_id):
                     if os.path.exists(icon_path):
                         try:
-                            icon = Editor(icon_path).resize((40, 40))
-                            background.paste(icon, (icon_x, 50))
-                            icon_x -= 50 
+                            # Placed at y=55 so they sit above the role title at y=95
+                            icon = Editor(icon_path).resize((35, 35))
+                            background.paste(icon, (icon_x, 55))
+                            icon_x += 40 
                         except:
                             continue
+
+            # --- 7. The Progress Bar ---
+            background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
+            if percentage > 0:
+                background.bar((230, 185), max_width=600, height=35, percentage=percentage, fill=bar_color, radius=20)
+
+            # XP Text (With outline)
+            background.text((830, 155), f"{xp_within_level} / 500 XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             file = discord.File(fp=background.image_bytes, filename="rank.png")
             await ctx.send(file=file)
