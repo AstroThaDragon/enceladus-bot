@@ -139,7 +139,7 @@ class Leveling(commands.Cog):
 
         self.conn.commit()
 
-@commands.hybrid_command(name="rank", description="Check your or another member's level!")
+    @commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
         await ctx.defer() 
         member = member or ctx.author
