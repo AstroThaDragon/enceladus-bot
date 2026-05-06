@@ -11,6 +11,7 @@ from discord import app_commands
 import aiohttp
 import asyncio
 import re
+import sqlite3 # Added for persistence
 from datetime import datetime, time, timezone, timedelta
 
 load_dotenv()
@@ -24,11 +25,19 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
-bump_timer_active = False
+DB_PATH = "levels.db" # Database where timers are stored
 
 # Anti-double message protection
 recent_joins = set()
 recent_leaves = set()
+
+# --- DATABASE INITIALIZATION ---
+def init_bump_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS bump_timer (id INTEGER PRIMARY KEY, remind_at TEXT, channel_id INTEGER)")
+    conn.commit()
+    conn.close()
 
 # --- STATUS ROTATOR SETUP ---
 status_list = [
@@ -48,6 +57,37 @@ async def change_status():
     new_status = random.choice(status_list)
     await bot.change_presence(activity=discord.CustomActivity(name=new_status))
 
+# --- BUMP PERSISTENCE LOOP ---
+@tasks.loop(minutes=1)
+async def check_bump_timer():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT remind_at, channel_id FROM bump_timer WHERE id = 1")
+    row = cursor.fetchone()
+    
+    if row:
+        remind_at = datetime.fromisoformat(row[0])
+        # Compare current time (UTC) to saved time
+        if datetime.now(timezone.utc) >= remind_at:
+            channel = bot.get_channel(row[1])
+            if channel:
+                bump_role_id = "1295212860720418887"
+                reminder_embed = discord.Embed(
+                    description=(
+                        f"*Sniffsniff..*\n\n"
+                        f"*Sniff!!*\n"
+                        f"It's time to bump once again! Please bump our server by typing /bump! "
+                        f"It helps us a lot by gaining more members! <a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> <a:PurpleHearts:1109768355390431323>"
+                    ),
+                    color=discord.Color.from_rgb(114, 0, 225)
+                )
+                await channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
+            
+            # Clean up the database once the reminder is sent
+            cursor.execute("DELETE FROM bump_timer WHERE id = 1")
+            conn.commit()
+    conn.close()
+
 # --- STARGAZING ALERTS SETUP ---
 edt = timezone(timedelta(hours=-4))
 scheduled_time = time(hour=12, minute=0, tzinfo=edt)
@@ -58,30 +98,29 @@ async def stargazing_alert():
     channel = bot.get_channel(channel_id)
     
     if channel:
-        url = "https://api.spaceflightnewsapi.net/v4/articles/?limit=1"
+        # This URL converts the "In-The-Sky" event feed into JSON for your bot
+        url = "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fin-the-sky.org%2Frss.php%3Ffeed%3Dupcoming"
         
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
-                        article = data['results'][0]
-                        title = article['title']
-                        summary = article['summary']
-                        img_url = article['image_url']
-                        site = article['news_site']
-                        article_url = article['url']
-                        
-                        if len(summary) > 200:
-                            summary = summary[:197] + "..."
+                        # Get the most recent upcoming event
+                        item = data['items'][0]
+                        title = item['title']
+                        link = item['link']
+                        # The description often has HTML, this clean-up helps
+                        description = re.sub('<[^<]+?>', '', item['description'])[:300] + "..."
 
                         embed = discord.Embed(
-                            title="🔭 Daily Stargazing & Space Update",
-                            description=f"**{title}**\n\n{summary}\n\n🔗 [Read Full Article]({article_url})",
-                            color=discord.Color.gold()
+                            title="🌌 🔭 Tonight's Cosmic Event!",
+                            description=f"**{title}**\n\n{description}\n\n🔗 [View Event Details]({link})",
+                            color=discord.Color.dark_purple()
                         )
-                        embed.set_image(url=img_url)
-                        embed.set_footer(text=f"Source: {site} | Helping the Lair look up! ✨")
+                        # Space-themed thumbnail
+                        embed.set_thumbnail(url="https://i.imgur.com/83S8Z6H.png")
+                        embed.set_footer(text="Source: In-The-Sky.org | Keep looking up, Stargazers! 🔭")
                         
                         await channel.send(embed=embed)
         except Exception as e:
@@ -91,6 +130,7 @@ async def stargazing_alert():
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
+    init_bump_db() # Ensure bump table exists
     
     try:
         await bot.tree.sync()
@@ -102,12 +142,14 @@ async def on_ready():
         
     if not stargazing_alert.is_running():
         stargazing_alert.start()
+
+    if not check_bump_timer.is_running():
+        check_bump_timer.start()
         
-    print("Status rotator and Stargazing alerts are now active!")
+    print("Status rotator, Stargazing alerts, and Bump Persistence are now active!")
 
 @bot.event
 async def on_message(message):
-    global bump_timer_active
     if message.author == bot.user:
         return
 
@@ -133,14 +175,10 @@ async def on_message(message):
             await message.channel.send(content)
             return 
 
-    # --- 2. DISBOARD BUMP LOGIC ---
+    # --- 2. DISBOARD BUMP LOGIC (Updated for Persistence) ---
     if message.author.id == 302050872383242240:
         await asyncio.sleep(2)
         if message.embeds and "Bump done!" in (message.embeds[0].description or ""):
-            if bump_timer_active:
-                return
-            bump_timer_active = True
-            
             description = message.embeds[0].description
             user_mention = ""
             if "<@" in description:
@@ -160,20 +198,14 @@ async def on_message(message):
             )
             await message.channel.send(thanks_text)
             
-            await asyncio.sleep(7200) # Wait 2 hours
-            
-            bump_role_id = "1295212860720418887"
-            reminder_embed = discord.Embed(
-                description=(
-                    f"*Sniffsniff..*\n\n"
-                    f"*Sniff!!*\n"
-                    f"It's time to bump once again! Please bump our server by typing /bump! "
-                    f"It helps us a lot by gaining more members! <a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> <a:PurpleHearts:1109768355390431323>"
-                ),
-                color=discord.Color.from_rgb(114, 0, 225)
-            )
-            await message.channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
-            bump_timer_active = False
+            # Save the reminder time (2 hours from now) to the database
+            remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)", 
+                           (remind_time, message.channel.id))
+            conn.commit()
+            conn.close()
 
     await bot.process_commands(message)
 
@@ -447,9 +479,12 @@ async def qr(ctx, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def resetbump(ctx):
-    global bump_timer_active
-    bump_timer_active = False
-    await ctx.send("Bump timer safety has been reset! 🔄")
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bump_timer WHERE id = 1")
+    conn.commit()
+    conn.close()
+    await ctx.send("Bump timer has been cleared from the database! 🔄")
 
 async def load_extensions():
     # This tells the bot to load your new leveling.py file
