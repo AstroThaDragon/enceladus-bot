@@ -86,96 +86,90 @@ class Fun(commands.Cog):
         await interaction.response.defer()
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
-        # This header tells GameBanana who is calling, which prevents many blocks
-        headers = {"User-Agent": "EnceladusBot/1.0 (DiscordBot; 18+ Community)"}
+        
+        # Upgraded headers to look like a standard Windows Chrome browser
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
 
         async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
-                    if response.status == 200:
+                    # Check if we actually got JSON back
+                    if response.status == 200 and "application/json" in response.headers.get("Content-Type", ""):
                         data = await response.json()
                         
                         if not data.get('aResults'):
-                            await interaction.followup.send(f"Skrrrrp. I couldn't find any mods for '{search_query}'. Maybe try a different name?")
+                            await interaction.followup.send(f"Skrrrrp. I couldn't find any mods for '{search_query}'.")
                             return
 
-                        best_match = None
-                        for result in data['aResults']:
-                            if result.get('_idGameRow') == 8694:
-                                best_match = result
-                                break
-                        
-                        if not best_match:
-                            best_match = data['aResults'][0]
+                        # Filter for FNF ID (8694)
+                        results = data.get('aResults', [])
+                        best_match = next((res for res in results if res.get('_idGameRow') == 8694), results[0])
 
                         mod_id = best_match['_idRow']
                         mod_name = best_match['_sName']
                         mod_url = f"https://gamebanana.com/mods/{mod_id}"
                         
                         view = discord.ui.View()
-                        button = discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤")
-                        view.add_item(button)
+                        view.add_item(discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤"))
 
                         embed = discord.Embed(
                             title=f"🎤 Mod Found: {mod_name}",
-                            description=f"Beep! I've found a match for your search! Click the button below to see files, credits, and more!",
+                            description=f"Beep! I've found a match! Click the button below to see more.",
                             color=discord.Color.from_rgb(255, 0, 77)
                         )
                         
                         if '_aPreviewMedia' in best_match:
                             img_data = best_match['_aPreviewMedia']['_aImages'][0]
-                            img_url = f"{img_data['_sBaseUrl']}/{img_data['_sFile']}"
-                            embed.set_image(url=img_url)
+                            embed.set_image(url=f"{img_data['_sBaseUrl']}/{img_data['_sFile']}")
 
-                        embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
                         await interaction.followup.send(embed=embed, view=view)
                     else:
-                        await interaction.followup.send(f"GameBanana returned an error ({response.status}). The stage is closed!")
+                        # If we get HTML instead of JSON, it means we're being blocked
+                        await interaction.followup.send("GameBanana is blocking the connection. They think I'm a bot! Try again in a few minutes.")
             except Exception as e:
-                # This will now tell you the EXACT error in Discord if it fails again
-                await interaction.followup.send(f"The connection to the mod vault timed out or failed. Error: {e}")
+                await interaction.followup.send(f"The connection failed. Error: {e}")
 
     @app_commands.command(name="fnfsong", description="Get info on a specific FNF song!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
         await interaction.response.defer()
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod"
-        headers = {"User-Agent": "EnceladusBot/1.0 (DiscordBot; 18+ Community)"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+        }
 
         async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
-                    if response.status == 200:
+                    if response.status == 200 and "application/json" in response.headers.get("Content-Type", ""):
                         data = await response.json()
                         
                         if not data.get('aResults'):
-                            await interaction.followup.send(f"Skrrrrp. I couldn't find a song or mod for '{song_name}'! Maybe try a different name?")
+                            await interaction.followup.send(f"Skrrrrp. I couldn't find anything for '{song_name}'.")
                             return
 
-                        result = None
-                        for item in data['aResults']:
-                            if item.get('_idGameRow') == 8694:
-                                result = item
-                                break
-                        
-                        if not result:
-                            result = data['aResults'][0]
+                        results = data.get('aResults', [])
+                        result = next((res for res in results if res.get('_idGameRow') == 8694), results[0])
 
                         name = result['_sName']
                         res_id = result['_idRow']
                         
                         embed = discord.Embed(
                             title=f"🎵 Song/Mod Info: {name}",
-                            description=f"Beep! I've found a match for **{song_name}**! Check out the details here!:",
+                            description=f"Beep! Found a match for **{song_name}**!",
                             color=discord.Color.from_rgb(255, 0, 77)
                         )
                         embed.add_field(name="Link", value=f"https://gamebanana.com/mods/{res_id}")
-                        embed.set_footer(text="Keep the rhythm going! 🎶")
                         await interaction.followup.send(embed=embed)
                     else:
-                        await interaction.followup.send(f"The rhythm was interrupted (Error {response.status}). Try again!")
+                        await interaction.followup.send("I'm being blocked by the mod vault's security. Try again later!")
             except Exception as e:
-                await interaction.followup.send(f"Search timed out or failed. Error: {e}")
+                await interaction.followup.send(f"Search failed. Error: {e}")
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
