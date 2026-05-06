@@ -287,5 +287,22 @@ class Leveling(commands.Cog):
     async def reset(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(content=f"⚠️ Reset all data for **{member.mention}**?", view=ResetConfirm(self, member), ephemeral=True)
 
+    @commands.hybrid_command(name="find_data", description="Search for the hidden data files")
+    @commands.has_permissions(administrator=True)
+    async def find_data(self, ctx):
+        await ctx.defer(ephemeral=True)
+        found_files = []
+        # This looks through every folder the bot can see
+        for root, dirs, files in os.walk('/'):
+            for file in files:
+                if file.endswith(".db") or file.endswith(".json"):
+                    # Ignore standard system files
+                    if "lib" not in root and "usr" not in root:
+                        found_files.append(os.path.join(root, file))
+        
+        result = "\n".join(found_files) if found_files else "No files found."
+        print(f"File Search Results:\n{result}")
+        await ctx.send(f"Check logs! Found {len(found_files)} potential data files.", ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(Leveling(bot))
