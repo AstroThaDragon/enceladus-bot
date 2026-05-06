@@ -85,7 +85,7 @@ class Fun(commands.Cog):
     async def fnfmod(self, interaction: discord.Interaction, search_query: str):
             await interaction.response.defer()
             
-            search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod&_aFilters[Generic_Game]=8694"
+            search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(search_url) as response:
@@ -126,7 +126,7 @@ class Fun(commands.Cog):
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
         await interaction.response.defer()
         
-        search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod&_aFilters[Generic_Game]=8694"
+        search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(search_url) as response:
@@ -134,7 +134,7 @@ class Fun(commands.Cog):
                     data = await response.json()
                     
                     if not data.get('aResults'):
-                        await interaction.followup.send(f"Skrrrrp. I couldn't find a song or mod for '{song_name}'! Maybe try a different name?")
+                        await interaction.followup.send(f"Skrrrrp. I couldn't find a son    g or mod for '{song_name}'! Maybe try a different name?")
                         return
 
                     result = data['aResults'][0]
