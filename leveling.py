@@ -215,9 +215,9 @@ class Leveling(commands.Cog):
             background.text((750, 50), "Level", font=font_small, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
             background.text((820, 42), f"{level}", font=font_large, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
 
-            # Name and Role Title
+            # Name and Role Title (Role color brightened to #d3d3d3)
             background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
-            background.text((230, 95), f"{current_role_name}", font=font_small, color="#aaaaaa", stroke_width=st_width, stroke_fill=st_col)
+            background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
             # --- 6. Special Role Icons (Above the Role Title) ---
             special_roles = {
@@ -243,8 +243,9 @@ class Leveling(commands.Cog):
             if percentage > 0:
                 background.bar((230, 185), max_width=600, height=35, percentage=percentage, fill=bar_color, radius=20)
 
-            # XP Text (With outline)
-            background.text((830, 155), f"{xp_within_level} / 500 XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+            # XP Text (Updated to show Total / Next Level Total)
+            next_level_total_xp = (level + 1) * 500
+            background.text((830, 155), f"{xp} / {next_level_total_xp} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             file = discord.File(fp=background.image_bytes, filename="rank.png")
             await ctx.send(file=file)
