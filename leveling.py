@@ -156,36 +156,25 @@ class Leveling(commands.Cog):
                     current_role_name = role.name
                     break
 
-            # --- UPDATED INVESTIGATOR LOGIC ---
+            # --- API LOGIC FOR DRACONOVA RANK ---
             dragon_rank = "0"
-            db_path = '/app/data/draconova.db'
+            # Replace the link below with your actual Draconova API link
+            api_url = "https://draconova-production.up.railway.app/leaderboard" 
 
-            if os.path.exists(db_path):
-                try:
-                    d_conn = sqlite3.connect(db_path)
-                    d_curr = d_conn.cursor()
-                    
-                    # This line checks what tables actually exist in Draconova's DB
-                    d_curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                    tables = d_curr.fetchall()
-                    print(f"Investigator: Tables found in draconova.db: {tables}")
-                    
-                    # We will try 'users' as a common alternative to 'hoard'
-                    # If this fails, the print statement above will tell us the real name!
-                    try:
-                        d_curr.execute("SELECT user_id FROM users ORDER BY monthly_points DESC")
-                        rows = d_curr.fetchall()
-                        for i, (u_id,) in enumerate(rows):
-                            if u_id == member.id:
-                                dragon_rank = str(i + 1)
-                                break
-                    except:
-                        pass
-                        
-                    d_conn.close()
-                except Exception as e:
-                    print(f"Draconova DB Ranking Error: {e}")
-            # --- END INVESTIGATOR LOGIC ---
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(api_url, timeout=5) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            # Assuming the API returns a list of users sorted by points
+                            for i, entry in enumerate(data):
+                                if str(entry.get('user_id')) == str(member.id):
+                                    dragon_rank = str(i + 1)
+                                    break
+            except Exception as e:
+                print(f"Draconova API Fetch Error: {e}")
+            # --- END API LOGIC ---
 
             try:
                 if bg_url:
@@ -286,23 +275,6 @@ class Leveling(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def reset(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(content=f"⚠️ Reset all data for **{member.mention}**?", view=ResetConfirm(self, member), ephemeral=True)
-
-    @commands.hybrid_command(name="find_data", description="Search for the hidden data files")
-    @commands.has_permissions(administrator=True)
-    async def find_data(self, ctx):
-        await ctx.defer(ephemeral=True)
-        found_files = []
-        # This looks through every folder the bot can see
-        for root, dirs, files in os.walk('/'):
-            for file in files:
-                if file.endswith(".db") or file.endswith(".json"):
-                    # Ignore standard system files
-                    if "lib" not in root and "usr" not in root:
-                        found_files.append(os.path.join(root, file))
-        
-        result = "\n".join(found_files) if found_files else "No files found."
-        print(f"File Search Results:\n{result}")
-        await ctx.send(f"Check logs! Found {len(found_files)} potential data files.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))
