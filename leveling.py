@@ -295,7 +295,16 @@ class Leveling(commands.Cog):
                     starting_level = level
                     break 
             xp = self.get_xp_for_level(starting_level)
-            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET xp = MAX(xp, excluded.xp), level = MAX(level, excluded.level)", (member.id, xp, starting_level))
+            
+            # Updated to prevent overwriting custom backgrounds/colors
+            self.cursor.execute("""
+                INSERT INTO users (user_id, xp, level) 
+                VALUES (?, ?, ?) 
+                ON CONFLICT(user_id) DO UPDATE SET 
+                    xp = excluded.xp, 
+                    level = excluded.level
+            """, (member.id, xp, starting_level))
+            
             synced_count += 1
         self.conn.commit()
         await interaction.followup.send(f"✅ Synced XP for {synced_count} members!", ephemeral=True)
