@@ -8,17 +8,16 @@ tag_list = {
     "arrived": "images/arrived.gif",
     "astro": "The dragon himself!\nimages/astrocandy.gif",
     "baldi": "Reminds me of someone...\nimages/baldi.gif",
-    "banned": """
-    # YOU'RE BANNED!!!
-    
-    -CaseOh
-    images/banned.gif
-    """,
+    "banned": (
+        "# YOU'RE BANNED!!!\n\n"
+        "-CaseOh\n"
+        "images/banned.gif"
+    ),
     "beepboopbop": "Beep boop bop?\nimages/beepboopbop.gif",
     "bite": "*Nom*\nimages/bite.gif",
     "blu": "The reason it's named that? For someone I know. Yes, this tag is for them\nimages/blu.gif",
     "boykisser": "Are *you* a boykisser?\nimages/boykisser.gif",
-    "🧱": "images/brick.gif",
+    "brick": "🧱\nimages/brick.gif",
     "dead": "Feelin' like this, bru\nimages/dead.gif",
     "deadchat": "This will TOTALLY work. Trust me\nimages/deadchat.gif",
     "deletethis": "Just delete it.\nimages/deletethis.jpg",
@@ -30,31 +29,30 @@ tag_list = {
     "handshake": "Hands down; the best handshake gif out there ngl\nimages/handshake.gif",
     "gm": "Good morning, chat! I hope you have a great day! 💜\nimages/gm.gif",
     "gn": "Goodnight, chat. Have a good rest 💜\nimages/gn.gif",
-    "hoopla": """
-    Sounds like a lot of..-
-    Hoopla!
-    # HOOPLA!
-    *clunk*
-    images/hoopla.gif
-    """,
+    "hoopla": (
+        "Sounds like a lot of..-\n"
+        "Hoopla!\n"
+        "# HOOPLA!\n"
+        "*clunk*\n"
+        "images/hoopla.gif"
+    ),
     "huzzah": "HUZZAH!\nimages/huzzah.gif",
     "imtotallyfine": "I'm totally fine, don't worry!\nimages/imtotallyfine.jpg",
-    "laughat": """
-    HA! Look at that! Look what they did! Point and laugh!!
-    
-    -# use this as a joke. Don't be rude!
-    images/laughat.gif
-    """,
-    "list": """
-    Here's our current tag list! 💜
-    **-aghghgh | -angery | -arrived | -astro | -baldi | -banned | -beepboop | -bite | -blu | -boykisser | -brick | -dead | -deadchat | -deletethis | -desgostang | -dragonhug | -forgetthat | -freaky | -freakycat | -gm | -gn | -handshake | -hoopla | -huzzah | -imtotallyfine | -laughat | -malo | -minigames | -minion | -nightflaid | -pathetic | -personalspace | -poyo | -punch | -retro | -screwit | -sharklunge | -sniffsniff | -spunchgun | -spunchpop | -stinks | -tired | -toopliss | -toothless | -trade | -umbre | -umbrecup | -vox | -wtf**
-    """,
-    "malo": """
-    AstroThaDragon's beloved. His future wife. His everything. 💜🖤
-    
-    -# no, I don't mean MalO herself, but someone who is *like* her! Perhaps you know who they are?
-    images/MalO_nom.gif
-    """,
+    "laughat": (
+        "HA! Look at that! Look what they did! Point and laugh!!\n\n"
+        "-# use this as a joke. Don't be rude!\n"
+        "images/laughat.gif"
+    ),
+    "list": (
+        "Here's our current tag list! 💜\n"
+        "**-aghghgh | -angery | -arrived | -astro | -baldi | -banned | -beepboop | -bite | -blu | -boykisser | -brick | -dead | -deadchat | -deletethis | -desgostang | -dragonhug | -forgetthat | -freaky | -freakycat | -gm | -gn | -handshake | -hoopla | -huzzah | -imtotallyfine | -laughat | -malo | -minigames | -minion | -nightflaid | -pathetic | -personalspace | -poyo | -punch | -retro | -screwit | -sharklunge | -sniffsniff | -spunchgun | -spunchpop | -stinks | -tired | -toopliss | -toothless | -trade | -umbre | -umbrecup | -vox | -wtf**\n"
+        )
+    ,
+    "malo": (
+        "AstroThaDragon's beloved. His future wife. His everything. 💜🖤\n\n"
+        "-# no, I don't mean MalO herself, but someone who is *like* her! Perhaps you know who they are?\n"
+        "images/MalO_nom.gif"
+    ),
     "minigames": "images/minigames.gif",
     "minion": "*Stare*\nimages/minion-stare.gif",
     "nightflaid": "Nightflaid from RetroSpecter V2 FNF. She just *OOZES* cool, bro\nimages/nightflaid.gif",
@@ -64,14 +62,12 @@ tag_list = {
     "punch": "images/punch.jpg",
     "retro": "Low quality ahh dance\nimages/retro.gif",
     "screwit": "Sometimes we all feel this way tbh\nimages/screwit.gif",
-    "sharklunge": """
-    -# Dun-dun..
-    Dun-dun...
-    *DUN-DUN-DUN-DUN-DUN-DUUUUUUNNNN!* 🦈
-    
-    -# supposed to be Jaws music btw
-    images/sharklunge.gif
-    """,
+    "sharklunge": (
+    "-# Dun-dun...\n"
+    "*DUN-DUN-DUN-DUN-DUN-DUUUUUUNNNN!* 🦈\n\n"
+    "-# supposed to be Jaws music btw\n"
+    "images/sharklunge.gif"
+    ),
     "sniffsniff": "*sniffing sounds intensify\nimages/sniffsniff.png",
     "spunchgun": "Omg!!11!!1 SPUNCH WIT A GUN!?1?!\nimages/spunchgun.jpg",
     "spunchpop": "I miss the old SpongeBob pops, bro..\nimages/spunchpop.jpg",
@@ -80,13 +76,13 @@ tag_list = {
     "tired": "Feeling like this rn?\nimages/tired.gif",
     "toothless": "The best dragon frfr\nimages/toothless.gif",
     "toopliss": "I love these goofy memes of Toothless so much\nimages/toopliss.gif",
-    "trade": """
-    I receive [insert]
-    You receive [insert]
-    
-    *Do you accept?*
-    images/trade.jpg
-    """,
+    "trade": (
+        "I receive [insert]\n"
+        "You receive [insert]\n"
+        "\n"
+        "*Do you accept?*\n"
+        "images/trade.jpg"
+    ),
     "umbre": "Bros on a Roomba, just chillin'\nimages/umbre.gif",
     "umbrecup": "How did he even manage to do that??\nimages/umbrecup.jpg",
     "vox": "He's a lover of Vox frfr\nimages/vox.gif",
