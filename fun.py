@@ -86,8 +86,10 @@ class Fun(commands.Cog):
         await interaction.response.defer()
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
+        # This header tells GameBanana who is calling, which prevents many blocks
+        headers = {"User-Agent": "EnceladusBot/1.0 (DiscordBot; 18+ Community)"}
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
                     if response.status == 200:
@@ -128,17 +130,19 @@ class Fun(commands.Cog):
                         embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
                         await interaction.followup.send(embed=embed, view=view)
                     else:
-                        await interaction.followup.send("GameBanana is acting up. Try again in a bit!")
-            except Exception:
-                await interaction.followup.send("The connection to the mod vault timed out. Try again!")
+                        await interaction.followup.send(f"GameBanana returned an error ({response.status}). The stage is closed!")
+            except Exception as e:
+                # This will now tell you the EXACT error in Discord if it fails again
+                await interaction.followup.send(f"The connection to the mod vault timed out or failed. Error: {e}")
 
     @app_commands.command(name="fnfsong", description="Get info on a specific FNF song!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
         await interaction.response.defer()
         
         search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_sModelName=Mod"
+        headers = {"User-Agent": "EnceladusBot/1.0 (DiscordBot; 18+ Community)"}
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as session:
             try:
                 async with session.get(search_url) as response:
                     if response.status == 200:
@@ -169,9 +173,9 @@ class Fun(commands.Cog):
                         embed.set_footer(text="Keep the rhythm going! 🎶")
                         await interaction.followup.send(embed=embed)
                     else:
-                        await interaction.followup.send("The rhythm was interrupted (API Error). Try again!")
-            except Exception:
-                await interaction.followup.send("Search timed out.")
+                        await interaction.followup.send(f"The rhythm was interrupted (Error {response.status}). Try again!")
+            except Exception as e:
+                await interaction.followup.send(f"Search timed out or failed. Error: {e}")
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
