@@ -139,7 +139,7 @@ class Leveling(commands.Cog):
 
         self.conn.commit()
 
-    @commands.hybrid_command(name="rank", description="Check your or another member's level!")
+@commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
         await ctx.defer() 
         member = member or ctx.author
@@ -190,10 +190,14 @@ class Leveling(commands.Cog):
                 elif os.path.exists("images/rank_template.png"):
                     background = Editor("images/rank_template.png")
                 else:
-                    # FALLBACK: Solid color so you can see text placement
                     background = Editor(Canvas((900, 270), color="#23272a"))
             except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
+
+            # --- NEW: Semi-Transparent Text Background (Scrim) ---
+            # Creates a dark box to make text readable against busy backgrounds
+            scrim = Editor(Canvas((680, 150), color="#000000")).set_opacity(0.60)
+            background.paste(scrim, (210, 40))
 
             # 2. Draw Avatar
             avatar_url = member.display_avatar.replace(format="png", size=256).url
@@ -206,33 +210,33 @@ class Leveling(commands.Cog):
             font_small = Font("fonts/Poppins-Regular.ttf", size=25)
             font_tiny = Font("fonts/Poppins-Regular.ttf", size=20)
 
-            background.text((230, 40), f"{member.name}", font=font_large, color="white")
-            background.text((230, 90), f"Rank: {current_role_name}", font=font_small, color="#aaaaaa")
+            background.text((230, 45), f"{member.name}", font=font_large, color="white")
+            background.text((230, 95), f"Rank: {current_role_name}", font=font_small, color="#aaaaaa")
             background.text((230, 130), f"Level: {level} | Dragon Rank: {dragon_rank}", font=font_small, color="white")
-            
-            # XP remaining text
-            background.text((830, 145), f"{xp_needed} XP to next level", font=font_tiny, color="white", align="right")
             
             # Percentage calculation
             percentage = (xp_within_level / 500) * 100
             background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, outline="#484b4e")
 
-            # --- NEW: Safe Icon Logic ---
+            # NEW: XP remaining text moved below the bar to prevent overlap
+            background.text((530, 230), f"{xp_needed} XP to next level", font=font_tiny, color="white", align="center")
+
+            # --- NEW: Safe Icon Logic (Repositioned to Top-Right) ---
             special_roles = {
                 1496031062218772510: "icons/starborn.png", 
                 1500011207929892884: "icons/dragon_champion.png",
                 1500010986835542138: "icons/dragon_lord.png"
             }
 
-            icon_x = 230
+            icon_x = 840 # Start icons from the right side of the scrim
             for role_id, icon_path in special_roles.items():
                 if member.get_role(role_id):
-                    # Only try to paste if the file actually exists in your repo
                     if os.path.exists(icon_path):
                         try:
                             icon = Editor(icon_path).resize((35, 35))
-                            background.paste(icon, (icon_x, 225))
-                            icon_x += 45 
+                            # Pasting in the top-right of the text area
+                            background.paste(icon, (icon_x, 50))
+                            icon_x -= 45 # Shift left for next icon
                         except:
                             continue
 
