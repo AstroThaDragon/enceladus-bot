@@ -198,10 +198,10 @@ class Leveling(commands.Cog):
             background.paste(avatar, (50, 60))
             
             # --- 4. Fonts ---
-            font_large = Font("fonts/Poppins-Bold.ttf", size=45)
-            font_medium = Font("fonts/Poppins-Bold.ttf", size=32)
-            font_small = Font("fonts/Poppins-Regular.ttf", size=22)
-            font_tiny = Font("fonts/Poppins-Regular.ttf", size=18)
+            font_large = Font("fonts/ComicRelief-Bold.ttf", size=45)
+            font_medium = Font("fonts/ComicRelief-Bold.ttf", size=32)
+            font_small = Font("fonts/ComicRelief-Regular.ttf", size=22)
+            font_tiny = Font("fonts/ComicRelief-Regular.ttf", size=18)
 
             # --- 5. Text Drawing with Outlines ---
             # Define stroke settings for readability on any background
