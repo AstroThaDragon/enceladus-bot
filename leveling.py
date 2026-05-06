@@ -196,7 +196,7 @@ class Leveling(commands.Cog):
 
             # --- NEW: Semi-Transparent Text Background (Scrim) ---
             # Creates a dark box to make text readable against busy backgrounds
-            scrim = Editor(Canvas((680, 150), color="#000000")).set_opacity(0.60)
+            scrim = Editor(Canvas((680, 150), color=(0, 0, 0, 153))) # 153 is roughly 60% opacity
             background.paste(scrim, (210, 40))
 
             # 2. Draw Avatar
