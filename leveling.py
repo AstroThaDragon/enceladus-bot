@@ -75,9 +75,10 @@ class Leveling(commands.Cog):
         self.cooldowns = {}
 
     def get_xp_for_level(self, level):
-        """Calculates the total XP required to reach a specific level."""
+        """Calculates the total XP required to reach a specific level with higher difficulty."""
         if level <= 0: return 0
-        return 5 * (level**2) + 50 * level + 100
+        # Increased multipliers to prevent the 'Level 50' jump
+        return 20 * (level**2) + 100 * level + 500
 
     async def _update_member_roles(self, member, new_level):
         """Helper function to manage roles and announcements for level-ups/manual sets."""
