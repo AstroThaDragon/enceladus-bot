@@ -83,44 +83,53 @@ class Fun(commands.Cog):
 
     @app_commands.command(name="fnfmod", description="Search for a Friday Night Funkin' mod on GameBanana!")
     async def fnfmod(self, interaction: discord.Interaction, search_query: str):
-            await interaction.response.defer()
-            
-            search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
+        await interaction.response.defer()
+        
+        search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod"
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(search_url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if not data.get('aResults'):
-                            await interaction.followup.send(f"Skrrrrp.I couldn't find any mods for '{search_query}'. Maybe try a different name?")
-                            return
+        async with aiohttp.ClientSession() as session:
+            async with session.get(search_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if not data.get('aResults'):
+                        await interaction.followup.send(f"Skrrrrp. I couldn't find any mods for '{search_query}'. Maybe try a different name?")
+                        return
 
+                    # Filter for FNF Game ID (8694)
+                    best_match = None
+                    for result in data['aResults']:
+                        if result.get('_idGameRow') == 8694:
+                            best_match = result
+                            break
+                    
+                    if not best_match:
                         best_match = data['aResults'][0]
-                        mod_id = best_match['_idRow']
-                        mod_name = best_match['_sName']
-                        mod_url = f"https://gamebanana.com/mods/{mod_id}"
-                        
-                        view = discord.ui.View()
-                        button = discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤")
-                        view.add_item(button)
 
-                        embed = discord.Embed(
-                            title=f"🎤 Mod Found: {mod_name}",
-                            description=f"Beep! I've found a match for your search! Click the button below to see files, credits, and more!",
-                            color=discord.Color.from_rgb(255, 0, 77)
-                        )
-                        
-                        if '_aPreviewMedia' in best_match:
-                            img_data = best_match['_aPreviewMedia']['_aImages'][0]
-                            img_url = f"{img_data['_sBaseUrl']}/{img_data['_sFile']}"
-                            embed.set_image(url=img_url)
+                    mod_id = best_match['_idRow']
+                    mod_name = best_match['_sName']
+                    mod_url = f"https://gamebanana.com/mods/{mod_id}"
+                    
+                    view = discord.ui.View()
+                    button = discord.ui.Button(label="Download on GameBanana!", url=mod_url, emoji="🎤")
+                    view.add_item(button)
 
-                        embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
-                        
-                        await interaction.followup.send(embed=embed, view=view)
-                    else:
-                        await interaction.followup.send("The rap battle stage is currently closed. Try again later!")
+                    embed = discord.Embed(
+                        title=f"🎤 Mod Found: {mod_name}",
+                        description=f"Beep! I've found a match for your search! Click the button below to see files, credits, and more!",
+                        color=discord.Color.from_rgb(255, 0, 77)
+                    )
+                    
+                    if '_aPreviewMedia' in best_match:
+                        img_data = best_match['_aPreviewMedia']['_aImages'][0]
+                        img_url = f"{img_data['_sBaseUrl']}/{img_data['_sFile']}"
+                        embed.set_image(url=img_url)
+
+                    embed.set_footer(text="Powered by GameBanana API • Beep Boop Bop!")
+                    
+                    await interaction.followup.send(embed=embed, view=view)
+                else:
+                    await interaction.followup.send("The rap battle stage is currently closed. Try again later!")
 
     @app_commands.command(name="fnfsong", description="Get info on a specific FNF song!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
@@ -134,10 +143,19 @@ class Fun(commands.Cog):
                     data = await response.json()
                     
                     if not data.get('aResults'):
-                        await interaction.followup.send(f"Skrrrrp. I couldn't find a son    g or mod for '{song_name}'! Maybe try a different name?")
+                        await interaction.followup.send(f"Skrrrrp. I couldn't find a song or mod for '{song_name}'! Maybe try a different name?")
                         return
 
-                    result = data['aResults'][0]
+                    # Filter for FNF Game ID (8694)
+                    result = None
+                    for item in data['aResults']:
+                        if item.get('_idGameRow') == 8694:
+                            result = item
+                            break
+                    
+                    if not result:
+                        result = data['aResults'][0]
+
                     name = result['_sName']
                     res_id = result['_idRow']
                     
