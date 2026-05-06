@@ -157,8 +157,10 @@ class Leveling(commands.Cog):
 
             dragon_rank = "0"
             try:
+                # Linking to Draconova's catching leaderboard
                 d_conn = sqlite3.connect('/app/data/draconova.db')
                 d_curr = d_conn.cursor()
+                # Query to find member's rank position based on total catches
                 d_curr.execute("SELECT pos FROM (SELECT user_id, RANK() OVER (ORDER BY catches DESC) as pos FROM dragon_stats) WHERE user_id = ?", (member.id,))
                 d_res = d_curr.fetchone()
                 if d_res: dragon_rank = str(d_res[0])
