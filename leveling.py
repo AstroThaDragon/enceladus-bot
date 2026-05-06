@@ -144,8 +144,8 @@ class Leveling(commands.Cog):
         await ctx.defer() 
         member = member or ctx.author
         
-        # Wrapped in a try/except to ensure errors show up in logs
         try:
+            # Use the cursor from your class
             self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
             result = self.cursor.fetchone()
             
@@ -153,11 +153,10 @@ class Leveling(commands.Cog):
                 return await ctx.send("This user hasn't earned any XP yet!")
 
             xp, level, bar_color, bg_url = result
-            next_lvl_xp = (level + 1) * 500
             xp_within_level = xp - (level * 500)
-            xp_needed = 500 - xp_within_level
+            percentage = (xp_within_level / 500) * 100
 
-            # --- NEW: Get Rank Title from highest level role ---
+            # --- 1. Get Rank Title & Dragon Rank ---
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
                 role = member.get_role(rid)
@@ -165,8 +164,7 @@ class Leveling(commands.Cog):
                     current_role_name = role.name
                     break
 
-            # --- NEW: Peek at Draconova Data ---
-            dragon_rank = "Unranked"
+            dragon_rank = "0"
             try:
                 d_conn = sqlite3.connect('/app/data/draconova.db')
                 d_curr = d_conn.cursor()
@@ -177,12 +175,12 @@ class Leveling(commands.Cog):
                     ) WHERE user_id = ?""", (member.id,))
                 d_res = d_curr.fetchone()
                 if d_res:
-                    dragon_rank = f"#{d_res[0]}"
+                    dragon_rank = str(d_res[0])
                 d_conn.close()
             except:
                 pass 
 
-            # 1. Create Background
+            # --- 2. Create Background ---
             try:
                 if bg_url:
                     bg_image = await load_image_async(bg_url)
@@ -194,49 +192,67 @@ class Leveling(commands.Cog):
             except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
 
-            # --- NEW: Semi-Transparent Text Background (Scrim) ---
-            # Creates a dark box to make text readable against busy backgrounds
-            scrim = Editor(Canvas((680, 150), color=(0, 0, 0, 153))) # 153 is roughly 60% opacity
-            background.paste(scrim, (210, 40))
+            # --- 3. The "Scrim" (Transparent Box) ---
+            scrim = Editor(Canvas((680, 200), color=(0, 0, 0, 153)))
+            background.paste(scrim, (210, 35))
 
-            # 2. Draw Avatar
+            # --- 4. Draw Avatar ---
             avatar_url = member.display_avatar.replace(format="png", size=256).url
             avatar_image = await load_image_async(avatar_url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
-            background.paste(avatar, (50, 50))
+            background.paste(avatar, (50, 60))
             
-            # 3. Text and Progress Bar
-            font_large = Font("fonts/Poppins-Bold.ttf", size=40)
-            font_small = Font("fonts/Poppins-Regular.ttf", size=25)
-            font_tiny = Font("fonts/Poppins-Regular.ttf", size=20)
+            # --- 5. Fonts ---
+            font_large = Font("fonts/Poppins-Bold.ttf", size=45)
+            font_medium = Font("fonts/Poppins-Bold.ttf", size=32)
+            font_small = Font("fonts/Poppins-Regular.ttf", size=22)
 
-            background.text((230, 45), f"{member.name}", font=font_large, color="white")
-            background.text((230, 95), f"Rank: {current_role_name}", font=font_small, color="#aaaaaa")
-            background.text((230, 130), f"Level: {level} | Dragon Rank: {dragon_rank}", font=font_small, color="white")
+            # --- 6. Stats Placement ---
+            # Rank & Level (Big numbers like the reference)
+            background.text((550, 50), "Rank", font=font_small, color="white")
+            background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white")
             
-            # Percentage calculation
-            percentage = (xp_within_level / 500) * 100
-            background.bar((230, 180), max_width=600, height=40, percentage=percentage, fill=bar_color, outline="#484b4e")
+            background.text((750, 50), "Level", font=font_small, color="#a97dd1") # Light purple
+            background.text((820, 42), f"{level}", font=font_large, color="#a97dd1")
 
-            # NEW: XP remaining text moved below the bar to prevent overlap
-            background.text((530, 230), f"{xp_needed} XP to next level", font=font_tiny, color="white", align="center")
+            # Name and Role
+            background.text((230, 130), f"{member.name}", font=font_medium, color="white")
+            background.text((230, 95), f"{current_role_name}", font=font_small, color="#aaaaaa")
 
-            # --- NEW: Safe Icon Logic (Repositioned to Top-Right) ---
+            # --- 7. The Progress Bar (Rounded & Showing Empty bit) ---
+            # Draw the background of the bar (the "empty" bit)
+            background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
+            
+            # Draw the actual progress
+            if percentage > 0:
+                # We use a nested bar or rectangle with radius for that rounded look
+                background.bar(
+                    (230, 185), 
+                    max_width=600, 
+                    height=35, 
+                    percentage=percentage, 
+                    fill=bar_color, 
+                    radius=20
+                )
+
+            # XP Text (Top right of the bar)
+            background.text((830, 155), f"{xp_within_level} / 500 XP", font=font_small, color="white", align="right")
+
+            # --- 8. Special Role Icons (Top Right) ---
             special_roles = {
                 1496031062218772510: "icons/starborn.png", 
                 1500011207929892884: "icons/dragon_champion.png",
                 1500010986835542138: "icons/dragon_lord.png"
             }
 
-            icon_x = 840 # Start icons from the right side of the scrim
+            icon_x = 450 # Placing these more toward the center-top
             for role_id, icon_path in special_roles.items():
                 if member.get_role(role_id):
                     if os.path.exists(icon_path):
                         try:
-                            icon = Editor(icon_path).resize((35, 35))
-                            # Pasting in the top-right of the text area
+                            icon = Editor(icon_path).resize((40, 40))
                             background.paste(icon, (icon_x, 50))
-                            icon_x -= 45 # Shift left for next icon
+                            icon_x -= 50 
                         except:
                             continue
 
@@ -245,7 +261,7 @@ class Leveling(commands.Cog):
             
         except Exception as e:
             print(f"Error generating rank card: {e}")
-            await ctx.send("There was an error generating the rank card. Check logs.")
+            await ctx.send("There was an error generating the rank card.")
 
     @commands.hybrid_command(name="customize", description="Change your rank card bar color or background!")
     async def customize(self, ctx, color_hex: str = None, background_url: str = None):
