@@ -32,10 +32,11 @@ recent_joins = set()
 recent_leaves = set()
 
 # --- DATABASE INITIALIZATION ---
-def init_bump_db():
+async def init_bump_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS bump_timer (id INTEGER PRIMARY KEY, remind_at TEXT, channel_id INTEGER)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS vaulted_messages (message_id INTEGER PRIMARY KEY)") 
     conn.commit()
     conn.close()
 
@@ -130,7 +131,7 @@ async def stargazing_alert():
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
-    init_bump_db() # Ensure bump table exists
+    await init_bump_db() # Ensure bump table exists
     
     try:
         await bot.tree.sync()
@@ -186,8 +187,8 @@ async def on_message(message):
                 if match:
                     user_mention = match.group(0)
             
-            if not user_mention and message.interaction:
-                user_mention = message.interaction.user.mention
+            if not user_mention and message.interaction_metadata:
+                user_mention = message.interaction_metadata.user.mention
 
             if not user_mention:
                 user_mention = "there"
@@ -299,32 +300,65 @@ async def on_member_update(before, after):
             
             await channel.send(content=content_text, embed=embed)
 
-# --- FUN COMMANDS ---
-@bot.tree.command(name="jokes", description="Get a random joke to brighten your day!")
-async def jokes(interaction: discord.Interaction):
-    joke_list = [
-        "Why don't scientists trust atoms? Because they make up everything!",
-        "What do you call a fake noodle? An impasta!",
-        "Why did the dragon get hired? He was really good at 'firing' people! 🐉",
-        "How does a penguin build its house? Igloos it together!",
-        "What do you call a skeleton who won't work? Lazy bones!",
-        "Why are dragons such good storytellers? Because they always have a long tail!",
-        "What is an astronaut's favorite key on the keyboard? The spacebar!",
-        "I'm on a seafood diet. I see food, I eat it!",
-        "What do you call a well-balanced horse? Stable!",
-        "How do you make an eggroll? Push it!",
-        "What do you call a pile of cats? A meow-ntain!",
-        "Why don't they play poker in the jungle? Too many cheetahs.",
-        "What kind of tea is hard to swallow? Realitea.",
-        "RIP to boiling water. You will be mist.",
-        "Knock-knock! - Who's there? - Boo. - Boo who? - Why are you crying??",
-        "Knock-knock! - Who's there? - Spell - Spell who? - W-H-O.",
-        "Why did the scarecrow win an award? Because he was outstanding in his field!"
-    ]
-    
-    random_joke = random.choice(joke_list)
-    await interaction.response.send_message(f"**Here's a goofy joke for ya!:**\n{random_joke}")
+VAULT_CHANNEL_ID = 1496628909570265199
+VAULT_THRESHOLD = 5
+EXCLUDED_CHANNELS = [593389789558865931, 598883099987673088, 1484487011933884509, 1352415256584130590, 1306821711970435122, 935876805607444510, 1118027416443564042, 1491230190469120010, 1117412987788075038]  # Add channel IDs here
+EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751721, 593413698085978132, 1474514782605541537] # Add category IDs here
 
+@bot.event
+async def on_raw_reaction_add(payload):
+    # 1. Only look for your specific 'Vault' emoji
+    if str(payload.emoji) == "⭐": 
+        channel = bot.get_channel(payload.channel_id)
+        
+        # NSFW & EXCLUSION CHECKS
+        if channel.is_nsfw() or channel.id in EXCLUDED_CHANNELS or channel.category_id in EXCLUDED_CATEGORIES:
+            return
+
+        message = await channel.fetch_message(payload.message_id)
+        
+        # SELF-CHECK
+        if payload.user_id == message.author.id:
+            return 
+
+        # --- FIX: Open Database Connection inside the event ---
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        # DUPLICATE CHECK
+        cursor.execute("SELECT message_id FROM vaulted_messages WHERE message_id = ?", (message.id,))
+        if cursor.fetchone():
+            conn.close() # Always close the connection before returning
+            return 
+
+        # Find the reaction count
+        reaction = discord.utils.get(message.reactions, emoji=payload.emoji.name)
+        
+        if reaction and reaction.count >= VAULT_THRESHOLD:
+            vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
+            
+            embed = discord.Embed(
+                description=message.content,
+                color=discord.Color.gold(),
+                timestamp=message.created_at
+            )
+            embed.set_author(name=message.author.display_name, icon_url=message.author.avatar.url)
+            embed.add_field(name="Original", value=f"[Jump to Message]({message.jump_url})")
+            
+            if message.attachments:
+                embed.set_image(url=message.attachments[0].url)
+                
+            embed.set_footer(text=f"ID: {message.id} • The Vault")
+            
+            await vault_channel.send(embed=embed)
+
+            # RECORD THE POST
+            cursor.execute("INSERT INTO vaulted_messages (message_id) VALUES (?)", (message.id,))
+            conn.commit()
+        
+        # Close connection when done
+        conn.close()
+        
 # --- COSMIC COMMANDS ---
 
 @bot.tree.command(name="nasa", description="View NASA's Astronomy Picture of the Day!")
@@ -489,12 +523,13 @@ async def resetbump(ctx):
 async def load_extensions():
     # This tells the bot to load your new leveling.py file
     await bot.load_extension('leveling')
+    await bot.load_extension("fun")
+    print("Fun Cog loaded!")
 
 async def main():
     async with bot:
         token = os.getenv('DISCORD_TOKEN') 
-        
-        # Load the leveling system before starting
+        await init_bump_db()
         await load_extensions()
         await bot.start(token)
 
