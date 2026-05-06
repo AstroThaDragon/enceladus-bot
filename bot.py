@@ -49,8 +49,17 @@ status_list = [
     "Powered by stardust!",
     "Harvesting moon rocks",
     "Beep boop bop",
-    "Playing FNF!",
-    "Watching SpongeBob"
+    "Playing FNF",
+    "Watching SpongeBob",
+    "Guarding the Astral Relic",
+    "Chillin' and vibin' with the stars",
+    "Calculating the meaning of life...",
+    "Sipping on some cosmic tea ☕",
+    "Waiting for the next big space event 🌠",
+    "Just a bot, living in a cosmic world",
+    "Looking up at the stars and wondering...",
+    "Stargazing",
+    "Quietly judging your memes"
 ]
 
 @tasks.loop(minutes=15)
@@ -358,7 +367,7 @@ async def on_raw_reaction_add(payload):
         
         # Close connection when done
         conn.close()
-        
+
 # --- COSMIC COMMANDS ---
 
 @bot.tree.command(name="nasa", description="View NASA's Astronomy Picture of the Day!")
