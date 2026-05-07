@@ -89,7 +89,7 @@ class Fun(commands.Cog):
         
         embed = discord.Embed(
             title=f"🎤 Mod Found: {search_query}",
-            description=f"Beep boop bop! Found a matching mod search for you. Click the button below to view it on GameBanana!",
+            description=f"Beep boop bop! Found a matching mod search for you! Click the button below to view the results on GameBanana!",
             color=discord.Color.from_rgb(255, 0, 77)
         )
         embed.set_thumbnail(url="https://images.gamebanana.com/static/img/favicon/favicon.png")
@@ -104,23 +104,24 @@ class Fun(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="fnfsong", description="Search for FNF music/audio!")
+    @app_commands.command(name="fnfsong", description="Search for an FNF song on YouTube!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
-        # Using the direct web search URL for audio/sounds
-        formatted_query = song_name.replace(" ", "+")
-        web_search_url = f"https://gamebanana.com/sounds/search?_sSearchString={formatted_query}&_idGameRow=8694"
+        # We add 'FNF' to the query to make sure the results are relevant
+        formatted_query = (song_name + " FNF song").replace(" ", "+")
+        youtube_search_url = f"https://www.youtube.com/results?search_query={formatted_query}"
         
         embed = discord.Embed(
             title=f"🎵 Result: {song_name}",
-            description="Beep boop! Found a matching submission search for you.",
-            color=discord.Color.blue()
+            description="Beep boop bop! Found a matching song search for you! Click the button below to view the results on YouTube!",
+            color=discord.Color.red() # Changed to Red to match YouTube's branding
         )
-        embed.set_thumbnail(url="https://images.gamebanana.com/static/img/favicon/favicon.png")
+        # Using a YouTube icon for the thumbnail
+        embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/e/ef/Youtube_logo.png")
 
         view = discord.ui.View()
         view.add_item(discord.ui.Button(
-            label="Listen on GameBanana", 
-            url=web_search_url, 
+            label="Listen on YouTube", 
+            url=youtube_search_url, 
             style=discord.ButtonStyle.link, 
             emoji="🎧"
         ))
