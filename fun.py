@@ -88,11 +88,11 @@ class Fun(commands.Cog):
         web_search_url = f"https://gamebanana.com/mods/search?_sSearchString={formatted_query}&_idGameRow=8694"
         
         embed = discord.Embed(
-            title=f"🎤 Mod Found: {search_query}",
+            title=f"🎤 Mods found for {search_query}!",
             description=f"Beep boop bop! Found a matching mod search for you! Click the button below to view the results on GameBanana!",
             color=discord.Color.from_rgb(255, 0, 77)
         )
-        embed.set_thumbnail(url="https://images.gamebanana.com/static/img/favicon/favicon.png")
+        embed.set_thumbnail(url="https://asset.brandfetch.io/idR3RhicYy/idoLc-TS4z.png?updated=1715263930459")
 
         view = discord.ui.View()
         view.add_item(discord.ui.Button(
@@ -111,7 +111,7 @@ class Fun(commands.Cog):
         youtube_search_url = f"https://www.youtube.com/results?search_query={formatted_query}"
         
         embed = discord.Embed(
-            title=f"🎵 Result: {song_name}",
+            title=f"🎵 Songs found for {song_name}!",
             description="Beep boop bop! Found a matching song search for you! Click the button below to view the results on YouTube!",
             color=discord.Color.red() # Changed to Red to match YouTube's branding
         )
