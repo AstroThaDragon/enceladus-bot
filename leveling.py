@@ -1,13 +1,13 @@
 import os
 import discord
 from discord.ext import commands
-from discord import app_commands # Added this to fix the @discord.app_commands errors
+from discord import app_commands
 import sqlite3
 import random
 import time
 from easy_pil import Editor, Canvas, Font, load_image_async
 import json
-from typing import Optional # Added for proper type hinting
+from typing import Optional
 
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member):
@@ -63,9 +63,20 @@ class Leveling(commands.Cog):
         self.cooldowns = {}
 
     def get_xp_for_level(self, level):
-        """Calculates total XP using Arcane Exponential: 5L^2 + 50L + 75"""
+        """Calculates total XP for 25k message grind to Level 100."""
         if level <= 0: return 0
-        return (5 * (level**2)) + (50 * level) + 75
+        
+        # Level 1-5: Easy start (~4-7 messages per level)
+        if level <= 5:
+            return (20 * (level**2)) + (80 * level) + 25
+        
+        # Level 6-10: Mid-tier transition
+        elif level <= 10:
+            return (35 * (level**2)) + (100 * level) + 200
+            
+        # Level 11-100: Hardcore RPG curve (L^2 coefficient bumped to 68)
+        else:
+            return (68 * (level**2)) + (150 * level) + 500
 
     async def _update_member_roles(self, member, new_level):
         guild = member.guild
