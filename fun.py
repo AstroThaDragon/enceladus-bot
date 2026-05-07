@@ -78,7 +78,7 @@ class Fun(commands.Cog):
             "Why did the scarecrow win an award? Because he was outstanding in his field!"
         ]
         
-        random_joke = random.choice(joke_list)
+        random_joke = random.choice(joke_list) 
         await interaction.response.send_message(f"**Here's a goofy joke for ya!:**\n{random_joke}")
 
     @app_commands.command(name="fnfmod", description="Search for a Friday Night Funkin' mod on GameBanana!")
