@@ -83,93 +83,49 @@ class Fun(commands.Cog):
 
     @app_commands.command(name="fnfmod", description="Search for a Friday Night Funkin' mod on GameBanana!")
     async def fnfmod(self, interaction: discord.Interaction, search_query: str):
-        await interaction.response.defer()
+        # Using the direct web search URL to bypass API blocks
+        formatted_query = search_query.replace(" ", "+")
+        web_search_url = f"https://gamebanana.com/mods/search?_sSearchString={formatted_query}&_idGameRow=8694"
         
-        # New endpoint: Searching Submissions specifically. It's less likely to be blocked.
-        search_url = "https://gamebanana.com/apiv11/Game/8694/Submissions"
-        params = {
-            "_sName": search_query,
-            "_nPage": 1,
-            "_perPage": 1
-        }
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
+        embed = discord.Embed(
+            title=f"🎤 Mod Found: {search_query}",
+            description=f"Beep boop bop! Found a matching mod search for you. Click the button below to view it on GameBanana!",
+            color=discord.Color.from_rgb(255, 0, 77)
+        )
+        embed.set_thumbnail(url="https://images.gamebanana.com/static/img/favicon/favicon.png")
 
-        async with aiohttp.ClientSession(headers=headers) as session:
-            try:
-                async with session.get(search_url, params=params, timeout=15) as response:
-                    # Check if it's actually JSON before parsing
-                    content_type = response.headers.get("Content-Type", "")
-                    if "application/json" not in content_type:
-                        return await interaction.followup.send("🚫 GameBanana's security wall is up. Please try again in a few minutes.")
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="View on GameBanana", 
+            url=web_search_url, 
+            style=discord.ButtonStyle.link,
+            emoji="🍌"
+        ))
 
-                    data = await response.json()
-                    
-                    # This endpoint returns a list directly or a 'aRecords' key
-                    results = data if isinstance(data, list) else data.get('aRecords', [])
-
-                    if not results:
-                        return await interaction.followup.send(f"❌ No FNF mods found for '{search_query}'.")
-
-                    mod = results[0]
-                    mod_id = mod.get('_idRow')
-                    mod_name = mod.get('_sName')
-                    
-                    embed = discord.Embed(
-                        title=f"🎤 Mod Found: {mod_name}",
-                        url=f"https://gamebanana.com/mods/{mod_id}",
-                        color=discord.Color.from_rgb(255, 0, 77)
-                    )
-                    
-                    # Handle image - Submissions API uses _aPreviewMedia
-                    preview = mod.get('_aPreviewMedia', {})
-                    if preview and '_aImages' in preview:
-                        img = preview['_aImages'][0]
-                        embed.set_image(url=f"{img['_sBaseUrl']}/{img['_sFile']}")
-
-                    view = discord.ui.View()
-                    view.add_item(discord.ui.Button(label="View on GameBanana", url=f"https://gamebanana.com/mods/{mod_id}", emoji="🍌"))
-                    
-                    await interaction.followup.send(embed=embed, view=view)
-
-            except Exception as e:
-                print(f"DEBUG Error: {e}")
-                await interaction.followup.send("🚫 The connection to GameBanana timed out.")
+        await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="fnfsong", description="Search for FNF music/audio!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
-        # We'll use the same logic here as it's more robust
-        await interaction.response.defer()
-        search_url = "https://gamebanana.com/apiv11/Game/8694/Submissions"
-        params = {"_sName": song_name, "_nPage": 1}
-        headers = {"User-Agent": "Mozilla/5.0"}
+        # Using the direct web search URL for audio/sounds
+        formatted_query = song_name.replace(" ", "+")
+        web_search_url = f"https://gamebanana.com/sounds/search?_sSearchString={formatted_query}&_idGameRow=8694"
+        
+        embed = discord.Embed(
+            title=f"🎵 Result: {song_name}",
+            description="Beep boop! Found a matching submission search for you.",
+            color=discord.Color.blue()
+        )
+        embed.set_thumbnail(url="https://images.gamebanana.com/static/img/favicon/favicon.png")
 
-        async with aiohttp.ClientSession(headers=headers) as session:
-            try:
-                async with session.get(search_url, params=params) as response:
-                    if "application/json" not in response.headers.get("Content-Type", ""):
-                        return await interaction.followup.send("🚫 Connection failed.")
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="Listen on GameBanana", 
+            url=web_search_url, 
+            style=discord.ButtonStyle.link, 
+            emoji="🎧"
+        ))
 
-                    data = await response.json()
-                    results = data if isinstance(data, list) else data.get('aRecords', [])
-
-                    if not results:
-                        return await interaction.followup.send(f"❌ Couldn't find any songs named '{song_name}'.")
-
-                    res = results[0]
-                    mod_id = res['_idRow']
-                    
-                    embed = discord.Embed(
-                        title=f"🎵 Result: {res['_sName']}",
-                        description="Beep boop! Found a matching submission.",
-                        url=f"https://gamebanana.com/mods/{mod_id}",
-                        color=discord.Color.blue()
-                    )
-                    await interaction.followup.send(embed=embed)
-            except Exception as e:
-                await interaction.followup.send(f"🚫 Connection failed: {e}")
+        await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
