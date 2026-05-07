@@ -253,18 +253,32 @@ class Leveling(commands.Cog):
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         synced_count = 0
+        
+        # This forces the bot to check every member in the server
         for member in interaction.guild.members:
             if member.bot: continue
+            
             starting_level = 0
+            # Check roles from highest (100) to lowest (1)
             for level, role_id in sorted(self.level_roles.items(), reverse=True):
                 if role_id != 0 and member.get_role(role_id):
                     starting_level = level
                     break 
+            
+            # Get the exact XP needed for that specific role level
             xp = self.get_xp_for_level(starting_level)
-            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level", (member.id, xp, starting_level))
+            
+            # Update the database
+            self.cursor.execute("""
+                INSERT INTO users (user_id, xp, level) 
+                VALUES (?, ?, ?) 
+                ON CONFLICT(user_id) 
+                DO UPDATE SET xp = excluded.xp, level = excluded.level
+            """, (member.id, xp, starting_level))
             synced_count += 1
+            
         self.conn.commit()
-        await interaction.followup.send(f"✅ Synced XP for {synced_count} members!", ephemeral=True)
+        await interaction.followup.send(f"✅ Leveling system calibrated! Synced {synced_count} members to the new RPG curve.", ephemeral=True)
 
     @app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
     @commands.has_permissions(administrator=True)
