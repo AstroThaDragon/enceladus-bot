@@ -85,89 +85,98 @@ class Fun(commands.Cog):
     async def fnfmod(self, interaction: discord.Interaction, search_query: str):
         await interaction.response.defer()
         
-        # We add the game ID (8694) directly to the query for better accuracy
-        search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={search_query}&_nPage=1&_sModelName=Mod&_idGameRow=8694"
+        # This URL mimics the exact search parameters the website uses
+        search_url = "https://gamebanana.com/apiv11/Util/Search/Results"
+        params = {
+            "_sSearchString": search_query,
+            "_nPage": 1,
+            "_sModelName": "Mod",
+            "_idGameRow": 8694  # FNF Game ID
+        }
         
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
         }
 
         async with aiohttp.ClientSession(headers=headers) as session:
             try:
-                async with session.get(search_url, timeout=15) as response:
+                async with session.get(search_url, params=params, timeout=15) as response:
                     if response.status == 200:
                         data = await response.json()
                         results = data.get('aResults', [])
 
                         if not results:
+                            # Fallback search: Remove the Game ID filter in case the mod isn't categorized perfectly
+                            params.pop("_idGameRow")
+                            async with session.get(search_url, params=params) as retry_res:
+                                data = await retry_res.json()
+                                results = data.get('aResults', [])
+                                
+                        if not results:
                             return await interaction.followup.send(f"❌ No FNF mods found for '{search_query}'.")
 
-                        # Take the first result (usually the most relevant)
+                        # Get the best match
                         mod = results[0]
                         mod_id = mod['_idRow']
                         mod_name = mod['_sName']
-                        mod_url = f"https://gamebanana.com/mods/{mod_id}"
                         
                         embed = discord.Embed(
-                            title=f"🎤 Mod Found: {mod_name}",
-                            description=f"Beep bop! I found a match for your search.",
-                            url=mod_url,
+                            title=f"🎤 Mod: {mod_name}",
+                            url=f"https://gamebanana.com/mods/{mod_id}",
                             color=discord.Color.from_rgb(255, 0, 77)
                         )
                         
-                        # Better Image Handling
-                        if '_aPreviewMedia' in mod and mod['_aPreviewMedia'].get('_aImages'):
-                            img = mod['_aPreviewMedia']['_aImages'][0]
+                        # Handle images more robustly
+                        preview = mod.get('_aPreviewMedia', {})
+                        if preview and '_aImages' in preview:
+                            img = preview['_aImages'][0]
                             embed.set_image(url=f"{img['_sBaseUrl']}/{img['_sFile']}")
 
                         view = discord.ui.View()
-                        view.add_item(discord.ui.Button(label="View on GameBanana", url=mod_url, emoji="🍌"))
-
+                        view.add_item(discord.ui.Button(label="View Mod", url=f"https://gamebanana.com/mods/{mod_id}", emoji="🍌"))
                         await interaction.followup.send(embed=embed, view=view)
                     else:
-                        await interaction.followup.send("⚠️ GameBanana API is acting up. Try again in a second!")
+                        await interaction.followup.send(f"⚠️ GameBanana returned error code: {response.status}")
             except Exception as e:
-                await interaction.followup.send(f"🚫 Connection error: {e}")
+                print(f"DEBUG: FNF Search Error: {e}")
+                await interaction.followup.send("🚫 Connection failed. The mod vault is sealed tight right now!")
 
-    @app_commands.command(name="fnfsong", description="Get info on a specific FNF song/audio!")
+    @app_commands.command(name="fnfsong", description="Search for FNF music and audio!")
     async def fnfsong(self, interaction: discord.Interaction, song_name: str):
         await interaction.response.defer()
         
-        # Searching specifically for Sound submissions first, then falling back to Mods
-        search_url = f"https://gamebanana.com/apiv11/Util/Search/Results?_sSearchString={song_name}&_nPage=1&_idGameRow=8694"
+        # Searching "Any" category but prioritizing FNF
+        search_url = "https://gamebanana.com/apiv11/Util/Search/Results"
+        params = {
+            "_sSearchString": song_name,
+            "_idGameRow": 8694
+        }
         
         headers = {"User-Agent": "Mozilla/5.0"}
 
         async with aiohttp.ClientSession(headers=headers) as session:
             try:
-                async with session.get(search_url) as response:
+                async with session.get(search_url, params=params) as response:
                     data = await response.json()
                     results = data.get('aResults', [])
 
                     if not results:
-                        return await interaction.followup.send(f"❌ Couldn't find any songs or mods named '{song_name}'.")
+                        return await interaction.followup.send(f"❌ Couldn't find any songs named '{song_name}'.")
 
-                    result = results[0]
-                    name = result['_sName']
-                    model = result.get('_sModelName', 'Mod').lower() # Could be 'Sound' or 'Mod'
-                    res_url = f"https://gamebanana.com/{model}s/{result['_idRow']}"
-                    
+                    res = results[0]
+                    # Dynamically find the model (Mod, Sound, etc)
+                    model = res.get('_sModelName', 'Mod').lower() + "s"
+                    link = f"https://gamebanana.com/{model}/{res['_idRow']}"
+
                     embed = discord.Embed(
-                        title=f"🎵 Result: {name}",
-                        description=f"Beep! I found a match in the **{model}** category.",
-                        color=discord.Color.blue(),
-                        url=res_url
+                        title=f"🎵 Result: {res['_sName']}",
+                        description=f"Category: **{res.get('_sModelName', 'Unknown')}**",
+                        url=link,
+                        color=discord.Color.blue()
                     )
                     
-                    if '_sDescription' in result:
-                        desc = result['_sDescription'][:100] + "..."
-                        embed.add_field(name="Description", value=desc, inline=False)
-
-                    view = discord.ui.View()
-                    view.add_item(discord.ui.Button(label=f"Open {model.capitalize()}", url=res_url, emoji="🎧"))
-
-                    await interaction.followup.send(embed=embed, view=view)
+                    await interaction.followup.send(embed=embed)
             except Exception as e:
                 await interaction.followup.send(f"🚫 Search failed: {e}")
 
