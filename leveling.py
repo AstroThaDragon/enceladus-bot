@@ -75,10 +75,11 @@ class Leveling(commands.Cog):
         self.cooldowns = {}
 
     def get_xp_for_level(self, level):
-        """Calculates the total XP required to reach a specific level with higher difficulty."""
+        """Calculates total XP needed to reach a level using the Arcane formula."""
         if level <= 0: return 0
-        # Increased multipliers to prevent the 'Level 50' jump
-        return 20 * (level**2) + 100 * level + 500
+        # Exact Arcane formula: 5L^2 + 50L + 75
+        # This makes Level 1 cost 130 XP total, starting very easy.
+        return (5 * (level**2)) + (50 * level) + 75
 
     async def _update_member_roles(self, member, new_level):
         """Helper function to manage roles and announcements for level-ups/manual sets."""
@@ -146,6 +147,7 @@ class Leveling(commands.Cog):
         
         new_xp = xp + base_xp
         
+        # This loop checks if the new XP total qualifies them for Level + 1
         temp_level = level
         while new_xp >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
@@ -177,7 +179,9 @@ class Leveling(commands.Cog):
             xp_end = self.get_xp_for_level(level + 1)
             xp_within_level = xp - xp_start
             needed_for_level = xp_end - xp_start
-            percentage = (xp_within_level / needed_for_level) * 100
+            
+            # Prevent division by zero if it happens
+            percentage = (xp_within_level / needed_for_level) * 100 if needed_for_level > 0 else 0
 
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
@@ -296,7 +300,6 @@ class Leveling(commands.Cog):
                     break 
             xp = self.get_xp_for_level(starting_level)
             
-            # Updated to prevent overwriting custom backgrounds/colors
             self.cursor.execute("""
                 INSERT INTO users (user_id, xp, level) 
                 VALUES (?, ?, ?) 
