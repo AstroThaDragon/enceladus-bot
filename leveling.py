@@ -1,11 +1,13 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands # Added this to fix the @discord.app_commands errors
 import sqlite3
 import random
 import time
 from easy_pil import Editor, Canvas, Font, load_image_async
 import json
+from typing import Optional # Added for proper type hinting
 
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member):
@@ -41,51 +43,33 @@ class Leveling(commands.Cog):
         self.conn.commit()
 
         # --- CONFIGURATION ---
-        self.ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456 # #spam-chat
-        self.BOOSTER_ROLE_ID = 927505358736470047         # Celestial Amplifier
-        self.WATCHLIST_ROLE_ID = 928584760748564570       # On Watchlist
+        self.ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456 
+        self.BOOSTER_ROLE_ID = 927505358736470047         
+        self.WATCHLIST_ROLE_ID = 928584760748564570       
         
         self.NO_XP_CHANNELS = [1117403991266041906, 593398659530489858, 1306821711970435122, 1496628909570265199, 1473398974508437645, 1352415256584130590] 
         self.NO_XP_CATEGORIES = [593406939111751721, 593413698085978132]
 
         self.level_roles = {
-            100: 1296961266627121223, 
-            95: 1501609710573453324, 
-            90: 1501609557804187781, 
-            85: 1501609375318675657, 
-            80: 1501609179566313522, 
-            75: 1501608976507211920, 
-            70: 1501608777613312020, 
-            65: 1501608443356643328, 
-            60: 1501608145582031000, 
-            55: 1501607815893094552, 
-            50: 1296959776667730143, 
-            45: 1296959689367617660, 
-            40: 1296959665455890483, 
-            35: 1296959633436708897, 
-            30: 1296959584820264980, 
-            25: 1295861213695311935, 
-            20: 1295861175388475463, 
-            15: 1295861144996806726, 
-            10: 1295861102483210260, 
-            5: 1295861061995597844, 
-            1: 1295860897532608615
+            100: 1296961266627121223, 95: 1501609710573453324, 90: 1501609557804187781, 
+            85: 1501609375318675657, 80: 1501609179566313522, 75: 1501608976507211920, 
+            70: 1501608777613312020, 65: 1501608443356643328, 60: 1501608145582031000, 
+            55: 1501607815893094552, 50: 1296959776667730143, 45: 1296959689367617660, 
+            40: 1296959665455890483, 35: 1296959633436708897, 30: 1296959584820264980, 
+            25: 1295861213695311935, 20: 1295861175388475463, 15: 1295861144996806726, 
+            10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615
         }
 
         self.cooldowns = {}
 
     def get_xp_for_level(self, level):
-        """Calculates total XP needed to reach a level using the Arcane formula."""
+        """Calculates total XP using Arcane Exponential: 5L^2 + 50L + 75"""
         if level <= 0: return 0
-        # Exact Arcane formula: 5L^2 + 50L + 75
-        # This makes Level 1 cost 130 XP total, starting very easy.
         return (5 * (level**2)) + (50 * level) + 75
 
     async def _update_member_roles(self, member, new_level):
-        """Helper function to manage roles and announcements for level-ups/manual sets."""
         guild = member.guild
         new_role_id = None
-        
         for lvl, rid in sorted(self.level_roles.items(), reverse=True):
             if new_level >= lvl:
                 new_role_id = rid
@@ -95,14 +79,12 @@ class Leveling(commands.Cog):
             new_role = guild.get_role(new_role_id)
             if new_role and new_role not in member.roles:
                 await member.add_roles(new_role)
-                
                 announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
                 if announcement_channel:
                     await announcement_channel.send(
                         f"🌌 **Congratulations, {member.mention}!** "
-                        f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring through the ranks! 🚀"
+                        f"You've reached level {new_level} and earned the **{new_role.name}** role! 🚀"
                     )
-
             roles_to_remove = [
                 guild.get_role(rid) for lvl, rid in self.level_roles.items() 
                 if rid != new_role_id and rid != 0 and guild.get_role(rid) in member.roles
@@ -112,19 +94,13 @@ class Leveling(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot or not message.guild:
-            return
-
-        if message.channel.id in self.NO_XP_CHANNELS or message.channel.category_id in self.NO_XP_CATEGORIES:
-            return
-        if message.author.get_role(self.WATCHLIST_ROLE_ID):
-            return
+        if message.author.bot or not message.guild: return
+        if message.channel.id in self.NO_XP_CHANNELS or message.channel.category_id in self.NO_XP_CATEGORIES: return
+        if message.author.get_role(self.WATCHLIST_ROLE_ID): return
 
         user_id = message.author.id
         current_time = time.time()
-        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60:
-            return 
-        
+        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60: return 
         self.cooldowns[user_id] = current_time
 
         self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,))
@@ -146,8 +122,6 @@ class Leveling(commands.Cog):
             base_xp = int(base_xp * 1.15) 
         
         new_xp = xp + base_xp
-        
-        # This loop checks if the new XP total qualifies them for Level + 1
         temp_level = level
         while new_xp >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
@@ -158,29 +132,22 @@ class Leveling(commands.Cog):
             self.cursor.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, new_level, user_id))
         else:
             self.cursor.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
-
         self.conn.commit()
 
     @commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
         await ctx.defer() 
         member = member or ctx.author
-        
         try:
             self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
             result = self.cursor.fetchone()
-            
-            if not result:
-                return await ctx.send("This user hasn't earned any XP yet!")
+            if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
             xp, level, bar_color, bg_url = result
-            
             xp_start = self.get_xp_for_level(level)
             xp_end = self.get_xp_for_level(level + 1)
             xp_within_level = xp - xp_start
             needed_for_level = xp_end - xp_start
-            
-            # Prevent division by zero if it happens
             percentage = (xp_within_level / needed_for_level) * 100 if needed_for_level > 0 else 0
 
             current_role_name = "No Rank"
@@ -192,20 +159,17 @@ class Leveling(commands.Cog):
                     break
 
             dragon_rank = "0"
-            api_url = "https://draconova-production.up.railway.app/leaderboard" 
-
             try:
                 import aiohttp
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(api_url, timeout=5) as response:
+                    async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=5) as response:
                         if response.status == 200:
                             data = await response.json()
                             for i, entry in enumerate(data):
                                 if str(entry.get('user_id')) == str(member.id):
                                     dragon_rank = str(i + 1)
                                     break
-            except Exception as e:
-                print(f"Draconova API Fetch Error: {e}")
+            except: pass
 
             try:
                 if bg_url:
@@ -218,8 +182,7 @@ class Leveling(commands.Cog):
             except:
                 background = Editor(Canvas((900, 270), color="#23272a"))
 
-            avatar_url = member.display_avatar.replace(format="png", size=256).url
-            avatar_image = await load_image_async(avatar_url)
+            avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
             background.paste(avatar, (50, 60))
             
@@ -235,19 +198,8 @@ class Leveling(commands.Cog):
             background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
-            special_roles = {1496031062218772510: "icons/starborn.png", 1500011207929892884: "icons/dragon_champion.png", 1500010986835542138: "icons/dragon_lord.png"}
-            icon_x = 230
-            for role_id, icon_path in special_roles.items():
-                if member.get_role(role_id) and os.path.exists(icon_path):
-                    try:
-                        icon = Editor(icon_path).resize((35, 35))
-                        background.paste(icon, (icon_x, 55))
-                        icon_x += 40 
-                    except: continue
-
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
             if percentage > 0: background.bar((230, 185), max_width=600, height=35, percentage=percentage, fill=bar_color, radius=20)
-
             background.text((830, 155), f"{xp} / {xp_end} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
@@ -256,7 +208,7 @@ class Leveling(commands.Cog):
             await ctx.send("There was an error generating the rank card.")
 
     @commands.hybrid_command(name="customize", description="Change your rank card bar color or background!")
-    async def customize(self, ctx, color_hex: str = None, background_url: str = None):
+    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None):
         if not color_hex and not background_url: return await ctx.send("Provide a hex color or image URL!", ephemeral=True)
         if color_hex:
             if not color_hex.startswith("#") or len(color_hex) != 7: return await ctx.send("Invalid hex color!", ephemeral=True)
@@ -265,19 +217,18 @@ class Leveling(commands.Cog):
         self.conn.commit()
         await ctx.send("✅ Rank card updated!", ephemeral=True)
 
-    @discord.app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
+    @app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         temp_level = 0
         while amount >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
-        
         self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, amount, temp_level))
         self.conn.commit()
         await self._update_member_roles(member, temp_level)
         await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
 
-    @discord.app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
+    @app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
         new_xp = self.get_xp_for_level(level)
@@ -286,7 +237,7 @@ class Leveling(commands.Cog):
         await self._update_member_roles(member, level)
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
 
-    @discord.app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
+    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -299,20 +250,12 @@ class Leveling(commands.Cog):
                     starting_level = level
                     break 
             xp = self.get_xp_for_level(starting_level)
-            
-            self.cursor.execute("""
-                INSERT INTO users (user_id, xp, level) 
-                VALUES (?, ?, ?) 
-                ON CONFLICT(user_id) DO UPDATE SET 
-                    xp = excluded.xp, 
-                    level = excluded.level
-            """, (member.id, xp, starting_level))
-            
+            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level", (member.id, xp, starting_level))
             synced_count += 1
         self.conn.commit()
         await interaction.followup.send(f"✅ Synced XP for {synced_count} members!", ephemeral=True)
 
-    @discord.app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
+    @app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def reset(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(content=f"⚠️ Reset all data for **{member.mention}**?", view=ResetConfirm(self, member), ephemeral=True)
