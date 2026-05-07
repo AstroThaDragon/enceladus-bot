@@ -123,7 +123,7 @@ class Fun(commands.Cog):
             label="Listen on YouTube", 
             url=youtube_search_url, 
             style=discord.ButtonStyle.link, 
-            emoji="🎧"
+            emoji="🎧" 
         ))
 
         await interaction.response.send_message(embed=embed, view=view)
