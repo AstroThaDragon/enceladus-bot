@@ -252,6 +252,17 @@ class Fun(commands.Cog):
                         # Get the parent body (Planet or Sun)
                         around_data = body.get('aroundPlanet')
                         around = around_data.get('planet').capitalize() if around_data else "The Sun"
+                        planet_map = {
+                            "Mercure": "Mercury",
+                            "Vénus": "Venus",
+                            "Terre": "Earth",
+                            "Mars": "Mars",
+                            "Jupiter": "Jupiter",
+                            "Saturne": "Saturn",
+                            "Uranus": "Uranus",
+                            "Neptune": "Neptune"
+                        }
+                        around = planet_map.get(around, around)
                         
                         # Temperature formatting
                         kelvin = body.get('avgTemp')
