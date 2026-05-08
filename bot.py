@@ -521,7 +521,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="#⭐ Leveling & Social",
+        name="__ ⭐ Leveling & Social__",
         value=(
             "`/rank [member]` - View your level, XP, and rank card.\n"
             "`/customize` - Personalize your rank card aesthetics.\n"
@@ -532,7 +532,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="# 🎮 Fun & Cosmic Games",
+        name="__ 🎮 Fun & Cosmic Games__",
         value=(
             "`/relic <question>` - Consult the Astral Relic for answers.\n"
             "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
@@ -545,7 +545,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="# 🎤 Rhythm & Search",
+        name="__ 🎤 Rhythm & Search__",
         value=(
             "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
             "`/fnfsong <song>` - Find FNF tracks on YouTube."
@@ -554,7 +554,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="# 🛠️ Server Tools",
+        name="__ 🛠️ Server Tools__",
         value=(
             "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere.\n"
             "`<-tagname>` - View a saved community tag.\n"
@@ -566,7 +566,7 @@ async def help_command(ctx):
     # Only shows this section if the user has Administrator permissions
     if ctx.author.guild_permissions.administrator:
         embed.add_field(
-            name="#🛡️ Station Admin (Staff Only)",
+            name="__ 🛡️ Station Admin (Staff Only)__",
             value=(
                 "`/setlevel` / `/setxp` - Manually adjust user stats.\n"
                 "`/sync_levels` - Calibrate levels based on roles.\n"
