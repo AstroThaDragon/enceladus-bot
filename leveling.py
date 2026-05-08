@@ -39,7 +39,7 @@ class Leveling(commands.Cog):
                              xp INTEGER DEFAULT 0, 
                              level INTEGER DEFAULT 0,
                              bar_color TEXT DEFAULT '#8a2be2',
-                             bg_url TEXT DEFAULT NULL)''')
+                             bg_url TEXT DEFAULT 'default')''')
         self.conn.commit()
 
         # --- CONFIGURATION ---
@@ -63,20 +63,17 @@ class Leveling(commands.Cog):
         self.cooldowns = {}
 
     def get_xp_for_level(self, level):
-        """Calculates total XP for 25k message grind to Level 100."""
+        """
+        The 'Infinite Slide' Formula. 
+        One equation for Level 1-100. 
+        Zero tier jumps, just a perfectly smooth difficulty curve.
+        """
         if level <= 0: return 0
         
-        # Level 1-5: Easy start (~4-7 messages per level)
-        if level <= 5:
-            return (20 * (level**2)) + (80 * level) + 25
-        
-        # Level 6-10: Mid-tier transition
-        elif level <= 10:
-            return (35 * (level**2)) + (100 * level) + 200
-            
-        # Level 11-100: Hardcore RPG curve (L^2 coefficient bumped to 68)
-        else:
-            return (68 * (level**2)) + (150 * level) + 500
+        # Total XP = (68 * L^2) + (150 * L) - 93
+        # Level 1 starts at 125 XP.
+        # Level 100 ends at 694,907 XP (~24.8k messages).
+        return (68 * (level**2)) + (150 * level) - 93
 
     async def _update_member_roles(self, member, new_level):
         guild = member.guild
@@ -248,37 +245,42 @@ class Leveling(commands.Cog):
         await self._update_member_roles(member, level)
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
 
-    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on their current roles (Admin only)")
+    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         synced_count = 0
         
-        # This forces the bot to check every member in the server
         for member in interaction.guild.members:
             if member.bot: continue
             
+            # Find the highest level role they have
             starting_level = 0
-            # Check roles from highest (100) to lowest (1)
             for level, role_id in sorted(self.level_roles.items(), reverse=True):
                 if role_id != 0 and member.get_role(role_id):
                     starting_level = level
                     break 
             
-            # Get the exact XP needed for that specific role level
-            xp = self.get_xp_for_level(starting_level)
-            
-            # Update the database
-            self.cursor.execute("""
-                INSERT INTO users (user_id, xp, level) 
-                VALUES (?, ?, ?) 
-                ON CONFLICT(user_id) 
-                DO UPDATE SET xp = excluded.xp, level = excluded.level
-            """, (member.id, xp, starting_level))
-            synced_count += 1
+            # Check current DB level to avoid demoting (e.g., Level 14 stay Level 14)
+            self.cursor.execute("SELECT level FROM users WHERE user_id = ?", (member.id,))
+            result = self.cursor.fetchone()
+            current_db_level = result[0] if result else -1
+
+            # Only update if the role indicates they should be a higher level than the DB says
+            if starting_level > current_db_level:
+                xp = self.get_xp_for_level(starting_level)
+                
+                # ON CONFLICT ONLY updates xp/level. It ignores bar_color and bg_url!
+                self.cursor.execute("""
+                    INSERT INTO users (user_id, xp, level, bar_color, bg_url) 
+                    VALUES (?, ?, ?, '#8a2be2', 'default') 
+                    ON CONFLICT(user_id) 
+                    DO UPDATE SET xp = excluded.xp, level = excluded.level
+                """, (member.id, xp, starting_level))
+                synced_count += 1
             
         self.conn.commit()
-        await interaction.followup.send(f"✅ Leveling system calibrated! Synced {synced_count} members to the new RPG curve.", ephemeral=True)
+        await interaction.followup.send(f"✅ Sync complete! Calibrated {synced_count} members.", ephemeral=True)
 
     @app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
     @commands.has_permissions(administrator=True)
