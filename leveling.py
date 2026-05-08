@@ -78,7 +78,8 @@ class Leveling(commands.Cog):
             55: 1501607815893094552, 50: 1296959776667730143, 45: 1296959689367617660, 
             40: 1296959665455890483, 35: 1296959633436708897, 30: 1296959584820264980, 
             25: 1295861213695311935, 20: 1295861175388475463, 15: 1295861144996806726, 
-            10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615
+            10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615,
+            0: 1501969001792798841
         }
 
         self.cooldowns = {}
@@ -107,7 +108,7 @@ class Leveling(commands.Cog):
                 new_role_id = rid
                 break
 
-        if new_role_id and new_role_id != 0:
+        if new_role_id is not None:
             new_role = guild.get_role(new_role_id)
             if new_role and new_role not in member.roles:
                 await member.add_roles(new_role)
@@ -123,10 +124,16 @@ class Leveling(commands.Cog):
             
             roles_to_remove = [
                 guild.get_role(rid) for lvl, rid in self.level_roles.items() 
-                if rid != new_role_id and rid != 0 and guild.get_role(rid) in member.roles
+                if rid != new_role_id and guild.get_role(rid) in member.roles
             ]
             if roles_to_remove:
                 await member.remove_roles(*[r for r in roles_to_remove if r])
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        if member.bot: return
+        # Automatically give Level 0 role on join
+        await self._update_member_roles(member, 0)
 
     @commands.Cog.listener()
     async def on_message(self, message):
