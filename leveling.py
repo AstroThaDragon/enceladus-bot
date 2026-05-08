@@ -34,14 +34,27 @@ class Leveling(commands.Cog):
         self.cursor = self.conn.cursor()
         self.cursor.execute('PRAGMA journal_mode=WAL')
         
+        # 1. Create the table with current standards
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                             (user_id INTEGER PRIMARY KEY, 
                              xp INTEGER DEFAULT 0, 
                              level INTEGER DEFAULT 0,
                              bar_color TEXT DEFAULT '#8a2be2',
                              bg_url TEXT DEFAULT 'default')''')
-        self.conn.commit()
 
+        # 2. Patch existing databases that might be missing new columns
+        try:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN bar_color TEXT DEFAULT '#8a2be2'")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+
+        try:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN bg_url TEXT DEFAULT 'default'")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+            
+        self.conn.commit()
+        
         # --- CONFIGURATION ---
         self.ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456 
         self.BOOSTER_ROLE_ID = 927505358736470047         
@@ -78,6 +91,9 @@ class Leveling(commands.Cog):
     async def _update_member_roles(self, member, new_level):
         guild = member.guild
         new_role_id = None
+        
+        is_milestone = new_level in self.level_roles
+        
         for lvl, rid in sorted(self.level_roles.items(), reverse=True):
             if new_level >= lvl:
                 new_role_id = rid
@@ -87,12 +103,16 @@ class Leveling(commands.Cog):
             new_role = guild.get_role(new_role_id)
             if new_role and new_role not in member.roles:
                 await member.add_roles(new_role)
-                announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
-                if announcement_channel:
-                    await announcement_channel.send(
-                        f"🌌 **Congratulations, {member.mention}!** "
-                        f"You've reached level {new_level} and earned the **{new_role.name}** role! 🚀"
-                    )
+                
+                # ONLY send the announcement if they hit the exact milestone level
+                if is_milestone:
+                    announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
+                    if announcement_channel:
+                        await announcement_channel.send(
+                            f"🌌 **Congratulations, {member.mention}!** "
+                            f"You've reached level {new_level} and earned the **{new_role.name}** role! 🚀"
+                        )
+            
             roles_to_remove = [
                 guild.get_role(rid) for lvl, rid in self.level_roles.items() 
                 if rid != new_role_id and rid != 0 and guild.get_role(rid) in member.roles
@@ -231,7 +251,15 @@ class Leveling(commands.Cog):
         temp_level = 0
         while amount >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
-        self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, amount, temp_level))
+            
+        # Using INSERT... ON CONFLICT to protect custom backgrounds and colors
+        self.cursor.execute("""
+            INSERT INTO users (user_id, xp, level) 
+            VALUES (?, ?, ?) 
+            ON CONFLICT(user_id) 
+            DO UPDATE SET xp = excluded.xp, level = excluded.level
+        """, (member.id, amount, temp_level))
+        
         self.conn.commit()
         await self._update_member_roles(member, temp_level)
         await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
@@ -240,7 +268,15 @@ class Leveling(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
         new_xp = self.get_xp_for_level(level)
-        self.cursor.execute("INSERT OR REPLACE INTO users (user_id, xp, level) VALUES (?, ?, ?)", (member.id, new_xp, level))
+        
+        # Swapped to ON CONFLICT to protect user customizations
+        self.cursor.execute("""
+            INSERT INTO users (user_id, xp, level) 
+            VALUES (?, ?, ?) 
+            ON CONFLICT(user_id) 
+            DO UPDATE SET xp = excluded.xp, level = excluded.level
+        """, (member.id, new_xp, level))
+        
         self.conn.commit()
         await self._update_member_roles(member, level)
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
