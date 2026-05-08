@@ -22,6 +22,7 @@ intents.members = True
 intents.voice_states = True 
 
 bot = commands.Bot(command_prefix='-', intents=intents)
+bot.remove_command('help')
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
@@ -482,25 +483,6 @@ async def iss(interaction: discord.Interaction):
             print(f"ISS Command Error: {e}")
             await interaction.followup.send("The tracking station is currently offline. Try again later!")
 
-@bot.tree.command(name="spacefact", description="Get a random, mind-blowing space fact!")
-async def spacefact(interaction: discord.Interaction):
-    url = "https://uselessfacts.jsph.pl/api/v2/facts/random"
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-                fact = data.get('text')
-                
-                embed = discord.Embed(
-                    title="🌌 Cosmic Trivia",
-                    description=fact,
-                    color=discord.Color.purple()
-                )
-                await interaction.response.send_message(embed=embed)
-            else:
-                await interaction.response.send_message("My star-charts are a bit blurry right now. Try again soon!")
-
 # --- COMMANDS ---
 @bot.command()
 async def qr(ctx, *, reason):
@@ -528,6 +510,74 @@ async def resetbump(ctx):
     conn.commit()
     conn.close()
     await ctx.send("Bump timer has been cleared from the database! 🔄")
+    
+@bot.hybrid_command(name="help", aliases=["commands"], description="Displays the full directory of Enceladus' commands!")
+async def help_command(ctx):
+    """The central directory for all of Enceladus' station functions."""
+    embed = discord.Embed(
+        title="🛰️ Enceladus Command Directory",
+        description="Use `/help` for Slash or `-commands` for Prefix.",
+        color=discord.Color.from_rgb(138, 43, 226)
+    )
+
+    embed.add_field(
+        name="⭐ Leveling & Social",
+        value=(
+            "`/rank [member]` - View your level, XP, and rank card.\n"
+            "`/customize` - Personalize your rank card aesthetics.\n"
+            "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
+            "`/slap <member>` - Strike someone with a random object."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎮 Fun & Cosmic Games",
+        value=(
+            "`/relic <question>` - Consult the Astral Relic for answers.\n"
+            "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
+            "`/roll [sides]` - Roll a die (2-20 sides).\n"
+            "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
+            "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
+            "`/blackhole <text>` - Send a message into the void."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎤 Rhythm & Search",
+        value=(
+            "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
+            "`/fnfsong <song>` - Find FNF tracks on YouTube."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛠️ Server Tools",
+        value=(
+            "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere.\n"
+            "`<-tagname>` - View a saved community tag.\n"
+            "`-tags` - List all available community tags."
+        ),
+        inline=False
+    )
+
+    # Only shows this section if the user has Administrator permissions
+    if ctx.author.guild_permissions.administrator:
+        embed.add_field(
+            name="🛡️ Station Admin (Staff Only)",
+            value=(
+                "`/setlevel` / `/setxp` - Manually adjust user stats.\n"
+                "`/sync_levels` - Calibrate levels based on roles.\n"
+                "`/reset <member>` - Wipe all leveling progress for a member."
+            ),
+            inline=False
+        )
+
+    embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
+    
+    await ctx.send(embed=embed)
 
 async def load_extensions():
     # This tells the bot to load your new leveling.py file

@@ -222,5 +222,77 @@ class Fun(commands.Cog):
         result = random.randint(1, sides)
         await ctx.send(f"🎲 **{ctx.author.display_name}** rolled a **D{sides}** and got: **{result}**")
 
+    @commands.hybrid_command(name="spacefact", description="Pull real-time data on a random celestial body!")
+    async def spacefact(self, ctx):
+        url = "https://api.le-systeme-solaire.net/rest/bodies/"
+        api_key = "99499df9-ede1-466d-8fcd-a7ee85201ffd"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        await ctx.defer()
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Filter: Only keep objects that have gravity data or a discoverer 
+                        # to avoid showing "empty" scan results.
+                        bodies = [b for b in data['bodies'] if b.get('gravity') or b.get('discoveredBy')]
+                        body = random.choice(bodies)
+                        
+                        name = body.get('englishName', 'Unknown Entity')
+                        body_type = body.get('bodyType', 'Object')
+                        gravity = body.get('gravity') or "Minimal"
+                        discovered = body.get('discoveryDate') or "Pre-modern"
+                        
+                        # Get the parent body (Planet or Sun)
+                        around_data = body.get('aroundPlanet')
+                        around = around_data.get('planet').capitalize() if around_data else "The Sun"
+                        planet_map = {
+                            "Mercure": "Mercury",
+                            "Vénus": "Venus",
+                            "Terre": "Earth",
+                            "Mars": "Mars",
+                            "Jupiter": "Jupiter",
+                            "Saturne": "Saturn",
+                            "Uranus": "Uranus",
+                            "Neptune": "Neptune"
+                        }
+                        around = planet_map.get(around, around)
+                        
+                        # Temperature formatting
+                        kelvin = body.get('avgTemp')
+                        if kelvin and kelvin != 0:
+                            celsius = round(kelvin - 273.15, 1)
+                            temp_display = f"{celsius}°C"
+                        else:
+                            temp_display = "Varies greatly"
+                        
+                        fact_msg = (
+                            f"**Classification:** {body_type.capitalize()}\n"
+                            f"**Orbiting:** {around}\n"
+                            f"**Surface Gravity:** {gravity} m/s²\n"
+                            f"**Surface Temp:** {temp_display}\n"
+                            f"**Discovered:** {discovered}"
+                        )
+
+                        embed = discord.Embed(
+                            title=f"🔭 Deep Space Scan",
+                            description=f"**Name: {name}**\n{fact_msg}",
+                            color=discord.Color.blue()
+                        )
+                        embed.set_footer(text="Enceladus' Station | Solar System Database")
+                        await ctx.send(embed=embed)
+                    else:
+                        print(f"API Error Status: {response.status}")
+                        await ctx.send("📡 The API uplink rejected our key or is down.")
+        except Exception as e:
+            print(f"Space Error: {e}")
+            await ctx.send("🌌 Something went wrong in the asteroid belt.")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot))
