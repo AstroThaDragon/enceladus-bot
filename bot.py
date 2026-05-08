@@ -482,24 +482,51 @@ async def iss(interaction: discord.Interaction):
             print(f"ISS Command Error: {e}")
             await interaction.followup.send("The tracking station is currently offline. Try again later!")
 
-@bot.tree.command(name="spacefact", description="Get a random, mind-blowing space fact!")
-async def spacefact(interaction: discord.Interaction):
-    url = "https://uselessfacts.jsph.pl/api/v2/facts/random"
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-                fact = data.get('text')
-                
-                embed = discord.Embed(
-                    title="🌌 Cosmic Trivia",
-                    description=fact,
-                    color=discord.Color.purple()
-                )
-                await interaction.response.send_message(embed=embed)
-            else:
-                await interaction.response.send_message("My star-charts are a bit blurry right now. Try again soon!")
+@app_commands.command(name="spacefact", description="Pull real-time data on a random celestial body!")
+async def spacefact(self, interaction: discord.Interaction):
+        # 1. Define your URL and your Key
+        url = "https://api.le-systeme-solaire.net/rest/bodies/"
+        api_key = "99499df9-ede1-466d-8fcd-a7ee85201ffd" # Put your key inside the quotes
+        
+        # 2. Put the key in a dictionary to send with the request
+        # Most APIs expect the key to be labeled as 'api_key' or 'key'
+        params = {"api_key": api_key} 
+
+        await interaction.response.defer()
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # 3. Pass the params into the get() request
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        body = random.choice(data['bodies'])
+                        
+                        name = body.get('englishName', 'Unknown Entity')
+                        gravity = body.get('gravity', 'Unknown')
+                        avg_temp = body.get('avgTemp', 'Unknown')
+                        body_type = body.get('bodyType', 'Object')
+                        
+                        # Formatting the 'fact'
+                        fact_msg = (
+                            f"**Name:** {name}\n"
+                            f"**Classification:** {body_type.capitalize()}\n"
+                            f"**Surface Gravity:** {gravity} m/s²\n"
+                            f"**Average Temp:** {avg_temp} K"
+                        )
+
+                        embed = discord.Embed(
+                            title="🛰️ Deep Space Scan Result",
+                            description=fact_msg,
+                            color=discord.Color.blue()
+                        )
+                        embed.set_footer(text="Enceladus' Station | Solar System Data")
+                        await interaction.followup.send(embed=embed)
+                    else:
+                        await interaction.followup.send("📡 The API uplink rejected our key or is down.")
+        except Exception as e:
+            print(f"Space Error: {e}")
+            await interaction.followup.send("🌌 Something went wrong in the asteroid belt.")
 
 # --- COMMANDS ---
 @bot.command()
@@ -528,6 +555,74 @@ async def resetbump(ctx):
     conn.commit()
     conn.close()
     await ctx.send("Bump timer has been cleared from the database! 🔄")
+    
+@bot.hybrid_command(name="help", aliases=["commands"], description="Displays the full directory of Enceladus' commands!")
+async def help_command(ctx):
+    """The central directory for all of Enceladus' station functions."""
+    embed = discord.Embed(
+        title="🛰️ Enceladus Command Directory",
+        description="Use `/help` for Slash or `-commands` for Prefix.",
+        color=discord.Color.from_rgb(138, 43, 226)
+    )
+
+    embed.add_field(
+        name="⭐ Leveling & Social",
+        value=(
+            "`/rank [member]` - View your level, XP, and rank card.\n"
+            "`/customize` - Personalize your rank card aesthetics.\n"
+            "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
+            "`/slap <member>` - Strike someone with a random object."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎮 Fun & Cosmic Games",
+        value=(
+            "`/relic <question>` - Consult the Astral Relic for answers.\n"
+            "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
+            "`/roll [sides]` - Roll a die (2-20 sides).\n"
+            "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
+            "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
+            "`/blackhole <text>` - Send a message into the void."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎤 Rhythm & Search",
+        value=(
+            "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
+            "`/fnfsong <song>` - Find FNF tracks on YouTube."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛠️ Server Tools",
+        value=(
+            "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere.\n"
+            "`<-tagname>` - View a saved community tag.\n"
+            "`-tags` - List all available community tags."
+        ),
+        inline=False
+    )
+
+    # Only shows this section if the user has Administrator permissions
+    if ctx.author.guild_permissions.administrator:
+        embed.add_field(
+            name="🛡️ Station Admin (Staff Only)",
+            value=(
+                "`/setlevel` / `/setxp` - Manually adjust user stats.\n"
+                "`/sync_levels` - Calibrate levels based on roles.\n"
+                "`/reset <member>` - Wipe all leveling progress for a member."
+            ),
+            inline=False
+        )
+
+    embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
+    
+    await ctx.send(embed=embed)
 
 async def load_extensions():
     # This tells the bot to load your new leveling.py file
