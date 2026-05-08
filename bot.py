@@ -22,6 +22,7 @@ intents.members = True
 intents.voice_states = True 
 
 bot = commands.Bot(command_prefix='-', intents=intents)
+bot.remove_command('help')
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
