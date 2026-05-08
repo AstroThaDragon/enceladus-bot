@@ -30,11 +30,19 @@ class ResetConfirm(discord.ui.View):
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.conn = sqlite3.connect('/app/data/levels.db', timeout=10)
+        
+        # --- Smart Database Pathing ---
+        # Checks if the Railway folder exists; if not, uses local folder
+        if os.path.exists('/app/data'):
+            db_path = '/app/data/levels.db'
+        else:
+            db_path = 'levels.db'
+            
+        self.conn = sqlite3.connect(db_path, timeout=10)
         self.cursor = self.conn.cursor()
         self.cursor.execute('PRAGMA journal_mode=WAL')
         
-        # 1. Create the table with current standards
+        # --- Table Setup ---
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                             (user_id INTEGER PRIMARY KEY, 
                              xp INTEGER DEFAULT 0, 
