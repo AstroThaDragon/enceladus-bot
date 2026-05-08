@@ -282,7 +282,7 @@ class Fun(commands.Cog):
 
                         embed = discord.Embed(
                             title=f"🔭 Deep Space Scan",
-                            description=f"**{name}**\n{fact_msg}",
+                            description=f"**Name: {name}**\n{fact_msg}",
                             color=discord.Color.blue()
                         )
                         embed.set_footer(text="Enceladus' Station | Solar System Database")
