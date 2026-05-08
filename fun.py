@@ -227,13 +227,17 @@ class Fun(commands.Cog):
         url = "https://api.le-systeme-solaire.net/rest/bodies/"
         api_key = "99499df9-ede1-466d-8fcd-a7ee85201ffd"
         
-        params = {"api_key": api_key} 
+        # This is where we format the 'Bearer Token' for the header
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
 
         await ctx.defer()
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as response:
+                # We change 'params=' to 'headers='
+                async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
                         body = random.choice(data['bodies'])
@@ -242,7 +246,6 @@ class Fun(commands.Cog):
                         gravity = body.get('gravity', 'Unknown')
                         body_type = body.get('bodyType', 'Object')
                         
-                        # --- Temperature Conversion ---
                         kelvin = body.get('avgTemp')
                         if kelvin and kelvin != 0:
                             celsius = round(kelvin - 273.15, 1)
@@ -263,9 +266,10 @@ class Fun(commands.Cog):
                             color=discord.Color.blue()
                         )
                         embed.set_footer(text="Enceladus Station | Solar System Data")
-                        
                         await ctx.send(embed=embed)
                     else:
+                        # Printing the status code helps you debug if it fails again
+                        print(f"API Error Status: {response.status}")
                         await ctx.send("📡 The API uplink rejected our key or is down.")
         except Exception as e:
             print(f"Space Error: {e}")
