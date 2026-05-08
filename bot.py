@@ -482,52 +482,6 @@ async def iss(interaction: discord.Interaction):
             print(f"ISS Command Error: {e}")
             await interaction.followup.send("The tracking station is currently offline. Try again later!")
 
-@app_commands.command(name="spacefact", description="Pull real-time data on a random celestial body!")
-async def spacefact(self, interaction: discord.Interaction):
-        # 1. Define your URL and your Key
-        url = "https://api.le-systeme-solaire.net/rest/bodies/"
-        api_key = "99499df9-ede1-466d-8fcd-a7ee85201ffd" # Put your key inside the quotes
-        
-        # 2. Put the key in a dictionary to send with the request
-        # Most APIs expect the key to be labeled as 'api_key' or 'key'
-        params = {"api_key": api_key} 
-
-        await interaction.response.defer()
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                # 3. Pass the params into the get() request
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        body = random.choice(data['bodies'])
-                        
-                        name = body.get('englishName', 'Unknown Entity')
-                        gravity = body.get('gravity', 'Unknown')
-                        avg_temp = body.get('avgTemp', 'Unknown')
-                        body_type = body.get('bodyType', 'Object')
-                        
-                        # Formatting the 'fact'
-                        fact_msg = (
-                            f"**Name:** {name}\n"
-                            f"**Classification:** {body_type.capitalize()}\n"
-                            f"**Surface Gravity:** {gravity} m/s²\n"
-                            f"**Average Temp:** {avg_temp} K"
-                        )
-
-                        embed = discord.Embed(
-                            title="🛰️ Deep Space Scan Result",
-                            description=fact_msg,
-                            color=discord.Color.blue()
-                        )
-                        embed.set_footer(text="Enceladus' Station | Solar System Data")
-                        await interaction.followup.send(embed=embed)
-                    else:
-                        await interaction.followup.send("📡 The API uplink rejected our key or is down.")
-        except Exception as e:
-            print(f"Space Error: {e}")
-            await interaction.followup.send("🌌 Something went wrong in the asteroid belt.")
-
 # --- COMMANDS ---
 @bot.command()
 async def qr(ctx, *, reason):
