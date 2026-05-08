@@ -511,17 +511,17 @@ async def resetbump(ctx):
     conn.close()
     await ctx.send("Bump timer has been cleared from the database! 🔄")
     
-@bot.hybrid_command(name="help", aliases=["commands"], description="Displays the full directory of Enceladus' commands!")
+@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
 async def help_command(ctx):
     """The central directory for all of Enceladus' station functions."""
     embed = discord.Embed(
-        title="🛰️ Enceladus Command Directory",
-        description="Use `/help` for Slash or `-commands` for Prefix.",
+        title="# 🛰️ Enceladus Command Directory",
+        description="Use `/help` for Slash or `-protocols` for Prefix.",
         color=discord.Color.from_rgb(138, 43, 226)
     )
 
     embed.add_field(
-        name="⭐ Leveling & Social",
+        name="#⭐ Leveling & Social",
         value=(
             "`/rank [member]` - View your level, XP, and rank card.\n"
             "`/customize` - Personalize your rank card aesthetics.\n"
@@ -532,7 +532,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="🎮 Fun & Cosmic Games",
+        name="# 🎮 Fun & Cosmic Games",
         value=(
             "`/relic <question>` - Consult the Astral Relic for answers.\n"
             "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
@@ -545,7 +545,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="🎤 Rhythm & Search",
+        name="# 🎤 Rhythm & Search",
         value=(
             "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
             "`/fnfsong <song>` - Find FNF tracks on YouTube."
@@ -554,7 +554,7 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="🛠️ Server Tools",
+        name="# 🛠️ Server Tools",
         value=(
             "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere.\n"
             "`<-tagname>` - View a saved community tag.\n"
@@ -566,7 +566,7 @@ async def help_command(ctx):
     # Only shows this section if the user has Administrator permissions
     if ctx.author.guild_permissions.administrator:
         embed.add_field(
-            name="🛡️ Station Admin (Staff Only)",
+            name="#🛡️ Station Admin (Staff Only)",
             value=(
                 "`/setlevel` / `/setxp` - Manually adjust user stats.\n"
                 "`/sync_levels` - Calibrate levels based on roles.\n"
