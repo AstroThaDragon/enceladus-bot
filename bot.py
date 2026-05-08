@@ -11,7 +11,7 @@ from discord import app_commands
 import aiohttp
 import asyncio
 import re
-import sqlite3 # Added for persistence
+import sqlite3
 from datetime import datetime, time, timezone, timedelta
 
 load_dotenv()
@@ -537,10 +537,15 @@ async def load_extensions():
 
 async def main():
     async with bot:
-        token = os.getenv('DISCORD_TOKEN') 
+        token = os.getenv('DEV_TOKEN') or os.getenv('DISCORD_TOKEN') 
+        
         await init_bump_db()
         await load_extensions()
-        await bot.start(token)
+        
+        if token:
+            await bot.start(token)
+        else:
+            print("❌ ERROR: No bot token found in environment variables!")
 
 if __name__ == "__main__":
     asyncio.run(main())
