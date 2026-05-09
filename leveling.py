@@ -8,6 +8,8 @@ import time
 from easy_pil import Editor, Canvas, Font, load_image_async
 import json
 from typing import Optional
+import io
+import aiohttp
 
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member):
@@ -26,6 +28,18 @@ class ResetConfirm(discord.ui.View):
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="❌ Reset cancelled.", view=None)
         self.stop()
+
+async def load_custom_image(url):
+    async with aiohttp.ClientSession() as session:
+        # This 'User-Agent' makes the bot look like a real person to Imgur
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"}
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.read()
+                return io.BytesIO(data)
+            else:
+                print(f"Image Load Failed: Status {response.status}")
+                return None
 
 class Leveling(commands.Cog):
     def __init__(self, bot):
@@ -254,14 +268,20 @@ class Leveling(commands.Cog):
             except: pass
 
             try:
-                if bg_url:
-                    bg_image = await load_image_async(bg_url)
-                    background = Editor(bg_image).resize((900, 270))
+                # Use our new 'load_custom_image' instead of the easy_pil one for backgrounds
+                if bg_url and bg_url != 'default':
+                    bg_data = await load_custom_image(bg_url)
+                    if bg_data:
+                        background = Editor(bg_data).resize((900, 270))
+                    else:
+                        # Fallback to default if the download failed
+                        background = Editor(Canvas((900, 270), color="#23272a"))
                 elif os.path.exists("images/rank_template.png"):
                     background = Editor("images/rank_template.png")
                 else:
                     background = Editor(Canvas((900, 270), color="#23272a"))
-            except:
+            except Exception as e:
+                print(f"Background Error: {e}")
                 background = Editor(Canvas((900, 270), color="#23272a"))
 
             avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
