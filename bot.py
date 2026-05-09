@@ -218,7 +218,7 @@ async def on_message(message):
                 # Reach into the Leveling cog from main.py
                 leveling_cog = bot.get_cog('Leveling')
                 if leveling_cog:
-                    await leveling_cog.add_xp(user_obj, 500)
+                    await leveling_cog.add_xp(user_obj, 400)
                 else:
                     print("Leveling cog not found, couldn't award bump XP.")
             # -------------------
