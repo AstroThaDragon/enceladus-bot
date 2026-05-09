@@ -189,7 +189,7 @@ class Leveling(commands.Cog):
         else:
             xp, level = result
 
-        base_xp = random.randint(15, 40)
+        base_xp = random.randint(20, 50)
         if message.author.get_role(self.BOOSTER_ROLE_ID):
             base_xp = int(base_xp * 1.15) 
         
@@ -231,9 +231,6 @@ class Leveling(commands.Cog):
 
             # CLAMP: This prevents the bar from breaking if the math goes weird
             percentage = max(0, min(percentage, 1))
-
-            # TEMPORARY DEBUG (Check your Railway logs to see these!)
-            print(f"DEBUG: XP={xp}, Start={xp_start}, End={xp_end}, %={percentage}")
 
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
