@@ -284,7 +284,7 @@ class Leveling(commands.Cog):
             background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
-            if percentage > 0: background.bar((230, 185), max_width=600, height=35, percentage=percentage, fill=bar_color, radius=20)
+            if percentage > 0: background.bar((230, 185), max_width=600, height=35, percentage=1, fill=bar_color, radius=10)
             background.text((830, 155), f"{xp} / {xp_end} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
