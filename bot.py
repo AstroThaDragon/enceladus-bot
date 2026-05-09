@@ -209,7 +209,7 @@ async def on_message(message):
 
             thanks_text = (
                 f"Thank you so much for bumping our server, {user_mention}! It helps us a ton!! <:CoolEevee:1109771250634592306> 💜\n"
-                f"You've earned **500 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
+                f"You've earned **400 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
             )
             await message.channel.send(thanks_text)
 

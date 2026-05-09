@@ -129,6 +129,35 @@ class Leveling(commands.Cog):
             if roles_to_remove:
                 await member.remove_roles(*[r for r in roles_to_remove if r])
 
+    async def add_xp(self, member: discord.Member, amount: int):
+        """Internal helper to award XP from external events like Bumping."""
+        if member.bot: return
+
+        user_id = member.id
+        self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,))
+        result = self.cursor.fetchone()
+
+        if result is None:
+            # If they aren't in the DB yet, start them at Level 0 + the reward
+            xp, level = amount, 0
+            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
+        else:
+            xp, level = result
+            new_xp = xp + amount
+            
+            # Level up logic
+            temp_level = level
+            while new_xp >= self.get_xp_for_level(temp_level + 1):
+                temp_level += 1
+            
+            if temp_level > level:
+                await self._update_member_roles(member, temp_level)
+                self.cursor.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, temp_level, user_id))
+            else:
+                self.cursor.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
+        
+        self.conn.commit()
+
     @commands.Cog.listener()
     async def on_member_join(self, member):
         if member.bot: return
