@@ -13,7 +13,7 @@ tag_list = {
         "-CaseOh\n"
         "images/banned.gif"
     ),
-    "beepboopbop": "Beep boop bop?\nimages/beepboopbop.gif",
+    "beepboop": "Beep boop?\nimages/beepboopbop.gif",
     "bite": "*Nom*\nimages/bite.gif",
     "blu": "The reason it's named that? For someone I know. Yes, this tag is for them\nimages/blu.gif",
     "boykisser": "Are *you* a boykisser?\nimages/boykisser.gif",
@@ -45,7 +45,7 @@ tag_list = {
     ),
     "list": (
         "Here's our current tag list! 💜\n"
-        "**-aghghgh | -angery | -arrived | -astro | -baldi | -banned | -beepboop | -bite | -blu | -boykisser | -brick | -dead | -deadchat | -deletethis | -desgostang | -dragonhug | -forgetthat | -freaky | -freakycat | -gm | -gn | -handshake | -hoopla | -huzzah | -imtotallyfine | -laughat | -malo | -minigames | -minion | -nightflaid | -pathetic | -personalspace | -poyo | -punch | -retro | -screwit | -sharklunge | -sniffsniff | -spunchgun | -spunchpop | -stinks | -tired | -toopliss | -toothless | -trade | -umbre | -umbrecup | -vox | -wtf**\n"
+        "**-angery | -arrived | -astro | -baldi | -banned | -beepboop | -bite | -blu | -boykisser | -brick | -dead | -deadchat | -deletethis | -desgostang | -dragonhug | -forgetthat | -freaky | -freakycat | -gm | -gn | -handshake | -hoopla | -huzzah | -imtotallyfine | -laughat | -malo | -minigames | -minion | -nightflaid | -pathetic | -personalspace | -poyo | -punch | -retro | -screwit | -sharklunge | -sniffsniff | -spunchgun | -spunchpop | -stinks | -tired | -toopliss | -toothless | -trade | -umbre | -umbrecup | -vox | -wtf**\n"
         )
     ,
     "malo": (

@@ -189,11 +189,11 @@ class Fun(commands.Cog):
     @commands.hybrid_command(name="hug", description="Give someone a warm, fuzzy hug!")
     async def hug(self, ctx, member: discord.Member):
         if member == ctx.author:
-            return await ctx.send(f"You're hugging yourself? That's actually wholesome. {ctx.author.mention} gets a hug from... themselves! ❤️")
+            return await ctx.send(f"You're hugging yourself? That's actually wholesome. {ctx.author.mention} gets a hug from... themselves! 💜")
             
-        await ctx.send(f"**{ctx.author.display_name}** gives **{member.display_name}** a big, warm hug!")
+        await ctx.send(f"**{ctx.author.mention}** gives **{member.mention}** a big, warm hug! How sweet! 💜")
 
-    @commands.hybrid_command(name="choose", description="Let the bot decide between multiple options!")
+    @commands.hybrid_command(name="choose", description="Let the bot decide between multiple options! Use commas to separate choices!")
     async def choose(self, ctx, *, choices: str):
         options = [option.strip() for option in choices.split(",")]
         
@@ -208,7 +208,7 @@ class Fun(commands.Cog):
         
         emoji = "<:SpongeMock:1502200574945529896>" 
         
-        await ctx.send(f"{emoji} <{ctx.author.display_name}> {mocked_text}")
+        await ctx.send(f"{emoji} {ctx.author.display_name} {mocked_text}")
 
     @commands.hybrid_command(name="roll", description="Roll a die (2-20 sides).")
     async def roll(self, ctx, sides: int = 6):

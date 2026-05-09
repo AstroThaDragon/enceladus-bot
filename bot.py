@@ -191,25 +191,39 @@ async def on_message(message):
         await asyncio.sleep(2)
         if message.embeds and "Bump done!" in (message.embeds[0].description or ""):
             description = message.embeds[0].description
-            user_mention = ""
-            if "<@" in description:
-                match = re.search(r"<@!?(\+?[0-9]+)>", description)
-                if match:
-                    user_mention = match.group(0)
-            
-            if not user_mention and message.interaction_metadata:
-                user_mention = message.interaction_metadata.user.mention
+            user_obj = None # We'll store the actual user here
 
-            if not user_mention:
-                user_mention = "there"
+            # 1. Try to get the user from the interaction metadata (most reliable)
+            if message.interaction_metadata:
+                user_obj = message.interaction_metadata.user
+            
+            # 2. Fallback: If no metadata, try to extract ID from the mention in description
+            if not user_obj and "<@" in description:
+                match = re.search(r"<@!?(\d+)>", description)
+                if match:
+                    user_id = int(match.group(1))
+                    user_obj = message.guild.get_member(user_id)
+
+            # Define mention string for your thanks_text
+            user_mention = user_obj.mention if user_obj else "there"
 
             thanks_text = (
                 f"Thank you so much for bumping our server, {user_mention}! It helps us a ton!! <:CoolEevee:1109771250634592306> 💜\n"
-                f"You may come back in two hours to do it again once I remind you! <a:DancingEevee:1109781719315398766>"
+                f"You've earned **500 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
             )
             await message.channel.send(thanks_text)
+
+            # --- ADD XP HERE ---
+            if user_obj:
+                # Reach into the Leveling cog from main.py
+                leveling_cog = bot.get_cog('Leveling')
+                if leveling_cog:
+                    await leveling_cog.add_xp(user_obj, 500)
+                else:
+                    print("Leveling cog not found, couldn't award bump XP.")
+            # -------------------
             
-            # Save the reminder time (2 hours from now) to the database
+            # Save the reminder time (2 hours from now)
             remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
@@ -244,6 +258,7 @@ async def on_member_join(member):
                 f"for full access to our server! Afterwards, please head over to <#593389789558865931> "
                 f"to read our rules if you haven't already, then maybe check out <#927536823746580570> "
                 f"for special roles while you're at it!\n\n"
+                f"We also highly recommend checking out <#1484487011933884509> for our server's unique features, roles, bots, and channels!\n\n"
                 f"Also, please be patient while our server grows; it may be a bit quiet at times!\n\n"
                 f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!"
             ),
@@ -317,7 +332,6 @@ EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    # 1. Only look for your specific 'Vault' emoji
     if str(payload.emoji) == "⭐": 
         channel = bot.get_channel(payload.channel_id)
         
@@ -516,15 +530,15 @@ async def help_command(ctx):
     """The central directory for all of Enceladus' station functions."""
     embed = discord.Embed(
         title="# 🛰️ Enceladus Command Directory",
-        description="Use `/help` for Slash or `-protocols` for Prefix.",
+        description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
         color=discord.Color.from_rgb(138, 43, 226)
     )
 
     embed.add_field(
         name="__ ⭐ Leveling & Social__",
         value=(
-            "`/rank [member]` - View your level, XP, and rank card.\n"
-            "`/customize` - Personalize your rank card aesthetics.\n"
+            "`/rank <member>` - View your level, XP, and rank card.\n"
+            "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
             "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
             "`/slap <member>` - Strike someone with a random object."
         ),
@@ -536,10 +550,16 @@ async def help_command(ctx):
         value=(
             "`/relic <question>` - Consult the Astral Relic for answers.\n"
             "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
-            "`/roll [sides]` - Roll a die (2-20 sides).\n"
+            "`/roll <sides>` - Roll a die (2-20 sides).\n"
             "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
             "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
-            "`/blackhole <text>` - Send a message into the void."
+            "`/blackhole <text>` - Send a message into the void.\n"
+            "`/spacedata` - Pull real-time data on a random celestial body.\n"
+            "`/bing` - View today's Bing wallpaper.\n"
+            "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
+            "`/moon` - Check the current moon phase.\n"
+            "`/weather <city>` - Get the current weather for a city.\n"
+            "`/iss` - Track the International Space Station's current location."
         ),
         inline=False
     )
@@ -557,8 +577,8 @@ async def help_command(ctx):
         name="__ 🛠️ Server Tools__",
         value=(
             "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere.\n"
-            "`<-tagname>` - View a saved community tag.\n"
-            "`-tags` - List all available community tags."
+            "`-[tagname]` - View a saved community tag.\n"
+            "`-list` - List all available community tags."
         ),
         inline=False
     )
@@ -568,7 +588,7 @@ async def help_command(ctx):
         embed.add_field(
             name="__ 🛡️ Station Admin (Staff Only)__",
             value=(
-                "`/setlevel` / `/setxp` - Manually adjust user stats.\n"
+                "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
                 "`/sync_levels` - Calibrate levels based on roles.\n"
                 "`/reset <member>` - Wipe all leveling progress for a member."
             ),

@@ -114,12 +114,12 @@ class Leveling(commands.Cog):
                 await member.add_roles(new_role)
                 
                 # ONLY send the announcement if they hit the exact milestone level
-                if is_milestone:
+                if is_milestone and new_level > 0:
                     announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
                     if announcement_channel:
                         await announcement_channel.send(
                             f"🌌 **Congratulations, {member.mention}!** "
-                            f"You've reached level {new_level} and earned the **{new_role.name}** role! 🚀"
+                            f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring! 🚀"
                         )
             
             roles_to_remove = [
