@@ -15,3 +15,6 @@ Thumbs.db
 
 # Ignore local log files
 *.log
+
+#ignore SQLite database files
+*.sqlite

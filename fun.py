@@ -208,7 +208,7 @@ class Fun(commands.Cog):
         
         emoji = "<:SpongeMock:1502200574945529896>" 
         
-        await ctx.send(f"{emoji} {ctx.author.display_name} {mocked_text}")
+        await ctx.send(f"{emoji} {ctx.author.mention} {mocked_text}")
 
     @commands.hybrid_command(name="roll", description="Roll a die (2-20 sides).")
     async def roll(self, ctx, sides: int = 6):
