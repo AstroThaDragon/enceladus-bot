@@ -11,6 +11,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Ignore database files
 *.db*
 
 # Ignore local log files
@@ -18,3 +19,9 @@ Thumbs.db
 
 #ignore SQLite database files
 *.sqlite
+
+# Ignore specific files that are frequently edited but not important to track
+rescue.py
+temp_raw.db
+levels.txt
+REAL_LIVE_DATA.db
