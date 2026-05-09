@@ -283,8 +283,17 @@ class Leveling(commands.Cog):
             background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
-            background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=20)
-            if percentage > 0: background.bar((230, 185), max_width=600, height=35, percentage=1, fill=bar_color, radius=10)
+            background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=10)
+            
+            # The actual progress (the colored part)
+            if percentage > 0:
+                # Calculate how many pixels wide the bar should be (out of 600)
+                bar_width = int(600 * percentage)
+                
+                # We use a rectangle instead of 'bar' to ensure it actually draws
+                # We keep a minimum of 20 pixels so the 'radius' doesn't look weird
+                if bar_width > 0:
+                    background.rectangle((230, 185), width=max(bar_width, 20), height=35, fill=bar_color, radius=10)
             background.text((830, 155), f"{xp} / {xp_end} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
