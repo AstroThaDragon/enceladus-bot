@@ -220,7 +220,7 @@ class Leveling(commands.Cog):
             xp_end = self.get_xp_for_level(level + 1)
             xp_within_level = xp - xp_start
             needed_for_level = xp_end - xp_start
-            percentage = (xp_within_level / needed_for_level) * 100 if needed_for_level > 0 else 0
+            percentage = (xp_within_level / needed_for_level) if needed_for_level > 0 else 0
 
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
