@@ -218,9 +218,22 @@ class Leveling(commands.Cog):
             xp, level, bar_color, bg_url = result
             xp_start = self.get_xp_for_level(level)
             xp_end = self.get_xp_for_level(level + 1)
+            
+            # Math for the progress within the current level
             xp_within_level = xp - xp_start
             needed_for_level = xp_end - xp_start
-            percentage = (xp_within_level / needed_for_level) if needed_for_level > 0 else 0
+            
+            # Calculate percentage as a decimal (0.0 to 1.0)
+            if needed_for_level > 0:
+                percentage = xp_within_level / needed_for_level
+            else:
+                percentage = 0
+
+            # CLAMP: This prevents the bar from breaking if the math goes weird
+            percentage = max(0, min(percentage, 1))
+
+            # TEMPORARY DEBUG (Check your Railway logs to see these!)
+            print(f"DEBUG: XP={xp}, Start={xp_start}, End={xp_end}, %={percentage}")
 
             current_role_name = "No Rank"
             for lvl, rid in sorted(self.level_roles.items(), reverse=True):
