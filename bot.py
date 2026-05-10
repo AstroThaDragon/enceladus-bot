@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands, tasks
 import os
 import random
+from roles import ExtraView, IdentityView, PersistentColorView, PingView, SexualityView, SpeciesSelectView
 from tags import tag_list
 from dotenv import load_dotenv
 from discord import app_commands
@@ -34,6 +35,15 @@ class Enceladus(commands.Bot):
         # Load extensions
         await self.load_extension('leveling')
         await self.load_extension("fun")
+        await self.load_extension('roles')
+        self.add_view(PersistentColorView())
+        self.add_view(IdentityView())
+        self.add_view(PingView())
+        self.add_view(SpeciesSelectView())
+        self.add_view(SexualityView())
+        self.add_view(ExtraView())
+        print("Persistent views registered!")
+        print("Role views registered!")
         print("Cogs loaded!")
 
         # Sync slash commands GLOBALLY (This puts them on your profile!)
