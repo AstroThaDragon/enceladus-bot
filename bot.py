@@ -546,12 +546,12 @@ async def resetbump(ctx):
         await db.commit()
     await ctx.send("Bump timer cleared! 🔄")
 
-@bot.hybrid_command(name="commands", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-async def commands_command(ctx):
+@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
+async def help_command(ctx):
         """The central directory for all of Enceladus' station functions."""
         embed = discord.Embed(
             title="# 🛰️ Enceladus Command Directory",
-            description="Use `/commands` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
+            description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
             color=discord.Color.from_rgb(138, 43, 226)
         )
 
@@ -568,31 +568,45 @@ async def commands_command(ctx):
         )
 
         embed.add_field(
-            name="__ 🎮 Fun & Cosmic Games__",
+            name="__ 🎮 Fun & Cosmic Games (1)__",
             value=(
-                "`/aurarate` - Check you or a member's aura.\n"
-                "`/bing` - View today's Bing wallpaper.\n"
-                "`/blackhole <text>` - Send a message into the void.\n"
-                "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
-                "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
-                "`/coolrate` - See how cool you or a member is.\n"
-                "`/cringerate` - Find out how cringey you or a member is.\n"
-                "`/fortune` - Receive a daily cosmic fortune.\n"
-                "`/freakyrate` - Discover how freaky you or a member is.\n"
-                "`/furryrate` - Determine how much of a furry you or a member is.\n"
-                "`/horoscope <sign>` - Check your daily horoscope.\n"
-                "`/iqrate` - Get a random IQ score for you or a member.\n"
-                "`/iss` - Track the International Space Station's current location.\n"
-                "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
-                "`/moon` - Check the current moon phase.\n"
-                "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
-                "`/relic <question>` - Consult the Astral Relic for answers.\n"
-                "`/roll <sides>` - Roll a die (2-20 sides).\n"
-                "`/spacedata` - Pull real-time data on a random celestial body.\n"
-                "`/weather <city>` - Get the current weather for a city."
-            ),
-            inline=False
-        )
+                "`/aurarate` - Check aura.\n"
+                "`/bing` - Today's Bing wallpaper.\n"
+                "`/blackhole <text>` - Send text into the void.\n"
+                "`/choose <opt1, opt2>` - Let fate decide.\n"
+                "`/coinflip` - Heads or tails?\n"
+                "`/coolrate` - Check coolness.\n"
+                "`/cringerate` - Measure cringe.\n"
+                "`/fortune` - Daily cosmic fortune.\n"
+        ),
+        inline=False
+    )
+
+        embed.add_field(
+            name="__ 🎮 Fun & Cosmic Games (2)__",
+            value=(
+                "`/freakyrate` - Freak level.\n"
+                "`/furryrate` - Furry percentage.\n"
+                "`/horoscope <sign>` - Horoscope.\n"
+                "`/iqrate` - Random IQ.\n"
+                "`/iss` - ISS tracker.\n"
+                "`/mock <text>` - Mock text.\n"
+                "`/moon` - Moon phase.\n"
+                "`/nasa` - NASA APOD.\n"
+        ),
+        inline=False
+    )
+
+        embed.add_field(
+            name="__ 🎮 Fun & Cosmic Games (3)__",
+            value=(
+                "`/relic <question>` - Ask the relic.\n"
+                "`/roll <sides>` - Roll dice.\n"
+                "`/spacedata` - Random celestial data.\n"
+                "`/weather <city>` - Weather lookup.\n"
+        ),
+        inline=False
+    )
 
         embed.add_field(
             name="__ 🎤 Rhythm & Search__",
