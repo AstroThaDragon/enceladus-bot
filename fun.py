@@ -698,16 +698,13 @@ class Fun(commands.Cog):
                         horoscope_text = None
                         
                         if 'data' in raw_data:
-                            # Try the first common path
-                            horoscope_text = raw_data['data'].get('horoscope_data')
-                        
-                        if not horoscope_text:
-                            horoscope_text = raw_data.get('horoscope') or raw_data.get('data')
 
+                            horoscope_text = raw_data['data'].get('horoscope')
+                        
                         if horoscope_text:
                             embed = discord.Embed(
                                 title=f"{sign.name} — Today's Reading", 
-                                description=str(horoscope_text), 
+                                description=horoscope_text, 
                                 color=0x6a0dad
                             )
                             embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
