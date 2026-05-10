@@ -32,10 +32,19 @@ class Enceladus(commands.Bot):
         )
 
     async def setup_hook(self):
-        # Load extensions
+        # 1. Initialize all databases FIRST
+        await init_bump_db()
+        await init_fun_db()
+        print("🌌 Databases initialized and ready!")
+
+        # 2. Load the cogs
         await self.load_extension('leveling')
         await self.load_extension("fun")
         await self.load_extension('roles')
+        await self.load_extension('birthdays')
+        print("🌌 All cogs loaded!")
+
+        # 3. Register the persistent views (Buttons/Dropdowns)
         self.add_view(PersistentColorView())
         self.add_view(PingView())
         self.add_view(SpeciesSelectView())
@@ -45,11 +54,8 @@ class Enceladus(commands.Bot):
         self.add_view(PronounView())
         self.add_view(DMStatusView())
         self.add_view(FandomView())
-        print("Persistent views registered!")
-        print("Role views registered!")
-        print("Cogs loaded!")
-
-        # Sync slash commands GLOBALLY (This puts them on your profile!)
+        
+        # 4. Global Sync
         try:
             await self.tree.sync()
             print(f"🌌 {self.user} has successfully synced commands globally!")
@@ -61,7 +67,7 @@ bot = Enceladus()
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
-DB_PATH = "levels.db" # Database where timers are stored
+DB_PATH = "/app/data/levels.db" # Stores Leveling data, XP, and Bump Timers
 FUN_DB_PATH = "/app/data/fun.db"
 
 # Anti-double message protection
@@ -78,6 +84,9 @@ async def init_bump_db():
 async def init_fun_db():
     async with aiosqlite.connect(FUN_DB_PATH) as db:
         await db.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, last_fortune_date TEXT)")
+        await db.commit()
+    async with aiosqlite.connect("/app/data/birthdays.db") as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS birthdays (user_id INTEGER PRIMARY KEY, month INTEGER, day INTEGER)")
         await db.commit()
 
 # --- STATUS ROTATOR SETUP ---
@@ -548,7 +557,8 @@ async def help_command(ctx):
             "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
             "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
             "`/rank <member>` - View your level, XP, and rank card.\n"
-            "`/slap <member>` - Strike someone with a random object."
+            "`/slap <member>` - Strike someone with a random object.\n"
+            "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping! Checks for upcoming birthdays daily at midnight, Eastern Time zone."
         ),
         inline=False
     )
