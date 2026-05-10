@@ -695,24 +695,30 @@ class Fun(commands.Cog):
                     if response.status == 200:
                         raw_data = await response.json()
                         
-                        if 'data' in raw_data and 'horoscope_data' in raw_data['data']:
-                            horoscope_text = raw_data['data']['horoscope_data']
-                            
+                        horoscope_text = None
+                        
+                        if 'data' in raw_data:
+                            # Try the first common path
+                            horoscope_text = raw_data['data'].get('horoscope_data')
+                        
+                        if not horoscope_text:
+                            horoscope_text = raw_data.get('horoscope') or raw_data.get('data')
+
+                        if horoscope_text:
                             embed = discord.Embed(
                                 title=f"{sign.name} — Today's Reading", 
-                                description=horoscope_text, 
+                                description=str(horoscope_text), 
                                 color=0x6a0dad
                             )
                             embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
                             await interaction.followup.send(embed=embed)
                         else:
-                            await interaction.followup.send("The stars are readable, but the message is garbled. (Data Format Error)")
+                            print(f"DEBUG DATA: {raw_data}")
+                            await interaction.followup.send("The stars are shy... I couldn't find the reading in the response.")
                     else:
-                        await interaction.followup.send(f"The cosmic vibrations are distorted. (API Status: {response.status})")
-        
+                        await interaction.followup.send(f"The cosmic vibrations are distorted. (Status: {response.status})")
         except Exception as e:
-            print(f"HOROSCOPE ERROR: {e}")
-            await interaction.followup.send("Something went wrong in the stars. Try again later!")
+            await interaction.followup.send("The cosmic connection failed. Please try again later.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot, "fun.db"))
