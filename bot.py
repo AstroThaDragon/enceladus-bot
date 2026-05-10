@@ -553,6 +553,7 @@ async def help_command(ctx):
             "`/fortune` - Receive a daily cosmic fortune. Resets daily at midnight, Eastern Time zone.\n"
             "`/freakyrate` - Discover how freaky you or a member is.\n"
             "`/furryrate` - Determine how much of a furry you or a member is.\n"
+            "`/horoscope <sign>` - Check your daily horoscope.\n"
             "`/iqrate` - Get a random IQ score for you or a member.\n"
             "`/iss` - Track the International Space Station's current location.\n"
             "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
