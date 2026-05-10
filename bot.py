@@ -62,12 +62,94 @@ class Enceladus(commands.Bot):
         except Exception as e:
             print(f"Error syncing tree: {e}")
 
+    # --- HELP COMMAND (Inside Class) ---
+    @commands.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
+    async def help_command(self, ctx):
+        """The central directory for all of Enceladus' station functions."""
+        embed = discord.Embed(
+            title="# 🛰️ Enceladus Command Directory",
+            description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
+            color=discord.Color.from_rgb(138, 43, 226)
+        )
+
+        embed.add_field(
+            name="__ ⭐ Leveling & Social__",
+            value=(
+                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
+                "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
+                "`/rank <member>` - View your level, XP, and rank card.\n"
+                "`/slap <member>` - Strike someone with a random object.\n"
+                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping!"
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🎮 Fun & Cosmic Games__",
+            value=(
+                "`/aurarate` - Check you or a member's aura.\n"
+                "`/bing` - View today's Bing wallpaper.\n"
+                "`/blackhole <text>` - Send a message into the void.\n"
+                "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
+                "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
+                "`/coolrate` - See how cool you or a member is.\n"
+                "`/cringerate` - Find out how cringey you or a member is.\n"
+                "`/fortune` - Receive a daily cosmic fortune.\n"
+                "`/freakyrate` - Discover how freaky you or a member is.\n"
+                "`/furryrate` - Determine how much of a furry you or a member is.\n"
+                "`/horoscope <sign>` - Check your daily horoscope.\n"
+                "`/iqrate` - Get a random IQ score for you or a member.\n"
+                "`/iss` - Track the International Space Station's current location.\n"
+                "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
+                "`/moon` - Check the current moon phase.\n"
+                "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
+                "`/relic <question>` - Consult the Astral Relic for answers.\n"
+                "`/roll <sides>` - Roll a die (2-20 sides).\n"
+                "`/spacedata` - Pull real-time data on a random celestial body.\n"
+                "`/weather <city>` - Get the current weather for a city."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🎤 Rhythm & Search__",
+            value=(
+                "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
+                "`/fnfsong <song>` - Find FNF tracks on YouTube."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🛠️ Server Tools__",
+            value=(
+                "`-list` - List all available community tags.\n"
+                "`-[tagname]` - View a saved community tag.\n"
+                "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere."
+            ),
+            inline=False
+        )
+
+        if ctx.author.guild_permissions.administrator:
+            embed.add_field(
+                name="__ 🛡️ Station Admin (Staff Only)__",
+                value=(
+                    "`/reset <member>` - Wipe all leveling progress for a member.\n"
+                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
+                    "`/sync_levels` - Calibrate levels based on roles."
+                ),
+                inline=False
+            )
+
+        embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
+        await ctx.send(embed=embed)
+
 # Initialize the bot
 bot = Enceladus()
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
-DB_PATH = "/app/data/levels.db" # Stores Leveling data, XP, and Bump Timers
+DB_PATH = "/app/data/levels.db" 
 FUN_DB_PATH = "/app/data/fun.db"
 
 # Anti-double message protection
@@ -127,7 +209,6 @@ async def check_bump_timer():
         
         if row:
             remind_at = datetime.fromisoformat(row[0])
-            # Compare current time (UTC) to saved time
             if datetime.now(timezone.utc) >= remind_at:
                 channel = bot.get_channel(row[1])
                 if channel:
@@ -143,7 +224,6 @@ async def check_bump_timer():
                     )
                     await channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
                 
-                # Clean up the database once the reminder is sent
                 await db.execute("DELETE FROM bump_timer WHERE id = 1")
                 await db.commit()
 
@@ -185,8 +265,8 @@ async def stargazing_alert():
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
-    await init_bump_db() # Ensure bump table exists
-    await init_fun_db() # Ensure fun table exists
+    await init_bump_db() 
+    await init_fun_db() 
     
     if not change_status.is_running():
         change_status.start()
@@ -204,7 +284,6 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
-    # --- 1. TAG LOGIC ---
     if message.content.startswith("-"):
         tag_name = message.content[1:].lower().strip()
         if tag_name in tag_list:
@@ -225,7 +304,6 @@ async def on_message(message):
             
             await message.channel.send(content)
 
-    # --- 2. DISBOARD BUMP LOGIC (Updated for Persistence) ---
     if message.author.id == 302050872383242240:
         await asyncio.sleep(2)
         if message.embeds and "Bump done!" in (message.embeds[0].description or ""):
@@ -357,8 +435,8 @@ async def on_member_update(before, after):
 
 VAULT_CHANNEL_ID = 1496628909570265199
 VAULT_THRESHOLD = 5
-EXCLUDED_CHANNELS = [593389789558865931, 598883099987673088, 1484487011933884509, 1352415256584130590, 1306821711970435122, 935876805607444510, 1118027416443564042, 1491230190469120010, 1117412987788075038]  # Add channel IDs here
-EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751721, 593413698085978132, 1474514782605541537] # Add category IDs here
+EXCLUDED_CHANNELS = [593389789558865931, 598883099987673088, 1484487011933884509, 1352415256584130590, 1306821711970435122, 935876805607444510, 1118027416443564042, 1491230190469120010, 1117412987788075038] 
+EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751721, 593413698085978132, 1474514782605541537] 
 
 @bot.event
 async def on_raw_reaction_add(payload):
@@ -480,12 +558,11 @@ async def weather(interaction: discord.Interaction, city: str):
                 weather_report = await response.text()
                 await interaction.response.send_message(f"**Current Weather:**\n{weather_report}")
             else:
-                await interaction.response.send_message(f"I couldn't find the weather for '{city}'. Is that a real place in the cosmos?")
+                await interaction.response.send_message(f"I couldn't find the weather for '{city}'.")
 
 @bot.tree.command(name="iss", description="Track the International Space Station's current location!")
 async def iss(interaction: discord.Interaction):
     await interaction.response.defer()
-    
     url = "https://api.wheretheiss.at/v1/satellites/25544"
     
     async with aiohttp.ClientSession() as session:
@@ -496,27 +573,20 @@ async def iss(interaction: discord.Interaction):
                     lat = data.get('latitude')
                     lon = data.get('longitude')
                     velocity = data.get('velocity')
-                    
                     maps_url = f"https://www.google.com/maps?q={lat},{lon}&t=k"
                     
                     embed = discord.Embed(
                         title="🛰️ ISS Current Location",
-                        description=f"The International Space Station is currently flying over:\n\n🔗 [View on Live Map]({maps_url})",
+                        description=f"The ISS is flying over:\n\n🔗 [View on Live Map]({maps_url})",
                         color=discord.Color.dark_blue()
                     )
                     embed.add_field(name="Latitude", value=f"{lat:.4f}", inline=True)
                     embed.add_field(name="Longitude", value=f"{lon:.4f}", inline=True)
                     embed.add_field(name="Velocity", value=f"{velocity:.2f} km/h", inline=False)
-                    embed.set_footer(text="Data provided by 'Where the ISS at?'")
-                    
                     await interaction.followup.send(embed=embed)
-                else:
-                    await interaction.followup.send("I've lost contact with the satellite! 📡")
-        except Exception as e:
-            print(f"ISS Command Error: {e}")
-            await interaction.followup.send("The tracking station is currently offline. Try again later!")
+        except:
+            await interaction.followup.send("Offline!")
 
-# --- COMMANDS ---
 @bot.command()
 async def qr(ctx, *, reason):
     staff_channel = bot.get_channel(1352834838478061608) 
@@ -526,7 +596,7 @@ async def qr(ctx, *, reason):
             f"⚠️ **New Quick Report!**\n"
             f"**User:** {ctx.author.mention} used `!qr` in {ctx.channel.mention}\n"
             f"**Reason:** {reason}\n"
-            f"🔗 [Click here for the message that was reported.]({jump_url})"
+            f"🔗 [Jump to Message]({jump_url})"
         )
         await staff_channel.send(report_msg)
         await ctx.message.delete()
@@ -540,88 +610,7 @@ async def resetbump(ctx):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM bump_timer WHERE id = 1")
         await db.commit()
-    await ctx.send("Bump timer has been cleared from the database! 🔄")
-    
-@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-async def help_command(ctx):
-    """The central directory for all of Enceladus' station functions."""
-    embed = discord.Embed(
-        title="# 🛰️ Enceladus Command Directory",
-        description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
-        color=discord.Color.from_rgb(138, 43, 226)
-    )
-
-    embed.add_field(
-        name="__ ⭐ Leveling & Social__",
-        value=(
-            "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
-            "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
-            "`/rank <member>` - View your level, XP, and rank card.\n"
-            "`/slap <member>` - Strike someone with a random object.\n"
-            "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping! Checks for upcoming birthdays daily at midnight, Eastern Time zone."
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="__ 🎮 Fun & Cosmic Games__",
-        value=(
-            "`/aurarate` - Check you or a member's aura.\n"
-            "`/bing` - View today's Bing wallpaper.\n"
-            "`/blackhole <text>` - Send a message into the void.\n"
-            "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
-            "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
-            "`/coolrate` - See how cool you or a member is.\n"
-            "`/cringerate` - Find out how cringey you or a member is.\n"
-            "`/fortune` - Receive a daily cosmic fortune. Resets daily at midnight, Eastern Time zone.\n"
-            "`/freakyrate` - Discover how freaky you or a member is.\n"
-            "`/furryrate` - Determine how much of a furry you or a member is.\n"
-            "`/horoscope <sign>` - Check your daily horoscope.\n"
-            "`/iqrate` - Get a random IQ score for you or a member.\n"
-            "`/iss` - Track the International Space Station's current location.\n"
-            "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
-            "`/moon` - Check the current moon phase.\n"
-            "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
-            "`/relic <question>` - Consult the Astral Relic for answers.\n"
-            "`/roll <sides>` - Roll a die (2-20 sides).\n"
-            "`/spacedata` - Pull real-time data on a random celestial body.\n"
-            "`/weather <city>` - Get the current weather for a city."
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="__ 🎤 Rhythm & Search__",
-        value=(
-            "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
-            "`/fnfsong <song>` - Find FNF tracks on YouTube."
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="__ 🛠️ Server Tools__",
-        value=(
-            "`-list` - List all available community tags.\n"
-            "`-[tagname]` - View a saved community tag.\n"
-            "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere."
-        ),
-        inline=False
-    )
-
-    if ctx.author.guild_permissions.administrator:
-        embed.add_field(
-            name="__ 🛡️ Station Admin (Staff Only)__",
-            value=(
-                "`/reset <member>` - Wipe all leveling progress for a member.\n"
-                "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
-                "`/sync_levels` - Calibrate levels based on roles."
-            ),
-            inline=False
-        )
-
-    embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
-    await ctx.send(embed=embed)
+    await ctx.send("Bump timer cleared! 🔄")
 
 async def main():
     async with bot:
