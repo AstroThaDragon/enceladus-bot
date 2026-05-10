@@ -189,16 +189,14 @@ class SpeciesSelectView(discord.ui.View):
 class SexualityView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        options = [
-            discord.SelectOption(label="Straight", value="1295668771339370546", emoji="👫"),
-            discord.SelectOption(label="Bisexual", value="1295668827362693190", emoji="💗"),
-            discord.SelectOption(label="Gay", value="1295668848716025857", emoji="👬"),
-            discord.SelectOption(label="Lesbian", value="1295668867049328641", emoji="👭"),
-            discord.SelectOption(label="Pansexual", value="1295668898464792637", emoji="💛"),
-            discord.SelectOption(label="Asexual", value="1295668916554567691", emoji="♠️"),
-            discord.SelectOption(label="Other Orientation", value="1295668942307721237", emoji="✨"),
-        ]
-        self.add_item(RoleSelect("Select your orientation...", options, "orientation_dropdown"))
+        # We use RoleButton just like we did in IdentityView
+        self.add_item(RoleButton("Straight", 1295668771339370546, "👫"))
+        self.add_item(RoleButton("Bisexual", 1295668827362693190, "💗"))
+        self.add_item(RoleButton("Gay", 1295668848716025857, "👬"))
+        self.add_item(RoleButton("Lesbian", 1295668867049328641, "👭"))
+        self.add_item(RoleButton("Pansexual", 1295668898464792637, "💛"))
+        self.add_item(RoleButton("Asexual", 1295668916554567691, "♠️"))
+        self.add_item(RoleButton("Other Orientation", 1295668942307721237, "✨"))
 
 class ExtraView(discord.ui.View):
     def __init__(self):
