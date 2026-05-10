@@ -11,7 +11,7 @@ from discord import app_commands
 import aiohttp
 import asyncio
 import re
-import sqlite3
+import aiosqlite
 from datetime import datetime, time, timezone, timedelta
 
 load_dotenv()
@@ -27,6 +27,7 @@ bot.remove_command('help')
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
 DB_PATH = "levels.db" # Database where timers are stored
+FUN_DB_PATH = "/app/data/fun.db"
 
 # Anti-double message protection
 recent_joins = set()
@@ -34,12 +35,15 @@ recent_leaves = set()
 
 # --- DATABASE INITIALIZATION ---
 async def init_bump_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS bump_timer (id INTEGER PRIMARY KEY, remind_at TEXT, channel_id INTEGER)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS vaulted_messages (message_id INTEGER PRIMARY KEY)") 
-    conn.commit()
-    conn.close()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS bump_timer (id INTEGER PRIMARY KEY, remind_at TEXT, channel_id INTEGER)")
+        await db.execute("CREATE TABLE IF NOT EXISTS vaulted_messages (message_id INTEGER PRIMARY KEY)") 
+        await db.commit()
+
+async def init_fun_db():
+    async with aiosqlite.connect(FUN_DB_PATH) as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, last_fortune_date TEXT)")
+        await db.commit()
 
 # --- STATUS ROTATOR SETUP ---
 status_list = [
@@ -49,7 +53,7 @@ status_list = [
     "Scanning the cosmos 🌌",
     "Powered by stardust!",
     "Harvesting moon rocks",
-    "Beep boop bop",
+    "Beep boop?",
     "Playing FNF",
     "Watching SpongeBob",
     "Guarding the Astral Relic",
@@ -60,7 +64,9 @@ status_list = [
     "Just a bot, living in a cosmic world",
     "Looking up at the stars and wondering...",
     "Stargazing",
-    "Quietly judging your memes"
+    "Quietly judging your memes",
+    "Reading the latest space news 📰",
+    "Searching for the best space puns... 🪐"
 ]
 
 @tasks.loop(minutes=15)
@@ -71,33 +77,31 @@ async def change_status():
 # --- BUMP PERSISTENCE LOOP ---
 @tasks.loop(minutes=1)
 async def check_bump_timer():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT remind_at, channel_id FROM bump_timer WHERE id = 1")
-    row = cursor.fetchone()
-    
-    if row:
-        remind_at = datetime.fromisoformat(row[0])
-        # Compare current time (UTC) to saved time
-        if datetime.now(timezone.utc) >= remind_at:
-            channel = bot.get_channel(row[1])
-            if channel:
-                bump_role_id = "1295212860720418887"
-                reminder_embed = discord.Embed(
-                    description=(
-                        f"*Sniffsniff..*\n\n"
-                        f"*Sniff!!*\n"
-                        f"It's time to bump once again! Please bump our server by typing /bump! "
-                        f"It helps us a lot by gaining more members! <a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> <a:PurpleHearts:1109768355390431323>"
-                    ),
-                    color=discord.Color.from_rgb(114, 0, 225)
-                )
-                await channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
-            
-            # Clean up the database once the reminder is sent
-            cursor.execute("DELETE FROM bump_timer WHERE id = 1")
-            conn.commit()
-    conn.close()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT remind_at, channel_id FROM bump_timer WHERE id = 1") as cursor:
+            row = await cursor.fetchone()
+        
+        if row:
+            remind_at = datetime.fromisoformat(row[0])
+            # Compare current time (UTC) to saved time
+            if datetime.now(timezone.utc) >= remind_at:
+                channel = bot.get_channel(row[1])
+                if channel:
+                    bump_role_id = "1295212860720418887"
+                    reminder_embed = discord.Embed(
+                        description=(
+                            f"*Sniffsniff..*\n\n"
+                            f"*Sniff!!*\n"
+                            f"It's time to bump once again! Please bump our server by typing /bump! "
+                            f"It helps us a lot by gaining more members! <a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> <a:PurpleHearts:1109768355390431323>"
+                        ),
+                        color=discord.Color.from_rgb(114, 0, 225)
+                    )
+                    await channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
+                
+                # Clean up the database once the reminder is sent
+                await db.execute("DELETE FROM bump_timer WHERE id = 1")
+                await db.commit()
 
 # --- STARGAZING ALERTS SETUP ---
 edt = timezone(timedelta(hours=-4))
@@ -142,6 +146,7 @@ async def stargazing_alert():
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
     await init_bump_db() # Ensure bump table exists
+    await init_fun_db() # Ensure fun table exists
     
     try:
         await bot.tree.sync()
@@ -184,7 +189,6 @@ async def on_message(message):
                     return 
             
             await message.channel.send(content)
-            return 
 
     # --- 2. DISBOARD BUMP LOGIC (Updated for Persistence) ---
     if message.author.id == 302050872383242240:
@@ -225,12 +229,10 @@ async def on_message(message):
             
             # Save the reminder time (2 hours from now)
             remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)", 
-                           (remind_time, message.channel.id))
-            conn.commit()
-            conn.close()
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute("INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)", 
+                                (remind_time, message.channel.id))
+                await db.commit()
 
     await bot.process_commands(message)
 
@@ -341,47 +343,44 @@ async def on_raw_reaction_add(payload):
 
         message = await channel.fetch_message(payload.message_id)
         
-        # SELF-CHECK
-        if payload.user_id == message.author.id:
-            return 
+        # --- DATABASE CONNECTION (ASYNC) ---
+        async with aiosqlite.connect(DB_PATH) as db:
+            # DUPLICATE CHECK
+            async with db.execute("SELECT message_id FROM vaulted_messages WHERE message_id = ?", (message.id,)) as cursor:
+                if await cursor.fetchone():
+                    return 
 
-        # --- FIX: Open Database Connection inside the event ---
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        # DUPLICATE CHECK
-        cursor.execute("SELECT message_id FROM vaulted_messages WHERE message_id = ?", (message.id,))
-        if cursor.fetchone():
-            conn.close() # Always close the connection before returning
-            return 
-
-        # Find the reaction count
-        reaction = discord.utils.get(message.reactions, emoji=payload.emoji.name)
-        
-        if reaction and reaction.count >= VAULT_THRESHOLD:
-            vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
+            # --- IMPROVED THRESHOLD LOGIC ---
+            reaction = discord.utils.get(message.reactions, emoji="⭐")
             
-            embed = discord.Embed(
-                description=message.content,
-                color=discord.Color.gold(),
-                timestamp=message.created_at
-            )
-            embed.set_author(name=message.author.display_name, icon_url=message.author.avatar.url)
-            embed.add_field(name="Original", value=f"[Jump to Message]({message.jump_url})")
-            
-            if message.attachments:
-                embed.set_image(url=message.attachments[0].url)
+            if reaction:
+                # Fetch all users who reacted to this emoji
+                users = [user async for user in reaction.users()]
                 
-            embed.set_footer(text=f"ID: {message.id} • The Vault")
-            
-            await vault_channel.send(embed=embed)
+                # Count how many reactors ARE NOT the message author
+                valid_star_count = len([u for u in users if u.id != message.author.id])
 
-            # RECORD THE POST
-            cursor.execute("INSERT INTO vaulted_messages (message_id) VALUES (?)", (message.id,))
-            conn.commit()
-        
-        # Close connection when done
-        conn.close()
+                if valid_star_count >= VAULT_THRESHOLD:
+                    vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
+                    
+                    embed = discord.Embed(
+                        description=message.content,
+                        color=discord.Color.gold(),
+                        timestamp=message.created_at
+                    )
+                    embed.set_author(name=message.author.display_name, icon_url=message.author.avatar.url)
+                    embed.add_field(name="Original", value=f"[Jump to Message]({message.jump_url})")
+                    
+                    if message.attachments:
+                        embed.set_image(url=message.attachments[0].url)
+                        
+                    embed.set_footer(text=f"ID: {message.id} • The Vault")
+                    
+                    await vault_channel.send(embed=embed)
+
+                    # RECORD THE POST
+                    await db.execute("INSERT INTO vaulted_messages (message_id) VALUES (?)", (message.id,))
+                    await db.commit()
 
 # --- COSMIC COMMANDS ---
 
@@ -518,11 +517,9 @@ async def qr(ctx, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def resetbump(ctx):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM bump_timer WHERE id = 1")
-    conn.commit()
-    conn.close()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM bump_timer WHERE id = 1")
+        await db.commit()
     await ctx.send("Bump timer has been cleared from the database! 🔄")
     
 @bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
@@ -552,7 +549,7 @@ async def help_command(ctx):
             "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
             "`/roll <sides>` - Roll a die (2-20 sides).\n"
             "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
-            "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
+            "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
             "`/blackhole <text>` - Send a message into the void.\n"
             "`/spacedata` - Pull real-time data on a random celestial body.\n"
             "`/bing` - View today's Bing wallpaper.\n"
@@ -609,7 +606,6 @@ async def main():
     async with bot:
         token = os.getenv('DEV_TOKEN') or os.getenv('DISCORD_TOKEN') 
         
-        await init_bump_db()
         await load_extensions()
         
         if token:

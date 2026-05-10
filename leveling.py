@@ -2,7 +2,7 @@ import os
 import discord
 from discord.ext import commands
 from discord import app_commands
-import sqlite3
+import aiosqlite
 import random
 import time
 from easy_pil import Editor, Canvas, Font, load_image_async
@@ -19,8 +19,9 @@ class ResetConfirm(discord.ui.View):
 
     @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.cog.cursor.execute("DELETE FROM users WHERE user_id = ?", (self.member.id,))
-        self.cog.conn.commit()
+        async with aiosqlite.connect(self.cog.db_path) as db:
+            await db.execute("DELETE FROM users WHERE user_id = ?", (self.member.id,))
+            await db.commit()
         await interaction.response.edit_message(content=f"♻️ **{self.member.name}** has been reset to Level 0.", view=None)
         self.stop()
 
@@ -48,38 +49,13 @@ class Leveling(commands.Cog):
         # --- Smart Database Pathing ---
         # Checks if the Railway folder exists; if not, uses local folder
         if os.path.exists('/app/data'):
-            db_path = '/app/data/levels.db'
+            self.db_path = '/app/data/levels.db'
         else:
-            db_path = 'levels.db'
-            
-        self.conn = sqlite3.connect(db_path, timeout=10)
-        self.cursor = self.conn.cursor()
-        self.cursor.execute('PRAGMA journal_mode=WAL')
-        
-        # --- Table Setup ---
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS users 
-                            (user_id INTEGER PRIMARY KEY, 
-                             xp INTEGER DEFAULT 0, 
-                             level INTEGER DEFAULT 0,
-                             bar_color TEXT DEFAULT '#8a2be2',
-                             bg_url TEXT DEFAULT 'default')''')
+            self.db_path = 'levels.db'
 
-        # 2. Patch existing databases that might be missing new columns
-        try:
-            self.cursor.execute("ALTER TABLE users ADD COLUMN bar_color TEXT DEFAULT '#8a2be2'")
-        except sqlite3.OperationalError:
-            pass # Column already exists
-
-        try:
-            self.cursor.execute("ALTER TABLE users ADD COLUMN bg_url TEXT DEFAULT 'default'")
-        except sqlite3.OperationalError:
-            pass # Column already exists
-            
-        self.conn.commit()
-        
         # --- CONFIGURATION ---
         self.ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456 
-        self.BOOSTER_ROLE_ID = 927505358736470047         
+        self.BOOSTER_ROLE_ID = 927505358736470047          
         self.WATCHLIST_ROLE_ID = 928584760748564570       
         
         self.NO_XP_CHANNELS = [1117403991266041906, 593398659530489858, 1306821711970435122, 1496628909570265199, 1473398974508437645, 1352415256584130590] 
@@ -97,6 +73,28 @@ class Leveling(commands.Cog):
         }
 
         self.cooldowns = {}
+
+    async def cog_load(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('PRAGMA journal_mode=WAL')
+            await db.execute('''CREATE TABLE IF NOT EXISTS users 
+                            (user_id INTEGER PRIMARY KEY, 
+                             xp INTEGER DEFAULT 0, 
+                             level INTEGER DEFAULT 0,
+                             bar_color TEXT DEFAULT '#8a2be2',
+                             bg_url TEXT DEFAULT 'default')''')
+
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN bar_color TEXT DEFAULT '#8a2be2'")
+            except:
+                pass 
+
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN bg_url TEXT DEFAULT 'default'")
+            except:
+                pass
+                
+            await db.commit()
 
     def get_xp_for_level(self, level):
         """
@@ -148,29 +146,30 @@ class Leveling(commands.Cog):
         if member.bot: return
 
         user_id = member.id
-        self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,))
-        result = self.cursor.fetchone()
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                result = await cursor.fetchone()
 
-        if result is None:
-            # If they aren't in the DB yet, start them at Level 0 + the reward
-            xp, level = amount, 0
-            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
-        else:
-            xp, level = result
-            new_xp = xp + amount
-            
-            # Level up logic
-            temp_level = level
-            while new_xp >= self.get_xp_for_level(temp_level + 1):
-                temp_level += 1
-            
-            if temp_level > level:
-                await self._update_member_roles(member, temp_level)
-                self.cursor.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, temp_level, user_id))
+            if result is None:
+                # If they aren't in the DB yet, start them at Level 0 + the reward
+                xp, level = amount, 0
+                await db.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
             else:
-                self.cursor.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
-        
-        self.conn.commit()
+                xp, level = result
+                new_xp = xp + amount
+                
+                # Level up logic
+                temp_level = level
+                while new_xp >= self.get_xp_for_level(temp_level + 1):
+                    temp_level += 1
+                
+                if temp_level > level:
+                    await self._update_member_roles(member, temp_level)
+                    await db.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, temp_level, user_id))
+                else:
+                    await db.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
+            
+            await db.commit()
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -189,44 +188,47 @@ class Leveling(commands.Cog):
         if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60: return 
         self.cooldowns[user_id] = current_time
 
-        self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,))
-        result = self.cursor.fetchone()
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                result = await cursor.fetchone()
 
-        if result is None:
-            starting_level = 0
-            for level, role_id in sorted(self.level_roles.items(), reverse=True):
-                if role_id != 0 and message.author.get_role(role_id):
-                    starting_level = level
-                    break 
-            xp, level = self.get_xp_for_level(starting_level), starting_level
-            self.cursor.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
-        else:
-            xp, level = result
+            if result is None:
+                starting_level = 0
+                for level, role_id in sorted(self.level_roles.items(), reverse=True):
+                    if role_id != 0 and message.author.get_role(role_id):
+                        starting_level = level
+                        break 
+                xp, level = self.get_xp_for_level(starting_level), starting_level
+                await db.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
+            else:
+                xp, level = result
 
-        base_xp = random.randint(20, 50)
-        if message.author.get_role(self.BOOSTER_ROLE_ID):
-            base_xp = int(base_xp * 1.15) 
-        
-        new_xp = xp + base_xp
-        temp_level = level
-        while new_xp >= self.get_xp_for_level(temp_level + 1):
-            temp_level += 1
-        new_level = temp_level
+            base_xp = random.randint(20, 50)
+            if message.author.get_role(self.BOOSTER_ROLE_ID):
+                base_xp = int(base_xp * 1.15) 
+            
+            new_xp = xp + base_xp
+            temp_level = level
+            while new_xp >= self.get_xp_for_level(temp_level + 1):
+                temp_level += 1
+            new_level = temp_level
 
-        if new_level > level:
-            await self._update_member_roles(message.author, new_level)
-            self.cursor.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, new_level, user_id))
-        else:
-            self.cursor.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
-        self.conn.commit()
+            if new_level > level:
+                await self._update_member_roles(message.author, new_level)
+                await db.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, new_level, user_id))
+            else:
+                await db.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
+            await db.commit()
 
     @commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
         await ctx.defer() 
         member = member or ctx.author
         try:
-            self.cursor.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,))
-            result = self.cursor.fetchone()
+            async with aiosqlite.connect(self.db_path) as db:
+                async with db.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,)) as cursor:
+                    result = await cursor.fetchone()
+            
             if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
             xp, level, bar_color, bg_url = result
@@ -256,7 +258,6 @@ class Leveling(commands.Cog):
 
             dragon_rank = "0"
             try:
-                import aiohttp
                 async with aiohttp.ClientSession() as session:
                     async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=5) as response:
                         if response.status == 200:
@@ -321,11 +322,13 @@ class Leveling(commands.Cog):
     @commands.hybrid_command(name="customize", description="Change your rank card bar color or background!")
     async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None):
         if not color_hex and not background_url: return await ctx.send("Provide a hex color or image URL!", ephemeral=True)
-        if color_hex:
-            if not color_hex.startswith("#") or len(color_hex) != 7: return await ctx.send("Invalid hex color!", ephemeral=True)
-            self.cursor.execute("UPDATE users SET bar_color = ? WHERE user_id = ?", (color_hex, ctx.author.id))
-        if background_url: self.cursor.execute("UPDATE users SET bg_url = ? WHERE user_id = ?", (background_url, ctx.author.id))
-        self.conn.commit()
+        async with aiosqlite.connect(self.db_path) as db:
+            if color_hex:
+                if not color_hex.startswith("#") or len(color_hex) != 7: return await ctx.send("Invalid hex color!", ephemeral=True)
+                await db.execute("UPDATE users SET bar_color = ? WHERE user_id = ?", (color_hex, ctx.author.id))
+            if background_url: 
+                await db.execute("UPDATE users SET bg_url = ? WHERE user_id = ?", (background_url, ctx.author.id))
+            await db.commit()
         await ctx.send("✅ Rank card updated!", ephemeral=True)
 
     @app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
@@ -335,15 +338,15 @@ class Leveling(commands.Cog):
         while amount >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
             
-        # Using INSERT... ON CONFLICT to protect custom backgrounds and colors
-        self.cursor.execute("""
-            INSERT INTO users (user_id, xp, level) 
-            VALUES (?, ?, ?) 
-            ON CONFLICT(user_id) 
-            DO UPDATE SET xp = excluded.xp, level = excluded.level
-        """, (member.id, amount, temp_level))
-        
-        self.conn.commit()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT INTO users (user_id, xp, level) 
+                VALUES (?, ?, ?) 
+                ON CONFLICT(user_id) 
+                DO UPDATE SET xp = excluded.xp, level = excluded.level
+            """, (member.id, amount, temp_level))
+            await db.commit()
+
         await self._update_member_roles(member, temp_level)
         await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
 
@@ -352,15 +355,15 @@ class Leveling(commands.Cog):
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
         new_xp = self.get_xp_for_level(level)
         
-        # Swapped to ON CONFLICT to protect user customizations
-        self.cursor.execute("""
-            INSERT INTO users (user_id, xp, level) 
-            VALUES (?, ?, ?) 
-            ON CONFLICT(user_id) 
-            DO UPDATE SET xp = excluded.xp, level = excluded.level
-        """, (member.id, new_xp, level))
-        
-        self.conn.commit()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT INTO users (user_id, xp, level) 
+                VALUES (?, ?, ?) 
+                ON CONFLICT(user_id) 
+                DO UPDATE SET xp = excluded.xp, level = excluded.level
+            """, (member.id, new_xp, level))
+            await db.commit()
+
         await self._update_member_roles(member, level)
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
 
@@ -370,35 +373,32 @@ class Leveling(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         synced_count = 0
         
-        for member in interaction.guild.members:
-            if member.bot: continue
-            
-            # Find the highest level role they have
-            starting_level = 0
-            for level, role_id in sorted(self.level_roles.items(), reverse=True):
-                if role_id != 0 and member.get_role(role_id):
-                    starting_level = level
-                    break 
-            
-            # Check current DB level to avoid demoting (e.g., Level 14 stay Level 14)
-            self.cursor.execute("SELECT level FROM users WHERE user_id = ?", (member.id,))
-            result = self.cursor.fetchone()
-            current_db_level = result[0] if result else -1
-
-            # Only update if the role indicates they should be a higher level than the DB says
-            if starting_level > current_db_level:
-                xp = self.get_xp_for_level(starting_level)
+        async with aiosqlite.connect(self.db_path) as db:
+            for member in interaction.guild.members:
+                if member.bot: continue
                 
-                # ON CONFLICT ONLY updates xp/level. It ignores bar_color and bg_url!
-                self.cursor.execute("""
-                    INSERT INTO users (user_id, xp, level, bar_color, bg_url) 
-                    VALUES (?, ?, ?, '#8a2be2', 'default') 
-                    ON CONFLICT(user_id) 
-                    DO UPDATE SET xp = excluded.xp, level = excluded.level
-                """, (member.id, xp, starting_level))
-                synced_count += 1
-            
-        self.conn.commit()
+                starting_level = 0
+                for level, role_id in sorted(self.level_roles.items(), reverse=True):
+                    if role_id != 0 and member.get_role(role_id):
+                        starting_level = level
+                        break 
+                
+                async with db.execute("SELECT level FROM users WHERE user_id = ?", (member.id,)) as cursor:
+                    result = await cursor.fetchone()
+                current_db_level = result[0] if result else -1
+
+                if starting_level > current_db_level:
+                    xp = self.get_xp_for_level(starting_level)
+                    
+                    await db.execute("""
+                        INSERT INTO users (user_id, xp, level, bar_color, bg_url) 
+                        VALUES (?, ?, ?, '#8a2be2', 'default') 
+                        ON CONFLICT(user_id) 
+                        DO UPDATE SET xp = excluded.xp, level = excluded.level
+                    """, (member.id, xp, starting_level))
+                    synced_count += 1
+                
+            await db.commit()
         await interaction.followup.send(f"✅ Sync complete! Calibrated {synced_count} members.", ephemeral=True)
 
     @app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")

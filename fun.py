@@ -5,10 +5,37 @@ import random
 import aiohttp
 import time
 import asyncio
+import datetime
+import pytz
+import aiosqlite
 
 class Fun(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, db_path: str):
         self.bot = bot
+        self.db_path = db_path
+        
+        # Initialize table with the necessary column
+        # Note: Since __init__ cannot be async, we create a task to run the setup
+        self.bot.loop.create_task(self.initialize_db())
+
+    async def initialize_db(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    last_fortune_date TEXT
+                )
+            """)
+            
+            # Migrating existing tables that might be missing the column
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN last_fortune_date TEXT;")
+            except:
+                # Column already exists
+                pass
+                
+            await db.commit()
+
         self.responses = [
             "Maybe someday.",
             "Nothing.",
@@ -35,7 +62,7 @@ class Fun(commands.Cog):
             "Do you kiss your mother with that mouth? Maybe rethink it, fam.",
             "You know it, I know it, we all know it. The answer is yes. Definitely yes.",
             "You got it, my guy.",
-            "Why are you asking me that? That's a bit sus, ngl.",
+            "Why are you asking me that? That's a bit sys, ngl.",
             "Signs point to yes.",
             "Looks like a yes from here, brodie.",
             "I don't even have an answer for that one, wtf.",
@@ -143,23 +170,31 @@ class Fun(commands.Cog):
             return await ctx.send(f"Nice try, {ctx.author.mention}, but I'm too fast for you! 😎")
         
         slap_objects = [
-            "a large, smelly trout 🐟",
-            "a massive rubber chicken 🐔",
-            "a wet pool noodle 🏊",
-            "a baguette 🥖",
-            "a dictionary 📖",
-            "their own hand ✋",
-            "a keyboard ⌨️",
-            "a tiny, squeaky hammer 🔨",
-            "a giant foam finger 🖐️",
-            "a fluffy pillow 🛏️",
-            "a chancla 👡"
+            "🐟 a large, smelly fish",
+            "🐔 a rubber chicken",
+            "🏊 a foam pool noodle",
+            "🥖 a baguette",
+            "📖 a dictionary",
+            "✋ their own hand",
+            "⌨️ a keyboard",
+            "🔨 a tiny, squeaky hammer",
+            "🖐️ a giant foam finger",
+            "🛏️ a fluffy pillow",
+            "👡 a chancla",
+            "🍕 a slice of pizza",
+            "🧀 a block of cheese",
+            "🍌 a ripe banana",
+            "🧻 a roll of toilet paper",
+            "🧸 a teddy bear",
+            "🥞 a pancake",
+            "🍩 a glazed donut",
+            "👜 a purse",
+            "🦯 a cane"
         ]
         
         random_object = random.choice(slap_objects)
         
-        # Send the message
-        await ctx.send(f"**{ctx.author.display_name}** slaps **{member.display_name}** across the face with {random_object}!")
+        await ctx.send(f"**{ctx.author.mention}** slaps **{member.mention}** across the face with {random_object}!")
 
     @commands.hybrid_command(name="coinflip", description="Consult the stars for a 50/50 outcome.")
     async def coinflip(self, ctx):
@@ -202,7 +237,7 @@ class Fun(commands.Cog):
             
         await ctx.send(f"I've thought about it, and I choose: **{random.choice(options)}!**")
 
-    @commands.hybrid_command(name="mock", description="mAkE yOuR tExT lOoK lIkE tHiS.")
+    @commands.hybrid_command(name="mock", description="mAkE yOuR tExT lOoK lHiS.")
     async def mock(self, ctx, *, text: str):
         mocked_text = "".join([char.upper() if i % 2 == 0 else char.lower() for i, char in enumerate(text)])
         
@@ -220,7 +255,7 @@ class Fun(commands.Cog):
             return await ctx.send("Easy there, high roller! Max die size is **20**. 🎲")
         
         result = random.randint(1, sides)
-        await ctx.send(f"🎲 **{ctx.author.display_name}** rolled a **D{sides}** and got: **{result}**")
+        await ctx.send(f"🎲 **{ctx.author.mention}** rolled a **D{sides}** and got: **{result}**")
 
     @commands.hybrid_command(name="spacefact", description="Pull real-time data on a random celestial body!")
     async def spacefact(self, ctx):
@@ -293,6 +328,345 @@ class Fun(commands.Cog):
         except Exception as e:
             print(f"Space Error: {e}")
             await ctx.send("🌌 Something went wrong in the asteroid belt.")
+    
+    @commands.hybrid_command(name="furryrate", description="Check the local fluff levels!")
+    async def furryrate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        percent = random.randint(0, 100)
+        
+        if percent == 0:
+            status = "Purely human. Not a single tuft of fur found. 🚫"
+        elif percent < 25:
+            status = "Low levels of fluff. Maybe just a fan of The Lion King? 🦁"
+        elif percent < 50:
+            status = "Modern furry. Likely owns a tail or a pair of ears. Nothing crazy. 🐾"
+        elif percent < 75:
+            status = "High-Grade furry. Definitely has a FurAffinity account. FOX"
+        elif percent < 100:
+            status = "Maximum floof!! 100% pathOwOgen detected! 🐺"
+        else:
+            status = "ASCENDED! Is literally just a giant ball of fluff at this point. 🐶"
+
+        await ctx.send(f"📊 **Furry Meter for {member.mention}:**\n**[{'█' * (percent // 10)}{'░' * (10 - (percent // 10))}]** {percent}%\n✨ **Diagnosis:** {status}")
+
+    @commands.hybrid_command(name="freakyrate", description="Check the local freak-o-meter levels!")
+    async def freakyrate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        percent = random.randint(0, 100)
+        
+        if percent == 0:
+            status = "Completely normal. Boringly standard. 🥱"
+        elif percent < 25:
+            status = "Slightly unhinged. You've thought about it. 🧐"
+        elif percent < 50:
+            status = "Certified weirdo. You're the reason we have rules. 🤨"
+        elif percent < 75:
+            status = "The freak is leaking. Dial it back a bit. 🫣"
+        elif percent < 100:
+            status = "FULL FREAK MODE. Seek immediate containment. ⛓️"
+        else:
+            status = "Freaky ahh 👅"
+
+        bar = '█' * (percent // 10)
+        empty = '░' * (10 - (percent // 10))
+
+        await ctx.send(
+            f"👅 **Freaky rate for {member.mention}:**\n"
+            f"**[{bar}{empty}]** {percent}%\n"
+            f"**Diagnosis:** {status}"
+        )
+
+    @commands.hybrid_command(name="iqrate", description="Measure your brain power (or lack thereof)!")
+    async def iqrate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        
+        iq = random.randint(30, 160)
+
+        if iq < 50:
+            status = "Cold fall temperature IQ. You make rocks look smart. 🪨"
+        elif iq < 70:
+            status = "Room temperature IQ. Your brain is essentially a potato. 🥔"
+        elif iq < 90:
+            status = "Below average. You struggle with push doors. 🚪"
+        elif iq < 110:
+            status = "Perfectly average. You are a background character. 😐"
+        elif iq < 130:
+            status = "High intelligence. You actually read the terms of service. 📜"
+        elif iq < 150:
+            status = "Certified genius. You can solve a Rubik's cube in under a minute. 🧩"
+        else:
+            status = "OMNISCIENT. You can see the code of the universe. 👁️"
+
+        bar = '█' * (iq // 16)
+        empty = '░' * (10 - (iq // 16))
+
+        await ctx.send(
+            f"🧠 **IQ Analysis for {member.mention}:**\n"
+            f"**[{bar}{empty}]** {iq} IQ\n"
+            f"**Diagnosis:** {status}"
+        )
+
+    @commands.hybrid_command(name="aurarate", description="Calculate your current aura levels with a reason!")
+    async def aurarate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+
+        if random.random() < 0.05:
+            aura = 0
+            reason = random.choice([
+                "stood perfectly still for 5 minutes",
+                "looked at a wall and blinked",
+                "blinked at the exact same time as everyone else",
+                "drank a glass of room-temperature water",
+                "existed in a state of pure neutrality",
+                "took a perfectly average nap",
+                "had a completely uneventful day",
+                "had a perfectly balanced breakfast of toast and cereal",
+                "walked in a straight line for 10 steps",
+                "stared at a ceiling fan and felt nothing",
+                "had a completely normal conversation about the weather",
+                "sat in silence for 10 minutes and felt at ease",
+                "performed a perfectly average dance move that neither impressed nor embarrassed anyone"
+            ])
+            status = "Neutral Aura. Perfectly balanced, as all things should be. ⚪"
+            color = "⚪"
+        else: 
+            aura = random.randint(-10000, 10000)
+        
+        negative_reasons = [
+            "tripped on a flat surface",
+            "said 'you too' to the waiter",
+            "posted a meme in the wrong channel",
+            "got left on read by a bot",
+            "accidentally liked a photo from 2016",
+            "sneezed and nobody said bless you",
+            "forgot your own password",
+            "typed 'lol' while stone-faced",
+            "called someone by the wrong name for an entire conversation",
+            "choked on your own spit while talking",
+            "had a hot mic while eating chips",
+            "tried to lean on a table that wasn't there in VR",
+            "replied 'here' when the teacher didn't call your name",
+            "failed a vibe check from a Level 1 member",
+            "forgot to unmute before a 5-minute rant",
+            "got 'L + Ratio'd' by a literal child",
+            "accidentally sent a message to the wrong person and it was awkward",
+            "posted a meme that was already posted 5 minutes ago and got called out for it",
+            "laughed at your own joke and nobody else did",
+            "tried to do a cool dance move and just looked like you were having a seizure"
+        ]
+        
+        positive_reasons = [
+            "clutched a 1v4 in Fortnite and won",
+            "actually used a coaster for your drink",
+            "caught the phone before it hit the floor",
+            "corrected the teacher and was right",
+            "found a shiny Pokemon on the first encounter",
+            "walked through an automatic door and it opened perfectly",
+            "ordered water and got a free soda",
+            "predicted the future in a dream",
+            "fixed a bug on the first try",
+            "made a joke that made the 'quiet person' laugh",
+            "guest-starred in a popular streamer's video by accident",
+            "plugged in a USB correctly on the first attempt",
+            "carried the entire team while eating a sandwich",
+            "somebody asked for the 'sauce' and you actually had the link",
+            "dropped your phone but caught it with your foot",
+            "typed 120 WPM without a single typo",
+            "everyone in the voice call went quiet to hear your story",
+            "you successfully argued with a moderator and won",
+            "you found a $20 bill on the ground and nobody else saw it",
+            "you got a notification that you were tagged in a meme and it was actually funny"
+        ]
+
+        if aura < 0:
+            status = "Losing Aura. You're cooked, fam. 📉"
+            reason = random.choice(negative_reasons)
+            color = "🔴"
+        else:
+            status = "Gaining Aura. Main character energy. 📈"
+            reason = random.choice(positive_reasons)
+            color = "🟢"
+
+        if aura < -9500: status = "Aura Debt. You **owe** the universe respect. Big oof. 💀"
+        if aura > 9500: status = "**GIGACHAD AURA!** The universe bows to you. 🌌"
+
+        await ctx.send(
+            f"✨ **Aura Analysis for {member.mention}:**\n"
+            f"**Current Aura:** `{aura:+,}`\n"
+            f"**Reason:** You {reason} ( {aura:+,} aura )\n"
+            f"**Status:** {status} {color}"
+        )
+
+    @commands.hybrid_command(name="cringerate", description="How much did you just make the chat physically recoil?")
+    async def cringerate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        percent = random.randint(0, 100)
+        
+        if percent == 0:
+            reaction = "Pure Based Energy. Everyone is nodding in respect."
+            status = "Unbelievably Based. 🗿"
+        elif percent < 30:
+            reaction = "A slight nose exhale. We'll allow it."
+            status = "Low Level Cringe. Just a minor slip-up. 🤏"
+        elif percent < 60:
+            reaction = "The chat has gone silent. Someone is typing '...' as we speak."
+            status = "Standard Cringe. Average Discord user behavior. 😬"
+        elif percent < 85:
+            reaction = "Visible shudders. People are closing the app to take a walk."
+            status = "High-Grade Cringe. This is going in the 'hall of shame'. 💀"
+        elif percent < 100:
+            reaction = "Physical recoil. People are shielding their eyes and looking away. The second-hand embarrassment is fatal."
+            status = "LETHAL CRINGE. This is the stuff of legends... and nightmares. 😬"
+        else:
+            reaction = "The universe has reset to 2008. You just posted 'ROFLCOPTER' and said swag."
+            status = "CRINGE SINGULARITY. You have folded space-time. 🌌"
+
+        bar = '█' * (percent // 10)
+        empty = '░' * (10 - (percent // 10))
+
+        await ctx.send(
+            f"😬 **Cringe Analysis for {member.display_name}:**\n"
+            f"**[{bar}{empty}]** {percent}%\n"
+            f"**Reaction:** *{reaction}*\n"
+            f"**Status:** {status}"
+        )
+
+    @commands.hybrid_command(name="coolrate", description="Check your ice-cold factor!")
+    async def coolrate(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        percent = random.randint(0, 100)
+        
+        cool_traits = [
+            "wearing sunglasses at night",
+            "never looking at explosions",
+            "always having the perfect reaction meme",
+            "doing a kickflip on a fingerboard",
+            "having a flawless kill streak",
+            "typing without looking at the keyboard",
+            "able to open a bottle with another bottle",
+            "knowing exactly when the beat is going to drop",
+            "always picking the best movie for group watch",
+            "having a voice that sounds like a radio host",
+            "the only one who actually knows the lyrics to the rap part",
+            "able to spin a pen around your thumb",
+            "the person everyone asks 'where did you get that?'",
+            "the one who clutched the 1% boss health wipe",
+            "able to cook a 5-star meal with just leftovers",
+            "knowing a guy who knows a guy",
+            "immune to second-hand embarrassment",
+            "the undisputed champion of the staring contest"
+        ]
+        
+        lame_traits = [
+            "using 'XD' in every sentence",
+            "clapping when the airplane lands",
+            "reminding the teacher about the homework",
+            "wearing socks with sandals",
+            "unironically liking 'Baby Shark'",
+            "tripping over your own shadow",
+            "asking 'where is my hug?'",
+            "still playing Flappy Bird in 2026",
+            "saying 'swag' unironically",
+            "posting 'first!' in the chat",
+            "making a 'dad joke' and then saying 'I know, I'm a dad!' as if that makes it better",
+            "saying 'cool story, bro' in response to literally any story",
+            "using 'u' instead of 'you' in a non-texting context",
+            "saying 'dab on the haters'",
+            "using the term 'ratio' in 2026",
+            "saying 'ROFL' in 2026",
+            "reminding the group that 'actually, it's 11:59, not midnight'",
+            "using your index fingers to type on a smartphone",
+            "telling a joke and then explaining why it's funny",
+            "wiping your forehead after a light jog",
+            "asking for a 'bite' of someone else's water",
+            "watching TikToks at full volume in a library",
+            "unironically using the '🤓' emoji in an argument",
+            "trying to high-five someone who is clearly waving at someone else"
+        ]
+
+        if percent < 40:
+            status = "Lame. You're trying too hard. 🤓"
+            trait = random.choice(lame_traits)
+        elif percent < 85:
+            status = "Average Joe. You're chill, but not legendary. 👍"
+            trait = random.choice(cool_traits)
+        elif percent < 100:
+            status = "The Main Character. You own the room. 🔥"
+            trait = random.choice(cool_traits)
+        else:
+            status = "COSMIC LEGEND. The stars literally want your autograph. 🌌"
+            trait = "the absolute goat of the server"
+
+        if percent == 0:
+            status = "Absolute Zero. Negative drip detected. 🧊"
+            trait = "the definition of a 'NPC'"
+
+        bar = '█' * (percent // 10)
+        empty = '░' * (10 - (percent // 10))
+
+        await ctx.send(
+            f"😎 **Coolness Analysis for {member.mention}:**\n"
+            f"**[{bar}{empty}]** {percent}%\n"
+            f"**Cool Factor:** You're {trait}.\n"
+            f"**Status:** {status}"
+        )
+
+    @commands.hybrid_command(name="fortune", description="Open your daily cosmic fortune cookie!")
+    async def fortune(self, ctx):
+        user_id = ctx.author.id
+        
+        # 1. Get the current date in Eastern Time
+        et_timezone = pytz.timezone("US/Eastern")
+        current_date_et = datetime.datetime.now(et_timezone).strftime("%Y-%m-%d")
+
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT last_fortune_date FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                result = await cursor.fetchone()
+
+            # If they've used it today already
+            if result and result[0] == current_date_et:
+                return await ctx.send("⏳ You've already opened your cookie for today! Come back after midnight **Eastern Time**.")
+
+            # 3. Fortune Logic
+            if random.random() < 0.01: 
+                selected_fortune = "The cookie is empty. A hollow void stares back at you. Your aura is currently unstable. 💀"
+                lucky_nums = "0, 0, 0, 0, 0"
+            else:
+                fortunes = [
+                    "A dragon's hoard of wealth is in your future.",
+                    "The stars suggest you'll find a $20 bill on the ground at some point today.",
+                    "Your code will compile on the first try today.",
+                    "Someone is admiring your vibe from across the server.",
+                    "A supernova of luck is heading your way!",
+                    "Your next meme will be legendary.",
+                    "The cosmic winds whisper... exciting news is coming!",
+                    "Your next game will be a masterpiece.",
+                    "A mysterious benefactor will boost your next project.",
+                    "Your next stream will break viewership records.",
+                    "The astral relic is feeling generous today. Expect good fortune!",
+                    "A cosmic event will align perfectly with your next big move.",
+                    "Your next idea will be a game-changer.",
+                    "Someone will compliment your profile picture today.",
+                    "Your next message will get an unexpected amount of likes.",
+                    "Your next joke will be the funniest thing in the chat.",
+                    "Your next game night will be unforgettable.",
+                    "A rare cosmic phenomenon will occur in your honor."
+                ]
+                selected_fortune = random.choice(fortunes)
+                lucky_nums = ", ".join(map(str, random.sample(range(1, 99), 5)))
+
+            await db.execute("""
+                INSERT INTO users (user_id, last_fortune_date) 
+                VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET last_fortune_date = excluded.last_fortune_date
+            """, (user_id, current_date_et))
+            await db.commit()
+
+        await ctx.send(
+            f"🥠 **{ctx.author.display_name} pulls apart the cookie...**\n"
+            f"> *\"{selected_fortune}\"*\n"
+            f"🔮 **Lucky Numbers:** `{lucky_nums}`"
+        )
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Fun(bot))
+    await bot.add_cog(Fun(bot, "fun.db"))
