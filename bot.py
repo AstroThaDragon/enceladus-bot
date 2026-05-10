@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands, tasks
 import os
 import random
-from roles import ExtraView, IdentityView, PersistentColorView, PingView, SexualityView, SpeciesSelectView
+from roles import DMStatusView, FandomView, PersistentColorView, PingView, PlatformView, PronounView, RegionView, SexualityView, SpeciesSelectView
 from tags import tag_list
 from dotenv import load_dotenv
 from discord import app_commands
@@ -37,11 +37,14 @@ class Enceladus(commands.Bot):
         await self.load_extension("fun")
         await self.load_extension('roles')
         self.add_view(PersistentColorView())
-        self.add_view(IdentityView())
         self.add_view(PingView())
         self.add_view(SpeciesSelectView())
         self.add_view(SexualityView())
-        self.add_view(ExtraView())
+        self.add_view(RegionView())
+        self.add_view(PlatformView())
+        self.add_view(PronounView())
+        self.add_view(DMStatusView())
+        self.add_view(FandomView())
         print("Persistent views registered!")
         print("Role views registered!")
         print("Cogs loaded!")

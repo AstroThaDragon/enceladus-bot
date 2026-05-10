@@ -128,15 +128,17 @@ class RoleSelect(discord.ui.Select):
 
 # --- THE VIEWS (One for each screenshot category) ---
 
-class IdentityView(discord.ui.View):
+class PronounView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        # Pronouns
         self.add_item(RoleButton("He/Him", 927535319778197554, "🚹"))
         self.add_item(RoleButton("She/Her", 927535749274951750, "🚺"))
         self.add_item(RoleButton("They/Them", 927535867172626524, "💛"))
         self.add_item(RoleButton("Any Pronoun", 1036615505773084762, "💎"))
-        # DM Status
+
+class DMStatusView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
         self.add_item(RoleButton("DMs Open", 1117449650790731919, "✅", discord.ButtonStyle.green))
         self.add_item(RoleButton("Ask to DM", 1117449682734563328, "⚠️", discord.ButtonStyle.blurple))
         self.add_item(RoleButton("DMs Closed", 1117449709414514748, "❌", discord.ButtonStyle.red))
@@ -198,16 +200,18 @@ class SexualityView(discord.ui.View):
         self.add_item(RoleButton("Asexual", 1295668916554567691, "♠️"))
         self.add_item(RoleButton("Other Orientation", 1295668942307721237, "✨"))
 
-class ExtraView(discord.ui.View):
+class RegionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        # Regional
         self.add_item(RoleButton("North America", 1306593842602053692, "🌎"))
         self.add_item(RoleButton("Europe", 1306593981378986005, "🍵"))
         self.add_item(RoleButton("Oceania", 1306593932473401405, "🌊"))
         self.add_item(RoleButton("Africa", 1306594172102246421, "🌍"))
         self.add_item(RoleButton("Asia", 1306594194122346517, "🌏"))
-        # Hobbies / Platform
+
+class PlatformView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
         self.add_item(RoleButton("PlayStation", 1036568587151867955, "🔵"))
         self.add_item(RoleButton("Xbox", 1036568737005969438, "🟢"))
         self.add_item(RoleButton("Nintendo", 1036569121464262696, "🔴"))
@@ -216,8 +220,13 @@ class ExtraView(discord.ui.View):
         self.add_item(RoleButton("Mobile", 1036568766391271504, "📱"))
         self.add_item(RoleButton("Gamer", 933525968662962216, "👾"))
         self.add_item(RoleButton("Tabletop Gamer", 1036567825835380826, "🎲"))
+
+class FandomView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
         self.add_item(RoleButton("Furry", 1118022152675921940, "🦊"))
         self.add_item(RoleButton("Brony", 1118022235681214485, "🐴"))
+
 
 # --- THE COG CLASS ---
 class RoleCog(commands.Cog):
@@ -229,27 +238,39 @@ class RoleCog(commands.Cog):
     async def setup_all_roles(self, interaction: discord.Interaction):
         await interaction.response.send_message("Deploying The Cosmic Lair Role System...", ephemeral=True)
         
-        # 1. Post Identity
-        emb_id = discord.Embed(title="🆔 Identity & Communication", description="Pronouns and DM preferences.", color=0x6a0dad)
-        await interaction.channel.send(embed=emb_id, view=IdentityView())
+        # 1. Post Pronouns
+        emb_pro = discord.Embed(title="🆔 Pronouns", description="Select your preferred pronouns.", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_pro, view=PronounView())
 
-        # 2. Post Species
+        # 2. Post DM Status
+        emb_dm = discord.Embed(title="💬 DM Status", description="Let others know if your DMs are open.", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_dm, view=DMStatusView())
+
+        # 3. Post Species
         emb_spec = discord.Embed(title="🐾 OC Species", description="Choose your primary fursona species.", color=0x6a0dad)
         await interaction.channel.send(embed=emb_spec, view=SpeciesSelectView())
 
-        # 3. Post Sexuality
+        # 4. Post Sexuality
         emb_sex = discord.Embed(title="🌈 Orientation", description="Select your orientation.", color=0x6a0dad)
         await interaction.channel.send(embed=emb_sex, view=SexualityView())
 
-        # 4. Post Pings
+        # 5. Post Pings
         emb_ping = discord.Embed(title="🔔 Community Notifications", description="What should we ping you for?", color=0x6a0dad)
         await interaction.channel.send(embed=emb_ping, view=PingView())
 
-        # 5. Post Regional/Hobbies
-        emb_extra = discord.Embed(title="🌍 Location & Interests", description="Where are you from and what do you do?", color=0x6a0dad)
-        await interaction.channel.send(embed=emb_extra, view=ExtraView())
+        # 6. Post Regional
+        emb_region = discord.Embed(title="🌍 Regional Roles", description="Where in the world are you?", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_region, view=RegionView())
 
-        # 6. Post Colors
+        # 7. Post Platforms
+        emb_platform = discord.Embed(title="🎮 Gaming Platforms", description="What platform do you play on?", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_platform, view=PlatformView())
+
+        # 8. Fandoms
+        emb_fandom = discord.Embed(title="🎮 Fandom Roles", description="What fandoms do you identify with?", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_fandom, view=FandomView())
+
+        # 9. Post Colors
         emb_color = discord.Embed(title="✨ Cosmic Color Roles", description="Pick a color for your name!", color=0x6a0dad)
         await interaction.channel.send(embed=emb_color, view=PersistentColorView())
 
