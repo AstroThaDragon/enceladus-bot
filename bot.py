@@ -531,8 +531,9 @@ async def resetbump(ctx):
     await ctx.send("Bump timer cleared! 🔄")
 
 @bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-async def protocols(ctx):
+async def help_command(ctx):
         """The central directory for all of Enceladus' station functions."""
+        await ctx.defer()
         embed = discord.Embed(
             title="# 🛰️ Enceladus Command Directory",
             description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
