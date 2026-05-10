@@ -687,24 +687,32 @@ class Fun(commands.Cog):
     async def horoscope(self, interaction: discord.Interaction, sign: app_commands.Choice[str]):
         await interaction.response.defer()
 
-        async with aiohttp.ClientSession() as session:
-            url = f"https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign={sign.value}&day=today"
-            
-            async with session.get(url) as response:
-                if response.status == 200:
-                    raw_data = await response.json()
-                    horoscope_text = raw_data['data']['horoscope_data']
-                    
-                    embed = discord.Embed(
-                        title=f"{sign.name} — Today's Reading", 
-                        description=horoscope_text, 
-                        color=0x6a0dad
-                    )
-                    embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
-                    
-                    await interaction.followup.send(embed=embed)
-                else:
-                    await interaction.followup.send("The cosmic vibrations are a bit distorted... (API Error)", ephemeral=True)
+        try:
+            async with aiohttp.ClientSession() as session:
+                url = f"https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign={sign.value}&day=today"
+                
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        raw_data = await response.json()
+                        
+                        if 'data' in raw_data and 'horoscope_data' in raw_data['data']:
+                            horoscope_text = raw_data['data']['horoscope_data']
+                            
+                            embed = discord.Embed(
+                                title=f"{sign.name} — Today's Reading", 
+                                description=horoscope_text, 
+                                color=0x6a0dad
+                            )
+                            embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
+                            await interaction.followup.send(embed=embed)
+                        else:
+                            await interaction.followup.send("The stars are readable, but the message is garbled. (Data Format Error)")
+                    else:
+                        await interaction.followup.send(f"The cosmic vibrations are distorted. (API Status: {response.status})")
+        
+        except Exception as e:
+            print(f"HOROSCOPE ERROR: {e}")
+            await interaction.followup.send("Something went wrong in the stars. Try again later!")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot, "fun.db"))
