@@ -530,7 +530,7 @@ async def resetbump(ctx):
         await db.commit()
     await ctx.send("Bump timer cleared! 🔄")
 
-@bot.hybrid_command(name="protocols", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
+@bot.hybrid_command(name="protocols", aliases=["help", "directory"], description="Displays the full directory of Enceladus' commands!")
 async def protocols_command(ctx):
         """The central directory for all of Enceladus' station functions."""
         await ctx.defer()
