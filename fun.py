@@ -698,15 +698,18 @@ class Fun(commands.Cog):
                         horoscope_text = None
                         
                         if 'data' in raw_data:
-
-                            horoscope_text = raw_data['data'].get('horoscope')
+                            horoscope_data = raw_data['data']
+                            horoscope_text = horoscope_data.get('horoscope')
+                            reading_date = horoscope_data.get('date') 
                         
                         if horoscope_text:
                             embed = discord.Embed(
-                                title=f"{sign.name} — Today's Reading", 
-                                description=horoscope_text, 
+                                title=f"{sign.name} — Daily Reading", 
+                                description=horoscope_text,
                                 color=0x6a0dad
                             )
+                            embed.add_field(name="📅 Date", value=reading_date, inline=True)
+                            
                             embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
                             await interaction.followup.send(embed=embed)
                         else:
