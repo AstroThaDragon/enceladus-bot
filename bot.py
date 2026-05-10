@@ -531,7 +531,7 @@ async def resetbump(ctx):
     await ctx.send("Bump timer cleared! 🔄")
 
 @bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-async def help_command(ctx):
+async def protocols(ctx):
         """The central directory for all of Enceladus' station functions."""
         embed = discord.Embed(
             title="# 🛰️ Enceladus Command Directory",
