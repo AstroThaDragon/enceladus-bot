@@ -57,6 +57,7 @@ class Enceladus(commands.Bot):
         
         # 4. Global Sync
         try:
+            self.tree.copy_global_to(guild=None)
             await self.tree.sync()
             print(f"🌌 {self.user} has successfully synced commands globally!")
         except Exception as e:
@@ -530,8 +531,8 @@ async def resetbump(ctx):
         await db.commit()
     await ctx.send("Bump timer cleared! 🔄")
 
-@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-async def help_command(ctx):
+@bot.hybrid_command(name="protocols", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
+async def protocols_command(ctx):
         """The central directory for all of Enceladus' station functions."""
         await ctx.defer()
         embed = discord.Embed(
