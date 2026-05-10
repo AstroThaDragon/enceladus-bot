@@ -630,6 +630,14 @@ async def commands_command(ctx):
         else:
             await ctx.send(embed=embed)
 
+@bot.event
+async def on_command_error(ctx, error):
+    print(f"COMMAND ERROR: {error}")
+
+@bot.tree.error
+async def on_app_command_error(interaction, error):
+    print(f"APP COMMAND ERROR: {error}")
+
 async def main():
     async with bot:
         token = os.getenv('DEV_TOKEN') or os.getenv('DISCORD_TOKEN') 
