@@ -57,7 +57,6 @@ class Enceladus(commands.Bot):
         
         # 4. Global Sync
         try:
-            self.tree.copy_global_to(guild=None)
             await self.tree.sync()
             print(f"🌌 {self.user} has successfully synced commands globally!")
         except Exception as e:
