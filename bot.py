@@ -203,24 +203,40 @@ async def on_message(message):
         return
 
     if message.content.startswith("-"):
-        tag_name = message.content[1:].lower().strip()
-        if tag_name in tag_list:
-            content = tag_list[tag_name]
-            if "images/" in content.lower():
-                if "\n" in content:
-                    parts = content.rsplit("\n", 1)
-                    text_caption = parts[0].strip()
-                    file_path = parts[1].strip()
-                else:
-                    text_caption = None
-                    file_path = content.strip()
 
-                if os.path.exists(file_path):
-                    with open(file_path, 'rb') as f:
-                        await message.channel.send(content=text_caption, file=discord.File(f))
-                    return 
-            
-            await message.channel.send(content)
+        ctx = await bot.get_context(message)
+
+    # If it's a real command, process it FIRST
+    if ctx.valid:
+        await bot.process_commands(message)
+        return
+
+    # Otherwise treat it like a tag
+    tag_name = message.content[1:].lower().strip()
+
+    if tag_name in tag_list:
+        content = tag_list[tag_name]
+
+        if "images/" in content.lower():
+
+            if "\n" in content:
+                parts = content.rsplit("\n", 1)
+                text_caption = parts[0].strip()
+                file_path = parts[1].strip()
+            else:
+                text_caption = None
+                file_path = content.strip()
+
+            if os.path.exists(file_path):
+                with open(file_path, 'rb') as f:
+                    await message.channel.send(
+                        content=text_caption,
+                        file=discord.File(f)
+                    )
+                return
+
+        await message.channel.send(content)
+        return
 
     if message.author.id == 302050872383242240:
         await asyncio.sleep(2)
@@ -530,10 +546,9 @@ async def resetbump(ctx):
         await db.commit()
     await ctx.send("Bump timer cleared! 🔄")
 
-@bot.hybrid_command(name="protocols", aliases=["help", "directory"], description="Displays the full directory of Enceladus' commands!")
+@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
 async def protocols_command(ctx):
         """The central directory for all of Enceladus' station functions."""
-        await ctx.defer()
         embed = discord.Embed(
             title="# 🛰️ Enceladus Command Directory",
             description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
