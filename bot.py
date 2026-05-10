@@ -16,13 +16,35 @@ from datetime import datetime, time, timezone, timedelta
 
 load_dotenv()
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.voice_states = True 
+# --- BOT CLASS SETUP ---
+class Enceladus(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        intents.voice_states = True 
+        
+        super().__init__(
+            command_prefix='-', 
+            intents=intents,
+            help_command=None # Replaces bot.remove_command('help')
+        )
 
-bot = commands.Bot(command_prefix='-', intents=intents)
-bot.remove_command('help')
+    async def setup_hook(self):
+        # Load extensions
+        await self.load_extension('leveling')
+        await self.load_extension("fun")
+        print("Cogs loaded!")
+
+        # Sync slash commands GLOBALLY (This puts them on your profile!)
+        try:
+            await self.tree.sync()
+            print(f"🌌 {self.user} has successfully synced commands globally!")
+        except Exception as e:
+            print(f"Error syncing tree: {e}")
+
+# Initialize the bot
+bot = Enceladus()
 
 # --- CONFIGURATION ---
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
@@ -113,7 +135,6 @@ async def stargazing_alert():
     channel = bot.get_channel(channel_id)
     
     if channel:
-        # This URL converts the "In-The-Sky" event feed into JSON for your bot
         url = "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fin-the-sky.org%2Frss.php%3Ffeed%3Dupcoming"
         
         try:
@@ -121,11 +142,9 @@ async def stargazing_alert():
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
-                        # Get the most recent upcoming event
                         item = data['items'][0]
                         title = item['title']
                         link = item['link']
-                        # The description often has HTML, this clean-up helps
                         description = re.sub('<[^<]+?>', '', item['description'])[:300] + "..."
 
                         embed = discord.Embed(
@@ -133,7 +152,6 @@ async def stargazing_alert():
                             description=f"**{title}**\n\n{description}\n\n🔗 [View Event Details]({link})",
                             color=discord.Color.dark_purple()
                         )
-                        # Space-themed thumbnail
                         embed.set_thumbnail(url="https://i.imgur.com/83S8Z6H.png")
                         embed.set_footer(text="Source: In-The-Sky.org | Keep looking up, Stargazers! 🔭")
                         
@@ -147,11 +165,6 @@ async def on_ready():
     print(f'Logged in as {bot.user.name}')
     await init_bump_db() # Ensure bump table exists
     await init_fun_db() # Ensure fun table exists
-    
-    try:
-        await bot.tree.sync()
-    except Exception as e:
-        print(f"Error syncing tree: {e}")
     
     if not change_status.is_running():
         change_status.start()
@@ -195,20 +208,17 @@ async def on_message(message):
         await asyncio.sleep(2)
         if message.embeds and "Bump done!" in (message.embeds[0].description or ""):
             description = message.embeds[0].description
-            user_obj = None # We'll store the actual user here
+            user_obj = None 
 
-            # 1. Try to get the user from the interaction metadata (most reliable)
             if message.interaction_metadata:
                 user_obj = message.interaction_metadata.user
             
-            # 2. Fallback: If no metadata, try to extract ID from the mention in description
             if not user_obj and "<@" in description:
                 match = re.search(r"<@!?(\d+)>", description)
                 if match:
                     user_id = int(match.group(1))
                     user_obj = message.guild.get_member(user_id)
 
-            # Define mention string for your thanks_text
             user_mention = user_obj.mention if user_obj else "there"
 
             thanks_text = (
@@ -217,17 +227,13 @@ async def on_message(message):
             )
             await message.channel.send(thanks_text)
 
-            # --- ADD XP HERE ---
             if user_obj:
-                # Reach into the Leveling cog from main.py
                 leveling_cog = bot.get_cog('Leveling')
                 if leveling_cog:
                     await leveling_cog.add_xp(user_obj, 400)
                 else:
                     print("Leveling cog not found, couldn't award bump XP.")
-            # -------------------
             
-            # Save the reminder time (2 hours from now)
             remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)", 
@@ -337,27 +343,20 @@ async def on_raw_reaction_add(payload):
     if str(payload.emoji) == "⭐": 
         channel = bot.get_channel(payload.channel_id)
         
-        # NSFW & EXCLUSION CHECKS
         if channel.is_nsfw() or channel.id in EXCLUDED_CHANNELS or channel.category_id in EXCLUDED_CATEGORIES:
             return
 
         message = await channel.fetch_message(payload.message_id)
         
-        # --- DATABASE CONNECTION (ASYNC) ---
         async with aiosqlite.connect(DB_PATH) as db:
-            # DUPLICATE CHECK
             async with db.execute("SELECT message_id FROM vaulted_messages WHERE message_id = ?", (message.id,)) as cursor:
                 if await cursor.fetchone():
                     return 
 
-            # --- IMPROVED THRESHOLD LOGIC ---
             reaction = discord.utils.get(message.reactions, emoji="⭐")
             
             if reaction:
-                # Fetch all users who reacted to this emoji
                 users = [user async for user in reaction.users()]
-                
-                # Count how many reactors ARE NOT the message author
                 valid_star_count = len([u for u in users if u.id != message.author.id])
 
                 if valid_star_count >= VAULT_THRESHOLD:
@@ -378,7 +377,6 @@ async def on_raw_reaction_add(payload):
                     
                     await vault_channel.send(embed=embed)
 
-                    # RECORD THE POST
                     await db.execute("INSERT INTO vaulted_messages (message_id) VALUES (?)", (message.id,))
                     await db.commit()
 
@@ -587,7 +585,6 @@ async def help_command(ctx):
         inline=False
     )
 
-    # Only shows this section if the user has Administrator permissions
     if ctx.author.guild_permissions.administrator:
         embed.add_field(
             name="__ 🛡️ Station Admin (Staff Only)__",
@@ -600,21 +597,11 @@ async def help_command(ctx):
         )
 
     embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
-    
     await ctx.send(embed=embed)
-
-async def load_extensions():
-    # This tells the bot to load your new leveling.py file
-    await bot.load_extension('leveling')
-    await bot.load_extension("fun")
-    print("Fun Cog loaded!")
 
 async def main():
     async with bot:
         token = os.getenv('DEV_TOKEN') or os.getenv('DISCORD_TOKEN') 
-        
-        await load_extensions()
-        
         if token:
             await bot.start(token)
         else:
