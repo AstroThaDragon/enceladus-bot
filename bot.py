@@ -62,88 +62,6 @@ class Enceladus(commands.Bot):
         except Exception as e:
             print(f"Error syncing tree: {e}")
 
-    # --- HELP COMMAND (Inside Class) ---
-    @commands.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
-    async def help_command(self, ctx):
-        """The central directory for all of Enceladus' station functions."""
-        embed = discord.Embed(
-            title="# 🛰️ Enceladus Command Directory",
-            description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
-            color=discord.Color.from_rgb(138, 43, 226)
-        )
-
-        embed.add_field(
-            name="__ ⭐ Leveling & Social__",
-            value=(
-                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
-                "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
-                "`/rank <member>` - View your level, XP, and rank card.\n"
-                "`/slap <member>` - Strike someone with a random object.\n"
-                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping!"
-            ),
-            inline=False
-        )
-
-        embed.add_field(
-            name="__ 🎮 Fun & Cosmic Games__",
-            value=(
-                "`/aurarate` - Check you or a member's aura.\n"
-                "`/bing` - View today's Bing wallpaper.\n"
-                "`/blackhole <text>` - Send a message into the void.\n"
-                "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
-                "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
-                "`/coolrate` - See how cool you or a member is.\n"
-                "`/cringerate` - Find out how cringey you or a member is.\n"
-                "`/fortune` - Receive a daily cosmic fortune.\n"
-                "`/freakyrate` - Discover how freaky you or a member is.\n"
-                "`/furryrate` - Determine how much of a furry you or a member is.\n"
-                "`/horoscope <sign>` - Check your daily horoscope.\n"
-                "`/iqrate` - Get a random IQ score for you or a member.\n"
-                "`/iss` - Track the International Space Station's current location.\n"
-                "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
-                "`/moon` - Check the current moon phase.\n"
-                "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
-                "`/relic <question>` - Consult the Astral Relic for answers.\n"
-                "`/roll <sides>` - Roll a die (2-20 sides).\n"
-                "`/spacedata` - Pull real-time data on a random celestial body.\n"
-                "`/weather <city>` - Get the current weather for a city."
-            ),
-            inline=False
-        )
-
-        embed.add_field(
-            name="__ 🎤 Rhythm & Search__",
-            value=(
-                "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
-                "`/fnfsong <song>` - Find FNF tracks on YouTube."
-            ),
-            inline=False
-        )
-
-        embed.add_field(
-            name="__ 🛠️ Server Tools__",
-            value=(
-                "`-list` - List all available community tags.\n"
-                "`-[tagname]` - View a saved community tag.\n"
-                "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere."
-            ),
-            inline=False
-        )
-
-        if ctx.author.guild_permissions.administrator:
-            embed.add_field(
-                name="__ 🛡️ Station Admin (Staff Only)__",
-                value=(
-                    "`/reset <member>` - Wipe all leveling progress for a member.\n"
-                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
-                    "`/sync_levels` - Calibrate levels based on roles."
-                ),
-                inline=False
-            )
-
-        embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
-        await ctx.send(embed=embed)
-
 # Initialize the bot
 bot = Enceladus()
 
@@ -611,6 +529,87 @@ async def resetbump(ctx):
         await db.execute("DELETE FROM bump_timer WHERE id = 1")
         await db.commit()
     await ctx.send("Bump timer cleared! 🔄")
+
+@bot.hybrid_command(name="help", aliases=["protocols", "directory"], description="Displays the full directory of Enceladus' commands!")
+async def help_command(ctx):
+        """The central directory for all of Enceladus' station functions."""
+        embed = discord.Embed(
+            title="# 🛰️ Enceladus Command Directory",
+            description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
+            color=discord.Color.from_rgb(138, 43, 226)
+        )
+
+        embed.add_field(
+            name="__ ⭐ Leveling & Social__",
+            value=(
+                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
+                "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
+                "`/rank <member>` - View your level, XP, and rank card.\n"
+                "`/slap <member>` - Strike someone with a random object.\n"
+                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping!"
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🎮 Fun & Cosmic Games__",
+            value=(
+                "`/aurarate` - Check you or a member's aura.\n"
+                "`/bing` - View today's Bing wallpaper.\n"
+                "`/blackhole <text>` - Send a message into the void.\n"
+                "`/choose <opt1, opt2>` - Let the bot decide for you.\n"
+                "`/coinflip` - Supernova (Heads) or Black Hole (Tails)?\n"
+                "`/coolrate` - See how cool you or a member is.\n"
+                "`/cringerate` - Find out how cringey you or a member is.\n"
+                "`/fortune` - Receive a daily cosmic fortune.\n"
+                "`/freakyrate` - Discover how freaky you or a member is.\n"
+                "`/furryrate` - Determine how much of a furry you or a member is.\n"
+                "`/horoscope <sign>` - Check your daily horoscope.\n"
+                "`/iqrate` - Get a random IQ score for you or a member.\n"
+                "`/iss` - Track the International Space Station's current location.\n"
+                "`/mock <text>` - mAkE yOuR tExT lHok lIkE tHiS.\n"
+                "`/moon` - Check the current moon phase.\n"
+                "`/nasa` - See NASA's Astronomy Picture of the Day.\n"
+                "`/relic <question>` - Consult the Astral Relic for answers.\n"
+                "`/roll <sides>` - Roll a die (2-20 sides).\n"
+                "`/spacedata` - Pull real-time data on a random celestial body.\n"
+                "`/weather <city>` - Get the current weather for a city."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🎤 Rhythm & Search__",
+            value=(
+                "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
+                "`/fnfsong <song>` - Find FNF tracks on YouTube."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="__ 🛠️ Server Tools__",
+            value=(
+                "`-list` - List all available community tags.\n"
+                "`-[tagname]` - View a saved community tag.\n"
+                "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere."
+            ),
+            inline=False
+        )
+
+        if ctx.author.guild_permissions.administrator:
+            embed.add_field(
+                name="__ 🛡️ Station Admin (Staff Only)__",
+                value=(
+                    "`/reset <member>` - Wipe all leveling progress for a member.\n"
+                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
+                    "`/sync_levels` - Calibrate levels based on roles."
+                ),
+                inline=False
+            )
+
+        embed.set_footer(text="Enceladus' Station | Powered by the Astral Plane! 🌌")
+        await ctx.send(embed=embed)
 
 async def main():
     async with bot:
