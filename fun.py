@@ -663,10 +663,48 @@ class Fun(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🥠 **{ctx.author.display_name} pulls apart the cookie...**\n"
+            f"🥠 **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
             f"🔮 **Lucky Numbers:** `{lucky_nums}`"
         )
+
+    @app_commands.command(name="horoscope", description="Check your daily horoscope!")
+    @app_commands.describe(sign="Choose your zodiac sign")
+    @app_commands.choices(sign=[
+        app_commands.Choice(name="♈ Aries", value="aries"),
+        app_commands.Choice(name="♉ Taurus", value="taurus"),
+        app_commands.Choice(name="♊ Gemini", value="gemini"),
+        app_commands.Choice(name="♋ Cancer", value="cancer"),
+        app_commands.Choice(name="♌ Leo", value="leo"),
+        app_commands.Choice(name="♍ Virgo", value="virgo"),
+        app_commands.Choice(name="♎ Libra", value="libra"),
+        app_commands.Choice(name="♏ Scorpio", value="scorpio"),
+        app_commands.Choice(name="♐ Sagittarius", value="sagittarius"),
+        app_commands.Choice(name="♑ Capricorn", value="capricorn"),
+        app_commands.Choice(name="♒ Aquarius", value="aquarius"),
+        app_commands.Choice(name="♓ Pisces", value="pisces"),
+    ])
+    async def horoscope(self, interaction: discord.Interaction, sign: app_commands.Choice[str]):
+        await interaction.response.defer()
+
+        async with aiohttp.ClientSession() as session:
+            url = f"https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign={sign.value}&day=today"
+            
+            async with session.get(url) as response:
+                if response.status == 200:
+                    raw_data = await response.json()
+                    horoscope_text = raw_data['data']['horoscope_data']
+                    
+                    embed = discord.Embed(
+                        title=f"{sign.name} — Today's Reading", 
+                        description=horoscope_text, 
+                        color=0x6a0dad
+                    )
+                    embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
+                    
+                    await interaction.followup.send(embed=embed)
+                else:
+                    await interaction.followup.send("The cosmic vibrations are a bit distorted... (API Error)", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot, "fun.db"))
