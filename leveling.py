@@ -46,12 +46,16 @@ class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         
-        # --- Smart Database Pathing ---
-        # Checks if the Railway folder exists; if not, uses local folder
+        # --- Fixed Database Pathing ---
+        # We check for the absolute path first to ensure we are in the Railway Volume
         if os.path.exists('/app/data'):
             self.db_path = '/app/data/levels.db'
+            print(f"LevelingCog: Using PRODUCTION database at {self.db_path}")
         else:
             self.db_path = 'levels.db'
+            print(f"LevelingCog: Using LOCAL database at {self.db_path}")
+
+        # ... (rest of your configuration stays exactly the same)
 
         # --- CONFIGURATION ---
         self.ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456 
