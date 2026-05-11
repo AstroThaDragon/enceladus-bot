@@ -341,7 +341,7 @@ class Fun(commands.Cog):
         elif percent < 50:
             status = "Modern furry. Likely owns a tail or a pair of ears. Nothing crazy. 🐾"
         elif percent < 75:
-            status = "High-Grade furry. Definitely has a FurAffinity account. FOX"
+            status = "High-Grade furry. Definitely has a FurAffinity account. 🦊"
         elif percent < 100:
             status = "Maximum floof!! 100% pathOwOgen detected! 🐺"
         else:
