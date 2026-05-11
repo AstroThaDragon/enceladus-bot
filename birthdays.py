@@ -87,7 +87,7 @@ class BirthdayCog(commands.Cog):
 
             upcoming.append((
                 days_until,
-                member.display_name,
+                member.mention,
                 month,
                 day
             ))
@@ -127,7 +127,10 @@ class BirthdayCog(commands.Cog):
             text="Cosmic birthday tracker ✨"
         )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions.none()
+        )
 
     # 2. Use the variable we defined at the top
     @tasks.loop(time=est_midnight)
