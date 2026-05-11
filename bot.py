@@ -121,29 +121,51 @@ async def change_status():
 # --- BUMP PERSISTENCE LOOP ---
 @tasks.loop(minutes=1)
 async def check_bump_timer():
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT remind_at, channel_id FROM bump_timer WHERE id = 1") as cursor:
-            row = await cursor.fetchone()
-        
-        if row:
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT remind_at, channel_id FROM bump_timer WHERE id = 1"
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row:
+                return
+
             remind_at = datetime.fromisoformat(row[0])
-            if datetime.now(timezone.utc) >= remind_at:
+
+            # Always use UTC-safe comparison
+            now = datetime.now(timezone.utc)
+
+            # If time has passed OR we missed it during downtime
+            if now >= remind_at:
                 channel = bot.get_channel(row[1])
+
                 if channel:
                     bump_role_id = "1295212860720418887"
+
                     reminder_embed = discord.Embed(
                         description=(
                             f"*Sniffsniff..*\n\n"
                             f"*Sniff!!*\n"
                             f"It's time to bump once again! Please bump our server by typing /bump! "
-                            f"It helps us a lot by gaining more members! <a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> <a:PurpleHearts:1109768355390431323>"
+                            f"It helps us a lot by gaining more members! "
+                            f"<a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> "
+                            f"<a:PurpleHearts:1109768355390431323>"
                         ),
                         color=discord.Color.from_rgb(114, 0, 225)
                     )
-                    await channel.send(content=f"<@&{bump_role_id}>", embed=reminder_embed)
-                
-                await db.execute("DELETE FROM bump_timer WHERE id = 1")
-                await db.commit()
+
+                    await channel.send(
+                        content=f"<@&{bump_role_id}>",
+                        embed=reminder_embed
+                    )
+
+                # clear timer after firing
+                async with db.execute("DELETE FROM bump_timer WHERE id = 1"):
+                    await db.commit()
+
+    except Exception as e:
+        print(f"[BUMP LOOP ERROR]: {e}")
 
 # --- STARGAZING ALERTS SETUP ---
 edt = timezone(timedelta(hours=-4))
@@ -202,77 +224,101 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
-    if message.content.startswith("-"):
+    ctx = None  # ✅ FIX: always define ctx first
 
+    # --- COMMAND HANDLING ---
+    if message.content.startswith("-"):
         ctx = await bot.get_context(message)
 
-    # If it's a real command, process it FIRST
-    if ctx.valid:
-        await bot.process_commands(message)
-        return
+        if ctx and ctx.valid:
+            await bot.process_commands(message)
+            return
 
-    # Otherwise treat it like a tag
-    tag_name = message.content[1:].lower().strip()
+    # --- TAG SYSTEM ---
+    if message.content.startswith("-"):
+        tag_name = message.content[1:].lower().strip()
 
-    if tag_name in tag_list:
-        content = tag_list[tag_name]
+        if tag_name in tag_list:
+            content = tag_list[tag_name]
 
-        if "images/" in content.lower():
+            if "images/" in content.lower():
 
-            if "\n" in content:
-                parts = content.rsplit("\n", 1)
-                text_caption = parts[0].strip()
-                file_path = parts[1].strip()
-            else:
-                text_caption = None
-                file_path = content.strip()
+                if "\n" in content:
+                    parts = content.rsplit("\n", 1)
+                    text_caption = parts[0].strip()
+                    file_path = parts[1].strip()
+                else:
+                    text_caption = None
+                    file_path = content.strip()
 
-            if os.path.exists(file_path):
-                with open(file_path, 'rb') as f:
-                    await message.channel.send(
-                        content=text_caption,
-                        file=discord.File(f)
-                    )
-                return
+                if os.path.exists(file_path):
+                    with open(file_path, 'rb') as f:
+                        await message.channel.send(
+                            content=text_caption,
+                            file=discord.File(f)
+                        )
+                    return
 
-        await message.channel.send(content)
-        return
+            await message.channel.send(content)
+            return
 
+    # --- BUMP DETECTION ---
     if message.author.id == 302050872383242240:
         await asyncio.sleep(2)
-        if message.embeds and "Bump done!" in (message.embeds[0].description or ""):
-            description = message.embeds[0].description
-            user_obj = None 
 
-            if message.interaction_metadata:
-                user_obj = message.interaction_metadata.user
-            
-            if not user_obj and "<@" in description:
-                match = re.search(r"<@!?(\d+)>", description)
-                if match:
-                    user_id = int(match.group(1))
-                    user_obj = message.guild.get_member(user_id)
+        if not message.embeds:
+            return
 
-            user_mention = user_obj.mention if user_obj else "there"
+        embed = message.embeds[0]
+        embed_text = (embed.description or "").lower()
 
-            thanks_text = (
-                f"Thank you so much for bumping our server, {user_mention}! It helps us a ton!! <:CoolEevee:1109771250634592306> 💜\n"
-                f"You've earned **400 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
+        is_bump = any(x in embed_text for x in [
+            "bump done",
+            "thanks for bumping",
+            "bumped the server",
+            "you can bump again",
+            "bump successful"
+        ])
+
+        if not is_bump:
+            return
+
+        user_obj = None
+
+        # FIX: safely check attribute existence
+        if hasattr(message, "interaction_metadata") and message.interaction_metadata:
+            user_obj = message.interaction_metadata.user
+
+        if not user_obj and message.content:
+            match = re.search(r"<@!?(\d+)>", message.content)
+            if match:
+                user_id = int(match.group(1))
+                user_obj = message.guild.get_member(user_id)
+
+        user_mention = user_obj.mention if user_obj else "there"
+
+        thanks_text = (
+            f"Thank you so much for bumping our server, {user_mention}! It helps us a ton!! <:CoolEevee:1109771250634592306> 💜\n"
+            f"You've earned **400 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
+        )
+
+        await message.channel.send(thanks_text)
+
+        if user_obj:
+            leveling_cog = bot.get_cog('Leveling')
+            if leveling_cog:
+                await leveling_cog.add_xp(user_obj, 400)
+            else:
+                print("Leveling cog not found, couldn't award bump XP.")
+
+        remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)",
+                (remind_time, message.channel.id)
             )
-            await message.channel.send(thanks_text)
-
-            if user_obj:
-                leveling_cog = bot.get_cog('Leveling')
-                if leveling_cog:
-                    await leveling_cog.add_xp(user_obj, 400)
-                else:
-                    print("Leveling cog not found, couldn't award bump XP.")
-            
-            remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
-            async with aiosqlite.connect(DB_PATH) as db:
-                await db.execute("INSERT OR REPLACE INTO bump_timer (id, remind_at, channel_id) VALUES (1, ?, ?)", 
-                                (remind_time, message.channel.id))
-                await db.commit()
+            await db.commit()
 
     await bot.process_commands(message)
 
@@ -558,11 +604,11 @@ async def help_command(ctx):
         embed.add_field(
             name="__ ⭐ Leveling & Social__",
             value=(
-                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics.\n"
-                "`/hug <member>` - Give a warm, fuzzy cosmic hug.\n"
+                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics!\n"
+                "`/hug <member>` - Give a warm, fuzzy cosmic hug!\n"
                 "`/rank <member>` - View your level, XP, and rank card.\n"
-                "`/slap <member>` - Strike someone with a random object.\n"
-                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping!"
+                "`/slap <member>` - Slap someone with a random object!\n"
+                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at 12AM EST!"
             ),
             inline=False
         )
@@ -570,14 +616,14 @@ async def help_command(ctx):
         embed.add_field(
             name="__ 🎮 Fun & Cosmic Games (1)__",
             value=(
-                "`/aurarate` - Check aura.\n"
-                "`/bing` - Today's Bing wallpaper.\n"
-                "`/blackhole <text>` - Send text into the void.\n"
-                "`/choose <opt1, opt2>` - Let fate decide.\n"
-                "`/coinflip` - Heads or tails?\n"
-                "`/coolrate` - Check coolness.\n"
-                "`/cringerate` - Measure cringe.\n"
-                "`/fortune` - Daily cosmic fortune.\n"
+                "`/aurarate` - Check you or a member's aura.\n"
+                "`/bing` - View today's Bing wallpaper.\n"
+                "`/blackhole <text>` - Send a message into the void.\n"
+                "`/choose <opt1, opt2>` - Let Enceladus decide choices for you! Multiple choices supported, just separate them with commas!\n"
+                "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
+                "`/coolrate` - See how cool you or a member is!\n"
+                "`/cringerate` - Find out how cringe you or a member is!\n"
+                "`/fortune` - Receive a daily cosmic fortune! Resets each day at 12AM EST.\n"
         ),
         inline=False
     )
@@ -585,14 +631,14 @@ async def help_command(ctx):
         embed.add_field(
             name="__ 🎮 Fun & Cosmic Games (2)__",
             value=(
-                "`/freakyrate` - Freak level.\n"
-                "`/furryrate` - Furry percentage.\n"
-                "`/horoscope <sign>` - Horoscope.\n"
-                "`/iqrate` - Random IQ.\n"
-                "`/iss` - ISS tracker.\n"
-                "`/mock <text>` - Mock text.\n"
-                "`/moon` - Moon phase.\n"
-                "`/nasa` - NASA APOD.\n"
+                "`/freakyrate` - Discover how freaky you or a member is!\n"
+                "`/furryrate` - Determine how furry you or a member is!\n"
+                "`/horoscope <sign>` - Check your daily horoscope.\n"
+                "`/iqrate` - Get a random IQ score for you or a member!\n"
+                "`/iss` - Track the International Space Station's current position.\n"
+                "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
+                "`/moon` - Check the current moon phase.\n"
+                "`/nasa` - See NASA's Astronomy Picture of the Day!\n"
         ),
         inline=False
     )
@@ -600,10 +646,10 @@ async def help_command(ctx):
         embed.add_field(
             name="__ 🎮 Fun & Cosmic Games (3)__",
             value=(
-                "`/relic <question>` - Ask the relic.\n"
-                "`/roll <sides>` - Roll dice.\n"
-                "`/spacedata` - Random celestial data.\n"
-                "`/weather <city>` - Weather lookup.\n"
+                "`/relic <question>` - Consult the Astral Relic for answers (Magic 8-Ball)!\n"
+                "`/roll <sides>` - Roll a die! Choose between 2 to 20 sides.\n"
+                "`/spacedata` - Pull real-time data on a random celestial body.\n"
+                "`/weather <city>` - Get the current weather for a city.\n"
         ),
         inline=False
     )
@@ -622,7 +668,7 @@ async def help_command(ctx):
             value=(
                 "`-list` - List all available community tags.\n"
                 "`-[tagname]` - View a saved community tag.\n"
-                "`/echo <msg> [chan (optional)]` - Make Enceladus speak elsewhere."
+                "`/echo <msg> [chan (optional)]` - Make Enceladus speak!"
             ),
             inline=False
         )
@@ -632,8 +678,8 @@ async def help_command(ctx):
                 name="__ 🛡️ Station Admin (Staff Only)__",
                 value=(
                     "`/reset <member>` - Wipe all leveling progress for a member.\n"
-                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust user stats.\n"
-                    "`/sync_levels` - Calibrate levels based on roles."
+                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust a user's stats.\n"
+                    "`/sync_levels` - Calibrate levels based on roles (ONLY FOR EMERGENCY USE)."
                 ),
                 inline=False
             )
