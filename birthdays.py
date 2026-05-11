@@ -28,7 +28,106 @@ class BirthdayCog(commands.Cog):
                              (interaction.user.id, month, day))
             await db.commit()
         
-        await interaction.response.send_message(f"Registered! I'll give you the role on **{month}/{day}**!", ephemeral=True)
+        await interaction.response.send_message(f"Registered! I'll give you the role and ping you on **{month}/{day}**!")
+
+    @app_commands.command(name="upcoming_birthdays", description="View upcoming server birthdays!")
+    async def upcoming_birthdays(self, interaction: discord.Interaction):
+
+        guild = interaction.guild
+        if not guild:
+            return await interaction.response.send_message(
+                "This command can only be used in a server.",
+                ephemeral=True
+            )
+
+        now = datetime.now(est)
+
+        async with aiosqlite.connect("/app/data/birthdays.db") as db:
+            async with db.execute(
+                "SELECT user_id, month, day FROM birthdays"
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        if not rows:
+            return await interaction.response.send_message(
+                "No birthdays have been registered yet!",
+                ephemeral=True
+            )
+
+        upcoming = []
+
+        for user_id, month, day in rows:
+            member = guild.get_member(user_id)
+
+            # Skip users no longer in the server
+            if not member:
+                continue
+
+            try:
+                birthday_this_year = datetime(
+                    year=now.year,
+                    month=month,
+                    day=day,
+                    tzinfo=est
+                )
+            except ValueError:
+                # Invalid dates like Feb 30
+                continue
+
+            # If already passed this year, use next year
+            if birthday_this_year < now:
+                birthday_this_year = datetime(
+                    year=now.year + 1,
+                    month=month,
+                    day=day,
+                    tzinfo=est
+                )
+
+            days_until = (birthday_this_year - now).days
+
+            upcoming.append((
+                days_until,
+                member.display_name,
+                month,
+                day
+            ))
+
+        if not upcoming:
+            return await interaction.response.send_message(
+                "No valid birthdays found!",
+                ephemeral=True
+            )
+
+        # Sort by closest birthday
+        upcoming.sort(key=lambda x: x[0])
+
+        # Show top 10 upcoming birthdays
+        birthday_lines = []
+
+        for days_until, name, month, day in upcoming[:10]:
+
+            if days_until == 0:
+                countdown = "🎉 Today!"
+            elif days_until == 1:
+                countdown = "⏳ 1 day away"
+            else:
+                countdown = f"⏳ {days_until} days away"
+
+            birthday_lines.append(
+                f"**{name}** — `{month}/{day}` • {countdown}"
+            )
+
+        embed = discord.Embed(
+            title="🎂 Upcoming Birthdays",
+            description="\n".join(birthday_lines),
+            color=discord.Color.from_rgb(114, 0, 225)
+        )
+
+        embed.set_footer(
+            text="Cosmic birthday tracker ✨"
+        )
+
+        await interaction.response.send_message(embed=embed)
 
     # 2. Use the variable we defined at the top
     @tasks.loop(time=est_midnight)
