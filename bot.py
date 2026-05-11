@@ -608,7 +608,8 @@ async def help_command(ctx):
                 "`/hug <member>` - Give a warm, fuzzy cosmic hug!\n"
                 "`/rank <member>` - View your level, XP, and rank card.\n"
                 "`/slap <member>` - Slap someone with a random object!\n"
-                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at 12AM EST!"
+                "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at 12AM EST!" \
+                "`/upcoming_birthdays` - See upcoming server birthdays!"
             ),
             inline=False
         )
