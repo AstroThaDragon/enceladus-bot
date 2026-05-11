@@ -143,7 +143,7 @@ class BirthdayCog(commands.Cog):
         
         BIRTHDAY_ROLE_ID = 1503120250139578440 
         GUILD_ID = 593387999316934676 
-        ANNOUNCEMENT_CHANNEL_ID = 1306602160527507456
+        ANNOUNCEMENT_CHANNEL_ID = 593397821835575306
 
         guild = self.bot.get_guild(GUILD_ID)
         if not guild: return
