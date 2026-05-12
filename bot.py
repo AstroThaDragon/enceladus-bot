@@ -597,7 +597,7 @@ async def resetbump(ctx):
 async def help_command(ctx):
         """The central directory for all of Enceladus' station functions."""
         embed = discord.Embed(
-            title="# 🛰️ Enceladus Command Directory",
+            title="**🛰️ Enceladus Command Directory**",
             description="Use `/help` for Slash or `-protocols` for Prefix. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
             color=discord.Color.from_rgb(138, 43, 226)
         )
