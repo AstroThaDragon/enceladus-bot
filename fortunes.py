@@ -309,6 +309,8 @@ class Fortunes(commands.Cog):
         et_timezone = pytz.timezone("US/Eastern")
         now_et = datetime.datetime.now(et_timezone)
 
+        lost_streak_messages = []
+
         if now_et.hour == 0 and now_et.minute == 0:
             await self.update_full_moon_status()
 
@@ -316,11 +318,56 @@ class Fortunes(commands.Cog):
 
             role_mention = f"<@&{FORTUNE_PING_ROLE_ID}>"
 
-            await channel.send(
-                f"{role_mention}\n"
-                "🌙✨ **The cosmic fortune cookies have reset!**\n"
-                "Use `/fortune` to open today's cookie!"
-            )
+            yesterday_et = (
+                now_et.date() - datetime.timedelta(days=1)
+            ).isoformat()
+
+            async with aiosqlite.connect(self.db_path) as db:
+
+                async with db.execute(
+                    """
+                    SELECT user_id, fortune_streak, last_fortune_streak_date
+                    FROM users
+                    WHERE fortune_streak > 0
+                    """
+                ) as cursor:
+
+                    users = await cursor.fetchall()
+
+                for user_id, streak, last_date in users:
+
+                    # If they missed yesterday, streak dies
+                    if last_date != yesterday_et:
+
+                        if streak >= 3: # Only mention if they lose a streak of 3 or more for spam reasons
+                            lost_streak_messages.append(
+                                f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
+                            )
+
+                        await db.execute(
+                            """
+                            UPDATE users
+                            SET fortune_streak = 0
+                            WHERE user_id = ?
+                            """,
+                            (user_id,)
+                        )
+
+                await db.commit()
+
+                message = (
+                    f"{role_mention}\n"
+                    "🌙✨ **The cosmic fortune cookies have reset!**\n"
+                    "Use `/fortune` to open today's cookie!"
+                )
+
+                if lost_streak_messages:
+                    message += (
+                        "\n\n"
+                        + "\n".join(lost_streak_messages[:10])
+                    )
+
+                await channel.send(message)
 
     async def setup_database(self):
         async with aiosqlite.connect(self.db_path) as db:
