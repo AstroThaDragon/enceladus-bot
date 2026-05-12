@@ -32,6 +32,7 @@ class Fortunes(commands.Cog):
         self.bot = bot
         self.db_path = "/app/data/levels.db" 
 
+        self.bot.loop.create_task(self.setup_database())
         self.fortune_reset_announcement.start() # type: ignore
 
     def cog_unload(self):
@@ -76,9 +77,21 @@ class Fortunes(commands.Cog):
                     "Use `/fortune` to open today's cookie!"
                 )
 
+    async def setup_database(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("PRAGMA table_info(users)") as cursor:
+                columns = await cursor.fetchall()
+
+            column_names = [column[1] for column in columns]
+
+            if "last_fortune_date" not in column_names:
+                await db.execute("ALTER TABLE users ADD COLUMN last_fortune_date TEXT")
+                await db.commit()
+
     @fortune_reset_announcement.before_loop
     async def before_fortune_reset_announcement(self):
         await self.bot.wait_until_ready()
+        await self.setup_database()
 
     @commands.hybrid_command(name="fortune", description="Open your daily cosmic fortune cookie!")
     async def fortune(self, ctx):
