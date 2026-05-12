@@ -625,7 +625,13 @@ async def help_command(ctx):
                 "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
                 "`/coolrate` - See how cool you or a member is!\n"
                 "`/cringerate` - Find out how cringe you or a member is!\n"
-                "`/fortune` - Receive a daily cosmic fortune and XP! Resets each day at 12AM EST. Keep opening daily for a streak and more XP!\n"
+                "`/fortune` - Receive a daily fortune cookie fortune and XP! Resets each day at 12AM EST. Keep opening daily for a streak and more XP!\n"
+                "When you open a fortune, you'll see an emoji near your mention to display rarity. Here's what each one means!\n"
+                "🥠 | Common\n"
+                "✨| Uncommon\n"
+                "🌙 | Rare\n"
+                "Legendary and Void have their own special open messages, so you'll know about those!\n\n"
+                "**(Disclaimer: the fortunes can be negative, sad, etc. to keep them realistic. It's just a little game, don't take it too serious!)**\n"
         ),
         inline=False
     )
