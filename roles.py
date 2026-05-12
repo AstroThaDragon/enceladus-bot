@@ -169,7 +169,7 @@ class SpeciesSelectView(discord.ui.View):
             discord.SelectOption(label="Raccoon", value="1295670843359367168", emoji="🦝"),
             discord.SelectOption(label="Bat", value="1295670875542257694", emoji="🦇"),
             discord.SelectOption(label="Dragon", value="1295670895335182399", emoji="🐲"),
-            discord.SelectOption(label="Kobold", value="1503673317633036288", emoji="🐲🦎"),
+            discord.SelectOption(label="Kobold", value="1503673317633036288", emoji="🦎"),
             discord.SelectOption(label="Lizard", value="1295670941027799084", emoji="🦎"),
             discord.SelectOption(label="Sergal", value="1295670958920695869", emoji="🧀"),
             discord.SelectOption(label="Deer", value="1295670981712543806", emoji="🦌"),
