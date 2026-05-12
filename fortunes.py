@@ -17,7 +17,7 @@ RARITY_WEIGHTS = {
     "uncommon": 18,
     "rare": 5,
     "legendary": 1.5,
-    "void": 0.5
+    "void": 0.7
 }
 
 HALLOWEEN_RARITY_WEIGHTS = {
@@ -25,7 +25,7 @@ HALLOWEEN_RARITY_WEIGHTS = {
     "uncommon": 24,
     "rare": 10,
     "legendary": 3,
-    "void": 8
+    "void": 1.2
 }
 
 CHRISTMAS_RARITY_WEIGHTS = {
@@ -116,6 +116,25 @@ FULL_MOON_RARITY_WEIGHTS = {
     "void": 10
 }
 
+RARITY_XP = {
+    "common": 35,
+    "uncommon": 50,
+    "rare": 85,
+    "legendary": 140,
+    "void": 175
+}
+
+STREAK_XP_PER_DAY = 5
+STREAK_XP_CAP_DAYS = 7
+
+EVENT_BLEND_VALUES = {
+            "christmas": 0.65,
+            "halloween": 0.8,
+            "summer": 0.55,
+            "winter": 0.5
+        }
+
+
 RARITY_PREFIXES = {
     "common": "🥠",
     "uncommon": "✨",
@@ -200,35 +219,26 @@ class Fortunes(commands.Cog):
         base_dir = os.path.join(os.path.dirname(__file__), "fortunes")
         active_event = self.get_active_event()
 
-        MIX_WITH_NORMAL_EVENTS = {
-            "christmas": 0.65,
-            "halloween": 0.8,
-            "summer": 0.55,
-            "winter": 0.5
-        }
-
         fortunes = {}
 
         for rarity in RARITY_WEIGHTS.keys():
-            fortunes[rarity] = []
+            fortunes[rarity] = {
+                "normal": [],
+                "event": []
+            }
 
-            # Only load normal fortunes if:
-            # - there is no event
-            # - OR the active event is month/season-long
-            should_load_normal = active_event is None or active_event in MIX_WITH_NORMAL_EVENTS
+            # Load normal fortunes
+            rarity_path = os.path.join(base_dir, rarity)
 
-            if should_load_normal:
-                rarity_path = os.path.join(base_dir, rarity)
+            if os.path.isdir(rarity_path):
+                for file_name in os.listdir(rarity_path):
+                    if not file_name.endswith(".json"):
+                        continue
 
-                if os.path.isdir(rarity_path):
-                    for file_name in os.listdir(rarity_path):
-                        if not file_name.endswith(".json"):
-                            continue
+                    file_path = os.path.join(rarity_path, file_name)
 
-                        file_path = os.path.join(rarity_path, file_name)
-
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            fortunes[rarity].extend(json.load(f))
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        fortunes[rarity]["normal"].extend(json.load(f))
 
             # Load event fortunes
             if active_event:
@@ -236,7 +246,7 @@ class Fortunes(commands.Cog):
 
                 if os.path.exists(event_file):
                     with open(event_file, "r", encoding="utf-8") as f:
-                        fortunes[rarity].extend(json.load(f))
+                        fortunes[rarity]["event"].extend(json.load(f))
 
         return fortunes
 
@@ -267,7 +277,30 @@ class Fortunes(commands.Cog):
             k=1
         )[0]
 
-        selected_fortune = random.choice(fortunes[rarity])
+        normal_pool = fortunes[rarity]["normal"]
+        event_pool = fortunes[rarity]["event"]
+
+        # Blended seasonal/month-long events
+        if active_event in EVENT_BLEND_VALUES and event_pool:
+            event_chance = EVENT_BLEND_VALUES[active_event]
+
+            if random.random() < event_chance:
+                selected_pool = event_pool
+            else:
+                selected_pool = normal_pool or event_pool
+
+        # Short events = event-only
+        elif active_event and event_pool:
+            selected_pool = event_pool
+
+        # No event active
+        else:
+            selected_pool = normal_pool
+
+        if not selected_pool:
+            selected_pool = normal_pool + event_pool
+
+        selected_fortune = random.choice(selected_pool)
 
         return rarity, selected_fortune
 
@@ -298,7 +331,17 @@ class Fortunes(commands.Cog):
 
             if "last_fortune_date" not in column_names:
                 await db.execute("ALTER TABLE users ADD COLUMN last_fortune_date TEXT")
-                await db.commit()
+
+            if "fortune_streak" not in column_names:
+                await db.execute("ALTER TABLE users ADD COLUMN fortune_streak INTEGER DEFAULT 0")
+
+            if "last_fortune_streak_date" not in column_names:
+                await db.execute("ALTER TABLE users ADD COLUMN last_fortune_streak_date TEXT")
+
+            if "xp" not in column_names:
+                await db.execute("ALTER TABLE users ADD COLUMN xp INTEGER DEFAULT 0")
+
+            await db.commit()
 
     @fortune_reset_announcement.before_loop
     async def before_fortune_reset_announcement(self):
@@ -437,33 +480,82 @@ class Fortunes(commands.Cog):
 
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
-                "SELECT last_fortune_date FROM users WHERE user_id = ?",
+                """
+                SELECT last_fortune_date, fortune_streak, last_fortune_streak_date
+                FROM users
+                WHERE user_id = ?
+                """,
                 (user_id,)
             ) as cursor:
                 result = await cursor.fetchone()
 
             if result and result[0] == current_date_et:
                 return await ctx.send(
-                    "⏳ You've already opened your cookie for today! Come back after midnight **Eastern Time**."
+                    "⏳ You've already opened your cookie for today! Come back after 12AM **Eastern Time.**"
                 )
 
+            yesterday_et = (
+                now_et.date() - datetime.timedelta(days=1)
+            ).isoformat()
+
+            current_streak = 1
+
+            # Continue streak only if yesterday was claimed
+            if result:
+                previous_streak = result[1] or 0
+                previous_date = result[2]
+
+                if previous_date == yesterday_et:
+                    current_streak = previous_streak + 1
+                else:
+                    current_streak = 1
+
             rarity, selected_fortune = self.choose_fortune()
+
+            rarity_xp = RARITY_XP.get(rarity, 10)
+
+            streak_bonus = (
+                min(current_streak, STREAK_XP_CAP_DAYS)
+                * STREAK_XP_PER_DAY
+            )
+
+            total_xp = rarity_xp + streak_bonus
 
             if rarity == "void":
                 lucky_nums = "0, 0, 0, 0, 0"
             else:
-                lucky_nums = ", ".join(map(str, random.sample(range(1, 99), 5)))
+                lucky_nums = ", ".join(
+                    map(str, random.sample(range(1, 99), 5))
+                )
 
             await db.execute(
                 """
-                INSERT INTO users (user_id, last_fortune_date)
-                VALUES (?, ?)
+                INSERT INTO users (
+                    user_id,
+                    last_fortune_date,
+                    fortune_streak,
+                    last_fortune_streak_date
+                )
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(user_id)
-                DO UPDATE SET last_fortune_date = excluded.last_fortune_date
+                DO UPDATE SET
+                    last_fortune_date = excluded.last_fortune_date,
+                    fortune_streak = excluded.fortune_streak,
+                    last_fortune_streak_date = excluded.last_fortune_streak_date
                 """,
-                (user_id, current_date_et)
+                (
+                    user_id,
+                    current_date_et,
+                    current_streak,
+                    current_date_et
+                )
             )
+
             await db.commit()
+            leveling_cog = self.bot.get_cog("Leveling")
+
+            if leveling_cog:
+                await leveling_cog.add_xp(ctx.author, total_xp)
 
         prefix = RARITY_PREFIXES.get(rarity, "🥠")
 
@@ -474,7 +566,9 @@ class Fortunes(commands.Cog):
             f"{event_note}"
             f"{prefix} **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
-            f"🔮 **Lucky Numbers:** `{lucky_nums}`"
+            f"🔮 **Lucky Numbers:** `{lucky_nums}`\n"
+            f"✨ **XP Gained:** `+{total_xp}`\n"
+            f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
         )
 
     @fortune.error

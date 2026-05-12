@@ -625,7 +625,7 @@ async def help_command(ctx):
                 "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
                 "`/coolrate` - See how cool you or a member is!\n"
                 "`/cringerate` - Find out how cringe you or a member is!\n"
-                "`/fortune` - Receive a daily cosmic fortune! Resets each day at 12AM EST.\n"
+                "`/fortune` - Receive a daily cosmic fortune and XP! Resets each day at 12AM EST. Keep opening daily for a streak and more XP!\n"
         ),
         inline=False
     )
