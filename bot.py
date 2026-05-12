@@ -41,6 +41,7 @@ class Enceladus(commands.Bot):
         await self.load_extension('leveling')
         await self.load_extension("fun")
         await self.load_extension('roles')
+        await bot.load_extension("cogs.fortunes")
         await self.load_extension('birthdays')
         print("🌌 All cogs loaded!")
 

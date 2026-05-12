@@ -525,7 +525,7 @@ class Fun(commands.Cog):
         empty = '░' * (10 - (percent // 10))
 
         await ctx.send(
-            f"😬 **Cringe Analysis for {member.display_name}:**\n"
+            f"😬 **Cringe Analysis for {member.mention}:**\n"
             f"**[{bar}{empty}]** {percent}%\n"
             f"**Reaction:** *{reaction}*\n"
             f"**Status:** {status}"
@@ -609,75 +609,6 @@ class Fun(commands.Cog):
             f"**[{bar}{empty}]** {percent}%\n"
             f"**Cool Factor:** You're {trait}.\n"
             f"**Status:** {status}"
-        )
-
-    @commands.hybrid_command(name="fortune", description="Open your daily cosmic fortune cookie!")
-    async def fortune(self, ctx):
-        user_id = ctx.author.id
-
-        # Always use Eastern Time (DST-safe)
-        et_timezone = pytz.timezone("US/Eastern")
-        now_et = datetime.datetime.now(et_timezone)
-        current_date_et = now_et.date().isoformat()  # safer than string formatting
-
-        async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute(
-                "SELECT last_fortune_date FROM users WHERE user_id = ?",
-                (user_id,)
-            ) as cursor:
-                result = await cursor.fetchone()
-
-            # Already used today (ET-based, persists across restarts)
-            if result and result[0] == current_date_et:
-                return await ctx.send(
-                    "⏳ You've already opened your cookie for today! Come back after midnight **Eastern Time**."
-                )
-
-            # Fortune Logic
-            if random.random() < 0.01:
-                selected_fortune = "The cookie is empty. A hollow void stares back at you. Your aura is currently unstable. 💀"
-                lucky_nums = "0, 0, 0, 0, 0"
-            else:
-                fortunes = [
-                    "A dragon's hoard of wealth is in your future.",
-                    "The stars suggest you'll find a $20 bill on the ground at some point today.",
-                    "Your next idea will be a game-changer.",
-                    "Someone is admiring your vibe from across the server.",
-                    "A supernova of luck is heading your way!",
-                    "Your next meme will be legendary.",
-                    "The cosmic winds whisper... exciting news is coming!",
-                    "Your next game will be a masterpiece.",
-                    "A mysterious benefactor will boost your next project.",
-                    "Your next stream will break viewership records.",
-                    "The astral relic is feeling generous today. Expect good fortune!",
-                    "A cosmic event will align perfectly with your next big move.",
-                    "Your next idea will be a game-changer.",
-                    "Someone will compliment your profile picture today.",
-                    "Your next message will get an unexpected amount of likes.",
-                    "Your next joke will be the funniest thing in the chat.",
-                    "Your next game night will be unforgettable.",
-                    "A rare cosmic phenomenon will occur in your honor."
-                ]
-
-                selected_fortune = random.choice(fortunes)
-                lucky_nums = ", ".join(map(str, random.sample(range(1, 99), 5)))
-
-            # Save "today" (ET date) so restart-proof cooldown works
-            await db.execute(
-                """
-                INSERT INTO users (user_id, last_fortune_date)
-                VALUES (?, ?)
-                ON CONFLICT(user_id)
-                DO UPDATE SET last_fortune_date = excluded.last_fortune_date
-                """,
-                (user_id, current_date_et)
-            )
-            await db.commit()
-
-        await ctx.send(
-            f"🥠 **{ctx.author.mention} pulls apart the cookie...**\n"
-            f"> *\"{selected_fortune}\"*\n"
-            f"🔮 **Lucky Numbers:** `{lucky_nums}`"
         )
 
     @app_commands.command(name="horoscope", description="Check your daily horoscope!")
