@@ -38,7 +38,7 @@ class Fortunes(commands.Cog):
         self.fortune_reset_announcement.cancel() # type: ignore
 
     def load_fortunes(self):
-        fortune_dir = "data/fortunes"
+        fortune_dir = os.path.join(os.path.dirname(__file__), "fortunes")
         fortunes = {}
 
         for rarity in RARITY_WEIGHTS.keys():
@@ -126,6 +126,10 @@ class Fortunes(commands.Cog):
             f"🔮 **Lucky Numbers:** `{lucky_nums}`"
         )
 
+    @fortune.error
+    async def fortune_error(self, ctx, error):
+        await ctx.send(f"⚠️ Fortune command error: `{error}`")
+        raise error
 
 async def setup(bot):
     await bot.add_cog(Fortunes(bot))
