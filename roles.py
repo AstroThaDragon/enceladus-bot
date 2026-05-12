@@ -152,7 +152,7 @@ class PingView(discord.ui.View):
             ("Events", 1295670451988594760, "🎭"), ("Partnerships", 1306077625428611082, "🤝"),
             ("Stream Alerts", 1307275275431841802, "📺"), ("Astro Content Alerts", 1440168122639454380, "🐲"),
             ("Fact of the Day", 1473410135161573416, "💡"), ("Question of the Day", 1473410588557185209, "❓"),
-            ("Poll Alerts", 1496356983320743946, "🗳️")
+            ("Poll Alerts", 1496356983320743946, "🗳️"), ("Daily Fortune Ping", 1503642487586029568, "🥠")
         ]
         for label, rid, emo in pings:
             self.add_item(RoleButton(label, rid, emo))
@@ -164,11 +164,12 @@ class SpeciesSelectView(discord.ui.View):
             discord.SelectOption(label="Canine", value="1295670753408192512", emoji="🐺"),
             discord.SelectOption(label="Feline", value="1295671149740556299", emoji="🐱"),
             discord.SelectOption(label="Vulpine", value="1295670778615955467", emoji="🦊"),
-            discord.SelectOption(label="Protogen", value="1295670812078243882", emoji="📟"),
+            discord.SelectOption(label="Protogen", value="1295670812078243882", emoji="🍞"),
             discord.SelectOption(label="Synth", value="1295704143918403624", emoji="🤖"),
             discord.SelectOption(label="Raccoon", value="1295670843359367168", emoji="🦝"),
             discord.SelectOption(label="Bat", value="1295670875542257694", emoji="🦇"),
             discord.SelectOption(label="Dragon", value="1295670895335182399", emoji="🐲"),
+            discord.SelectOption(label="Kobold", value="1503673317633036288", emoji="🐲🦎"),
             discord.SelectOption(label="Lizard", value="1295670941027799084", emoji="🦎"),
             discord.SelectOption(label="Sergal", value="1295670958920695869", emoji="🧀"),
             discord.SelectOption(label="Deer", value="1295670981712543806", emoji="🦌"),
@@ -204,10 +205,12 @@ class RegionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(RoleButton("North America", 1306593842602053692, "🌎"))
-        self.add_item(RoleButton("Europe", 1306593981378986005, "🍵"))
-        self.add_item(RoleButton("Oceania", 1306593932473401405, "🌊"))
+        self.add_item(RoleButton("South America", 1503672483176255558, "🌎"))
+        self.add_item(RoleButton("Europe", 1306593981378986005, "🌍"))
+        self.add_item(RoleButton("Oceania", 1306593932473401405, "🌏"))
         self.add_item(RoleButton("Africa", 1306594172102246421, "🌍"))
         self.add_item(RoleButton("Asia", 1306594194122346517, "🌏"))
+        self.add_item(RoleButton("Antarctica", 1503672527095074886, "🧊"))
 
 class PlatformView(discord.ui.View):
     def __init__(self):
