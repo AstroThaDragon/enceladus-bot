@@ -311,7 +311,7 @@ class Fortunes(commands.Cog):
 
         lost_streak_messages = []
 
-        if now_et.hour == 0 and now_et.minute == 0:
+        if now_et.hour == 6 and now_et.minute == 0:
             await self.update_full_moon_status()
 
             channel = self.bot.get_channel(FORTUNE_RESET_CHANNEL_ID)
