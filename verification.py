@@ -169,35 +169,47 @@ class VerificationDropdown(Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         member = interaction.user
 
         application_key = self.values[0]
         application_name = APPLICATION_TYPES[application_key]["label"]
 
-        verification_channel = guild.get_channel(
-            VERIFICATION_CHANNEL_ID
+        verification_channel = guild.get_channel(VERIFICATION_CHANNEL_ID)
+
+        request_message = await verification_channel.send(
+            f"<@&{VERIFICATION_TEAM_ROLE_ID}> <@{OWNER_ID}> <@&{ADMIN_ROLE_ID}>\n"
+            f"**New Verification Request**\n\n"
+            f"**User:** {member.mention}\n"
+            f"**Application:** {application_name}\n\n"
+            f"Open the attached thread to review this request."
         )
 
-        thread = await verification_channel.create_thread(
+        thread = await request_message.create_thread(
             name=f"verify-{member.name}-{application_key}",
-            type=discord.ChannelType.private_thread,
-            invitable=False
+            auto_archive_duration=1440
         )
 
         await thread.add_user(member)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Your verification thread has been created. A staff member will be with you shortly: {thread.mention}",
             ephemeral=True
         )
 
+        try:
+            await member.send(
+                f"✅ Your **{application_name}** request has been opened in **{guild.name}**.\n\n"
+                f"Please continue in your verification thread here: {thread.mention}\n\n"
+                "A verification team member will review your request as soon as possible."
+            )
+        except:
+            pass
+
         await thread.send(
-            f"<@&{VERIFICATION_TEAM_ROLE_ID}>\n"
-            f"<@{OWNER_ID}>\n"
-            f"**New Verification Request**\n\n"
-            f"**User:** {member.mention}\n"
-            f"**Application:** {application_name}\n\n"
+            f"Welcome {member.mention}!\n\n"
             f"Please answer the questions below and upload your verification images here.\n\n"
             f"⚠️ **Cover sensitive information. Only DOB and photo should remain visible!**"
         )
