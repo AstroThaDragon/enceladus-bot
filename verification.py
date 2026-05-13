@@ -361,6 +361,7 @@ class Verification(commands.Cog):
                 f"❌ {member.mention} denied for **{APPLICATION_TYPES[application_key]['label']}**"
             )
 
+        member = await guild.fetch_member(member.id)
         pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
 
         if pending_role and pending_role in member.roles:

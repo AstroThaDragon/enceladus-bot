@@ -538,7 +538,7 @@ class Fortunes(commands.Cog):
 
             if result and result[0] == current_date_et:
                 return await ctx.send(
-                    "⏳ You've already opened your cookie for today! Come back after 12AM **Eastern Time.**"
+                    "⏳ You've already opened your cookie for today! Come back after 6AM **Eastern Time.**"
                 )
 
             yesterday_et = (
