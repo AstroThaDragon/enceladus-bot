@@ -103,12 +103,18 @@ class VerificationReviewView(View):
         self.application_key = application_key
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.data and interaction.data.get("custom_id"):
+            custom_id = interaction.data["custom_id"]
+
+            if "cancel" in custom_id and interaction.user.id == self.member.id:
+                return True
+
         allowed_roles = [
             VERIFICATION_TEAM_ROLE_ID,
             ADMIN_ROLE_ID
         ]
 
-        if interaction.user.id == OWNER_ID or interaction.user.id == self.member.id:
+        if interaction.user.id == OWNER_ID:
             return True
 
         for role in interaction.user.roles:
@@ -183,7 +189,8 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Cancel Application",
         style=discord.ButtonStyle.secondary,
-        emoji="🛑"
+        emoji="🛑",
+        custom_id="verification_cancel"
     )
     async def cancel_button(self, interaction, button):
         if interaction.user.id != self.member.id:
