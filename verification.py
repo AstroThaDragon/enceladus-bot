@@ -78,6 +78,26 @@ class VerificationReviewView(View):
         self.member = member
         self.application_key = application_key
 
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        allowed_roles = [
+            VERIFICATION_TEAM_ROLE_ID,
+            ADMIN_ROLE_ID
+        ]
+
+        if interaction.user.id == OWNER_ID:
+            return True
+
+        for role in interaction.user.roles:
+            if role.id in allowed_roles:
+                return True
+
+        await interaction.response.send_message(
+            "❌ You are not allowed to use verification controls. Nice try, though! 😉",
+            ephemeral=True
+        )
+
+        return False
+
     @discord.ui.button(
         label="Accept",
         style=discord.ButtonStyle.success,
