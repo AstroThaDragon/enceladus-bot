@@ -70,6 +70,30 @@ class ReasonModal(Modal):
             reason=self.reason.value
         )
 
+class CancelConfirmView(View):
+    def __init__(self, original_view):
+        super().__init__(timeout=30)
+        self.original_view = original_view
+
+    @discord.ui.button(
+        label="Yes, Cancel",
+        style=discord.ButtonStyle.danger,
+        emoji="🛑"
+    )
+    async def confirm_cancel(self, interaction, button):
+        await self.original_view.cancel_application(interaction)
+
+    @discord.ui.button(
+        label="Nevermind",
+        style=discord.ButtonStyle.secondary,
+        emoji="↩️"
+    )
+    async def nevermind(self, interaction, button):
+        await interaction.response.edit_message(
+            content="✅ Cancelled the cancellation.",
+            view=None
+        )
+
 class VerificationReviewView(View):
     def __init__(self, cog, member, application_key):
         super().__init__(timeout=None)
@@ -84,7 +108,7 @@ class VerificationReviewView(View):
             ADMIN_ROLE_ID
         ]
 
-        if interaction.user.id == OWNER_ID:
+        if interaction.user.id == OWNER_ID or interaction.user.id == self.member.id:
             return True
 
         for role in interaction.user.roles:
@@ -154,6 +178,55 @@ class VerificationReviewView(View):
                 self.application_key,
                 False
             )
+        )
+
+    @discord.ui.button(
+        label="Cancel Application",
+        style=discord.ButtonStyle.secondary,
+        emoji="🛑"
+    )
+    async def cancel_button(self, interaction, button):
+        if interaction.user.id != self.member.id:
+            return await interaction.response.send_message(
+                "❌ Only the applicant can cancel this verification request.",
+                ephemeral=True
+            )
+
+        await interaction.response.send_message(
+            "⚠️ Are you sure you want to cancel this verification request?",
+            view=CancelConfirmView(self),
+            ephemeral=True
+        )
+
+    async def cancel_application(self, interaction):
+        guild = interaction.guild
+        thread = interaction.channel
+
+        pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
+        refreshed_member = await guild.fetch_member(self.member.id)
+
+        if pending_role and pending_role in refreshed_member.roles:
+            await refreshed_member.remove_roles(pending_role)
+
+        try:
+            await refreshed_member.send(
+                "🛑 Your verification request has been cancelled."
+            )
+        except:
+            pass
+
+        await interaction.response.edit_message(
+            content="🛑 Verification request cancelled.",
+            view=None
+        )
+
+        await thread.send(
+            f"🛑 {refreshed_member.mention} cancelled their verification request."
+        )
+
+        await thread.edit(
+            archived=True,
+            locked=True
         )
 
 class VerificationDropdown(Select):
