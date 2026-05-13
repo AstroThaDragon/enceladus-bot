@@ -5,9 +5,10 @@ from discord.ui import View, Select, Button, Modal, TextInput
 
 VERIFICATION_CHANNEL_ID = 1297033393313288263
 VERIFICATION_LOG_CHANNEL_ID = 1352834838478061608
+PENDING_VERIFICATION_ROLE_ID = 1504001672576241665
 
 VERIFICATION_TEAM_ROLE_ID = 1502764416356319413
-OWNER_ID = 891356074689560626
+OWNER_ID = 395453475284320268
 ADMIN_ROLE_ID = 593718477831929858
 
 ROLE_18_VERIFIED = 1353561740238913636
@@ -174,6 +175,11 @@ class VerificationDropdown(Select):
         guild = interaction.guild
         member = interaction.user
 
+        pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
+
+        if pending_role:
+            await member.add_roles(pending_role)
+
         application_key = self.values[0]
         application_name = APPLICATION_TYPES[application_key]["label"]
 
@@ -187,8 +193,9 @@ class VerificationDropdown(Select):
             f"Open the attached thread to review this request."
         )
 
+        safe_name = member.display_name.lower().replace(" ", "-")
         thread = await request_message.create_thread(
-            name=f"verify-{member.name}-{application_key}",
+            name=f"verification-{safe_name}",
             auto_archive_duration=1440
         )
 
@@ -205,8 +212,13 @@ class VerificationDropdown(Select):
                 f"Please continue in your verification thread here: {thread.mention}\n\n"
                 "A verification team member will review your request as soon as possible."
             )
-        except:
-            pass
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "⚠️ I couldn't DM you. Please check your Discord privacy settings, but your verification thread was still created.",
+                ephemeral=True
+            )
+        except Exception as e:
+            print(f"Verification DM failed: {e}")
 
         await thread.send(
             f"Welcome {member.mention}!\n\n"
@@ -348,6 +360,11 @@ class Verification(commands.Cog):
             await log_channel.send(
                 f"❌ {member.mention} denied for **{APPLICATION_TYPES[application_key]['label']}**"
             )
+
+        pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
+
+        if pending_role and pending_role in member.roles:
+            await member.remove_roles(pending_role)
 
         await thread.edit(
             archived=True,
