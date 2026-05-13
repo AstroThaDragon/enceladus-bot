@@ -43,7 +43,7 @@ class Enceladus(commands.Bot):
         await self.load_extension('roles')
         await self.load_extension("fortunes")
         await self.load_extension('birthdays')
-        await bot.load_extension("verification")
+        await self.load_extension("verification")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
