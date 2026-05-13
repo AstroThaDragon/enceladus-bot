@@ -246,6 +246,24 @@ class Verification(commands.Cog):
             VerificationPanelView(self)
         )
 
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def sendverificationpanel(self, ctx):
+        embed = discord.Embed(
+            title="🔞 Verification Center",
+            description=(
+                "Select the type of verification you want below.\n\n"
+                "Verification is manually reviewed by staff.\n"
+                "Please follow all instructions carefully."
+            ),
+            color=discord.Color.red()
+        )
+
+        await ctx.send(
+            embed=embed,
+            view=VerificationPanelView(self)
+        )
+
     async def finish_verification(
         self,
         interaction,
@@ -323,25 +341,6 @@ class Verification(commands.Cog):
             archived=True,
             locked=True
         )
-
-@commands.command()
-@commands.has_permissions(administrator=True)
-async def sendverificationpanel(self, ctx):
-
-    embed = discord.Embed(
-        title="🔞 Verification Center",
-        description=(
-            "Select the type of verification you want below.\n\n"
-            "Verification is manually reviewed by staff.\n"
-            "Please follow all instructions carefully."
-        ),
-        color=discord.Color.red()
-    )
-
-    await ctx.send(
-        embed=embed,
-        view=VerificationPanelView(self)
-    )
 
 async def setup(bot):
     await bot.add_cog(Verification(bot))
