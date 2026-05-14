@@ -18,6 +18,7 @@ tag_list = {
     "blu": "Don't care. Go my 2011x's.\nimages/blu.gif",
     "boykisser": "Are *you* a boykisser?\nimages/boykisser.gif",
     "brick": "🧱\nimages/brick.gif",
+    "catburglar": "He's gonna steal your taiyakis!!\nimages/catburglar.jpg",
     "dead": "Feelin' like this, bru\nimages/dead.gif",
     "deadchat": "This will TOTALLY work. Trust me\nimages/deadchat.gif",
     "deletethis": "Just delete it.\nimages/deletethis.jpg",
@@ -47,7 +48,7 @@ tag_list = {
         "## 🏷️ Our current tags in the server! Don't forget the '-'!\n\n"
 
         "`-angery` `-arrived` `-astro` `-baldi` `-banned`\n"
-        "`-beepboop` `-bite` `-blu` `-boykisser` `-brick`\n"
+        "`-beepboop` `-bite` `-blu` `-boykisser` `-brick` `-catburglar`\n"
         "`-dead` `-deadchat` `-deletethis` `-desgostang`\n"
         "`-dragonhug` `-forgetthat` `-freaky` `-freakycat`\n"
         "`-gm` `-gn` `-handshake` `-hoopla` `-huzzah`\n"
