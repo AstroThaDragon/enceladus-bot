@@ -72,6 +72,7 @@ tag_list = {
     "personalspace": "images/personalspace.jpg",
     "poyo": "-# poyo\nimages/poyo.gif",
     "punch": "images/punch.jpg",
+    "quazar": "He loves to cuddle with Vox! 🩷💙\nimages/quazar.png",
     "retro": "Low quality ahh dance\nimages/retro.gif",
     "sacrifice": "Oh yay! I'm a sacrifice!\nimages/sacrifice.gif",
     "screwit": "Sometimes we all feel this way tbh\nimages/screwit.gif",
