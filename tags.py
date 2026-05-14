@@ -15,7 +15,7 @@ tag_list = {
     ),
     "beepboop": "Beep boop?\nimages/beepboopbop.gif",
     "bite": "*Nom*\nimages/bite.gif",
-    "blu": "The reason it's named that? For someone I know. Yes, this tag is for them\nimages/blu.gif",
+    "blu": "Don't care. Go my 2011x's.\nimages/blu.gif",
     "boykisser": "Are *you* a boykisser?\nimages/boykisser.gif",
     "brick": "🧱\nimages/brick.gif",
     "dead": "Feelin' like this, bru\nimages/dead.gif",
@@ -44,9 +44,20 @@ tag_list = {
         "images/laughat.gif"
     ),
     "list": (
-        "Here's our current tag list! 💜\n"
-        "**-angery | -arrived | -astro | -baldi | -banned | -beepboop | -bite | -blu | -boykisser | -brick | -dead | -deadchat | -deletethis | -desgostang | -dragonhug | -forgetthat | -freaky | -freakycat | -gm | -gn | -handshake | -hoopla | -huzzah | -imtotallyfine | -laughat | -malo | -minigames | -minion | -nightflaid | -pathetic | -personalspace | -poyo | -punch | -retro | -screwit | -sharklunge | -sniffsniff | -spunchgun | -spunchpop | -stinks | -tired | -toopliss | -toothless | -trade | -umbre | -umbrecup | -vox | -wtf**\n"
-        )
+        "## 🏷️ Our current tags in the server! Don't forget the '-'!\n\n"
+
+        "`-angery` `-arrived` `-astro` `-baldi` `-banned`\n"
+        "`-beepboop` `-bite` `-blu` `-boykisser` `-brick`\n"
+        "`-dead` `-deadchat` `-deletethis` `-desgostang`\n"
+        "`-dragonhug` `-forgetthat` `-freaky` `-freakycat`\n"
+        "`-gm` `-gn` `-handshake` `-hoopla` `-huzzah`\n"
+        "`-imtotallyfine` `-laughat` `-malo` `-minigames`\n"
+        "`-minion` `-murdock` `-nightflaid` `-pathetic` `-personalspace`\n"
+        "`-poyo` `-punch` `-retro` `-sacrifice` `-screwit` `-sharklunge`\n"
+        "`-sniffsniff` `-spunchgun` `-spunchpop` `-stinks`\n"
+        "`-tired` `-toopliss` `-toothless` `-trade`\n"
+        "`-umbre` `-umbrecup` `-vox` `-wtf`"
+    )
     ,
     "malo": (
         "AstroThaDragon's beloved. His future wife. His everything. 💜🖤\n\n"
@@ -55,12 +66,14 @@ tag_list = {
     ),
     "minigames": "images/minigames.gif",
     "minion": "*Stare*\nimages/minion-stare.gif",
+    "murdock": "Heyyyy hiiii hellooo!\nimages/murdock.gif",
     "nightflaid": "Nightflaid from RetroSpecter V2 FNF. She just *OOZES* cool, bro\nimages/nightflaid.gif",
     "pathetic": "# Pathetic.\nimages/pathetic.jpg",
     "personalspace": "images/personalspace.jpg",
     "poyo": "-# poyo\nimages/poyo.gif",
     "punch": "images/punch.jpg",
     "retro": "Low quality ahh dance\nimages/retro.gif",
+    "sacrifice": "Oh yay! I'm a sacrifice!\nimages/sacrifice.gif",
     "screwit": "Sometimes we all feel this way tbh\nimages/screwit.gif",
     "sharklunge": (
     "-# Dun-dun...\n"

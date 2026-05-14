@@ -185,6 +185,12 @@ class Fortunes(commands.Cog):
     def cog_unload(self):
         self.fortune_reset_announcement.cancel() # type: ignore
 
+    def get_fortune_day(self, now_et):
+        if now_et.hour < 6:
+            now_et = now_et - datetime.timedelta(days=1)
+
+        return now_et.date().isoformat()
+
     def get_easter_date(self, year):
         # Western/Gregorian Easter calculation
         a = year % 19
@@ -523,7 +529,7 @@ class Fortunes(commands.Cog):
 
         et_timezone = pytz.timezone("US/Eastern")
         now_et = datetime.datetime.now(et_timezone)
-        current_date_et = now_et.date().isoformat()
+        current_date_et = self.get_fortune_day(now_et)
 
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
@@ -542,7 +548,7 @@ class Fortunes(commands.Cog):
                 )
 
             yesterday_et = (
-                now_et.date() - datetime.timedelta(days=1)
+                datetime.date.fromisoformat(current_date_et) - datetime.timedelta(days=1)
             ).isoformat()
 
             current_streak = 1
