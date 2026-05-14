@@ -53,7 +53,7 @@ tag_list = {
         "`-gm` `-gn` `-handshake` `-hoopla` `-huzzah`\n"
         "`-imtotallyfine` `-laughat` `-malo` `-minigames`\n"
         "`-minion` `-murdock` `-nightflaid` `-pathetic` `-personalspace`\n"
-        "`-poyo` `-punch` `-retro` `-sacrifice` `-screwit` `-sharklunge`\n"
+        "`-poyo` `-punch` `-quazar` `-retro` `-sacrifice` `-screwit` `-sharklunge`\n"
         "`-sniffsniff` `-spunchgun` `-spunchpop` `-stinks`\n"
         "`-tired` `-toopliss` `-toothless` `-trade`\n"
         "`-umbre` `-umbrecup` `-vox` `-wtf`"
