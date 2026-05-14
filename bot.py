@@ -272,14 +272,28 @@ async def on_message(message):
             return
 
         embed = message.embeds[0]
-        embed_text = (embed.description or "").lower()
+
+        embed_parts = [
+            embed.title or "",
+            embed.description or "",
+            embed.footer.text if embed.footer else "",
+            embed.author.name if embed.author else ""
+        ]
+
+        for field in embed.fields:
+            embed_parts.append(field.name or "")
+            embed_parts.append(field.value or "")
+
+        embed_text = " ".join(embed_parts).lower()
 
         is_bump = any(x in embed_text for x in [
             "bump done",
             "thanks for bumping",
             "bumped the server",
             "you can bump again",
-            "bump successful"
+            "bump successful",
+            "bump done!",
+            "disboard: the public server list"
         ])
 
         if not is_bump:
