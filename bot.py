@@ -43,7 +43,9 @@ class Enceladus(commands.Bot):
         await self.load_extension('roles')
         await self.load_extension("fortunes")
         await self.load_extension('birthdays')
+        await self.load_extension("autoresponses")
         await self.load_extension("verification")
+        await self.load_extension("moderation")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
@@ -584,23 +586,6 @@ async def iss(interaction: discord.Interaction):
             await interaction.followup.send("Offline!")
 
 @bot.command()
-async def qr(ctx, *, reason):
-    staff_channel = bot.get_channel(1352834838478061608) 
-    if staff_channel:
-        jump_url = f"https://discord.com/channels/{ctx.guild.id}/{ctx.channel.id}/{ctx.message.id}"
-        report_msg = (
-            f"⚠️ **New Quick Report!**\n"
-            f"**User:** {ctx.author.mention} used `!qr` in {ctx.channel.mention}\n"
-            f"**Reason:** {reason}\n"
-            f"🔗 [Jump to Message]({jump_url})"
-        )
-        await staff_channel.send(report_msg)
-        await ctx.message.delete()
-        await ctx.author.send("Your report has been sent to the staff. Thank you for helping The Cosmic Lair stay positive! 🌌💜")
-    else:
-        print("Error: Staff channel not found.")
-
-@bot.command()
 @commands.has_permissions(administrator=True)
 async def resetbump(ctx):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -691,7 +676,8 @@ async def help_command(ctx):
             value=(
                 "`-list` - List all available community tags.\n"
                 "`-[tagname]` - View a saved community tag.\n"
-                "`/echo <msg> [chan (optional)]` - Make Enceladus speak!"
+                "`/echo <msg> [chan (optional)]` - Make Enceladus speak!\n"
+                "`-qr` <report reason> - Make a silent quick report to the staff about a member."
             ),
             inline=False
         )

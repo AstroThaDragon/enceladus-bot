@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ui import View, Select, Button, Modal, TextInput
+import os
 
 
 VERIFICATION_CHANNEL_ID = 1297033393313288263
@@ -388,6 +389,28 @@ class Verification(commands.Cog):
             view=VerificationPanelView(self)
         )
 
+    async def create_thread_transcript(self, thread):
+        messages = []
+
+        async for message in thread.history(limit=None, oldest_first=True):
+            content = message.content or ""
+
+            if message.attachments:
+                attachments = "\n".join(a.url for a in message.attachments)
+                content += f"\n[Attachments]\n{attachments}"
+
+            messages.append(
+                f"[{message.created_at}] {message.author}: {content}"
+            )
+
+        transcript_text = "\n\n".join(messages)
+        file_name = f"transcript-{thread.id}.txt"
+
+        with open(file_name, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+
+        return file_name
+
     async def finish_verification(
         self,
         interaction,
@@ -466,6 +489,16 @@ class Verification(commands.Cog):
 
         if pending_role and pending_role in member.roles:
             await member.remove_roles(pending_role)
+
+        transcript_file = await self.create_thread_transcript(thread)
+
+        if log_channel:
+            await log_channel.send(
+                content=f"📜 Transcript for {thread.name}:",
+                file=discord.File(transcript_file)
+            )
+
+        os.remove(transcript_file)
 
         await thread.edit(
             archived=True,
