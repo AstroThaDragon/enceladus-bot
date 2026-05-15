@@ -16,25 +16,15 @@ AUTO_RESPONSES = {
         "Cosmic systems online ✨"
     ],
 
-    "goodnight": [
-        "Goodnight! 🌙",
-        "Sweet dreams among the stars ✨"
-    ],
-
-    "good morning": [
-        "Good morning! ☀️",
-        "Good mornin', hope you have a great day!"
-    ],
-
-    "morning": [
-        "Good morning! ☀️",
-        "Good mornin', hope you have a great day!"
-    ],
-
     "toaster": [
         "You called?",
         "I'm the toaster, I am here",
         "I'm here! Want a PopTart or somethin?"
+    ],
+
+    "toast": [
+        "*Toaster noises*",
+        "*DING*"
     ]
 }
 
@@ -47,7 +37,10 @@ AUTO_REACTIONS = {
     "cosmic": "🌌",
     "void": "🕳️",
     "proot": "🍞",
-    "toaster": "🍞"
+    "toaster": "🍞",
+    "morning": "👋",
+    "good morning": "👋",
+    "good night": "🌙"
 }
 
 
@@ -58,6 +51,9 @@ class AutoResponses(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
+            return
+        
+        if not message.content:
             return
 
         content = message.content.lower()
