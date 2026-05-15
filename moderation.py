@@ -2,8 +2,11 @@ import random
 import string
 import discord
 from discord.ext import commands
-from discord.ui import View, Button, Modal, TextInput
+from discord.ui import View, Button
+import asyncio
+import aiosqlite
 
+MIN_ACCOUNT_AGE_DAYS = 30
 
 VERIFY_CHANNEL_ID = 1296962529989361685
 VERIFY_LOG_CHANNEL_ID = 1352834838478061608
@@ -13,6 +16,8 @@ VERIFIED_ROLE_ID = 593723369422192661
 
 MOD_LOG_CHANNEL_ID = 1352095872812318760
 
+VERIFICATION_DB_PATH = "/app/data/verification.db"
+
 
 pending_codes = {}
 
@@ -21,31 +26,6 @@ def generate_code():
     letters = ''.join(random.choices(string.ascii_uppercase, k=4))
     numbers = ''.join(random.choices(string.digits, k=3))
     return f"{letters}-{numbers}"
-
-
-class VerifyCodeModal(Modal):
-    def __init__(self, cog, member):
-        super().__init__(title="Enter Verification Code")
-
-        self.cog = cog
-        self.member = member
-
-        self.code_input = TextInput(
-            label="Verification Code",
-            placeholder="Example: STAR-123",
-            required=True,
-            max_length=20
-        )
-
-        self.add_item(self.code_input)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await self.cog.check_code(
-            interaction,
-            self.member,
-            self.code_input.value
-        )
-
 
 class VerifyView(View):
     def __init__(self, cog):
@@ -76,8 +56,13 @@ class VerifyView(View):
                 ephemeral=True
             )
 
-        await interaction.response.send_modal(
-            VerifyCodeModal(self.cog, member)
+        await interaction.response.send_message(
+            "✅ I sent you a verification code in DMs!\n\n"
+            "Once you receive it, return here and type:\n"
+            "`-verifycode YOUR-CODE`\n\n"
+            "Example:\n"
+            "`-verifycode STAR-482`",
+            ephemeral=True
         )
 
 
@@ -85,6 +70,45 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.add_view(VerifyView(self))
+
+        self.bot.loop.create_task(
+            self.setup_verification_db()
+        )
+
+    async def setup_verification_db(self):
+        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS verification_strikes (
+                    user_id INTEGER PRIMARY KEY,
+                    strikes INTEGER DEFAULT 0
+                )
+                """
+            )
+
+            await db.commit()
+
+    async def add_verification_strike(self, user_id):
+        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+            await db.execute(
+                """
+                INSERT INTO verification_strikes (user_id, strikes)
+                VALUES (?, 1)
+                ON CONFLICT(user_id)
+                DO UPDATE SET strikes = strikes + 1
+                """,
+                (user_id,)
+            )
+
+            async with db.execute(
+                "SELECT strikes FROM verification_strikes WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            await db.commit()
+
+        return row[0] if row else 1
 
     @commands.command()
     async def qr(self, ctx, *, reason):
@@ -119,6 +143,71 @@ class Moderation(commands.Cog):
                 delete_after=10
             )
 
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+
+        account_age = discord.utils.utcnow() - member.created_at
+
+        if account_age.days < MIN_ACCOUNT_AGE_DAYS:
+            try:
+                await member.send(
+                    f"⚠️ You were removed from **{member.guild.name}** because your Discord account is less than "
+                    f"**{MIN_ACCOUNT_AGE_DAYS} days old**.\n\n"
+                    "This is an automatic safety measure to protect the server from raids, spam, scams, and throwaway accounts.\n\n"
+                    "You may try joining again once your account is old enough. If you are **not** a bot, you can contact 'astrothadragon' and continue from there."
+                )
+            except discord.Forbidden:
+                pass
+
+            await member.kick(
+                reason=f"Account younger than {MIN_ACCOUNT_AGE_DAYS} days."
+            )
+
+            return
+
+        await asyncio.sleep(1800)  # 30 minutes
+
+        guild = member.guild
+        unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
+
+        try:
+            member = await guild.fetch_member(member.id)
+        except discord.NotFound:
+            return
+
+        if not unverified_role or unverified_role not in member.roles:
+            return
+
+        strikes = await self.add_verification_strike(member.id)
+
+        if strikes >= 3:
+            action_text = (
+                "🚫 You have reached the maximum number of verification strikes and have been banned from the server.\n\n"
+                "If you believe this was a mistake, you may appeal by contacting the server owner at 'astrothadragon.'"
+            )
+        else:
+            action_text = (
+                "You may rejoin and try again, but repeated missed verifications will lead to a ban."
+            )
+
+        try:
+            await member.send(
+                f"⚠️ You were removed from **{guild.name}** because you did not verify within 30 minutes.\n\n"
+                f"Verification strike: **{strikes}/3**\n\n"
+                f"{action_text}"
+            )
+        except discord.Forbidden:
+            pass
+
+        if strikes >= 3:
+            await member.ban(
+                reason="Reached 3/3 verification timeout strikes."
+            )
+        else:
+            await member.kick(
+                reason=f"Did not verify within 30 minutes. Verification strike {strikes}/3."
+            )
+
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def sendverifypanel(self, ctx):
@@ -126,7 +215,7 @@ class Moderation(commands.Cog):
             title="🔒 Server Verification",
             description=(
                 "To gain access to The Cosmic Lair, click the button below.\n\n"
-                "Enceladus will DM you a code. Enter the code here to verify."
+                "I, Enceladus, will DM you a code. Return here and type `-verifycode <YOUR-CODE>` to verify."
             ),
             color=discord.Color.blurple()
         )
@@ -136,22 +225,24 @@ class Moderation(commands.Cog):
             view=VerifyView(self)
         )
 
-    async def check_code(self, interaction, member, submitted_code):
+    @commands.command()
+    async def verifycode(self, ctx, code: str):
+        member = ctx.author
         correct_code = pending_codes.get(member.id)
 
         if not correct_code:
-            return await interaction.response.send_message(
-                "❌ No verification code found. Please click Verify again.",
-                ephemeral=True
+            return await ctx.send(
+                "❌ You do not currently have an active verification code.",
+                delete_after=10
             )
 
-        if submitted_code.strip().upper() != correct_code:
-            return await interaction.response.send_message(
-                "❌ Incorrect code. Please check your DMs and try again.",
-                ephemeral=True
+        if code.strip().upper() != correct_code:
+            return await ctx.send(
+                "❌ Incorrect verification code. Check your DMs and try again.",
+                delete_after=10
             )
 
-        guild = interaction.guild
+        guild = ctx.guild
 
         verified_role = guild.get_role(VERIFIED_ROLE_ID)
         unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
@@ -164,9 +255,10 @@ class Moderation(commands.Cog):
 
         pending_codes.pop(member.id, None)
 
-        await interaction.response.send_message(
-            "✅ You're verified! Welcome to The Cosmic Lair!",
-            ephemeral=True
+        await ctx.message.delete()
+
+        await ctx.send(
+            f"✅ {member.mention}, you're verified! Welcome to The Cosmic Lair!"
         )
 
         log_channel = guild.get_channel(VERIFY_LOG_CHANNEL_ID)
@@ -175,6 +267,13 @@ class Moderation(commands.Cog):
             await log_channel.send(
                 f"✅ {member.mention} passed verification."
             )
+
+        try:
+            await member.send(
+                "✅ You have successfully verified in **The Cosmic Lair**!"
+            )
+        except discord.Forbidden:
+            pass
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
