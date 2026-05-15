@@ -137,7 +137,12 @@ class DMHandler(commands.Cog):
 
             await log_channel.send(embed=embed)
 
-        if any(word in lowered for word in ["appeal", "appeals", "ban", "banned", "unban"]):
+        if session_active:
+            await user.send(
+                "🌌 Added to your active support session. Your message has been forwarded to staff."
+            )
+
+        elif any(word in lowered for word in ["appeal", "appeals", "ban", "banned", "unban"]):
             active_sessions[user.id] = time.time()
             await user.send(
                 "🌌 If this is about a ban or verification appeal, please reply here with:\n\n"
@@ -145,7 +150,7 @@ class DMHandler(commands.Cog):
                 "• Why you were removed or banned\n"
                 "• Any relevant screenshots/details\n"
                 "• Whether this was related to verification, account age, or timeout strikes\n\n"
-                "Your messages here will be forwarded to staff for review. Your messages here will be forwarded to staff for the next 15 minutes."
+                "Your messages here will be forwarded to staff for the next 15 minutes."
             )
 
         elif any(word in lowered for word in HELP_KEYWORDS):
@@ -165,7 +170,7 @@ class DMHandler(commands.Cog):
         else:
             await user.send(
                 "🌌 Hello! Message received!\n\n"
-                "If you need help, reports, appeals, bans, or verification support, please say that clearly so I can forward it to staff. Your messages here will be forwarded to staff for the next 15 minutes."
+                "If you need help, reports, appeals, bans, or verification support, please say that clearly so I can forward it to staff."
             )
 
 async def setup(bot):
