@@ -258,7 +258,8 @@ class Moderation(commands.Cog):
         await ctx.message.delete()
 
         await ctx.send(
-            f"✅ {member.mention}, you're verified! Welcome to The Cosmic Lair!"
+            f"✅ {member.mention}, you're verified! Welcome to The Cosmic Lair!",
+            delete_after=10
         )
 
         log_channel = guild.get_channel(VERIFY_LOG_CHANNEL_ID)
@@ -270,10 +271,26 @@ class Moderation(commands.Cog):
 
         try:
             await member.send(
-                "✅ You have successfully verified in **The Cosmic Lair**!",
-                delete_after=10
+                "✅ You have successfully verified in **The Cosmic Lair**!"
             )
         except discord.Forbidden:
+            pass
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+
+        if message.channel.id != VERIFY_CHANNEL_ID:
+            return
+
+        await asyncio.sleep(5)
+
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass
+        except discord.NotFound:
             pass
 
     @commands.Cog.listener()
