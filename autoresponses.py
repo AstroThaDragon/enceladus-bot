@@ -2,6 +2,18 @@ import discord
 from discord.ext import commands
 import random
 
+IGNORED_CHANNEL_IDS = [
+    593397821835575306,
+    1117377155496673330,
+    1117391981627318363,
+    598883099987673088,
+    1036594500916756490,
+    593410829857325056,
+    1440166194866028666,
+    1036596295353245726,
+    1117403991266041906,
+    1496628909570265199
+]
 
 AUTO_RESPONSES = {
     "good bot": [
@@ -12,7 +24,7 @@ AUTO_RESPONSES = {
 
     "enceladus": [
         "You called? 🌠",
-        "The stars are listening...",
+        "The stars are listening.",
         "Cosmic systems online ✨"
     ],
 
@@ -24,7 +36,8 @@ AUTO_RESPONSES = {
 
     "toast": [
         "*Toaster noises*",
-        "*DING*"
+        "*DING*",
+        "Want toast? I gotchu"
     ]
 }
 
@@ -40,7 +53,8 @@ AUTO_REACTIONS = {
     "toaster": "🍞",
     "morning": "👋",
     "good morning": "👋",
-    "good night": "🌙"
+    "good night": "🌙",
+    "goodnight": "🌙"
 }
 
 
@@ -55,8 +69,18 @@ class AutoResponses(commands.Cog):
         
         if not message.content:
             return
+        
+        if message.channel.id in IGNORED_CHANNEL_IDS:
+            return
 
         content = message.content.lower()
+
+        if (
+            "tenor.com" in content
+            or "giphy.com" in content
+            or "gif" in content
+        ):
+            return
 
         # --- AUTO RESPONSES ---
         for trigger, responses in AUTO_RESPONSES.items():
