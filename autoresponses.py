@@ -35,7 +35,7 @@ AUTO_RESPONSES = {
         "You called?",
         "I'm the toaster, I am here",
         "I'm here! Want a PopTart or somethin?"
-    ],
+    ]
 }
 
 

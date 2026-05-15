@@ -16,6 +16,10 @@ VERIFIED_ROLE_ID = 593723369422192661
 
 MOD_LOG_CHANNEL_ID = 1352095872812318760
 
+VERIFY_MESSAGE_EXEMPT_ROLE_IDS = [
+    891356074689560626,  # Owner
+]
+
 VERIFICATION_DB_PATH = "/app/data/verification.db"
 
 
@@ -154,7 +158,7 @@ class Moderation(commands.Cog):
                     f"⚠️ You were removed from **{member.guild.name}** because your Discord account is less than "
                     f"**{MIN_ACCOUNT_AGE_DAYS} days old**.\n\n"
                     "This is an automatic safety measure to protect the server from raids, spam, scams, and throwaway accounts.\n\n"
-                    "You may try joining again once your account is old enough. If you are **not** a bot, you can contact 'astrothadragon' and continue from there."
+                    "You may try joining again once your account is old enough. If you believe this was a mistake, you can contact @Enceladus#0496, or 'astrothadragon' and continue from there."
                 )
             except discord.Forbidden:
                 pass
@@ -183,7 +187,7 @@ class Moderation(commands.Cog):
         if strikes >= 3:
             action_text = (
                 "🚫 You have reached the maximum number of verification strikes and have been banned from the server.\n\n"
-                "If you believe this was a mistake, you may appeal by contacting the server owner at 'astrothadragon.'"
+                "If you believe this was a mistake, you may appeal by contacting @Enceladus#0496, or the server owner at 'astrothadragon.'"
             )
         else:
             action_text = (
@@ -278,10 +282,14 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
+
+        if (
+            message.channel.id != VERIFY_CHANNEL_ID
+            or message.author.bot
+        ):
             return
 
-        if message.channel.id != VERIFY_CHANNEL_ID:
+        if any(role.id in VERIFY_MESSAGE_EXEMPT_ROLE_IDS for role in message.author.roles):
             return
 
         await asyncio.sleep(5)

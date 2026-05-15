@@ -46,6 +46,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("autoresponses")
         await self.load_extension("verification")
         await self.load_extension("moderation")
+        await self.load_extension("dm_handler")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
