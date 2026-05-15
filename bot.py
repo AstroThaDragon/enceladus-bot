@@ -171,6 +171,7 @@ async def check_bump_timer():
 
     except Exception as e:
         print(f"[BUMP LOOP ERROR]: {e}")
+        await asyncio.sleep(60)
 
 # --- STARGAZING ALERTS SETUP ---
 edt = timezone(timedelta(hours=-4))
@@ -678,7 +679,7 @@ async def help_command(ctx):
                 "`-list` - List all available community tags.\n"
                 "`-[tagname]` - View a saved community tag.\n"
                 "`/echo <msg> [chan (optional)]` - Make Enceladus speak!\n"
-                "`-qr` <report reason> - Make a silent quick report to the staff about a member."
+                "`-qr <report reason>` - Make a silent quick report to the staff about a member."
             ),
             inline=False
         )

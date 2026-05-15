@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import random
+import re
 
 IGNORED_CHANNEL_IDS = [
     593397821835575306,
@@ -20,12 +21,6 @@ AUTO_RESPONSES = {
         "Beep boop! 💜",
         "Cosmic appreciation detected! 🌌",
         "Thank youuu <3"
-    ],
-
-    "enceladus": [
-        "You called? 🌠",
-        "The stars are listening.",
-        "Cosmic systems online ✨"
     ],
 
     "toaster": [
@@ -84,7 +79,7 @@ class AutoResponses(commands.Cog):
 
         # --- AUTO RESPONSES ---
         for trigger, responses in AUTO_RESPONSES.items():
-            if trigger in content:
+            if re.search(rf"\b{re.escape(trigger)}\b", content):
                 try:
                     await message.channel.send(
                         random.choice(responses)
@@ -96,7 +91,7 @@ class AutoResponses(commands.Cog):
 
         # --- AUTO REACTIONS ---
         for trigger, emoji in AUTO_REACTIONS.items():
-            if trigger in content:
+            if re.search(rf"\b{re.escape(trigger)}\b", content):
                 try:
                     await message.add_reaction(emoji)
                 except:
