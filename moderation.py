@@ -270,7 +270,8 @@ class Moderation(commands.Cog):
 
         try:
             await member.send(
-                "✅ You have successfully verified in **The Cosmic Lair**!"
+                "✅ You have successfully verified in **The Cosmic Lair**!",
+                delete_after=10
             )
         except discord.Forbidden:
             pass
