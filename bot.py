@@ -14,7 +14,6 @@ import asyncio
 import re
 import aiosqlite
 from datetime import datetime, time, timezone, timedelta
-import datetime
 import pytz
 
 load_dotenv()
@@ -593,21 +592,21 @@ async def iss(interaction: discord.Interaction):
 
 def get_next_midnight_reset():
     et = pytz.timezone("US/Eastern")
-    now = datetime.datetime.now(et)
+    now = datetime.now(et)
 
     reset_time = now.replace(
         hour=0,
         minute=0,
         second=0,
         microsecond=0
-    ) + datetime.timedelta(days=1)
+    ) + timedelta(days=1)
 
     return int(reset_time.timestamp())
 
 
 def get_next_fortune_reset():
     et = pytz.timezone("US/Eastern")
-    now = datetime.datetime.now(et)
+    now = datetime.now(et)
 
     reset_time = now.replace(
         hour=6,
@@ -617,7 +616,7 @@ def get_next_fortune_reset():
     )
 
     if now >= reset_time:
-        reset_time += datetime.timedelta(days=1)
+        reset_time += timedelta(days=1)
 
     return int(reset_time.timestamp())
 
