@@ -689,7 +689,7 @@ class Fortunes(commands.Cog):
             f"{prefix} **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
             f"🔮 **Lucky Numbers:** `{lucky_nums}`\n"
-            f"\n📊 **Today's Cosmic Stats:**\n{stats_text}\n"
+            f"\n📊 **Today's Cosmic Stats:**\n{stats_text}\n\n"
             f"✨ **XP Gained:** `+{total_xp}`\n"
             f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
         )
