@@ -335,6 +335,7 @@ class Sword(commands.Cog):
             fail_text = random.choice(FAIL_MESSAGES)
 
             return await ctx.send(
+                f"⚔️ {user.mention} attempts to pull the sword!\n\n"
                 f"**{fail_text}**\n\n"
                 f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably? Maybe?\n\n"
                 f"-# ***Your Attempts:*** `{user_attempts}`"
