@@ -629,7 +629,7 @@ async def help_command(ctx):
                 "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
                 "`/coolrate` - See how cool you or a member is!\n"
                 "`/cringerate` - Find out how cringe you or a member is!\n"
-                "`/dragonflight` `-ft` `-flytest` - Attempt your daily Dragon Flight Test and try to earn your Dragonrider license! Resets daily at 12AM EST.\n"
+                "`/dragonrider` `-ft` `-flytest` - Attempt your daily Dragonrider Test and try to earn your Dragonrider license! Resets daily at 12AM EST.\n"
                 "`/fortune` - Receive a daily fortune cookie fortune and XP! Resets daily at 6AM EST. Keep opening every day for a streak and more XP!\n"
                 "When you open a fortune, you'll see an emoji near your mention to display rarity. Here's what each one means!\n"
                 "🥠 | Common\n"
