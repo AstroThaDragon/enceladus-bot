@@ -321,7 +321,7 @@ class DragonFlight(commands.Cog):
                 f"🐲 {user.mention} attempts their Dragonrider Test...\n\n"
                 f"**{random.choice(FAIL_MESSAGES)}**\n\n"
                 f"You've failed your test! Your instructor must endure another day... 💔\n\n"
-                f"**Test Attempts:** `{attempts}`"
+                f"-# ***Test Attempts:*** `{attempts}`"
             )
 
         license_role = guild.get_role(LICENSE_ROLE_ID)
