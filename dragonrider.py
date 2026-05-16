@@ -232,6 +232,22 @@ class DragonFlight(commands.Cog):
 
             await db.commit()
 
+    def get_next_midnight_reset(self):
+        import datetime
+        import pytz
+
+        et = pytz.timezone("US/Eastern")
+        now = datetime.datetime.now(et)
+
+        reset_time = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0
+        ) +     datetime.timedelta(days=1)
+
+        return int(reset_time.timestamp())
+
     def get_today_et(self):
         import datetime
         import pytz
@@ -272,10 +288,13 @@ class DragonFlight(commands.Cog):
                     )
 
                 if last_attempt_date == today_et:
-                    return await ctx.send(
-                        "⏳ You've already attempted your Dragonrider Test today! Try again after midnight **Eastern Time.**"
-                    )
+                    reset_timestamp = self.get_next_midnight_reset()
 
+                    return await ctx.send(
+                        f"⏳ You've already attempted your Dragon Rider Test today!\n"
+                        f"🐉 You may attempt another test <t:{reset_timestamp}:R>."
+                )
+                
             await db.execute(
                 """
                 INSERT INTO dragonflight (

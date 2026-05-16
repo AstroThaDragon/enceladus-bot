@@ -309,6 +309,22 @@ class Sword(commands.Cog):
         now_et = datetime.datetime.now(et_timezone)
 
         return now_et.date().isoformat()
+    
+    def get_next_midnight_reset(self):
+        import datetime
+        import pytz
+
+        et = pytz.timezone("US/Eastern")
+        now = datetime.datetime.now(et)
+
+        reset_time = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0
+        ) + datetime.timedelta(days=1)
+
+        return int(reset_time.timestamp())
 
     @commands.hybrid_command(
         name="pullsword",
@@ -322,8 +338,11 @@ class Sword(commands.Cog):
         user_attempts, total_attempts, previous_wielder_id, already_pulled = await self.add_attempt(user.id)
 
         if already_pulled:
+            reset_timestamp = self.get_next_midnight_reset()
+
             return await ctx.send(
-                "⏳ You've already attempted to pull the cosmic blade today! Try again after midnight **Eastern Time.**"
+                f"⏳ You've already attempted to pull the cosmic blade today!\n"
+                f"⚔️ You may attempt another pull <t:{reset_timestamp}:R>."
             )
 
         sword_role = guild.get_role(SWORD_ROLE_ID)
@@ -337,7 +356,7 @@ class Sword(commands.Cog):
             return await ctx.send(
                 f"⚔️ {user.mention} attempts to pull the sword!\n\n"
                 f"**{fail_text}**\n\n"
-                f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably? Maybe?\n\n"
+                f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\n\n"
                 f"-# ***Your Attempts:*** `{user_attempts}`"
             )
 

@@ -193,6 +193,25 @@ class Fortunes(commands.Cog):
     def cog_unload(self):
         self.fortune_reset_announcement.cancel() # type: ignore
 
+    def get_next_fortune_reset(self):
+        import datetime
+        import pytz
+
+        et = pytz.timezone("US/Eastern")
+        now = datetime.datetime.now(et)
+
+        reset_time = now.replace(
+            hour=6,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+        if now >= reset_time:
+            reset_time += datetime.timedelta(days=1)
+
+        return int(reset_time.timestamp())
+
     def generate_fortune_stats(self, mood):
         stats = {}
 
@@ -603,8 +622,11 @@ class Fortunes(commands.Cog):
                 result = await cursor.fetchone()
 
             if result and result[0] == current_date_et:
+                reset_timestamp = self.get_next_fortune_reset()
+
                 return await ctx.send(
-                    "⏳ You've already opened your cookie for today! Come back after 6AM **Eastern Time.**"
+                    f"🥠 You've already opened your fortune cookie today!\n"
+                    f"⏳ You can open another <t:{reset_timestamp}:R>."
                 )
 
             yesterday_et = (
