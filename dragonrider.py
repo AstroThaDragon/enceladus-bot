@@ -244,7 +244,7 @@ class DragonFlight(commands.Cog):
     @commands.hybrid_command(
         name="dragonflight",
         aliases=["flytest", "ft"],
-        description="Attempt your dragon flying test!"
+        description="Attempt your Dragonrider test!"
     )
     async def dragonflight(self, ctx):
         user = ctx.author
@@ -319,9 +319,9 @@ class DragonFlight(commands.Cog):
         if not success:
             return await ctx.send(
                 f"🐲 {user.mention} attempts their Dragonrider Test...\n\n"
-                f"{random.choice(FAIL_MESSAGES)}\n"
-                f"You've failed your test! Your instructor must endure another day...\n\n"
-                f"🐉 **Flight Attempts:** `{attempts}`"
+                f"**{random.choice(FAIL_MESSAGES)}**\n\n"
+                f"You've failed your test! Your instructor must endure another day... 💔\n\n"
+                f"**Test Attempts:** `{attempts}`"
             )
 
         license_role = guild.get_role(LICENSE_ROLE_ID)
@@ -338,7 +338,7 @@ class DragonFlight(commands.Cog):
         await ctx.send(
             f"{random.choice(SUCCESS_MESSAGES)}\n\n"
             f"🐉 {user.mention} has earned their **Dragonrider License!**\n"
-            f"🐉 **Flight Attempts:** `{attempts}`"
+            f"**Test Attempts:** `{attempts}`"
         )
 
 
