@@ -14,114 +14,114 @@ FORTUNE_PING_ROLE_ID = 1503642487586029568
 
 RARITY_WEIGHTS = {
     "common": 75,
-    "uncommon": 18,
-    "rare": 5,
-    "legendary": 1.5,
-    "void": 0.7
+    "uncommon": 38,
+    "rare": 16,
+    "legendary": 6.1,
+    "void": 1.2
 }
 
 HALLOWEEN_RARITY_WEIGHTS = {
     "common": 55,
-    "uncommon": 24,
-    "rare": 10,
-    "legendary": 3,
-    "void": 1.2
+    "uncommon": 38,
+    "rare": 24,
+    "legendary": 10,
+    "void": 9
 }
 
 CHRISTMAS_RARITY_WEIGHTS = {
     "common": 72,
-    "uncommon": 20,
-    "rare": 6,
-    "legendary": 1.5,
-    "void": 0.5
+    "uncommon": 42,
+    "rare": 18,
+    "legendary": 7,
+    "void": 1
 }
 
 VALENTINES_RARITY_WEIGHTS = {
     "common": 68,
-    "uncommon": 22,
-    "rare": 7,
-    "legendary": 2.5,
-    "void": 0.5
+    "uncommon": 42,
+    "rare": 18,
+    "legendary": 9,
+    "void": 1
 }
 
 NEW_YEAR_RARITY_WEIGHTS = {
-    "common": 60,
-    "uncommon": 25,
-    "rare": 10,
-    "legendary": 4,
-    "void": 1
+    "common": 58,
+    "uncommon": 42,
+    "rare": 24,
+    "legendary": 10,
+    "void": 2
 }
 
 FOURTH_OF_JULY_RARITY_WEIGHTS = {
-    "common": 73,
-    "uncommon": 18,
-    "rare": 6,
-    "legendary": 2,
-    "void": 1
+    "common": 70,
+    "uncommon": 40,
+    "rare": 18,
+    "legendary": 7,
+    "void": 1.5
 }
 
 EASTER_RARITY_WEIGHTS = {
     "common": 72,
-    "uncommon": 20,
-    "rare": 6,
-    "legendary": 1.5,
-    "void": 0.5
+    "uncommon": 42,
+    "rare": 18,
+    "legendary": 7,
+    "void": 1
 }
 
 THANKSGIVING_RARITY_WEIGHTS = {
     "common": 74,
-    "uncommon": 18,
-    "rare": 6,
-    "legendary": 1.5,
-    "void": 0.5
+    "uncommon": 40,
+    "rare": 17,
+    "legendary": 6.5,
+    "void": 1
 }
 
 APRIL_FOOLS_RARITY_WEIGHTS = {
-    "common": 50,
-    "uncommon": 28,
-    "rare": 14,
-    "legendary": 6,
-    "void": 2
+    "common": 45,
+    "uncommon": 40,
+    "rare": 28,
+    "legendary": 14,
+    "void": 6
 }
 
 SUMMER_RARITY_WEIGHTS = {
     "common": 75,
-    "uncommon": 18,
-    "rare": 5,
-    "legendary": 1.5,
-    "void": 0.5
+    "uncommon": 38,
+    "rare": 16,
+    "legendary": 6.1,
+    "void": 1.2
 }
 
 WINTER_RARITY_WEIGHTS = {
-    "common": 73,
-    "uncommon": 20,
-    "rare": 5,
-    "legendary": 1.5,
-    "void": 0.5
+    "common": 72,
+    "uncommon": 40,
+    "rare": 17,
+    "legendary": 7,
+    "void": 1
 }
 
 LUNAR_NEW_YEAR_RARITY_WEIGHTS = {
-    "common": 60,
-    "uncommon": 25,
-    "rare": 10,
-    "legendary": 4.5,
-    "void": 0.5
+    "common": 58,
+    "uncommon": 42,
+    "rare": 24,
+    "legendary": 12,
+    "void": 1
 }
 
 FULL_MOON_RARITY_WEIGHTS = {
-    "common": 60,
-    "uncommon": 25,
-    "rare": 10,
-    "legendary": 3,
-    "void": 10
+    "common": 45,
+    "uncommon": 35,
+    "rare": 22,
+    "legendary": 10,
+    "void": 20
 }
 
 RARITY_XP = {
     "common": 35,
     "uncommon": 50,
     "rare": 85,
-    "legendary": 140,
-    "void": 175
+    "legendary": 120,
+    "void": 160
 }
 
 STREAK_XP_PER_DAY = 5
@@ -140,7 +140,15 @@ RARITY_PREFIXES = {
     "uncommon": "✨",
     "rare": "🌙",
     "legendary": "🌌 **A LEGENDARY FORTUNE APPEARS... (Legendary!)**\n",
-    "void": "💀 **The cookie cracks open incorrectly... (Void?)**\n"
+    "void": "💀 **The cookie cracks open incorrectly... (Void!)**\n"
+}
+
+STAT_MOODS = {
+    "common": "neutral",
+    "uncommon": "slightly_good",
+    "rare": "good",
+    "legendary": "legendary",
+    "void": "void"
 }
 
 EVENT_NOTES = {
@@ -184,6 +192,52 @@ class Fortunes(commands.Cog):
 
     def cog_unload(self):
         self.fortune_reset_announcement.cancel() # type: ignore
+
+    def generate_fortune_stats(self, mood):
+        stats = {}
+
+        stat_names = [
+            ("❤️", "Love"),
+            ("💉", "Health"),
+            ("🍀", "Luck"),
+            ("💸", "Money")
+        ]
+
+        for emoji, name in stat_names:
+
+            if mood == "neutral":
+                value = random.randint(20, 80)
+
+            elif mood == "slightly_good":
+                value = random.randint(35, 90)
+
+            elif mood == "good":
+                value = random.randint(50, 100)
+
+            elif mood == "legendary":
+                value = random.randint(70, 100)
+
+            elif mood == "void":
+                void_values = [
+                    random.randint(-999, 999),
+                    "ERROR",
+                    "???",
+                    "∞",
+                    "NULL"
+                ]
+                value = random.choice(void_values)
+
+            else:
+                value = random.randint(0, 100)
+
+            stats[f"{emoji} {name}"] = value
+
+        # Legendary guaranteed high stat
+        if mood == "legendary":
+            random_stat = random.choice(list(stats.keys()))
+            stats[random_stat] = random.randint(95, 100)
+
+        return stats
 
     def get_fortune_day(self, now_et):
         if now_et.hour < 6:
@@ -518,7 +572,13 @@ class Fortunes(commands.Cog):
 
             phase_date = self.parse_usno_phase_date(phase)
 
-            if phase_date == today:
+            if not phase_date:
+                continue
+
+            full_moon_start = phase_date - datetime.timedelta(days=1)
+            full_moon_end = phase_date + datetime.timedelta(days=1)
+
+            if full_moon_start <= today <= full_moon_end:
                 return True
 
         return False
@@ -564,6 +624,9 @@ class Fortunes(commands.Cog):
                     current_streak = 1
 
             rarity, selected_fortune = self.choose_fortune()
+
+            stat_mood = STAT_MOODS.get(rarity, "neutral")
+            stats = self.generate_fortune_stats(stat_mood)
 
             rarity_xp = RARITY_XP.get(rarity, 10)
 
@@ -614,12 +677,19 @@ class Fortunes(commands.Cog):
 
         active_event = self.get_active_event()
         event_note = EVENT_NOTES.get(active_event or "", "")
+        
+        stats_text = "\n".join(
+            f"{stat}: `{value}%`" if isinstance(value, int)
+            else f"{stat}: `{value}`"
+            for stat, value in stats.items()
+        )
 
         await ctx.send(
             f"{event_note}"
             f"{prefix} **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
             f"🔮 **Lucky Numbers:** `{lucky_nums}`\n"
+            f"\n📊 **Today's Cosmic Stats:**\n{stats_text}\n"
             f"✨ **XP Gained:** `+{total_xp}`\n"
             f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
         )

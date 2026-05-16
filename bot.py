@@ -47,6 +47,8 @@ class Enceladus(commands.Bot):
         await self.load_extension("verification")
         await self.load_extension("moderation")
         await self.load_extension("dm_handler")
+        await self.load_extension("sword")
+        await self.load_extension("dragonflight")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
@@ -627,7 +629,8 @@ async def help_command(ctx):
                 "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
                 "`/coolrate` - See how cool you or a member is!\n"
                 "`/cringerate` - Find out how cringe you or a member is!\n"
-                "`/fortune` - Receive a daily fortune cookie fortune and XP! Resets each day at 6AM EST. Keep opening daily for a streak and more XP!\n"
+                "`/dragonflight` `-ft` `-flytest` - Attempt your daily Dragon Flight Test and try to earn your Dragonrider license! Resets daily at 12AM EST.\n"
+                "`/fortune` - Receive a daily fortune cookie fortune and XP! Resets daily at 6AM EST. Keep opening every day for a streak and more XP!\n"
                 "When you open a fortune, you'll see an emoji near your mention to display rarity. Here's what each one means!\n"
                 "🥠 | Common\n"
                 "✨| Uncommon\n"
@@ -649,6 +652,7 @@ async def help_command(ctx):
                 "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
                 "`/moon` - Check the current moon phase.\n"
                 "`/nasa` - See NASA's Astronomy Picture of the Day!\n"
+                "`/pullsword` `-ps` - Attempt to pull the ancient Cosmic Blade from the stone and claim the Bladebearer title! Resets daily at 12AM EST.\n"
         ),
         inline=False
     )
