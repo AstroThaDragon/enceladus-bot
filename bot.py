@@ -664,7 +664,7 @@ async def help_command(ctx):
             "`/coinflip` - Supernova (heads) or blackhole (tails)!\n"
             "`/coolrate` - See how cool you or a member is!\n"
             "`/cringerate` - Find out how cringe you or a member is!\n"
-            "`/dragonrider` `-ft` `-flytest` - Attempt your daily Dragonrider Test and try to earn your Dragonrider license! Resets daily at <t:{daily_reset}:t>.\n"
+            f"`/dragonrider` `-ft` `-flytest` - Attempt your daily Dragonrider Test and try to earn your Dragonrider license! Resets daily at <t:{daily_reset}:t>.\n"
         ),
         inline=False
     )
@@ -672,13 +672,13 @@ async def help_command(ctx):
     embed.add_field(
         name="__ 🎮 Fun & Cosmic Games (2)__",
         value=(
-            "`/fortune` - Receive a daily fortune cookie fortune and XP! Resets daily at <t:{fortune_reset}:t>. Keep opening every day for a streak and more XP!\n"
+            f"`/fortune` - Receive a daily fortune cookie fortune and XP! Resets daily at <t:{fortune_reset}:t>. Keep opening every day for a streak and more XP!\n"
             "When you open a fortune, you'll see an emoji near your mention to display rarity. Here's what each one means!\n"
             "🥠 | Common\n"
             "✨| Uncommon\n"
             "🌙 | Rare\n"
             "Legendary and Void have their own special open messages, so you'll know about those!\n\n"
-            "-# ***(Disclaimer: the fortunes can be negative, sad, etc. to keep them realistic. It's just a little game, don't take it too serious!)***\n"
+            "-# ***(Disclaimer: the fortunes can be negative, sad, etc. to keep them realistic. It's just a little game, don't take it too serious!)***\n\n"
             "`/freakyrate` - Discover how freaky you or a member is!\n"
             "`/furryrate` - Determine how furry you or a member is!\n"
             "`/horoscope <sign>` - Check your daily horoscope.\n"
@@ -694,7 +694,7 @@ async def help_command(ctx):
         value=(
             "`/moon` - Check the current moon phase.\n"
             "`/nasa` - See NASA's Astronomy Picture of the Day!\n"
-            "`/pullsword` `-ps` - Attempt to pull the ancient Cosmic Blade from the stone and claim the Bladebearer title! Resets daily at <t:{daily_reset}:t>.\n"
+            f"`/pullsword` `-ps` - Attempt to pull the ancient Cosmic Blade from the stone and claim the Bladebearer title! Resets daily at <t:{daily_reset}:t>.\n"
             "`/relic <question>` - Consult the Astral Relic for answers (Magic 8-Ball)!\n"
             "`/roll <sides>` - Roll a die! Choose between 2 to 20 sides.\n"
             "`/spacedata` - Pull real-time data on a random celestial body.\n"
