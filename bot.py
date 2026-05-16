@@ -48,7 +48,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("moderation")
         await self.load_extension("dm_handler")
         await self.load_extension("sword")
-        await self.load_extension("dragonflight")
+        await self.load_extension("dragonrider")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
