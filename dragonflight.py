@@ -268,12 +268,12 @@ class DragonFlight(commands.Cog):
 
                 if licensed:
                     return await ctx.send(
-                        "🐉 You already possess a Dragon Flight License!"
+                        "🐉 You already possess a Dragonrider License!"
                     )
 
                 if last_attempt_date == today_et:
                     return await ctx.send(
-                        "⏳ You've already attempted your Dragon Flight Test today! Try again after midnight **Eastern Time.**"
+                        "⏳ You've already attempted your Dragonrider Test today! Try again after midnight **Eastern Time.**"
                     )
 
             await db.execute(
