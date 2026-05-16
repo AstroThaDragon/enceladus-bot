@@ -318,7 +318,9 @@ class DragonFlight(commands.Cog):
 
         if not success:
             return await ctx.send(
-                f"{random.choice(FAIL_MESSAGES)}\n\n"
+                f"🐲 {user.mention} attempts their Dragon Flight Test...\n\n"
+                f"{random.choice(FAIL_MESSAGES)}\n"
+                f"You've failed your test! Your instructor must endure another day...\n\n"
                 f"🐉 **Flight Attempts:** `{attempts}`"
             )
 
