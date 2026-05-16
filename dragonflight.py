@@ -318,7 +318,7 @@ class DragonFlight(commands.Cog):
 
         if not success:
             return await ctx.send(
-                f"🐲 {user.mention} attempts their Dragon Flight Test...\n\n"
+                f"🐲 {user.mention} attempts their Dragonrider Test...\n\n"
                 f"{random.choice(FAIL_MESSAGES)}\n"
                 f"You've failed your test! Your instructor must endure another day...\n\n"
                 f"🐉 **Flight Attempts:** `{attempts}`"
@@ -337,7 +337,7 @@ class DragonFlight(commands.Cog):
 
         await ctx.send(
             f"{random.choice(SUCCESS_MESSAGES)}\n\n"
-            f"🐉 {user.mention} has earned their **Dragon Flight License!**\n"
+            f"🐉 {user.mention} has earned their **Dragonrider License!**\n"
             f"🐉 **Flight Attempts:** `{attempts}`"
         )
 
