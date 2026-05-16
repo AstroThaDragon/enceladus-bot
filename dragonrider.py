@@ -242,7 +242,7 @@ class DragonFlight(commands.Cog):
         return now_et.date().isoformat()
 
     @commands.hybrid_command(
-        name="dragonflight",
+        name="dragonrider",
         aliases=["flytest", "ft"],
         description="Attempt your Dragonrider test!"
     )
