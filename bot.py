@@ -648,8 +648,8 @@ async def help_command(ctx):
             "`/hug <member>` - Give a warm, fuzzy cosmic hug!\n"
             "`/rank <member>` - View your level, XP, and rank card.\n"
             "`/slap <member>` - Slap someone with a random object!\n"
-            "`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at 12AM EST!" \
-            "`/upcoming_birthdays` - See upcoming server birthdays!"
+            f"`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at <t:{daily_reset}:t>.\n"
+            "`/upcoming_birthdays` - See upcoming server birthdays!\n"
         ),
         inline=False
     )
@@ -707,7 +707,7 @@ async def help_command(ctx):
         name="__ 🎤 Rhythm & Search__",
         value=(
             "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
-            "`/fnfsong <song>` - Find FNF tracks on YouTube."
+            "`/fnfsong <song>` - Find FNF tracks on YouTube.\n"
         ),
         inline=False
     )
@@ -718,7 +718,7 @@ async def help_command(ctx):
             "`-list` - List all available community tags.\n"
             "`-[tagname]` - View a saved community tag.\n"
             "`/echo <msg> [chan (optional)]` - Make Enceladus speak!\n"
-            "`-qr <report reason>` - Make a silent quick report to the staff about a member."
+            "`-qr <report reason>` - Make a silent quick report to the staff about a member.\n"
         ),
         inline=False
     )
