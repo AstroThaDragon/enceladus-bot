@@ -144,9 +144,18 @@ async def check_bump_timer():
             # Always use UTC-safe comparison
             now = datetime.now(timezone.utc)
 
+            print(f"[BUMP TIMER CHECK]: now={now}, remind_at={remind_at}")
+
             # If time has passed OR we missed it during downtime
             if now >= remind_at:
                 channel = bot.get_channel(row[1])
+
+                if channel is None:
+                    try:
+                        channel = await bot.fetch_channel(row[1])
+                    except Exception as e:
+                        print(f"[BUMP LOOP ERROR]: Could not fetch channel {row[1]}: {e}")
+                        return
 
                 if channel:
                     bump_role_id = "1295212860720418887"
@@ -169,8 +178,8 @@ async def check_bump_timer():
                     )
 
                 # clear timer after firing
-                async with db.execute("DELETE FROM bump_timer WHERE id = 1"):
-                    await db.commit()
+                await db.execute("DELETE FROM bump_timer WHERE id = 1")
+                await db.commit()
 
     except Exception as e:
         print(f"[BUMP LOOP ERROR]: {e}")
@@ -335,6 +344,8 @@ async def on_message(message):
                 print("Leveling cog not found, couldn't award bump XP.")
 
         remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+
+        print(f"[BUMP TIMER SET]: remind_at={remind_time}, channel={message.channel.id}")
 
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
