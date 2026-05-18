@@ -2,12 +2,11 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import aiosqlite
-from datetime import datetime, time, timezone, timedelta
+from datetime import datetime, time
+import pytz
 
-# 1. Define the time OUTSIDE the class so the decorator can see it
-# EST is UTC-5
-est = timezone(timedelta(hours=-5))
-est_midnight = time(hour=0, minute=0, tzinfo=est)
+eastern = pytz.timezone("US/Eastern")
+est_midnight = time(hour=0, minute=0)
 
 class BirthdayCog(commands.Cog):
     def __init__(self, bot):
@@ -40,7 +39,7 @@ class BirthdayCog(commands.Cog):
                 ephemeral=True
             )
 
-        now = datetime.now(est)
+        now = datetime.now(eastern)
 
         async with aiosqlite.connect("/app/data/birthdays.db") as db:
             async with db.execute(
@@ -68,7 +67,7 @@ class BirthdayCog(commands.Cog):
                     year=now.year,
                     month=month,
                     day=day,
-                    tzinfo=est
+                    tzinfo=eastern
                 )
             except ValueError:
                 # Invalid dates like Feb 30
@@ -80,10 +79,12 @@ class BirthdayCog(commands.Cog):
                     year=now.year + 1,
                     month=month,
                     day=day,
-                    tzinfo=est
+                    tzinfo=eastern
                 )
 
-            days_until = (birthday_this_year - now).days
+            today = now.date()
+            birthday_date = birthday_this_year.date()
+            days_until = (birthday_date - today).days
 
             upcoming.append((
                 days_until,
@@ -137,7 +138,7 @@ class BirthdayCog(commands.Cog):
     async def check_birthdays(self):
         await self.bot.wait_until_ready()
         
-        now = datetime.now(est) # Use EST for the comparison too!
+        now = datetime.now(eastern)
         current_month = now.month
         current_day = now.day
         

@@ -172,10 +172,20 @@ async def check_bump_timer():
                         color=discord.Color.from_rgb(114, 0, 225)
                     )
 
-                    await channel.send(
-                        content=f"<@&{bump_role_id}>",
-                        embed=reminder_embed
-                    )
+                    try:
+                        await channel.send(
+                            content=f"<@&{bump_role_id}>",
+                            embed=reminder_embed
+                        )
+
+                        print(f"[BUMP TIMER SENT]: channel={channel.id}")
+
+                        await db.execute("DELETE FROM bump_timer WHERE id = 1")
+                        await db.commit()
+
+                    except Exception as e:
+                        print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
+                        return
 
                 # clear timer after firing
                 await db.execute("DELETE FROM bump_timer WHERE id = 1")
