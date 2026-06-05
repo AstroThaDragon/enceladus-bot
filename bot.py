@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands, tasks
 import os
 import random
-from roles import DMStatusView, FandomView, PersistentColorView, PingView, PlatformView, PronounView, RegionView, SexualityView, SpeciesSelectView
+from roles import DMStatusView, FandomView, GradientColorView, PersistentColorView, PingView, PlatformView, PronounView, RegionView, SexualityView, SpeciesSelectView
 from tags import tag_list
 from dotenv import load_dotenv
 from discord import app_commands
@@ -62,6 +62,7 @@ class Enceladus(commands.Bot):
         self.add_view(PronounView())
         self.add_view(DMStatusView())
         self.add_view(FandomView())
+        self.add_view(GradientColorView())
         
         # 4. Global Sync
         try:

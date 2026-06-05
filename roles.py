@@ -10,6 +10,51 @@ ALL_COLOR_ROLES = [
     941487675721007195, 941487725222170715, 941487911260532826 
 ]
 
+GRADIENT_COLOR_ROLES = [
+    1512317592612901004,
+    1512317873748574218,
+    1512317986206126181,
+    1512318247364460674,
+    1512318342336352387,
+    1512318549782171749,
+    1512318671136231464,
+    1512318750400184481,
+    1512318866666160319,
+    1512318961348251798,
+    1512319051299557417,
+    1512319052339613877,
+    1512319166239998004,
+    1512319393990705323,
+    1512319500953976832,
+    1512319848032632872,
+    1512319934582095902,
+    1512320030908612668,
+    1512320127184404480,
+    1512320224530141184
+]
+
+LEVEL_UNLOCK_ROLES = [
+    1295861102483210260, # Level 10
+    1295861144996806726, # Level 15
+    1295861175388475463, # Level 20
+    1295861213695311935, # Level 25
+    1296959584820264980, # Level 30
+    1296959633436708897, # Level 35
+    1296959665455890483, # Level 40
+    1296959689367617660, # Level 45
+    1296959776667730143, # Level 50
+    1501607815893094552, # Level 55
+    1501608145582031000, # Level 60
+    1501608443356643328, # Level 65
+    1501608777613312020, # Level 70
+    1501608976507211920, # Level 75
+    1501609179566313522, # Level 80
+    1501609375318675657, # Level 85
+    1501609557804187781, # Level 90
+    1501609710573453324, # Level 95
+    1296961266627121223  # Level 100
+]
+
 class ColorSelect(discord.ui.Select):
     def __init__(self, placeholder, options, custom_id):
         # custom_id is CRITICAL for persistent views
@@ -19,7 +64,10 @@ class ColorSelect(discord.ui.Select):
         await interaction.response.defer(ephemeral=True)
         
         # 1. Check which color roles the user currently has
-        member_roles = [role for role in interaction.user.roles if role.id in ALL_COLOR_ROLES]
+        member_roles = [
+            role for role in interaction.user.roles
+            if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+        ]
         
         # 2. Handle Removal
         if self.values[0] == "remove":
@@ -91,6 +139,84 @@ class PersistentColorView(discord.ui.View):
         ]
         self.add_item(ColorSelect("Cosmic Palette: Page 2", p2_options, custom_id="color_select_p2"))
 
+class GradientColorSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Nebula Glow", value="1512317592612901004", emoji="🌈"),
+            discord.SelectOption(label="Cosmic Fade", value="1512317873748574218", emoji="🌌"),
+            discord.SelectOption(label="Stardust", value="1512317986206126181", emoji="✨"),
+            discord.SelectOption(label="Aurora", value="1512318247364460674", emoji="☄️"),
+            discord.SelectOption(label="Galaxy Wave", value="1512318342336352387", emoji="🌌"),
+            discord.SelectOption(label="Solar Flare", value="1512318549782171749", emoji="🔥"),
+            discord.SelectOption(label="Tidal Wave", value="1512318671136231464", emoji="🌊"),
+            discord.SelectOption(label="Crimson Eclipse", value="1512318750400184481", emoji="🌒"),
+            discord.SelectOption(label="Verdant Bloom", value="1512318866666160319", emoji="🌿"),
+            discord.SelectOption(label="Frostbite", value="1512318961348251798", emoji="❄️"),
+            discord.SelectOption(label="Toxic Surge", value="1512319051299557417", emoji="☣️"),
+            discord.SelectOption(label="Molten Core", value="1512319052339613877", emoji="🌋"),
+            discord.SelectOption(label="Cherry Blossom", value="1512319166239998004", emoji="🌸"),
+            discord.SelectOption(label="Phantom Mist", value="1512319393990705323", emoji="👻"),
+            discord.SelectOption(label="Crystal Prism", value="1512319500953976832", emoji="💎"),
+            discord.SelectOption(label="Lunar Veil", value="1512319848032632872", emoji="🌙"),
+            discord.SelectOption(label="Stormcaller", value="1512319934582095902", emoji="⛈️"),
+            discord.SelectOption(label="Ringed Giant", value="1512320030908612668", emoji="🪐"),
+            discord.SelectOption(label="Celestial Peacock", value="1512320127184404480", emoji="🦚"),
+            discord.SelectOption(label="Voidwalker", value="1512320224530141184", emoji="🕳️"),
+            discord.SelectOption(label="❌ Remove Color", value="remove", description="Reset to default"),
+        ]
+
+        super().__init__(
+            placeholder="Level 10+ Gradient Colors",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="gradient_color_select"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        member_roles = [
+            role for role in interaction.user.roles
+            if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+        ]
+
+        if self.values[0] == "remove":
+            if member_roles:
+                await interaction.user.remove_roles(*member_roles)
+                return await interaction.followup.send("All cosmic colors have been stripped.", ephemeral=True)
+
+            return await interaction.followup.send("You don't have a color role to remove!", ephemeral=True)
+
+        if not any(role.id in LEVEL_UNLOCK_ROLES for role in interaction.user.roles):
+            return await interaction.followup.send(
+                "🌈 You must be **Level 10 or higher** to use gradient color roles!",
+                ephemeral=True
+            )
+
+        selected_role_id = int(self.values[0])
+        new_role = interaction.guild.get_role(selected_role_id)
+
+        if new_role:
+            if interaction.guild.me.top_role <= new_role:
+                return await interaction.followup.send(
+                    "I can't assign this role! Move my 'Enceladus' role higher in settings.",
+                    ephemeral=True
+                )
+
+            await interaction.user.remove_roles(*member_roles)
+            await interaction.user.add_roles(new_role)
+
+            await interaction.followup.send(
+                f"Your gradient color is now **{new_role.name}**!",
+                ephemeral=True
+            )
+
+class GradientColorView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(GradientColorSelect())
+
 # --- SHARED TOGGLE LOGIC ---
 async def toggle_role(interaction: discord.Interaction, role_id: int):
     role = interaction.guild.get_role(role_id)
@@ -120,7 +246,10 @@ class RoleSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "remove":
             # Specialized removal for the Color dropdowns
-            member_roles = [r for r in interaction.user.roles if r.id in ALL_COLOR_ROLES]
+            member_roles = [
+                r for r in interaction.user.roles
+                if r.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+            ]
             await interaction.user.remove_roles(*member_roles)
             return await interaction.response.send_message("All cosmic colors cleared!", ephemeral=True)
         
@@ -275,8 +404,12 @@ class RoleCog(commands.Cog):
         await interaction.channel.send(embed=emb_fandom, view=FandomView())
 
         # 9. Post Colors
-        emb_color = discord.Embed(title="✨ Cosmic Color Roles", description="Pick a color for your name!", color=0x6a0dad)
+        emb_color = discord.Embed(title="✨ Solid Color Roles", description="Pick a solid color for your name!", color=0x6a0dad)
         await interaction.channel.send(embed=emb_color, view=PersistentColorView())
+
+        # 10. Post Gradient Colors
+        emb_gradient = discord.Embed(title="🌈 Gradient Color Roles", description="Pick a gradient color for your name! ✨\n\n🔓 Requires **Level 10 or higher!**", color=0x6a0dad)
+        await interaction.channel.send(embed=emb_gradient, view=GradientColorView())
 
     @app_commands.command(name="edit_platform_roles", description="Updates the existing platform role panel")
     @app_commands.checks.has_permissions(administrator=True)
