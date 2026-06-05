@@ -278,41 +278,41 @@ class RoleCog(commands.Cog):
         emb_color = discord.Embed(title="✨ Cosmic Color Roles", description="Pick a color for your name!", color=0x6a0dad)
         await interaction.channel.send(embed=emb_color, view=PersistentColorView())
 
-@app_commands.command(name="edit_platform_roles", description="Updates the existing platform role panel")
-@app_commands.checks.has_permissions(administrator=True)
-async def edit_platform_roles(self, interaction: discord.Interaction):
-    CHANNEL_ID = 927536823746580570
-    MESSAGE_ID = 1503674763497705543
+    @app_commands.command(name="edit_platform_roles", description="Updates the existing platform role panel")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def edit_platform_roles(self, interaction: discord.Interaction):
+        CHANNEL_ID = 927536823746580570
+        MESSAGE_ID = 1503674763497705543
 
-    channel = interaction.guild.get_channel(CHANNEL_ID)
+        channel = interaction.guild.get_channel(CHANNEL_ID)
 
-    if channel is None:
-        return await interaction.response.send_message(
-        "Could not find the channel!",
-        ephemeral=True
-    )
-
-    try:
-        message = await channel.fetch_message(MESSAGE_ID)
-
-    except Exception as e:
-        return await interaction.response.send_message(
-            f"Failed to fetch message: {e}",
+        if channel is None:
+            return await interaction.response.send_message(
+            "Could not find the channel!",
             ephemeral=True
         )
 
-    emb_platform = discord.Embed(
-        title="🎮 Gaming Platforms",
-        description="What platform do you play on?",
-        color=0x6a0dad
-    )
+        try:
+            message = await channel.fetch_message(MESSAGE_ID)
 
-    await message.edit(embed=emb_platform, view=PlatformView())
+        except Exception as e:
+            return await interaction.response.send_message(
+                f"Failed to fetch message: {e}",
+                ephemeral=True
+            )
 
-    await interaction.response.send_message(
-        "Platform role panel updated!",
-        ephemeral=True
-    )
+        emb_platform = discord.Embed(
+            title="🎮 Gaming Platforms",
+            description="What platform do you play on?",
+            color=0x6a0dad
+        )
+
+        await message.edit(embed=emb_platform, view=PlatformView())
+
+        await interaction.response.send_message(
+            "Platform role panel updated!",
+            ephemeral=True
+        )
 
 async def setup(bot):
     await bot.add_cog(RoleCog(bot))
