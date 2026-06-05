@@ -140,56 +140,54 @@ async def check_bump_timer():
                 return
 
             remind_at = datetime.fromisoformat(row[0])
-
-            # Always use UTC-safe comparison
             now = datetime.now(timezone.utc)
 
             print(f"[BUMP TIMER CHECK]: now={now}, remind_at={remind_at}")
 
-            # If time has passed OR we missed it during downtime
-            if now >= remind_at:
-                channel = bot.get_channel(row[1])
+            if now < remind_at:
+                return
 
-                if channel is None:
-                    try:
-                        channel = await bot.fetch_channel(row[1])
-                    except Exception as e:
-                        print(f"[BUMP LOOP ERROR]: Could not fetch channel {row[1]}: {e}")
-                        return
+            channel = bot.get_channel(row[1])
 
-                if channel:
-                    bump_role_id = "1295212860720418887"
+            if channel is None:
+                try:
+                    channel = await bot.fetch_channel(row[1])
+                except Exception as e:
+                    print(f"[BUMP LOOP ERROR]: Could not fetch channel {row[1]}: {e}")
+                    return
 
-                    reminder_embed = discord.Embed(
-                        description=(
-                            f"*Sniffsniff..*\n\n"
-                            f"*Sniff!!*\n"
-                            f"It's time to bump once again! Please bump our server by typing /bump! "
-                            f"It helps us a lot by gaining more members! "
-                            f"<a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> "
-                            f"<a:PurpleHearts:1109768355390431323>"
-                        ),
-                        color=discord.Color.from_rgb(114, 0, 225)
-                    )
+            if channel is None:
+                print(f"[BUMP LOOP ERROR]: No channel found for {row[1]}")
+                return
 
-                    try:
-                        await channel.send(
-                            content=f"<@&{bump_role_id}>",
-                            embed=reminder_embed
-                        )
+            bump_role_id = "1295212860720418887"
 
-                        print(f"[BUMP TIMER SENT]: channel={channel.id}")
+            reminder_embed = discord.Embed(
+                description=(
+                    f"*Sniffsniff..*\n\n"
+                    f"*Sniff!!*\n"
+                    f"It's time to bump once again! Please bump our server by typing /bump! "
+                    f"It helps us a lot by gaining more members! "
+                    f"<a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> "
+                    f"<a:PurpleHearts:1109768355390431323>"
+                ),
+                color=discord.Color.from_rgb(114, 0, 225)
+            )
 
-                        await db.execute("DELETE FROM bump_timer WHERE id = 1")
-                        await db.commit()
+            try:
+                await channel.send(
+                    content=f"<@&{bump_role_id}>",
+                    embed=reminder_embed
+                )
 
-                    except Exception as e:
-                        print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
-                        return
+                print(f"[BUMP TIMER SENT]: channel={channel.id}")
 
-                # clear timer after firing
                 await db.execute("DELETE FROM bump_timer WHERE id = 1")
                 await db.commit()
+
+            except Exception as e:
+                print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
+                return
 
     except Exception as e:
         print(f"[BUMP LOOP ERROR]: {e}")
