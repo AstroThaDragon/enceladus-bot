@@ -63,6 +63,8 @@ class ReasonModal(Modal):
         self.add_item(self.reason)
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
         await self.cog.finish_verification(
             interaction=interaction,
             member=self.member,
@@ -132,7 +134,8 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Accept",
         style=discord.ButtonStyle.success,
-        emoji="✅"
+        emoji="✅",
+        custom_id="verification_accept"
     )
     async def accept_button(self, interaction, button):
         await self.cog.finish_verification(
@@ -146,7 +149,8 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Accept w/ Reason",
         style=discord.ButtonStyle.success,
-        emoji="📝"
+        emoji="📝",
+        custom_id="verification_accept_reason"
     )
     async def accept_reason_button(self, interaction, button):
         await interaction.response.send_modal(
@@ -161,7 +165,8 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Deny",
         style=discord.ButtonStyle.danger,
-        emoji="❌"
+        emoji="❌",
+        custom_id="verification_deny"
     )
     async def deny_button(self, interaction, button):
         await self.cog.finish_verification(
@@ -175,7 +180,8 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Deny w/ Reason",
         style=discord.ButtonStyle.danger,
-        emoji="📝"
+        emoji="📝",
+        custom_id="verification_deny_reason"
     )
     async def deny_reason_button(self, interaction, button):
         await interaction.response.send_modal(
@@ -456,7 +462,7 @@ class Verification(commands.Cog):
             except:
                 pass
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"✅ {member.mention} approved.")
 
             await log_channel.send(
@@ -476,7 +482,7 @@ class Verification(commands.Cog):
             except:
                 pass
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ {member.mention} denied."
             )
 
