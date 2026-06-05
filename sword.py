@@ -185,7 +185,93 @@ FAIL_MESSAGES = [
     "⚔️ The sword almost accepts you.\nThen remembers standards exist.",
     "⚔️ Ancient celestial energy spirals around the blade.\nYou accomplish nothing.",
     "⚔️ The sword hums approvingly.\nThen immediately changes its mind.",
-    "⚔️ The blade grants you a brief glimpse of greatness.\nThen takes it back.",
+    "⚔️ The blade grants you a brief glimpse of greatness.\nThen takes it back."
+    "⚔️ The Cosmic Blade considered your request.\nIt respectfully declined.",
+	"⚔️ You reached for the blade.\nThe blade reached for a different destiny.",
+	"⚔️ The sword examined your qualifications.\nThe examination was brief.",
+	"⚔️ The Cosmic Blade remains unconvinced.",
+	"⚔️ You attempted to look worthy.\nThe blade attempted not to laugh.",
+	"⚔️ The sword sensed your presence.\nIt immediately sensed danger.",
+	"⚔️ You pulled with all your strength.\nThe sword remained mildly amused.",
+	"⚔️ The blade whispered:\n'Not today.'",
+	"⚔️ You gave an inspiring speech.\nThe sword was not inspired.",
+	"⚔️ The Cosmic Blade has rejected your application.",
+	"⚔️ The sword admired your determination.\nIt did not admire your odds.",
+	"⚔️ You approached with confidence.\nThe blade approached with skepticism.",
+	"⚔️ The sword stared into your soul.\nIt left disappointed.",
+	"⚔️ The Cosmic Blade has seen heroes.\nYou are certainly somebody.",
+	"⚔️ You attempted to draw the blade.\nThe blade remained employed elsewhere.",
+	"⚔️ The sword says:\n'Ask again in another timeline.'",
+	"⚔️ The Cosmic Blade rolled a higher number.",
+	"⚔️ You nearly grasped greatness.\nThe keyword is 'nearly.'",
+	"⚔️ The sword has placed you on a waiting list.",
+	"⚔️ You reached for the blade.\nThe blade reached for popcorn.",
+	"⚔️ The Cosmic Blade politely requested a different wielder.",
+	"⚔️ The sword appreciates your enthusiasm.\nIt fears your execution.",
+	"⚔️ You attempted a legendary pull.\nThe blade attempted a legendary refusal.",
+	"⚔️ The sword says:\n'We're not there yet, champ.'",
+	"⚔️ The Cosmic Blade remains firmly attached to destiny.",
+	"⚔️ The sword reviewed your request.\nRequest denied.",
+	"⚔️ You felt a powerful connection.\nThe sword did not.",
+	"⚔️ The blade sensed potential.\nIt is still searching.",
+	"⚔️ The Cosmic Blade has elected to remain unclaimed.",
+	"⚔️ You tugged heroically.\nThe sword tugged emotionally.",
+	"⚔️ The blade stared back.\nThe awkward silence continued for several minutes.",
+	"⚔️ The sword says:\n'Come back after the training montage.'",
+	"⚔️ The Cosmic Blade has forwarded your request to management.",
+	"⚔️ You attempted to prove your worth.\nThe sword requested additional evidence.",
+	"⚔️ The blade remains untouched.\nYour pride does not.",
+	"⚔️ The Cosmic Blade was not forged for quitters.\nUnfortunately it wasn't forged for this either.",
+	"⚔️ You gave it your all.\nThe sword gave you nothing.",
+	"⚔️ The blade says:\n'I admire the effort.'",
+	"⚔️ The Cosmic Blade has marked today as another successful rejection.",
+	"⚔️ You pulled with heroic strength.\nThe sword responded with heroic resistance.",
+	"⚔️ The blade felt destiny calling.\nIt wasn't your destiny.",
+	"⚔️ The Cosmic Blade remains exactly where it was five seconds ago.",
+    "⚔️ You dramatically reached for the Cosmic Blade.\nThe Cosmic Blade dramatically remained where it was.",
+	"⚔️ The sword sensed your arrival.\nIt locked itself.",
+	"⚔️ You pulled with all your might.\nThe blade rated the attempt 3/10.",
+	"⚔️ The Cosmic Blade says:\n'Bold of you to assume.'",
+	"⚔️ You heard a mysterious voice.\nIt was the sword laughing.",
+	"⚔️ The blade reviewed your application.\nIt used red ink.",
+	"⚔️ The Cosmic Blade has chosen a worthy hero.\nIt wasn't you.",
+	"⚔️ You struck a heroic pose.\nThe sword struck a judgmental one.",
+	"⚔️ The blade remained motionless.\nYour confidence followed shortly after.",
+	"⚔️ The Cosmic Blade has blocked your number.",
+	"⚔️ You attempted to summon destiny.\nDestiny sent you to voicemail.",
+	"⚔️ The sword says:\n'I'm gonna stop you right there.'",
+	"⚔️ You felt the blade calling.\nIt was calling security.",
+	"⚔️ The Cosmic Blade has filed a restraining order.",
+	"⚔️ You pulled heroically.\nThe sword pulled a prank.",
+	"⚔️ The blade looked deep into your soul.\nIt kept looking for a few minutes.",
+	"⚔️ The Cosmic Blade says:\n'Have you tried being worthy?'",
+	"⚔️ You challenged fate.\nFate accepted and won.",
+	"⚔️ The sword witnessed your attempt.\nIt wishes it hadn't.",
+	"⚔️ The Cosmic Blade is currently unavailable.\nPlease try another century.",
+	"⚔️ You gave the sword your best effort.\nThe sword gave you its funniest rejection.",
+	"⚔️ The blade remains unconquered.\nYou remain optimistic somehow.",
+	"⚔️ The Cosmic Blade has updated your status to:\n'Maybe later.'",
+	"⚔️ You attempted to claim the blade.\nThe blade claimed emotional damages.",
+	"⚔️ The sword says:\n'Interesting strategy. Terrible strategy, but interesting.'",
+	"⚔️ The Cosmic Blade rolled its eyes.",
+	"⚔️ You almost looked legendary.\nAlmost.",
+	"⚔️ The sword has requested a more experienced protagonist.",
+	"⚔️ You reached enlightenment.\nThe blade remained out of reach.",
+	"⚔️ The Cosmic Blade has seen many heroes.\nToday's not looking promising.",
+	"⚔️ You attempted a destiny speedrun.\nThe sword patched the exploit.",
+	"⚔️ The blade stared silently.\nThe silence was devastating.",
+	"⚔️ The Cosmic Blade says:\n'Skill issue.'",
+	"⚔️ You were one step away from greatness.\nUnfortunately it was the wrong step.",
+	"⚔️ The sword appreciated the comedy.\nIt did not appreciate the attempt.",
+	"⚔️ The Cosmic Blade remains firmly lodged in reality.",
+	"⚔️ You tried the power of friendship.\nThe sword tried the power of saying no.",
+	"⚔️ The blade sensed immense potential.\nIn somebody nearby.",
+	"⚔️ The Cosmic Blade has promoted you to spectator.",
+	"⚔️ You attempted to become the chosen one.\nThe sword chose violence instead.",
+	"⚔️ The blade says:\n'You miss 100% of the pulls you don't make.\nYou also miss some of the ones you do.'",
+	"⚔️ The Cosmic Blade has concluded today's comedy show.",
+	"⚔️ You grabbed the handle.\nThe handle grabbed your self-esteem.",
+	"⚔️ The sword has been advised by its lawyers not to comment."
 ]
 
 
@@ -357,7 +443,7 @@ class Sword(commands.Cog):
                 f"⚔️ {user.mention} attempts to pull the sword!\n\n"
                 f"**{fail_text}**\n\n"
                 f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\n\n"
-                f"-# ***Your Attempts:*** `{user_attempts}`"
+                f"-# ***Your Attempts:*** {user_attempts}"
             )
 
         previous_wielder = None
@@ -391,7 +477,7 @@ class Sword(commands.Cog):
             )
 
         message += (
-            f"\n\n ⚔️ **{user.display_name}'s Attempts:** `{user_attempts}`"
+            f"\n\n ⚔️ **{user.display_name}'s Attempts:** {user_attempts}"
         )
 
         await ctx.send(message)
@@ -425,7 +511,7 @@ class Sword(commands.Cog):
 
         await ctx.send(
             "🌌⚔️ **Cosmic Sword Stats**\n\n"
-            f"🌌 **Global Pull Attempts:** `{total_attempts}`\n"
+            f"🌌 **Global Pull Attempts:** {total_attempts}\n"
             f"👑 **Current Wielder:** {wielder_text}"
         )
 

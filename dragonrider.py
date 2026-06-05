@@ -160,6 +160,134 @@ FAIL_MESSAGES = [
     "🐉 The dragon carried you bravely into the skies.\nThe skies rejected you immediately.",
     "🐉 You attempted a legendary maneuver.\nLegends will indeed be told about it.",
     "🐉 Your dragon stared at you after landing.\nThe disappointment was palpable.",
+    "🐉 Your dragon took one look at your flight plan.\nIt immediately filed for retirement.",
+    "🐉 You mounted the dragon backwards.\nThe dragon has not stopped laughing.",
+    "🐉 Your dragon approved the takeoff.\nThe landing remains under investigation.",
+    "🐉 The dragon politely suggested a different career path.",
+    "🐉 You achieved flight.\nThe dragon achieved distance.",
+    "🐉 Your dragon reviewed your performance.\nThe review contained only question marks.",
+    "🐉 The dragon admired your confidence.\nIt did not admire anything else.",
+    "🐉 You attempted an advanced maneuver.\nThe maneuver was advanced directly into a tree.",
+    "🐉 Your dragon asked if this was your first test.\nYour performance answered for you.",
+    "🐉 The dragon carried you into the skies.\nThe skies requested a refund.",
+    "🐉 Your dragon gave you a practice score.\nThe score was confidential for your protection.",
+    "🐉 You attempted to bond with the dragon.\nThe dragon bonded with a nearby rock instead.",
+    "🐉 Your flight path has been added to several safety training courses.",
+    "🐉 The dragon complimented your bravery.\nIt had concerns about everything else.",
+    "🐉 You attempted a heroic landing.\nThe ground remained unconvinced.",
+    "🐉 The dragon flew perfectly.\nYou contributed very little to this achievement.",
+    "🐉 Your instructor says:\n'At least nobody exploded this time.'",
+    "🐉 You achieved a new record.\nUnfortunately it was the wrong record.",
+    "🐉 The dragon trusted you with its life.\nIt has since reconsidered.",
+    "🐉 You attempted to impress the crowd.\nThe crowd was impressed by the dragon.",
+    "🐉 Your dragon requested hazard pay.",
+    "🐉 The dragon stared at your exam results.\nThe silence was deafening.",
+    "🐉 You nearly became a Dragonrider.\nThe keyword is 'nearly.'",
+    "🐉 Your dragon performed beautifully.\nYou performed creatively.",
+    "🐉 The dragon has recommended additional training.\nSeveral additional years of training.",
+    "🐉 You landed successfully.\nThe definition of 'successfully' is currently under review.",
+    "🐉 Your dragon called the flight 'memorable.'\nNobody was comforted by this statement.",
+    "🐉 The dragon avoided every obstacle.\nYou introduced several new ones.",
+    "🐉 Your instructor circled the entire exam in red.",
+    "🐉 You attempted a legendary maneuver.\nLegends will indeed be told about it.",
+    "🐉 Your dragon requested emotional support after the test.",
+    "🐉 You flew directly into the sunset.\nAnd then directly into a lake.",
+    "🐉 The dragon applauded your effort.\nIt did not applaud your results.",
+    "🐉 Your takeoff was magnificent.\nThe landing was a separate event.",
+    "🐉 The dragon gave you a map.\nIt led to the nearest training academy.",
+    "🐉 Your dragon says:\n'Please do not do that again.'",
+    "🐉 The skies welcomed your arrival.\nThe ground welcomed your return.",
+    "🐉 You attempted to wave to the crowd.\nThe crowd waved goodbye.",
+    "🐉 Your dragon filed a formal complaint with management.",
+    "🐉 The dragon believes in you.\nThe instructor does not.",
+    "🐉 You achieved negative aerodynamic performance somehow.",
+    "🐉 The dragon carried you bravely into the skies.\nThe skies rejected you immediately.",
+    "🐉 Your dragon stared at you after landing.\nThe disappointment was palpable.",
+    "🐉 The dragon asked if you had any experience.\nYou changed the subject.",
+	"🐉 Your dragon reviewed the footage.\nIt somehow got worse on replay.",
+	"🐉 You attempted to look cool.\nThe dragon attempted to look elsewhere.",
+	"🐉 The dragon admired your optimism.\nIt did not share it.",
+	"🐉 Your flight instructor has requested a vacation.",
+	"🐉 You successfully located the dragon.\nThe rest was less successful.",
+	"🐉 The dragon says:\n'We're gonna pretend this never happened.'",
+	"🐉 You attempted a barrel roll.\nThe barrel performed better.",
+	"🐉 Your dragon submitted a transfer request.",
+	"🐉 The dragon has seen worse.\nIt refuses to elaborate.",
+	"🐉 You flew with confidence.\nThe dragon flew with concern.",
+	"🐉 Your landing has been classified as a natural disaster.",
+	"🐉 The dragon was impressed.\nNot by the flying, but still.",
+	"🐉 You attempted a shortcut.\nThe shortcut was longer somehow.",
+	"🐉 Your dragon says:\n'I miss my previous rider.'",
+	"🐉 The dragon believes every failure is a lesson.\nYou provided many lessons today.",
+	"🐉 Your exam results have been forwarded to several comedians.",
+	"🐉 The dragon requested a helmet.\nFor itself.",
+	"🐉 You attempted a smooth landing.\nThe ground disagreed.",
+	"🐉 The dragon asked you to point north.\nYou pointed at the dragon.",
+	"🐉 Your dragon has updated its will.",
+	"🐉 The skies were clear.\nYour future was not.",
+	"🐉 The dragon complimented your courage.\nIt questioned everything else.",
+	"🐉 You attempted an emergency maneuver.\nThe emergency was the maneuver.",
+	"🐉 Your dragon rated the experience 2 stars.",
+	"🐉 The dragon says:\n'At least it was entertaining.'",
+	"🐉 You flew directly into the history books.\nMostly the accident reports section.",
+	"🐉 Your dragon carried you safely.\nYou did not return the favor.",
+	"🐉 The dragon has requested additional rider screening procedures.",
+	"🐉 You attempted to inspire confidence.\nInstead you inspired paperwork.",
+	"🐉 The dragon avoided the mountain.\nYou introduced yourself to it personally.",
+	"🐉 Your flight path was unique.\nLet's leave it at that.",
+	"🐉 The dragon says:\n'Have you considered walking instead?'",
+	"🐉 You attempted to become one with the dragon.\nThe dragon declined.",
+	"🐉 Your instructor wrote:\n'Needs improvement.'\nSeveral pages later it continued.",
+	"🐉 The dragon applauded your determination.\nIt was unclear what else to applaud.",
+	"🐉 You attempted a graceful dismount.\nWitnesses described it differently.",
+	"🐉 The dragon carried you beyond your limits.\nUnfortunately your limits were very close.",
+	"🐉 Your performance has been archived for future safety demonstrations.",
+	"🐉 The dragon says:\n'Well... nobody can say you didn't try.'",
+	"🐉 You attempted to ride the dragon.\nThe dragon ended up riding the situation instead.",
+	"🐉 Your dragon stared into the distance.\nPerhaps remembering better riders.",
+    "🐉 You passed the written test.\nUnfortunately there was also a flying test.",
+	"🐉 The dragon says:\n'Is mayonnaise a flight plan?'",
+	"🐉 You attempted to fly.\nThe dragon attempted to forget.",
+	"🐉 The dragon stared at you for several seconds.\nYou somehow scored lower during the staring portion.",
+	"🐉 You were THIS close to success.\nThe dragon refuses to specify what 'this' means.",
+	"🐉 The dragon has diagnosed you with severe skill deficiency.",
+	"🐉 You attempted a barrel roll.\nThe barrel has requested an apology.",
+	"🐉 The dragon says:\n'How are you still alive?'",
+	"🐉 You prepared for years.\nThe dragon prepared for five minutes and still won.",
+	"🐉 Your dragon riding license application was eaten by a seagull.",
+	"🐉 The dragon would like to know what exactly your plan was.",
+	"🐉 You attempted to soar through the skies.\nInstead you explored gravity.",
+	"🐉 The dragon has rated your performance:\n'Certified Goober.'",
+	"🐉 You flew directly into danger.\nDanger was not expecting visitors.",
+	"🐉 The dragon says:\n'You make Patrick look prepared.'",
+	"🐉 You attempted a legendary takeoff.\nWitnesses described it as 'an event.'",
+	"🐉 The dragon is currently laughing too hard to continue the exam.",
+	"🐉 Your flight path looked like a toddler drawing.",
+	"🐉 The dragon has suggested training wheels.",
+	"🐉 You achieved a new record.\nNobody knows what record.",
+	"🐉 The dragon says:\n'Write that down so we never do it again.'",
+	"🐉 You attempted advanced dragon riding.\nThe dragon attempted advanced patience.",
+	"🐉 The dragon would like to remind you that the ground is not optional.",
+	"🐉 You approached the dragon with confidence.\nThe dragon approached with concern.",
+	"🐉 The dragon says:\n'Bold strategy. Horrible strategy, but bold.'",
+	"🐉 You somehow missed the sky.",
+	"🐉 The dragon reviewed your results.\nThe review simply says 'bruh.'",
+	"🐉 You flew into a cloud.\nThe cloud is considering legal action.",
+	"🐉 The dragon has hidden your exam results for public safety.",
+	"🐉 You attempted a smooth landing.\nSeveral geologists are studying the impact site.",
+	"🐉 The dragon says:\n'Who taught you that?'",
+	"🐉 You answered every question incorrectly.\nIncluding your name somehow.",
+	"🐉 The dragon has recommended a nice career in walking.",
+	"🐉 Your flight instructor has disconnected from reality.",
+	"🐉 You attempted to become one with the dragon.\nThe dragon requested personal space.",
+	"🐉 The dragon says:\n'Congratulations. That was definitely one of the attempts of all time.'",
+	"🐉 You nearly became a Dragonrider.\nThe dragon nearly agreed.",
+	"🐉 The dragon is forwarding your footage to the annual comedy festival.",
+	"🐉 You successfully discovered several new ways to fail.",
+	"🐉 The dragon says:\n'Next time, bring a map. And a miracle.'",
+	"🐉 Your test results have been classified.\nMostly to protect your reputation.",
+	"🐉 The dragon would like to remind you that screaming is not a flight technique.",
+	"🐉 You attempted to look heroic.\nThe dragon attempted not to make eye contact."
 ]
 
 
@@ -174,7 +302,7 @@ SUCCESS_MESSAGES = [
     "🐉✨ The skies themselves acknowledge your success.",
     "🐉✨ Your dragon lets out a proud roar.\nNobody can believe this actually worked.",
     "🐉✨ You completed the flight course without crashing into a single object!",
-    "🐉✨ The instructor quietly mutters:\n'holy shit.'",
+    "🐉✨ The instructor quietly mutters:\n'holy sh-.'",
     "🐉✨ Your dragon performs a majestic landing.\nFor once, you are still attached.",
     "🐉✨ After countless disasters, broken fences, and emotional trauma...\nYou are officially licensed.",
     "🐉✨ The stars shine brighter as your dragon lands successfully.",
@@ -284,7 +412,7 @@ class DragonFlight(commands.Cog):
 
                 if licensed:
                     return await ctx.send(
-                        "🐉 You already possess a Dragonrider License!"
+                        "🐉 You already possess a Dragonrider License! Don't try to make the instructor feel even more pain, bro."
                     )
 
                 if last_attempt_date == today_et:
@@ -340,7 +468,7 @@ class DragonFlight(commands.Cog):
                 f"🐲 {user.mention} attempts their Dragonrider Test...\n\n"
                 f"**{random.choice(FAIL_MESSAGES)}**\n\n"
                 f"You've failed your test! Your instructor must endure another day... 💔\n\n"
-                f"-# ***Test Attempts:*** `{attempts}`"
+                f"-# ***Test Attempts:*** {attempts}"
             )
 
         license_role = guild.get_role(LICENSE_ROLE_ID)
@@ -356,8 +484,8 @@ class DragonFlight(commands.Cog):
 
         await ctx.send(
             f"{random.choice(SUCCESS_MESSAGES)}\n\n"
-            f"🐉 {user.mention} has earned their **Dragonrider License!**\n"
-            f"**Test Attempts:** `{attempts}`"
+            f"🐉 {user.mention} has earned their **Dragonrider License! The instructor can finally sleep at night.**\n"
+            f"**Test Attempts:** {attempts}"
         )
 
 
