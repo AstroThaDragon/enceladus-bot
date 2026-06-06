@@ -716,6 +716,43 @@ class Fortunes(commands.Cog):
             f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
         )
 
+        @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. Only use for debugging or restoring lost streaks!")
+        @commands.has_permissions(administrator=True)
+        async def set_fortune_streak(self, ctx, member: commands.MemberConverter, streak: int):
+            if streak < 0:
+                return await ctx.send("⚠️ Streak cannot be negative.")
+
+            et_timezone = pytz.timezone("US/Eastern")
+            now_et = datetime.datetime.now(et_timezone)
+            current_date_et = self.get_fortune_day(now_et)
+
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute(
+                    """
+                    INSERT INTO users (
+                        user_id,
+                        fortune_streak,
+                        last_fortune_streak_date
+                    )
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id)
+                    DO UPDATE SET
+                        fortune_streak = excluded.fortune_streak,
+                        last_fortune_streak_date = excluded.last_fortune_streak_date
+                    """,
+                    (
+                        member.id,
+                        streak,
+                        current_date_et
+                    )
+                )
+
+                await db.commit()
+
+            await ctx.send(
+                f"✅ Restored {member.mention}'s fortune streak to **{streak} day{'s' if streak != 1 else ''}**."
+            )
+
     @fortune.error
     async def fortune_error(self, ctx, error):
         await ctx.send(f"⚠️ Fortune command error: `{error}`")
