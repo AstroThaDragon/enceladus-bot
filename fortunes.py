@@ -90,7 +90,7 @@ SUMMER_RARITY_WEIGHTS = {
     "uncommon": 38,
     "rare": 16,
     "legendary": 6.1,
-    "void": 1.2
+    "void": 2
 }
 
 WINTER_RARITY_WEIGHTS = {
@@ -111,10 +111,10 @@ LUNAR_NEW_YEAR_RARITY_WEIGHTS = {
 
 FULL_MOON_RARITY_WEIGHTS = {
     "common": 45,
-    "uncommon": 35,
+    "uncommon": 40,
     "rare": 22,
     "legendary": 10,
-    "void": 20
+    "void": 35
 }
 
 RARITY_XP = {
