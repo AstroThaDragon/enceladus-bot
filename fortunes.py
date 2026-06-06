@@ -717,7 +717,7 @@ class Fortunes(commands.Cog):
             f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
         )
 
-    @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. This is for debugging and restorive purposes only! (Admin only)")
+    @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. For restoration purposes only! (Admin only)")
     @commands.has_permissions(administrator=True)
     async def set_fortune_streak(self, ctx, member: discord.Member, streak: int):
         if streak < 0:
