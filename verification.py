@@ -134,10 +134,11 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Accept",
         style=discord.ButtonStyle.success,
-        emoji="✅",
-        custom_id="verification_accept"
+        emoji="✅"
     )
     async def accept_button(self, interaction, button):
+        await interaction.response.defer(ephemeral=True)
+
         await self.cog.finish_verification(
             interaction=interaction,
             member=self.member,
@@ -165,10 +166,11 @@ class VerificationReviewView(View):
     @discord.ui.button(
         label="Deny",
         style=discord.ButtonStyle.danger,
-        emoji="❌",
-        custom_id="verification_deny"
+        emoji="❌"
     )
     async def deny_button(self, interaction, button):
+        await interaction.response.defer(ephemeral=True)
+
         await self.cog.finish_verification(
             interaction=interaction,
             member=self.member,
