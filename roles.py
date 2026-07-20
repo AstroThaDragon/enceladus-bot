@@ -278,7 +278,7 @@ class PingView(discord.ui.View):
         pings = [
             ("Announcements", 1117441565657419787, "📢"), ("Bump Reminder", 1295212860720418887, "🔔"),
             ("Welcome Ping", 1295670300674883646, "👋"), ("Giveaways", 1295670387501436970, "🎁"),
-            ("Events", 1295670451988594760, "🎭"), ("Partnerships", 1306077625428611082, "🤝"),
+            ("Events", 1158309071187882034, "🎭"), ("Partnerships", 1306077625428611082, "🤝"),
             ("Stream Alerts", 1307275275431841802, "📺"), ("Astro Content Alerts", 1440168122639454380, "🐲"),
             ("Fact of the Day", 1473410135161573416, "💡"), ("Question of the Day", 1473410588557185209, "❓"),
             ("Poll Alerts", 1496356983320743946, "🗳️"), ("Daily Fortune Ping", 1503642487586029568, "🥠")
