@@ -371,6 +371,23 @@ class Leveling(commands.Cog):
         await self._update_member_roles(member, level)
         await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
 
+    @app_commands.command(name="addxp", description="Add XP to a user's current total (Admin only)")
+    @commands.has_permissions(administrator=True)
+    async def addxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        # Run your existing helper function which handles the math, DB, and roles!
+        await self.add_xp(member, amount)
+        
+        # Fetch their updated stats to show in the confirmation message
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT xp, level FROM users WHERE user_id = ?", (member.id,)) as cursor:
+                result = await cursor.fetchone()
+                
+        if result:
+            new_xp, new_level = result
+            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}! They now have **{new_xp} XP** (Level {new_level}).", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}!", ephemeral=True)
+
     @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
