@@ -384,9 +384,11 @@ class Leveling(commands.Cog):
                 
         if result:
             new_xp, new_level = result
-            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}! They now have **{new_xp} XP** (Level {new_level}).", ephemeral=True)
+            # Removed ephemeral=True so it posts publicly in the channel
+            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}! They now have **{new_xp} XP** (Level {new_level}).")
         else:
-            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}!", ephemeral=True)
+            # Removed ephemeral=True here as well
+            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}!")
 
     @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only)")
     @commands.has_permissions(administrator=True)
