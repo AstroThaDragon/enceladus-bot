@@ -165,7 +165,7 @@ async def check_bump_timer():
 
             reminder_embed = discord.Embed(
                 description=(
-                    f"*Sniffsniff..*\n\n"
+                    f"# *Sniffsniff..*\n\n"
                     f"*Sniff!!*\n"
                     f"It's time to bump once again! Please bump our server by typing /bump! "
                     f"It helps us a lot by gaining more members! "
@@ -339,8 +339,8 @@ async def on_message(message):
         user_mention = user_obj.mention if user_obj else "there"
 
         thanks_text = (
-            f"Thank you so much for bumping our server, {user_mention}! It helps us a ton!! <:CoolEevee:1109771250634592306> 💜\n"
-            f"You've earned **400 XP** for the server boost! You may come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
+            f"Thank you so much for bumping our server, {user_mention}! It helps us a ton! <:CoolEevee:1109771250634592306> 💜\n"
+            f"You've earned **400 XP** for the server bump! You can come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
         )
 
         await message.channel.send(thanks_text)
