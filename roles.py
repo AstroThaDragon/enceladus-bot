@@ -223,12 +223,25 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
     if not role:
         return await interaction.response.send_message("Role not found! Check the code IDs.", ephemeral=True)
     
-    if role in interaction.user.roles:
-        await interaction.user.remove_roles(role)
-        await interaction.response.send_message(f"Removed **{role.name}** role.", ephemeral=True)
-    else:
-        await interaction.user.add_roles(role)
-        await interaction.response.send_message(f"Added **{role.name}** role!", ephemeral=True)
+    # NEW: Check hierarchy safety before trying to assign the role
+    if interaction.guild.me.top_role <= role:
+        return await interaction.response.send_message(
+            f"I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in settings.", 
+            ephemeral=True
+        )
+    
+    # Try/Except block to catch any other random API errors
+    try:
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message(f"Removed **{role.name}** role.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"Added **{role.name}** role!", ephemeral=True)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message("An error occurred while managing that role.", ephemeral=True)
+        print(f"Role Error: {e}")
 
 # --- REUSABLE COMPONENTS ---
 class RoleButton(discord.ui.Button):
@@ -263,6 +276,7 @@ class PronounView(discord.ui.View):
         self.add_item(RoleButton("He/Him", 927535319778197554, "🚹"))
         self.add_item(RoleButton("She/Her", 927535749274951750, "🚺"))
         self.add_item(RoleButton("They/Them", 927535867172626524, "💛"))
+        self.add_item(RoleButton("Other Pronoun", 1530785968263528469, "💟"))
         self.add_item(RoleButton("Any Pronoun", 1036615505773084762, "💎"))
 
 class DMStatusView(discord.ui.View):
@@ -314,6 +328,7 @@ class SpeciesSelectView(discord.ui.View):
             discord.SelectOption(label="Red Panda", value="1503105723037650944", emoji="🐾"),
             discord.SelectOption(label="Sheep", value="1295705466050973718", emoji="🐑"),
             discord.SelectOption(label="Slime", value="1295671199237406721", emoji="🦠"),
+            discord.SelectOption(label="Fish", value="1530786530690601131", emoji="🐟"),
             discord.SelectOption(label="Other/Hybrid", value="1295671231722291243", emoji="✨"),
         ]
         self.add_item(RoleSelect("Select your OC species!", options, "species_dropdown"))
