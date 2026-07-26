@@ -1,10 +1,11 @@
 import random
 import string
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ui import View, Button
 import asyncio
 import aiosqlite
+from datetime import datetime, timedelta, timezone
 
 MIN_ACCOUNT_AGE_DAYS = 30
 
@@ -78,6 +79,7 @@ class Moderation(commands.Cog):
         self.bot.loop.create_task(
             self.setup_verification_db()
         )
+        self.check_pending_verifications.start()
 
     async def setup_verification_db(self):
         async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
@@ -90,6 +92,14 @@ class Moderation(commands.Cog):
                 """
             )
 
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pending_verifications (
+                    user_id INTEGER PRIMARY KEY,
+                    join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
             await db.commit()
 
     async def add_verification_strike(self, user_id):
@@ -169,48 +179,13 @@ class Moderation(commands.Cog):
 
             return
 
-        await asyncio.sleep(1800)  # 30 minutes
-
-        guild = member.guild
-        unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
-
-        try:
-            member = await guild.fetch_member(member.id)
-        except discord.NotFound:
-            return
-
-        if not unverified_role or unverified_role not in member.roles:
-            return
-
-        strikes = await self.add_verification_strike(member.id)
-
-        if strikes >= 3:
-            action_text = (
-                "🚫 You have reached the maximum number of verification strikes and have been banned from the server.\n\n"
-                "If you believe this was a mistake, you may appeal by contacting @Enceladus#0496, or the server owner at 'astrothadragon.'"
+        # --- NEW: Save the new member to the database to start their 30-minute timer ---
+        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO pending_verifications (user_id) VALUES (?)",
+                (member.id,)
             )
-        else:
-            action_text = (
-                "You may rejoin and try again, but repeated missed verifications will lead to a ban."
-            )
-
-        try:
-            await member.send(
-                f"⚠️ You were removed from **{guild.name}** because you did not verify within 30 minutes.\n\n"
-                f"Verification strike: **{strikes}/3**\n\n"
-                f"{action_text}"
-            )
-        except discord.Forbidden:
-            pass
-
-        if strikes >= 3:
-            await member.ban(
-                reason="Reached 3/3 verification timeout strikes."
-            )
-        else:
-            await member.kick(
-                reason=f"Did not verify within 30 minutes. Verification strike {strikes}/3."
-            )
+            await db.commit()
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -256,6 +231,14 @@ class Moderation(commands.Cog):
 
         if unverified_role and unverified_role in member.roles:
             await member.remove_roles(unverified_role)
+            
+            # --- NEW: STOP THE TIMER ---
+            async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                await db.execute("DELETE FROM pending_verifications WHERE user_id = ?", (member.id,))
+                await db.commit()
+
+        pending_codes.pop(member.id, None)
+        # (Keep the rest of your success messages below)
 
         pending_codes.pop(member.id, None)
 
@@ -477,6 +460,56 @@ class Moderation(commands.Cog):
             f.write(transcript_text)
 
         return file_name
+
+    @tasks.loop(minutes=2)
+    async def check_pending_verifications(self):
+        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+            async with db.execute("SELECT user_id, join_time FROM pending_verifications") as cursor:
+                rows = await cursor.fetchall()
+            
+            for row in rows:
+                user_id, join_time_str = row
+                # Convert SQLite timestamp to a timezone-aware Python datetime
+                join_time = datetime.strptime(join_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                
+                # Check if 30 minutes have passed
+                if (datetime.now(timezone.utc) - join_time) > timedelta(minutes=30):
+                    member_found = False
+                    
+                    # Search for the user in the server
+                    for guild in self.bot.guilds:
+                        member = guild.get_member(user_id)
+                        if member:
+                            member_found = True
+                            unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
+                            
+                            # If they still have the unverified role, apply strike and kick/ban
+                            if unverified_role and unverified_role in member.roles:
+                                strikes = await self.add_verification_strike(member.id)
+                                
+                                if strikes >= 3:
+                                    action_text = "🚫 You have reached the maximum number of verification strikes and have been banned from the server.\n\nIf you believe this was a mistake, you may appeal by contacting @Enceladus#0496, or the server owner at 'astrothadragon.'"
+                                else:
+                                    action_text = "You may rejoin and try again, but repeated missed verifications will lead to a ban."
+
+                                try:
+                                    await member.send(
+                                        f"⚠️ You were removed from **{guild.name}** because you did not verify within 30 minutes.\n\n"
+                                        f"Verification strike: **{strikes}/3**\n\n"
+                                        f"{action_text}"
+                                    )
+                                except discord.Forbidden:
+                                    pass
+
+                                if strikes >= 3:
+                                    await member.ban(reason="Reached 3/3 verification timeout strikes.")
+                                else:
+                                    await member.kick(reason=f"Did not verify within 30 minutes. Verification strike {strikes}/3.")
+
+                    # Delete them from the database regardless (whether kicked, or they left manually)
+                    await db.execute("DELETE FROM pending_verifications WHERE user_id = ?", (user_id,))
+            
+            await db.commit()
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
