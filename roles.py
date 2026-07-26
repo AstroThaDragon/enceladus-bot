@@ -328,7 +328,6 @@ class SpeciesSelectView(discord.ui.View):
             discord.SelectOption(label="Red Panda", value="1503105723037650944", emoji="🐾"),
             discord.SelectOption(label="Sheep", value="1295705466050973718", emoji="🐑"),
             discord.SelectOption(label="Slime", value="1295671199237406721", emoji="🦠"),
-            discord.SelectOption(label="Fish", value="1530786530690601131", emoji="🐟"),
             discord.SelectOption(label="Other/Hybrid", value="1295671231722291243", emoji="✨"),
         ]
         self.add_item(RoleSelect("Select your OC species!", options, "species_dropdown"))
