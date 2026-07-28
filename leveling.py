@@ -337,7 +337,7 @@ class Leveling(commands.Cog):
                     # 4. Fire Icon (Underneath the streak number, triggers at 3+ streak)
                     if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
                         # Pasted right under where the number text will go
-                        fire_icon = Editor("images/fire_icon.png").resize((25, 25))
+                        fire_icon = Editor("images/fire_icon.png").resize((35, 35))
                         background.paste(fire_icon, (text_x + 2, icon_y + 2))
 
                     # 5. Streak Number Text (Layered directly on top of the fire)
