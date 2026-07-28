@@ -128,7 +128,7 @@ async def change_status():
     await bot.change_presence(activity=discord.CustomActivity(name=new_status))
 
 # --- BUMP PERSISTENCE LOOP ---
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=2)
 async def check_bump_timer():
     try:
         async with aiosqlite.connect(DB_PATH) as db:
@@ -142,8 +142,6 @@ async def check_bump_timer():
 
             remind_at = datetime.fromisoformat(row[0])
             now = datetime.now(timezone.utc)
-
-            print(f"[BUMP TIMER CHECK]: now={now}, remind_at={remind_at}")
 
             if now < remind_at:
                 return
@@ -186,6 +184,17 @@ async def check_bump_timer():
                 await db.execute("DELETE FROM bump_timer WHERE id = 1")
                 await db.commit()
 
+            except discord.HTTPException as e:
+                # Catch the Rate Limit error specifically
+                if e.status == 429:
+                    print(f"[RATE LIMIT CAUGHT]: Backing off for 15 minutes.")
+                    # Push the reminder back 15 minutes in the database to stop the spam loop
+                    new_remind = (now + timedelta(minutes=15)).isoformat()
+                    await db.execute("UPDATE bump_timer SET remind_at = ? WHERE id = 1", (new_remind,))
+                    await db.commit()
+                else:
+                    print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
+                    
             except Exception as e:
                 print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
                 return
