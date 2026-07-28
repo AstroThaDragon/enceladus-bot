@@ -273,13 +273,11 @@ class Leveling(commands.Cog):
             except: pass
 
             try:
-                # Use our new 'load_custom_image' instead of the easy_pil one for backgrounds
                 if bg_url and bg_url != 'default':
                     bg_data = await load_custom_image(bg_url)
                     if bg_data:
                         background = Editor(bg_data).resize((900, 270))
                     else:
-                        # Fallback to default if the download failed
                         background = Editor(Canvas((900, 270), color="#23272a"))
                 elif os.path.exists("images/rank_template.png"):
                     background = Editor("images/rank_template.png")
@@ -305,18 +303,25 @@ class Leveling(commands.Cog):
             background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
+            # Progress Bar Background
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=10)
             
             # The actual progress (the colored part)
             if percentage > 0:
-                # Calculate how many pixels wide the bar should be (out of 600)
                 bar_width = int(600 * percentage)
-                
-                # We use a rectangle instead of 'bar' to ensure it actually draws
-                # We keep a minimum of 20 pixels so the 'radius' doesn't look weird
                 if bar_width > 0:
                     background.rectangle((230, 185), width=max(bar_width, 20), height=35, fill=bar_color, radius=10)
-            background.text((830, 155), f"{xp} / {xp_end} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+            
+            # --- NEW TEXT LOGIC ---
+            # Calculate the exact amount of XP left to reach the next level
+            xp_remaining = xp_end - xp 
+            
+            # Top Text: Current XP / Remaining XP Needed
+            background.text((830, 155), f"{xp} / {xp_remaining} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+            
+            # Bottom Text: Total XP Goal for Next Level
+            # Placed at Y=228 so it sits nicely underneath the bar
+            background.text((830, 228), f"Total: {xp_end} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
         except Exception as e:
