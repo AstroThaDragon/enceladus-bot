@@ -307,7 +307,6 @@ class Leveling(commands.Cog):
             icon_y = 20
             icon_spacing = 40 # Spacing between icons
             
-            # PLACEHOLDERS: Replace these with your actual Role IDs for the sword and dragon
             SWORD_ROLE_ID = 1505077643567956069
             DRAGON_ROLE_ID = 1505083974509269074
 
@@ -326,7 +325,13 @@ class Leveling(commands.Cog):
                         background.paste(dragon_icon, (current_icon_x, icon_y))
                         current_icon_x += icon_spacing
                         
-                # 3. Cookie Icon + Live Streak (Pulled straight from users.fortune_streak)
+                # 3. Fire Icon (Triggers at 3+ streak)
+                if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
+                    fire_icon = Editor("images/fire_icon.png").resize((30, 30))
+                    background.paste(fire_icon, (current_icon_x, icon_y))
+                    current_icon_x += icon_spacing
+
+                # 4. Cookie Icon + Live Streak
                 if os.path.exists("images/cookie_icon.png"):
                     cookie_icon = Editor("images/cookie_icon.png").resize((30, 30))
                     background.paste(cookie_icon, (current_icon_x, icon_y))
