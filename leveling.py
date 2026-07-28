@@ -230,12 +230,18 @@ class Leveling(commands.Cog):
         member = member or ctx.author
         try:
             async with aiosqlite.connect(self.db_path) as db:
-                async with db.execute("SELECT xp, level, bar_color, bg_url FROM users WHERE user_id = ?", (member.id,)) as cursor:
+                # Fetch xp, level, bar config, background, and the fortune streak all in one query!
+                async with db.execute(
+                    "SELECT xp, level, bar_color, bg_url, fortune_streak FROM users WHERE user_id = ?", 
+                    (member.id,)
+                ) as cursor:
                     result = await cursor.fetchone()
             
             if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
-            xp, level, bar_color, bg_url = result
+            xp, level, bar_color, bg_url, fortune_streak = result
+            streak_number = fortune_streak or 0 # Default to 0 if null
+            
             xp_start = self.get_xp_for_level(level)
             xp_end = self.get_xp_for_level(level + 1)
             
@@ -296,6 +302,42 @@ class Leveling(commands.Cog):
             font_small = Font("fonts/ComicRelief-Regular.ttf", size=22)
             st_col, st_width = (0, 0, 0), 2
 
+            # --- TOP LEFT ICONS LOGIC (IMAGE BASED) ---
+            current_icon_x = 50 
+            icon_y = 20
+            icon_spacing = 40 # Spacing between icons
+            
+            # PLACEHOLDERS: Replace these with your actual Role IDs for the sword and dragon
+            SWORD_ROLE_ID = 1505077643567956069
+            DRAGON_ROLE_ID = 1505083974509269074
+
+            try:
+                # 1. Sword Icon
+                if member.get_role(SWORD_ROLE_ID): 
+                    if os.path.exists("images/sword_icon.png"):
+                        sword_icon = Editor("images/sword_icon.png").resize((30, 30))
+                        background.paste(sword_icon, (current_icon_x, icon_y))
+                        current_icon_x += icon_spacing
+                        
+                # 2. Dragon Icon
+                if member.get_role(DRAGON_ROLE_ID): 
+                    if os.path.exists("images/dragon_icon.png"):
+                        dragon_icon = Editor("images/dragon_icon.png").resize((30, 30))
+                        background.paste(dragon_icon, (current_icon_x, icon_y))
+                        current_icon_x += icon_spacing
+                        
+                # 3. Cookie Icon + Live Streak (Pulled straight from users.fortune_streak)
+                if os.path.exists("images/cookie_icon.png"):
+                    cookie_icon = Editor("images/cookie_icon.png").resize((30, 30))
+                    background.paste(cookie_icon, (current_icon_x, icon_y))
+                    
+                    text_x = current_icon_x + 35
+                    background.text((text_x, icon_y + 4), f"{streak_number}", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
+                        
+            except Exception as e:
+                print(f"Error drawing rank card icons: {e}")
+
+            # --- STANDARD RANK CARD TEXT ---
             background.text((550, 50), "Rank", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((750, 50), "Level", font=font_small, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
@@ -312,16 +354,12 @@ class Leveling(commands.Cog):
                 if bar_width > 0:
                     background.rectangle((230, 185), width=max(bar_width, 20), height=35, fill=bar_color, radius=10)
             
-            # --- NEW TEXT LOGIC ---
-            # Calculate the exact amount of XP left to reach the next level
-            xp_remaining = xp_end - xp 
+            # --- XP TEXT LOGIC ---
+            # Top Text: XP earned in this level / Total XP needed to finish this level
+            background.text((830, 155), f"{xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
             
-            # Top Text: Current XP / Remaining XP Needed
-            background.text((830, 155), f"{xp} / {xp_remaining} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
-            
-            # Bottom Text: Total XP Goal for Next Level
-            # Placed at Y=228 so it sits nicely underneath the bar
-            background.text((830, 228), f"Total: {xp_end} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
+            # Bottom Text: Total lifetime XP currently held
+            background.text((830, 228), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
         except Exception as e:
