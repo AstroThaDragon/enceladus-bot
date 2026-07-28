@@ -325,18 +325,21 @@ class Leveling(commands.Cog):
                         background.paste(dragon_icon, (current_icon_x, icon_y))
                         current_icon_x += icon_spacing
                         
-                # 3. Fire Icon (Triggers at 3+ streak)
+                # Capture the X coordinate where the cookie and streak live
+                cookie_x = current_icon_x
+
+                # 3. Fire Icon (Underneath streak number, triggers at 3+ streak)
                 if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
-                    fire_icon = Editor("images/fire_icon.png").resize((30, 30))
-                    background.paste(fire_icon, (current_icon_x, icon_y))
-                    current_icon_x += icon_spacing
+                    # y=52 places it right under the cookie/text area
+                    fire_icon = Editor("images/fire_icon.png").resize((25, 25))
+                    background.paste(fire_icon, (cookie_x + 2, 52))
 
                 # 4. Cookie Icon + Live Streak
                 if os.path.exists("images/cookie_icon.png"):
                     cookie_icon = Editor("images/cookie_icon.png").resize((30, 30))
-                    background.paste(cookie_icon, (current_icon_x, icon_y))
+                    background.paste(cookie_icon, (cookie_x, icon_y))
                     
-                    text_x = current_icon_x + 35
+                    text_x = cookie_x + 35
                     background.text((text_x, icon_y + 4), f"{streak_number}", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
                         
             except Exception as e:
