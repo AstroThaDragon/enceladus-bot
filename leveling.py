@@ -356,7 +356,7 @@ class Leveling(commands.Cog):
 
                     # 5. Streak Number Text (Layered directly on top of the fire)
                     # Centered nicely within the new 45px flame
-                    background.text((text_x + 22, icon_y - 3), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
+                    background.text((text_x + 22, icon_y - 1), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
                         
             except Exception as e:
                 print(f"Error drawing rank card icons: {e}")
