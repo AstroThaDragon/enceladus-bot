@@ -10,6 +10,7 @@ import json
 from typing import Optional
 import io
 import aiohttp
+from PIL import Image
 
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member):
@@ -303,45 +304,56 @@ class Leveling(commands.Cog):
             st_col, st_width = (0, 0, 0), 2
 
             # --- TOP LEFT ICONS LOGIC (IMAGE BASED) ---
-            current_icon_x = 50 
-            icon_y = 20
-            icon_spacing = 40 # Spacing between icons
+            # Moved to X: 230 (aligned left with your text) and Y: 45 (right above the role name)
+            current_icon_x = 230 
+            icon_y = 45
+            icon_spacing = 60 # Increased spacing to accommodate bigger icons
+            icon_size = (45, 45) # Bumped up from 30x30!
             
             SWORD_ROLE_ID = 1505077643567956069
             DRAGON_ROLE_ID = 1505083974509269074
 
             try:
+                # Helper function to safely lower opacity of unearned icons by 70%
+                def get_icon(path, earned):
+                    img = Image.open(path).convert("RGBA")
+                    if not earned:
+                        r, g, b, a = img.split()
+                        a = a.point(lambda p: p * 0.3) # 0.3 = 30% visible
+                        img.putalpha(a)
+                    return Editor(img).resize(icon_size)
+
                 # 1. Sword Icon
-                if member.get_role(SWORD_ROLE_ID): 
-                    if os.path.exists("images/sword_icon.png"):
-                        sword_icon = Editor("images/sword_icon.png").resize((30, 30))
-                        background.paste(sword_icon, (current_icon_x, icon_y))
-                        current_icon_x += icon_spacing
+                if os.path.exists("images/sword_icon.png"):
+                    has_sword = bool(member.get_role(SWORD_ROLE_ID))
+                    sword_icon = get_icon("images/sword_icon.png", has_sword)
+                    background.paste(sword_icon, (current_icon_x, icon_y))
+                    current_icon_x += icon_spacing
                         
                 # 2. Dragon Icon
-                if member.get_role(DRAGON_ROLE_ID): 
-                    if os.path.exists("images/dragon_icon.png"):
-                        dragon_icon = Editor("images/dragon_icon.png").resize((30, 30))
-                        background.paste(dragon_icon, (current_icon_x, icon_y))
-                        current_icon_x += icon_spacing
+                if os.path.exists("images/dragon_icon.png"):
+                    has_dragon = bool(member.get_role(DRAGON_ROLE_ID))
+                    dragon_icon = get_icon("images/dragon_icon.png", has_dragon)
+                    background.paste(dragon_icon, (current_icon_x, icon_y))
+                    current_icon_x += icon_spacing
                         
                 cookie_x = current_icon_x
 
-                # 3. Cookie Icon (Pasted first so the text and fire layer over/under correctly)
+                # 3. Cookie Icon (Pasted first, always solid)
                 if os.path.exists("images/cookie_icon.png"):
-                    cookie_icon = Editor("images/cookie_icon.png").resize((30, 30))
+                    cookie_icon = Editor("images/cookie_icon.png").resize(icon_size)
                     background.paste(cookie_icon, (cookie_x, icon_y))
                     
-                    text_x = cookie_x + 35
+                    text_x = cookie_x + 50 # Shifted further right since cookie is bigger
                     
-                    # 4. Fire Icon (Underneath the streak number, triggers at 3+ streak)
+                    # 4. Fire Icon (Underneath the streak number)
                     if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
-                        # Adjust these numbers to reposition the fire behind your text
-                        fire_icon = Editor("images/fire_icon.png").resize((45, 45))
-                        background.paste(fire_icon, (text_x - 9, icon_y - 13))
+                        # Scaled the fire up to match the bigger cookie (from 45 to 65)
+                        fire_icon = Editor("images/fire_icon.png").resize((65, 65))
+                        background.paste(fire_icon, (text_x - 12, icon_y - 15))
 
                     # 5. Streak Number Text (Layered directly on top of the fire)
-                    background.text((text_x, icon_y + 4), f"{streak_number}", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
+                    background.text((text_x, icon_y + 10), f"{streak_number}", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
                         
             except Exception as e:
                 print(f"Error drawing rank card icons: {e}")
@@ -365,7 +377,7 @@ class Leveling(commands.Cog):
             
             # --- XP TEXT LOGIC ---
             # Top Text: XP earned in this level / Total XP needed to finish this level
-            background.text((830, 155), f"{xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+            background.text((830, 155), f"Next level: {xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
             
             # Bottom Text: Total lifetime XP currently held
             background.text((830, 228), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
