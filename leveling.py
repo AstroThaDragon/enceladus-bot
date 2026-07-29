@@ -344,17 +344,18 @@ class Leveling(commands.Cog):
                     cookie_icon = Editor("images/cookie_icon.png").resize(icon_size)
                     background.paste(cookie_icon, (cookie_x, icon_y))
                     
-                    text_x = cookie_x + 50 # Shifted further right since cookie is bigger
+                    # Shifted closer to the cookie (changed from +50 to +40)
+                    text_x = cookie_x + 40 
                     
-                    # 4. Fire Icon (Scaled down to 40x40)
+                    # 4. Fire Icon (Scaled exactly to 45x45 to match the cookie)
                     if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
-                        fire_icon = Editor("images/fire_icon.png").resize((40, 40))
-                        # Shifted coordinates to match the smaller image size
-                        background.paste(fire_icon, (text_x - 2, icon_y - 20))
+                        fire_icon = Editor("images/fire_icon.png").resize((45, 45))
+                        # Adjusted the Y-offset to tuck it nicely next to the cookie
+                        background.paste(fire_icon, (text_x, icon_y - 18))
 
-                    # 5. Streak Number Text 
-                    # Adjusted text coordinates to stay in the center of the 40px flame
-                    background.text((text_x + 18, icon_y - 8), f"{streak_number}", font=font_small, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
+                    # 5. Streak Number Text (Layered directly on top of the fire)
+                    # Centered nicely within the new 45px flame
+                    background.text((text_x + 22, icon_y - 3), f"{streak_number}", font=font_small, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
                         
             except Exception as e:
                 print(f"Error drawing rank card icons: {e}")
