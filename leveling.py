@@ -103,6 +103,11 @@ class Leveling(commands.Cog):
                 await db.execute("ALTER TABLE users ADD COLUMN font_choice TEXT DEFAULT 'comic'")
             except:
                 pass
+
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN booster_glow TEXT DEFAULT 'on'")
+            except:
+                pass
                 
             await db.commit()
 
@@ -242,10 +247,16 @@ class Leveling(commands.Cog):
                     (member.id,)
                 ) as cursor:
                     result = await cursor.fetchone()
+
+            async with db.execute(
+                "SELECT xp, level, bar_color, bg_url, fortune_streak, font_choice, booster_glow FROM users WHERE user_id = ?", 
+                (member.id,)
+            ) as cursor:
+                result = await cursor.fetchone()
             
             if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
-            xp, level, bar_color, bg_url, fortune_streak, font_choice = result
+            xp, level, bar_color, bg_url, fortune_streak, font_choice, booster_glow = result
             streak_number = fortune_streak or 0 # Default to 0 if null
             
             xp_start = self.get_xp_for_level(level)
@@ -482,21 +493,21 @@ class Leveling(commands.Cog):
 
             # --- PROGRESS BAR (BOOSTER GLOW VS NORMAL OUTLINE) ---
 
-            if member.get_role(self.BOOSTER_ROLE_ID):
-                # 1. Booster: High-intensity vibrant cosmic glow (No black outline framing it)
-                # Outer nebula haze (Bright electric purple, wider spread)
+            # Check if they are a booster AND have their toggle set to 'on'
+            is_glowing = member.get_role(self.BOOSTER_ROLE_ID) and (booster_glow == 'on')
+
+            if is_glowing:
+                # 1. Booster Glow Enabled: High-intensity vibrant cosmic glow
                 background.rectangle((223, 178), width=614, height=49, fill=(160, 32, 240, 140), radius=15)
-                # Mid layer (Vibrant neon cyan flare)
                 background.rectangle((225, 180), width=610, height=45, fill=(0, 242, 254, 180), radius=13)
-                # Inner starlight core (Hot magenta/pink pop right against the bar)
                 background.rectangle((227, 182), width=606, height=41, fill=(255, 0, 128, 220), radius=11)
             else:
-                # 2. Regular Members: Clean default black outline
+                # 2. Regular Members OR Boosters with Glow Turned Off: Clean default black outline
                 background.rectangle((228, 183), width=604, height=39, fill="black", radius=12)
 
             # 3. Progress Bar Background (The empty dark gray track)
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=10)
-            
+
             # 4. The actual progress (the colored part)
             if percentage > 0:
                 bar_width = int(600 * percentage)
@@ -515,12 +526,13 @@ class Leveling(commands.Cog):
             print(f"Error: {e}")
             await ctx.send("There was an error generating the rank card.")
 
-    @commands.hybrid_command(name="customize", description="Change your rank card bar color, background, or font!")
-    @app_commands.rename(color_hex="color", background_url="background", font_choice="font")
-    @app_commands.describe(
+    @commands.hybrid_command(name="customize", description="Change your rank card bar color, background, font, or booster glow!")
+    @app_commands.rename(color_hex="color", background_url="background", font_choice="font", glow_toggle="glow")
+    @app_commands.describe( 
         color_hex="The Hex code for your progress bar (e.g. #FFFFFF)",
         background_url="A direct image URL for your custom background",
-        font_choice="Choose a custom font for your text"
+        font_choice="Choose a custom font for your text",
+        glow_toggle="Turn your booster glow outline on or off"
     )
     @app_commands.choices(font_choice=[
         app_commands.Choice(name="Comic Relief (Default)", value="comic"),
@@ -549,9 +561,9 @@ class Leveling(commands.Cog):
         app_commands.Choice(name="Smokum", value="smokum"),
         app_commands.Choice(name="Ubuntu", value="ubuntu"),
     ])
-    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None):
-        if not color_hex and not background_url and not font_choice: 
-            return await ctx.send("Provide a hex color, image URL, or pick a font!", ephemeral=True)
+    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None, glow_toggle: Optional[app_commands.Choice[str]] = None):
+        if not color_hex and not background_url and not font_choice and not glow_toggle: 
+            return await ctx.send("Provide a hex color, image URL, pick a font, or toggle your glow!", ephemeral=True)
             
         async with aiosqlite.connect(self.db_path) as db:
             if color_hex:
@@ -562,7 +574,8 @@ class Leveling(commands.Cog):
             if font_choice:
                 # This grabs the 'value' (e.g., 'font2') to store in your database
                 await db.execute("UPDATE users SET font_choice = ? WHERE user_id = ?", (font_choice.value, ctx.author.id))
-                
+            if glow_toggle:
+                await db.execute("UPDATE users SET booster_glow = ? WHERE user_id = ?", (glow_toggle.value, ctx.author.id))
             await db.commit()
         await ctx.send("✅ Rank card updated!", ephemeral=True)
 
