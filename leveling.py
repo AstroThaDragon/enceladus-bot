@@ -302,6 +302,42 @@ class Leveling(commands.Cog):
             avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
             background.paste(avatar, (50, 60))
+
+            STARBORN_ROLE_ID = 1496031062218772510 
+            OWNER_ROLE_ID = 891356074689560626    
+            ADMIN_ROLE_ID = 593718477831929858    
+            MOD_ROLE_ID = 1036583011405266974      
+
+            badge_size = (45, 45)
+
+            try:
+                # 1. Starborn Icon (Top Left of Avatar)
+                if member.get_role(STARBORN_ROLE_ID) and os.path.exists("icons/starborn_icon.png"):
+                    starborn_icon = Editor("icons/starborn_icon.png").resize(badge_size)
+                    # Coordinates place it slightly overlapping the top-left edge of the PFP
+                    background.paste(starborn_icon, (30, 40)) 
+
+                # 2. Staff Hierarchy (Bottom Left of Avatar)
+                # The if/elif chain ensures only ONE of these ever shows up in this spot
+                if member.get_role(OWNER_ROLE_ID) and os.path.exists("icons/owner_icon.png"):
+                    owner_icon = Editor("icons/owner_icon.png").resize(badge_size)
+                    # Coordinates place it slightly overlapping the bottom-left edge of the PFP
+                    background.paste(owner_icon, (30, 170)) 
+                elif member.get_role(ADMIN_ROLE_ID) and os.path.exists("icons/admin_icon.png"):
+                    admin_icon = Editor("icons/admin_icon.png").resize(badge_size)
+                    background.paste(admin_icon, (30, 170))
+                elif member.get_role(MOD_ROLE_ID) and os.path.exists("icons/mod_icon.png"):
+                    mod_icon = Editor("icons/mod_icon.png").resize(badge_size)
+                    background.paste(mod_icon, (30, 170))
+
+                # 3. Watchlist Icon (Top Center of Avatar, Invisible if unearned)
+                if member.get_role(self.WATCHLIST_ROLE_ID) and os.path.exists("icons/watchlist_icon.png"):
+                    watchlist_icon = Editor("icons/watchlist_icon.png").resize(badge_size)
+                    # X=102 perfectly centers it over the 150px avatar. Y=10 tucks it right above.
+                    background.paste(watchlist_icon, (102, 10))
+
+            except Exception as e:
+                print(f"Error drawing avatar badges: {e}")
             
             # 1. Set the default fallback path
             active_font_path = "fonts/ComicRelief-Regular.ttf"
@@ -385,38 +421,45 @@ class Leveling(commands.Cog):
                     return Editor(img).resize(icon_size)
 
                 # 1. Sword Icon
-                if os.path.exists("images/sword_icon.png"):
+                if os.path.exists("icons/sword_icon.png"):
                     has_sword = bool(member.get_role(SWORD_ROLE_ID))
-                    sword_icon = get_icon("images/sword_icon.png", has_sword)
+                    sword_icon = get_icon("icons/sword_icon.png", has_sword)
                     background.paste(sword_icon, (current_icon_x, icon_y))
                     current_icon_x += icon_spacing
                         
                 # 2. Dragon Icon
-                if os.path.exists("images/dragon_icon.png"):
+                if os.path.exists("icons/dragon_icon.png"):
                     has_dragon = bool(member.get_role(DRAGON_ROLE_ID))
-                    dragon_icon = get_icon("images/dragon_icon.png", has_dragon)
+                    dragon_icon = get_icon("icons/dragon_icon.png", has_dragon)
                     background.paste(dragon_icon, (current_icon_x, icon_y))
                     current_icon_x += icon_spacing
                         
                 cookie_x = current_icon_x
 
                 # 3. Cookie Icon (Pasted first, always solid)
-                if os.path.exists("images/cookie_icon.png"):
-                    cookie_icon = Editor("images/cookie_icon.png").resize(icon_size)
+                if os.path.exists("icons/cookie_icon.png"):
+                    cookie_icon = Editor("icons/cookie_icon.png").resize(icon_size)
                     background.paste(cookie_icon, (cookie_x, icon_y))
                     
                     # Shifted closer to the cookie (changed from +50 to +40)
                     text_x = cookie_x + 40 
                     
                     # 4. Fire Icon (Scaled exactly to 45x45 to match the cookie)
-                    if streak_number >= 3 and os.path.exists("images/fire_icon.png"):
-                        fire_icon = Editor("images/fire_icon.png").resize((45, 45))
+                    if streak_number >= 3 and os.path.exists("icons/fire_icon.png"):
+                        fire_icon = Editor("icons/fire_icon.png").resize((45, 45))
                         # Adjusted the Y-offset to tuck it nicely next to the cookie
                         background.paste(fire_icon, (text_x, icon_y - 18))
 
                     # 5. Streak Number Text (Layered directly on top of the fire)
                     # Centered nicely within the new 45px flame
                     background.text((text_x + 22, icon_y - 0), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
+
+                    # 6. Booster Icon (Below Progress Bar, Transparent if unearned)
+                if os.path.exists("icons/booster_icon.png"):
+                    has_booster = bool(member.get_role(self.BOOSTER_ROLE_ID))
+                    booster_icon = get_icon("icons/booster_icon.png", has_booster)
+                    # X=230 aligns with the start of the progress bar. Y=225 places it right beneath it.
+                    background.paste(booster_icon, (230, 225))
                         
             except Exception as e:
                 print(f"Error drawing rank card icons: {e}")
