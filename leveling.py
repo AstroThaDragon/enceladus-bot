@@ -176,7 +176,7 @@ class FontPreviewSelect(discord.ui.Select):
             "libertinus_math": "fonts/LibertinusMath-Regular.ttf",
             "lobster_two": "fonts/LobsterTwo-Regular.ttf",
             "medieval": "fonts/MedievalSharp-Regular.ttf",
-            "christmas": "fonts/MountainsOfChristmas-Regular.ttf",
+            "christmas": "fonts/MountainsofChristmas-Regular.ttf",
             "nosifer": "fonts/Nosifer-Regular.ttf",
             "open_sans": "fonts/OpenSans-Regular.ttf",
             "pixelify_sans": "fonts/PixelifySans-Regular.ttf",
@@ -604,7 +604,7 @@ class Leveling(commands.Cog):
             elif font_choice == "medieval":
                 active_font_path = "fonts/MedievalSharp-Regular.ttf"
             elif font_choice == "christmas":
-                active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
+                active_font_path = "fonts/MountainsofChristmas-Regular.ttf"
             elif font_choice == "nosifer":
                 active_font_path = "fonts/Nosifer-Regular.ttf"
             elif font_choice == "open_sans":
