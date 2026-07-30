@@ -241,18 +241,11 @@ class Leveling(commands.Cog):
         member = member or ctx.author
         try:
             async with aiosqlite.connect(self.db_path) as db:
-                # Fetch xp, level, bar config, background, and the fortune streak all in one query!
                 async with db.execute(
-                    "SELECT xp, level, bar_color, bg_url, fortune_streak, font_choice FROM users WHERE user_id = ?", 
+                    "SELECT xp, level, bar_color, bg_url, fortune_streak, font_choice, booster_glow FROM users WHERE user_id = ?", 
                     (member.id,)
                 ) as cursor:
                     result = await cursor.fetchone()
-
-            async with db.execute(
-                "SELECT xp, level, bar_color, bg_url, fortune_streak, font_choice, booster_glow FROM users WHERE user_id = ?", 
-                (member.id,)
-            ) as cursor:
-                result = await cursor.fetchone()
             
             if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
