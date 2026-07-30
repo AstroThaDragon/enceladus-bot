@@ -859,7 +859,7 @@ class Leveling(commands.Cog):
             # Removed ephemeral=True here as well
             await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}!")
 
-    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only)")
+    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only!)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
