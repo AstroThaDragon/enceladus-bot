@@ -561,7 +561,11 @@ class Leveling(commands.Cog):
         app_commands.Choice(name="Smokum", value="smokum"),
         app_commands.Choice(name="Ubuntu", value="ubuntu"),
     ])
-    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None, glow_toggle: Optional[app_commands.Choice[str]] = None):
+    @app_commands.choices(glow_toggle=[
+        app_commands.Choice(name="On", value="on"),
+        app_commands.Choice(name="Off", value="off"),
+    ])
+    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None, glow_toggle: app_commands.Choice[str] = None):
         if not color_hex and not background_url and not font_choice and not glow_toggle: 
             return await ctx.send("Provide a hex color, image URL, pick a font, or toggle your glow!", ephemeral=True)
             
