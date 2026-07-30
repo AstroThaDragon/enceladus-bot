@@ -111,14 +111,15 @@ class FontPreviewSelect(discord.ui.Select):
         dragon_rank = "0"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=5) as response:
+                async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=2) as response:
                     if response.status == 200:
                         data = await response.json()
                         for i, entry in enumerate(data):
                             if str(entry.get('user_id')) == str(member.id):
                                 dragon_rank = str(i + 1)
                                 break
-        except: pass
+        except Exception:
+            pass
 
         try:
             if bg_url and bg_url != 'default':
@@ -128,12 +129,15 @@ class FontPreviewSelect(discord.ui.Select):
                 background = Editor("images/rank_template.png")
             else:
                 background = Editor(Canvas((900, 270), color="#23272a"))
-        except:
+        except Exception:
             background = Editor(Canvas((900, 270), color="#23272a"))
 
-        avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
-        avatar = Editor(avatar_image).resize((150, 150)).circle_image()
-        background.paste(avatar, (50, 60))
+        try:
+            avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
+            avatar = Editor(avatar_image).resize((150, 150)).circle_image()
+            background.paste(avatar, (50, 60))
+        except Exception:
+            pass
 
         STARBORN_ROLE_ID = 1496031062218772510 
         OWNER_ROLE_ID = 891356074689560626    
@@ -152,33 +156,38 @@ class FontPreviewSelect(discord.ui.Select):
                 background.paste(Editor("icons/mod_icon.png").resize(badge_size), (30, 170))
             if member.get_role(self.cog.WATCHLIST_ROLE_ID) and os.path.exists("icons/watchlist_icon.png"):
                 background.paste(Editor("icons/watchlist_icon.png").resize(badge_size), (102, 10))
-        except: pass
+        except Exception: 
+            pass
 
         active_font_path = "fonts/ComicRelief-Regular.ttf"
-        if chosen_font == "bangers": active_font_path = "fonts/Bangers-Regular.ttf" 
-        elif chosen_font == "bytesized": active_font_path = "fonts/Bytesized-Regular.ttf"
-        elif chosen_font == "caveat": active_font_path = "fonts/Caveat-Regular.ttf"
-        elif chosen_font == "chewy": active_font_path = "fonts/Chewy-Regular.ttf"
-        elif chosen_font == "crafty": active_font_path = "fonts/CraftyGirls-Regular.ttf"
-        elif chosen_font == "creepster": active_font_path = "fonts/Creepster-Regular.ttf"
-        elif chosen_font == "dancing_script": active_font_path = "fonts/DancingScript-Regular.ttf"
-        elif chosen_font == "germania": active_font_path = "fonts/GermaniaOne-Regular.ttf"
-        elif chosen_font == "griffy": active_font_path = "fonts/Griffy-Regular.ttf"
-        elif chosen_font == "henny_penny": active_font_path = "fonts/HennyPenny-Regular.ttf"
-        elif chosen_font == "lavishly_yours": active_font_path = "fonts/LavishlyYours-Regular.ttf"
-        elif chosen_font == "libertinus_math": active_font_path = "fonts/LibertinusMath-Regular.ttf"
-        elif chosen_font == "lobster_two": active_font_path = "fonts/LobsterTwo-Regular.ttf"
-        elif chosen_font == "medieval": active_font_path = "fonts/MedievalSharp-Regular.ttf"
-        elif chosen_font == "christmas": active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
-        elif chosen_font == "nosifer": active_font_path = "fonts/Nosifer-Regular.ttf"
-        elif chosen_font == "open_sans": active_font_path = "fonts/OpenSans-Regular.ttf"
-        elif chosen_font == "pixelify_sans": active_font_path = "fonts/PixelifySans-Regular.ttf"
-        elif chosen_font == "roboto": active_font_path = "fonts/Roboto-Regular.ttf"
-        elif chosen_font == "rye": active_font_path = "fonts/Rye-Regular.ttf"
-        elif chosen_font == "schoolbell": active_font_path = "fonts/Schoolbell-Regular.ttf"
-        elif chosen_font == "shadows_night": active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
-        elif chosen_font == "smokum": active_font_path = "fonts/Smokum-Regular.ttf"
-        elif chosen_font == "ubuntu": active_font_path = "fonts/Ubuntu-Regular.ttf"
+        font_map = {
+            "bangers": "fonts/Bangers-Regular.ttf",
+            "bytesized": "fonts/Bytesized-Regular.ttf",
+            "caveat": "fonts/Caveat-Regular.ttf",
+            "chewy": "fonts/Chewy-Regular.ttf",
+            "crafty": "fonts/CraftyGirls-Regular.ttf",
+            "creepster": "fonts/Creepster-Regular.ttf",
+            "dancing_script": "fonts/DancingScript-Regular.ttf",
+            "germania": "fonts/GermaniaOne-Regular.ttf",
+            "griffy": "fonts/Griffy-Regular.ttf",
+            "henny_penny": "fonts/HennyPenny-Regular.ttf",
+            "lavishly_yours": "fonts/LavishlyYours-Regular.ttf",
+            "libertinus_math": "fonts/LibertinusMath-Regular.ttf",
+            "lobster_two": "fonts/LobsterTwo-Regular.ttf",
+            "medieval": "fonts/MedievalSharp-Regular.ttf",
+            "christmas": "fonts/MountainsOfChristmas-Regular.ttf",
+            "nosifer": "fonts/Nosifer-Regular.ttf",
+            "open_sans": "fonts/OpenSans-Regular.ttf",
+            "pixelify_sans": "fonts/PixelifySans-Regular.ttf",
+            "roboto": "fonts/Roboto-Regular.ttf",
+            "rye": "fonts/Rye-Regular.ttf",
+            "schoolbell": "fonts/Schoolbell-Regular.ttf",
+            "shadows_night": "fonts/ShadowsIntoNight-Regular.ttf",
+            "smokum": "fonts/Smokum-Regular.ttf",
+            "ubuntu": "fonts/Ubuntu-Regular.ttf"
+        }
+        if chosen_font in font_map and os.path.exists(font_map[chosen_font]):
+            active_font_path = font_map[chosen_font]
             
         font_large = Font(active_font_path, size=45)
         font_medium = Font(active_font_path, size=32)
@@ -226,7 +235,8 @@ class FontPreviewSelect(discord.ui.Select):
                     a = a.point(lambda p: p * 0.3)
                     img.putalpha(a)
                 background.paste(Editor(img).resize((35, 35)), (230, 232))
-        except: pass
+        except Exception: 
+            pass
 
         background.text((550, 50), "Rank", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
         background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white", stroke_width=st_width, stroke_fill=st_col)
@@ -252,7 +262,8 @@ class FontPreviewSelect(discord.ui.Select):
         background.text((830, 155), f"Next level: {xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
         background.text((830, 238), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
-        await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=discord.File(fp=background.image_bytes, filename="preview.png"), ephemeral=True)
+        file = discord.File(fp=background.image_bytes, filename="preview.png")
+        await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=file, ephemeral=True)
 
 class FontView(discord.ui.View):
     def __init__(self, cog):
