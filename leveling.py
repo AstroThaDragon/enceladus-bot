@@ -451,6 +451,12 @@ class Leveling(commands.Cog):
             await ctx.send("There was an error generating the rank card.")
 
     @commands.hybrid_command(name="customize", description="Change your rank card bar color, background, or font!")
+    @app_commands.rename(color_hex="color", background_url="background", font_choice="font")
+    @app_commands.describe(
+        color_hex="The Hex code for your progress bar (e.g. #FFFFFF)",
+        background_url="A direct image URL for your custom background",
+        font_choice="Choose a custom font for your text"
+    )
     @app_commands.choices(font_choice=[
         app_commands.Choice(name="Comic Relief (Default)", value="comic"),
         app_commands.Choice(name="Bangers", value="bangers"),
