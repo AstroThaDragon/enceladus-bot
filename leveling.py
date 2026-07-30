@@ -454,10 +454,18 @@ class Leveling(commands.Cog):
                     # Centered nicely within the new 45px flame
                     background.text((text_x + 22, icon_y - 0), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
 
-                    # 6. Booster Icon (Below Progress Bar, Transparent if unearned)
+                # 6. Booster Icon (Below Progress Bar, Transparent if unearned)
                 if os.path.exists("icons/booster_icon.png"):
                     has_booster = bool(member.get_role(self.BOOSTER_ROLE_ID))
-                    booster_icon = get_icon("icons/booster_icon.png", has_booster)
+                    
+                    # Custom smaller size (35x35) for the booster badge
+                    img = Image.open("icons/booster_icon.png").convert("RGBA")
+                    if not has_booster:
+                        r, g, b, a = img.split()
+                        a = a.point(lambda p: p * 0.3)
+                        img.putalpha(a)
+                    booster_icon = Editor(img).resize((35, 35))
+                    
                     # X=230 aligns with the start of the progress bar. Y=225 places it right beneath it.
                     background.paste(booster_icon, (230, 225))
                         
