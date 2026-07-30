@@ -98,6 +98,11 @@ class Leveling(commands.Cog):
                 await db.execute("ALTER TABLE users ADD COLUMN bg_url TEXT DEFAULT 'default'")
             except:
                 pass
+
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN font_choice TEXT DEFAULT 'comic'")
+            except:
+                pass
                 
             await db.commit()
 
@@ -233,14 +238,14 @@ class Leveling(commands.Cog):
             async with aiosqlite.connect(self.db_path) as db:
                 # Fetch xp, level, bar config, background, and the fortune streak all in one query!
                 async with db.execute(
-                    "SELECT xp, level, bar_color, bg_url, fortune_streak FROM users WHERE user_id = ?", 
+                    "SELECT xp, level, bar_color, bg_url, fortune_streak, font_choice FROM users WHERE user_id = ?", 
                     (member.id,)
                 ) as cursor:
                     result = await cursor.fetchone()
             
             if not result: return await ctx.send("This user hasn't earned any XP yet!")
 
-            xp, level, bar_color, bg_url, fortune_streak = result
+            xp, level, bar_color, bg_url, fortune_streak, font_choice = result
             streak_number = fortune_streak or 0 # Default to 0 if null
             
             xp_start = self.get_xp_for_level(level)
@@ -298,10 +303,65 @@ class Leveling(commands.Cog):
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
             background.paste(avatar, (50, 60))
             
-            font_large = Font("fonts/ComicRelief-Bold.ttf", size=45)
-            font_medium = Font("fonts/ComicRelief-Bold.ttf", size=32)
-            font_small = Font("fonts/ComicRelief-Regular.ttf", size=22)
-            font_tiny = Font("fonts/ComicRelief-Regular.ttf", size=20)
+            # 1. Set the default fallback path
+            active_font_path = "fonts/ComicRelief-Regular.ttf"
+            
+            # 2. Route the path based on what they picked in the dropdown
+            if font_choice == "bangers":
+                active_font_path = "fonts/Bangers-Regular.ttf" 
+            elif font_choice == "bytesized":
+                active_font_path = "fonts/Bytesized-Regular.ttf"
+            elif font_choice == "caveat":
+                active_font_path = "fonts/Caveat-Regular.ttf"
+            elif font_choice == "chewy":
+                active_font_path = "fonts/Chewy-Regular.ttf"
+            elif font_choice == "crafty":
+                active_font_path = "fonts/CraftyGirls-Regular.ttf"
+            elif font_choice == "creepster":
+                active_font_path = "fonts/Creepster-Regular.ttf"
+            elif font_choice == "dancing_script":
+                active_font_path = "fonts/DancingScript-Regular.ttf"
+            elif font_choice == "germania":
+                active_font_path = "fonts/GermaniaOne-Regular.ttf"
+            elif font_choice == "griffy":
+                 active_font_path = "fonts/Griffy-Regular.ttf"
+            elif font_choice == "henny_penny":
+                active_font_path = "fonts/HennyPenny-Regular.ttf"
+            elif font_choice == "lavishly_yours":
+                active_font_path = "fonts/LavishlyYours-Regular.ttf"
+            elif font_choice == "libertinus_math":
+                active_font_path = "fonts/LibertinusMath-Regular.ttf"
+            elif font_choice == "lobster_two":
+                active_font_path = "fonts/LobsterTwo-Regular.ttf"
+            elif font_choice == "medieval":
+                active_font_path = "fonts/MedievalSharp-Regular.ttf"
+            elif font_choice == "christmas":
+                active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
+            elif font_choice == "nosifer":
+                active_font_path = "fonts/Nosifer-Regular.ttf"
+            elif font_choice == "open_sans":
+                active_font_path = "fonts/OpenSans-Regular.ttf"
+            elif font_choice == "pixelify_sans":
+                active_font_path = "fonts/PixelifySans-Regular.ttf"
+            elif font_choice == "roboto":
+                active_font_path = "fonts/Roboto-Regular.ttf"
+            elif font_choice == "rye":
+                active_font_path = "fonts/Rye-Regular.ttf"
+            elif font_choice == "schoolbell":
+                active_font_path = "fonts/Schoolbell-Regular.ttf"
+            elif font_choice == "shadows_night":
+                active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
+            elif font_choice == "smokum":
+                active_font_path = "fonts/Smokum-Regular.ttf"
+            elif font_choice == "ubuntu":
+                active_font_path = "fonts/Ubuntu-Regular.ttf"
+                
+            # 3. Apply the chosen path to all your sizes
+            font_large = Font(active_font_path, size=45)
+            font_medium = Font(active_font_path, size=32)
+            font_small = Font(active_font_path, size=22)
+            font_tiny = Font(active_font_path, size=20)
+            
             st_col, st_width = (0, 0, 0), 2
 
             # --- TOP LEFT ICONS LOGIC (IMAGE BASED) ---
@@ -390,15 +450,48 @@ class Leveling(commands.Cog):
             print(f"Error: {e}")
             await ctx.send("There was an error generating the rank card.")
 
-    @commands.hybrid_command(name="customize", description="Change your rank card bar color or background!")
-    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None):
-        if not color_hex and not background_url: return await ctx.send("Provide a hex color or image URL!", ephemeral=True)
+    @commands.hybrid_command(name="customize", description="Change your rank card bar color, background, or font!")
+    @app_commands.choices(font_choice=[
+        app_commands.Choice(name="Comic Relief (Default)", value="comic"),
+        app_commands.Choice(name="Bangers", value="bangers"),
+        app_commands.Choice(name="Bytesized", value="bytesized"),
+        app_commands.Choice(name="Caveat", value="caveat"),
+        app_commands.Choice(name="Chewy", value="chewy"),
+        app_commands.Choice(name="Crafty Girls", value="crafty"),
+        app_commands.Choice(name="Creepster", value="creepster"),
+        app_commands.Choice(name="Dancing Script", value="dancing_script"),
+        app_commands.Choice(name="Germania One", value="germania"),
+        app_commands.Choice(name="Griffy", value="griffy"),
+        app_commands.Choice(name="Henny Penny", value="henny_penny"),
+        app_commands.Choice(name="Lavishly Yours", value="lavishly_yours"),
+        app_commands.Choice(name="Libertinus Math", value="libertinus_math"),
+        app_commands.Choice(name="Lobster Two", value="lobster_two"),
+        app_commands.Choice(name="Medieval Sharp", value="medieval"),
+        app_commands.Choice(name="Mountains of Christmas", value="christmas"),
+        app_commands.Choice(name="Nosifer", value="nosifer"),
+        app_commands.Choice(name="Open Sans", value="open_sans"),
+        app_commands.Choice(name="Pixelify Sans", value="pixelify_sans"),
+        app_commands.Choice(name="Roboto", value="roboto"),
+        app_commands.Choice(name="Rye", value="rye"),
+        app_commands.Choice(name="Schoolbell", value="schoolbell"),
+        app_commands.Choice(name="Shadows Into Night", value="shadows_night"),
+        app_commands.Choice(name="Smokum", value="smokum"),
+        app_commands.Choice(name="Ubuntu", value="ubuntu"),
+    ])
+    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None):
+        if not color_hex and not background_url and not font_choice: 
+            return await ctx.send("Provide a hex color, image URL, or pick a font!", ephemeral=True)
+            
         async with aiosqlite.connect(self.db_path) as db:
             if color_hex:
                 if not color_hex.startswith("#") or len(color_hex) != 7: return await ctx.send("Invalid hex color!", ephemeral=True)
                 await db.execute("UPDATE users SET bar_color = ? WHERE user_id = ?", (color_hex, ctx.author.id))
             if background_url: 
                 await db.execute("UPDATE users SET bg_url = ? WHERE user_id = ?", (background_url, ctx.author.id))
+            if font_choice:
+                # This grabs the 'value' (e.g., 'font2') to store in your database
+                await db.execute("UPDATE users SET font_choice = ? WHERE user_id = ?", (font_choice.value, ctx.author.id))
+                
             await db.commit()
         await ctx.send("✅ Rank card updated!", ephemeral=True)
 
