@@ -46,7 +46,6 @@ async def load_custom_image(url):
 class FontPreviewSelect(discord.ui.Select):
     def __init__(self, cog):
         self.cog = cog
-        # Pull your font choices directly from your existing list or define them here
         options = [
             discord.SelectOption(label="Comic Relief (Default)", value="comic"),
             discord.SelectOption(label="Bangers", value="bangers"),
@@ -79,61 +78,181 @@ class FontPreviewSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         chosen_font = self.values[0]
+        member = interaction.user
         
-        # 1. Fetch user's actual data from the DB so the preview matches THEIR level/name/avatar
         async with aiosqlite.connect(self.cog.db_path) as db:
             async with db.execute(
                 "SELECT xp, level, bar_color, bg_url, fortune_streak, booster_glow FROM users WHERE user_id = ?", 
-                (interaction.user.id,)
+                (member.id,)
             ) as cursor:
                 result = await cursor.fetchone()
 
-        # Fallback defaults if they aren't in the database yet
         if result:
             xp, level, bar_color, bg_url, fortune_streak, booster_glow = result
         else:
             xp, level, bar_color, bg_url, fortune_streak, booster_glow = 0, 0, "#8a2be2", "default", 0, "on"
 
-        # 2. Re-use your exact rank card generation logic, but FORCE `chosen_font` 
-        # instead of reading it from the database table for this temporary preview!
-        try:
-            # (Copy your background loading, avatar pasting, and icon drawing code here...)
-            # For brevity, let's look at the font mapping part:
-            
-            active_font_path = "fonts/ComicRelief-Regular.ttf"
-            if chosen_font == "bangers": active_font_path = "fonts/Bangers-Regular.ttf"
-            elif chosen_font == "bytesized": active_font_path = "fonts/Bytesized-Regular.ttf"
-            elif chosen_font == "caveat": active_font_path = "fonts/Caveat-Regular.ttf"
-            elif chosen_font == "chewy": active_font_path = "fonts/Chewy-Regular.ttf"
-            elif chosen_font == "crafty": active_font_path = "fonts/CraftyGirls-Regular.ttf"
-            elif chosen_font == "creepster": active_font_path = "fonts/Creepster-Regular.ttf"
-            elif chosen_font == "dancing_script": active_font_path = "fonts/DancingScript-Regular.ttf"
-            elif chosen_font == "germania": active_font_path = "fonts/GermaniaOne-Regular.ttf"
-            elif chosen_font == "griffy": active_font_path = "fonts/Griffy-Regular.ttf"
-            elif chosen_font == "henny_penny": active_font_path = "fonts/HennyPenny-Regular.ttf"
-            elif chosen_font == "lavishly_yours": active_font_path = "fonts/LavishlyYours-Regular.ttf"
-            elif chosen_font == "libertinus_math": active_font_path = "fonts/LibertinusMath-Regular.ttf"
-            elif chosen_font == "lobster_two": active_font_path = "fonts/LobsterTwo-Regular.ttf"
-            elif chosen_font == "medieval": active_font_path = "fonts/MedievalSharp-Regular.ttf"
-            elif chosen_font == "christmas": active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
-            elif chosen_font == "nosifer": active_font_path = "fonts/Nosifer-Regular.ttf"
-            elif chosen_font == "open_sans": active_font_path = "fonts/OpenSans-Regular.ttf"
-            elif chosen_font == "pixelify_sans": active_font_path = "fonts/PixelifySans-Regular.ttf"
-            elif chosen_font == "roboto": active_font_path = "fonts/Roboto-Regular.ttf"
-            elif chosen_font == "rye": active_font_path = "fonts/Rye-Regular.ttf"
-            elif chosen_font == "schoolbell": active_font_path = "fonts/Schoolbell-Regular.ttf"
-            elif chosen_font == "shadows_night": active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
-            elif chosen_font == "smokum": active_font_path = "fonts/Smokum-Regular.ttf"
-            elif chosen_font == "ubuntu": active_font_path = "fonts/Ubuntu-Regular.ttf"
+        streak_number = fortune_streak or 0
+        xp_start = self.cog.get_xp_for_level(level)
+        xp_end = self.cog.get_xp_for_level(level + 1)
+        xp_within_level = xp - xp_start
+        needed_for_level = xp_end - xp_start
+        percentage = (xp_within_level / needed_for_level) if needed_for_level > 0 else 0
+        percentage = max(0, min(percentage, 1))
 
-            # Build the image using `active_font_path` (omitted full image generation boilerplate here to keep it clean, 
-            # but it uses the exact same drawing steps as your `rank` command).
+        current_role_name = "No Rank"
+        for lvl, rid in sorted(self.cog.level_roles.items(), reverse=True):
+            if rid == 0: continue
+            role = member.get_role(rid)
+            if role:
+                current_role_name = role.name
+                break
+
+        dragon_rank = "0"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        for i, entry in enumerate(data):
+                            if str(entry.get('user_id')) == str(member.id):
+                                dragon_rank = str(i + 1)
+                                break
+        except: pass
+
+        try:
+            if bg_url and bg_url != 'default':
+                bg_data = await load_custom_image(bg_url)
+                background = Editor(bg_data).resize((900, 270)) if bg_data else Editor(Canvas((900, 270), color="#23272a"))
+            elif os.path.exists("images/rank_template.png"):
+                background = Editor("images/rank_template.png")
+            else:
+                background = Editor(Canvas((900, 270), color="#23272a"))
+        except:
+            background = Editor(Canvas((900, 270), color="#23272a"))
+
+        avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
+        avatar = Editor(avatar_image).resize((150, 150)).circle_image()
+        background.paste(avatar, (50, 60))
+
+        STARBORN_ROLE_ID = 1496031062218772510 
+        OWNER_ROLE_ID = 891356074689560626    
+        ADMIN_ROLE_ID = 593718477831929858    
+        MOD_ROLE_ID = 1036583011405266974      
+        badge_size = (45, 45)
+
+        try:
+            if member.get_role(STARBORN_ROLE_ID) and os.path.exists("icons/starborn_icon.png"):
+                background.paste(Editor("icons/starborn_icon.png").resize(badge_size), (30, 40)) 
+            if member.get_role(OWNER_ROLE_ID) and os.path.exists("icons/owner_icon.png"):
+                background.paste(Editor("icons/owner_icon.png").resize(badge_size), (30, 170)) 
+            elif member.get_role(ADMIN_ROLE_ID) and os.path.exists("icons/admin_icon.png"):
+                background.paste(Editor("icons/admin_icon.png").resize(badge_size), (30, 170))
+            elif member.get_role(MOD_ROLE_ID) and os.path.exists("icons/mod_icon.png"):
+                background.paste(Editor("icons/mod_icon.png").resize(badge_size), (30, 170))
+            if member.get_role(self.cog.WATCHLIST_ROLE_ID) and os.path.exists("icons/watchlist_icon.png"):
+                background.paste(Editor("icons/watchlist_icon.png").resize(badge_size), (102, 10))
+        except: pass
+
+        active_font_path = "fonts/ComicRelief-Regular.ttf"
+        if chosen_font == "bangers": active_font_path = "fonts/Bangers-Regular.ttf" 
+        elif chosen_font == "bytesized": active_font_path = "fonts/Bytesized-Regular.ttf"
+        elif chosen_font == "caveat": active_font_path = "fonts/Caveat-Regular.ttf"
+        elif chosen_font == "chewy": active_font_path = "fonts/Chewy-Regular.ttf"
+        elif chosen_font == "crafty": active_font_path = "fonts/CraftyGirls-Regular.ttf"
+        elif chosen_font == "creepster": active_font_path = "fonts/Creepster-Regular.ttf"
+        elif chosen_font == "dancing_script": active_font_path = "fonts/DancingScript-Regular.ttf"
+        elif chosen_font == "germania": active_font_path = "fonts/GermaniaOne-Regular.ttf"
+        elif chosen_font == "griffy": active_font_path = "fonts/Griffy-Regular.ttf"
+        elif chosen_font == "henny_penny": active_font_path = "fonts/HennyPenny-Regular.ttf"
+        elif chosen_font == "lavishly_yours": active_font_path = "fonts/LavishlyYours-Regular.ttf"
+        elif chosen_font == "libertinus_math": active_font_path = "fonts/LibertinusMath-Regular.ttf"
+        elif chosen_font == "lobster_two": active_font_path = "fonts/LobsterTwo-Regular.ttf"
+        elif chosen_font == "medieval": active_font_path = "fonts/MedievalSharp-Regular.ttf"
+        elif chosen_font == "christmas": active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
+        elif chosen_font == "nosifer": active_font_path = "fonts/Nosifer-Regular.ttf"
+        elif chosen_font == "open_sans": active_font_path = "fonts/OpenSans-Regular.ttf"
+        elif chosen_font == "pixelify_sans": active_font_path = "fonts/PixelifySans-Regular.ttf"
+        elif chosen_font == "roboto": active_font_path = "fonts/Roboto-Regular.ttf"
+        elif chosen_font == "rye": active_font_path = "fonts/Rye-Regular.ttf"
+        elif chosen_font == "schoolbell": active_font_path = "fonts/Schoolbell-Regular.ttf"
+        elif chosen_font == "shadows_night": active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
+        elif chosen_font == "smokum": active_font_path = "fonts/Smokum-Regular.ttf"
+        elif chosen_font == "ubuntu": active_font_path = "fonts/Ubuntu-Regular.ttf"
             
-            # Finally, send it ephemeral so only they see their preview:
-            # await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=discord.File(fp=background.image_bytes, filename="preview.png"), ephemeral=True)
-            
-        except Exception as e:
-            await interaction.followup.send(f"Error generating preview: {e}", ephemeral=True)
+        font_large = Font(active_font_path, size=45)
+        font_medium = Font(active_font_path, size=32)
+        font_small = Font(active_font_path, size=22)
+        font_tiny = Font(active_font_path, size=20)
+        
+        st_col, st_width = (0, 0, 0), 2
+        current_icon_x = 230 
+        icon_y = 45
+        icon_size = (45, 45)
+        
+        SWORD_ROLE_ID = 1505077643567956069
+        DRAGON_ROLE_ID = 1505083974509269074
+
+        try:
+            def get_icon(path, earned):
+                img = Image.open(path).convert("RGBA")
+                if not earned:
+                    r, g, b, a = img.split()
+                    a = a.point(lambda p: p * 0.3)
+                    img.putalpha(a)
+                return Editor(img).resize(icon_size)
+
+            if os.path.exists("icons/sword_icon.png"):
+                background.paste(get_icon("icons/sword_icon.png", bool(member.get_role(SWORD_ROLE_ID))), (current_icon_x, icon_y))
+                current_icon_x += 60
+                    
+            if os.path.exists("icons/dragon_icon.png"):
+                background.paste(get_icon("icons/dragon_icon.png", bool(member.get_role(DRAGON_ROLE_ID))), (current_icon_x, icon_y))
+                current_icon_x += 60
+                    
+            cookie_x = current_icon_x
+            if os.path.exists("icons/cookie_icon.png"):
+                background.paste(Editor("icons/cookie_icon.png").resize(icon_size), (cookie_x, icon_y))
+                text_x = cookie_x + 40 
+                if streak_number >= 3 and os.path.exists("icons/fire_icon.png"):
+                    background.paste(Editor("icons/fire_icon.png").resize((45, 45)), (text_x, icon_y - 18))
+                background.text((text_x + 22, icon_y - 0), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
+
+            if os.path.exists("icons/booster_icon.png"):
+                has_booster = bool(member.get_role(self.cog.BOOSTER_ROLE_ID))
+                img = Image.open("icons/booster_icon.png").convert("RGBA")
+                if not has_booster:
+                    r, g, b, a = img.split()
+                    a = a.point(lambda p: p * 0.3)
+                    img.putalpha(a)
+                background.paste(Editor(img).resize((35, 35)), (230, 232))
+        except: pass
+
+        background.text((550, 50), "Rank", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
+        background.text((610, 42), f"#{dragon_rank}", font=font_large, color="white", stroke_width=st_width, stroke_fill=st_col)
+        background.text((750, 50), "Level", font=font_small, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
+        background.text((820, 42), f"{level}", font=font_large, color="#a97dd1", stroke_width=st_width, stroke_fill=st_col)
+        background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
+        background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
+
+        is_glowing = member.get_role(self.cog.BOOSTER_ROLE_ID) and (booster_glow == 'on')
+        if is_glowing:
+            background.rectangle((223, 178), width=614, height=49, fill=(160, 32, 240, 140), radius=15)
+            background.rectangle((225, 180), width=610, height=45, fill=(0, 242, 254, 180), radius=13)
+            background.rectangle((227, 182), width=606, height=41, fill=(255, 0, 128, 220), radius=11)
+        else:
+            background.rectangle((228, 183), width=604, height=39, fill="black", radius=12)
+
+        background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=10)
+        if percentage > 0:
+            bar_width = int(600 * percentage)
+            if bar_width > 0:
+                background.rectangle((230, 185), width=max(bar_width, 20), height=35, fill=bar_color, radius=10)
+        
+        background.text((830, 155), f"Next level: {xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
+        background.text((830, 238), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
+
+        await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=discord.File(fp=background.image_bytes, filename="preview.png"), ephemeral=True)
 
 class FontView(discord.ui.View):
     def __init__(self, cog):
