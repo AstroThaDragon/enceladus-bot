@@ -480,19 +480,19 @@ class Leveling(commands.Cog):
             background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
             background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
-            # --- PROGRESS BAR WITH DEFAULT OUTLINE & COSMIC BOOSTER GLOW ---
+            # --- PROGRESS BAR (BOOSTER GLOW VS NORMAL OUTLINE) ---
 
-            # 1. If booster, draw a multi-layered galaxy glow *behind* the bar
             if member.get_role(self.BOOSTER_ROLE_ID):
-                # Outer soft nebula haze (Deep purple/indigo aura)
-                background.rectangle((224, 179), width=612, height=47, fill=(138, 43, 226, 50), radius=14)
-                # Mid layer energy bloom (Vibrant electric cyan/blue)
-                background.rectangle((226, 181), width=608, height=43, fill=(0, 229, 255, 80), radius=12)
-                # Inner bright starlight core (Soft magenta/pinkish white pop)
-                background.rectangle((227, 182), width=606, height=41, fill=(255, 119, 255, 100), radius=11)
-
-            # 2. Default Black Outline (Appears for everyone)
-            background.rectangle((228, 183), width=604, height=39, fill="black", radius=12)
+                # 1. Booster: High-intensity vibrant cosmic glow (No black outline framing it)
+                # Outer nebula haze (Bright electric purple, wider spread)
+                background.rectangle((223, 178), width=614, height=49, fill=(160, 32, 240, 140), radius=15)
+                # Mid layer (Vibrant neon cyan flare)
+                background.rectangle((225, 180), width=610, height=45, fill=(0, 242, 254, 180), radius=13)
+                # Inner starlight core (Hot magenta/pink pop right against the bar)
+                background.rectangle((227, 182), width=606, height=41, fill=(255, 0, 128, 220), radius=11)
+            else:
+                # 2. Regular Members: Clean default black outline
+                background.rectangle((228, 183), width=604, height=39, fill="black", radius=12)
 
             # 3. Progress Bar Background (The empty dark gray track)
             background.rectangle((230, 185), width=600, height=35, fill="#3d3d3d", radius=10)
