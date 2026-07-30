@@ -69,7 +69,7 @@ class FontPreviewSelect(discord.ui.Select):
             discord.SelectOption(label="Roboto", value="roboto"),
             discord.SelectOption(label="Rye", value="rye"),
             discord.SelectOption(label="Schoolbell", value="schoolbell"),
-            discord.SelectOption(label="Shadows Into Night", value="shadows_night"),
+            discord.SelectOption(label="Shadows Into Light", value="shadows_light"),
             discord.SelectOption(label="Smokum", value="smokum"),
             discord.SelectOption(label="Ubuntu", value="ubuntu"),
         ]
@@ -183,7 +183,7 @@ class FontPreviewSelect(discord.ui.Select):
             "roboto": "fonts/Roboto-Regular.ttf",
             "rye": "fonts/Rye-Regular.ttf",
             "schoolbell": "fonts/Schoolbell-Regular.ttf",
-            "shadows_night": "fonts/ShadowsIntoNight-Regular.ttf",
+            "shadows_light": "fonts/ShadowsIntoLight-Regular.ttf",
             "smokum": "fonts/Smokum-Regular.ttf",
             "ubuntu": "fonts/Ubuntu-Regular.ttf"
         }
@@ -617,8 +617,8 @@ class Leveling(commands.Cog):
                 active_font_path = "fonts/Rye-Regular.ttf"
             elif font_choice == "schoolbell":
                 active_font_path = "fonts/Schoolbell-Regular.ttf"
-            elif font_choice == "shadows_night":
-                active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
+            elif font_choice == "shadows_light":
+                active_font_path = "fonts/ShadowsIntoLight-Regular.ttf"
             elif font_choice == "smokum":
                 active_font_path = "fonts/Smokum-Regular.ttf"
             elif font_choice == "ubuntu":
@@ -778,7 +778,7 @@ class Leveling(commands.Cog):
         app_commands.Choice(name="Roboto", value="roboto"),
         app_commands.Choice(name="Rye", value="rye"),
         app_commands.Choice(name="Schoolbell", value="schoolbell"),
-        app_commands.Choice(name="Shadows Into Night", value="shadows_night"),
+        app_commands.Choice(name="Shadows Into Light", value="shadows_light"),
         app_commands.Choice(name="Smokum", value="smokum"),
         app_commands.Choice(name="Ubuntu", value="ubuntu"),
     ])
