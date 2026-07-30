@@ -43,6 +43,103 @@ async def load_custom_image(url):
                 print(f"Image Load Failed: Status {response.status}")
                 return None
 
+class FontPreviewSelect(discord.ui.Select):
+    def __init__(self, cog):
+        self.cog = cog
+        # Pull your font choices directly from your existing list or define them here
+        options = [
+            discord.SelectOption(label="Comic Relief (Default)", value="comic"),
+            discord.SelectOption(label="Bangers", value="bangers"),
+            discord.SelectOption(label="Bytesized", value="bytesized"),
+            discord.SelectOption(label="Caveat", value="caveat"),
+            discord.SelectOption(label="Chewy", value="chewy"),
+            discord.SelectOption(label="Crafty Girls", value="crafty"),
+            discord.SelectOption(label="Creepster", value="creepster"),
+            discord.SelectOption(label="Dancing Script", value="dancing_script"),
+            discord.SelectOption(label="Germania One", value="germania"),
+            discord.SelectOption(label="Griffy", value="griffy"),
+            discord.SelectOption(label="Henny Penny", value="henny_penny"),
+            discord.SelectOption(label="Lavishly Yours", value="lavishly_yours"),
+            discord.SelectOption(label="Libertinus Math", value="libertinus_math"),
+            discord.SelectOption(label="Lobster Two", value="lobster_two"),
+            discord.SelectOption(label="Medieval Sharp", value="medieval"),
+            discord.SelectOption(label="Mountains of Christmas", value="christmas"),
+            discord.SelectOption(label="Nosifer", value="nosifer"),
+            discord.SelectOption(label="Open Sans", value="open_sans"),
+            discord.SelectOption(label="Pixelify Sans", value="pixelify_sans"),
+            discord.SelectOption(label="Roboto", value="roboto"),
+            discord.SelectOption(label="Rye", value="rye"),
+            discord.SelectOption(label="Schoolbell", value="schoolbell"),
+            discord.SelectOption(label="Shadows Into Night", value="shadows_night"),
+            discord.SelectOption(label="Smokum", value="smokum"),
+            discord.SelectOption(label="Ubuntu", value="ubuntu"),
+        ]
+        super().__init__(placeholder="Choose a font to preview...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        chosen_font = self.values[0]
+        
+        # 1. Fetch user's actual data from the DB so the preview matches THEIR level/name/avatar
+        async with aiosqlite.connect(self.cog.db_path) as db:
+            async with db.execute(
+                "SELECT xp, level, bar_color, bg_url, fortune_streak, booster_glow FROM users WHERE user_id = ?", 
+                (interaction.user.id,)
+            ) as cursor:
+                result = await cursor.fetchone()
+
+        # Fallback defaults if they aren't in the database yet
+        if result:
+            xp, level, bar_color, bg_url, fortune_streak, booster_glow = result
+        else:
+            xp, level, bar_color, bg_url, fortune_streak, booster_glow = 0, 0, "#8a2be2", "default", 0, "on"
+
+        # 2. Re-use your exact rank card generation logic, but FORCE `chosen_font` 
+        # instead of reading it from the database table for this temporary preview!
+        try:
+            # (Copy your background loading, avatar pasting, and icon drawing code here...)
+            # For brevity, let's look at the font mapping part:
+            
+            active_font_path = "fonts/ComicRelief-Regular.ttf"
+            if chosen_font == "bangers": active_font_path = "fonts/Bangers-Regular.ttf"
+            elif chosen_font == "bytesized": active_font_path = "fonts/Bytesized-Regular.ttf"
+            elif chosen_font == "caveat": active_font_path = "fonts/Caveat-Regular.ttf"
+            elif chosen_font == "chewy": active_font_path = "fonts/Chewy-Regular.ttf"
+            elif chosen_font == "crafty": active_font_path = "fonts/CraftyGirls-Regular.ttf"
+            elif chosen_font == "creepster": active_font_path = "fonts/Creepster-Regular.ttf"
+            elif chosen_font == "dancing_script": active_font_path = "fonts/DancingScript-Regular.ttf"
+            elif chosen_font == "germania": active_font_path = "fonts/GermaniaOne-Regular.ttf"
+            elif chosen_font == "griffy": active_font_path = "fonts/Griffy-Regular.ttf"
+            elif chosen_font == "henny_penny": active_font_path = "fonts/HennyPenny-Regular.ttf"
+            elif chosen_font == "lavishly_yours": active_font_path = "fonts/LavishlyYours-Regular.ttf"
+            elif chosen_font == "libertinus_math": active_font_path = "fonts/LibertinusMath-Regular.ttf"
+            elif chosen_font == "lobster_two": active_font_path = "fonts/LobsterTwo-Regular.ttf"
+            elif chosen_font == "medieval": active_font_path = "fonts/MedievalSharp-Regular.ttf"
+            elif chosen_font == "christmas": active_font_path = "fonts/MountainsOfChristmas-Regular.ttf"
+            elif chosen_font == "nosifer": active_font_path = "fonts/Nosifer-Regular.ttf"
+            elif chosen_font == "open_sans": active_font_path = "fonts/OpenSans-Regular.ttf"
+            elif chosen_font == "pixelify_sans": active_font_path = "fonts/PixelifySans-Regular.ttf"
+            elif chosen_font == "roboto": active_font_path = "fonts/Roboto-Regular.ttf"
+            elif chosen_font == "rye": active_font_path = "fonts/Rye-Regular.ttf"
+            elif chosen_font == "schoolbell": active_font_path = "fonts/Schoolbell-Regular.ttf"
+            elif chosen_font == "shadows_night": active_font_path = "fonts/ShadowsIntoNight-Regular.ttf"
+            elif chosen_font == "smokum": active_font_path = "fonts/Smokum-Regular.ttf"
+            elif chosen_font == "ubuntu": active_font_path = "fonts/Ubuntu-Regular.ttf"
+
+            # Build the image using `active_font_path` (omitted full image generation boilerplate here to keep it clean, 
+            # but it uses the exact same drawing steps as your `rank` command).
+            
+            # Finally, send it ephemeral so only they see their preview:
+            # await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=discord.File(fp=background.image_bytes, filename="preview.png"), ephemeral=True)
+            
+        except Exception as e:
+            await interaction.followup.send(f"Error generating preview: {e}", ephemeral=True)
+
+class FontView(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=None) # Persistent view so it never expires
+        self.add_item(FontPreviewSelect(cog))
+
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -669,6 +766,17 @@ class Leveling(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def reset(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(content=f"⚠️ Reset all data for **{member.mention}**?", view=ResetConfirm(self, member), ephemeral=True)
+
+    @app_commands.command(name="font_preview_setup", description="Sends the interactive font preview dropdown (Admin only)")
+    @commands.has_permissions(administrator=True)
+    async def font_preview_setup(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="Rank Card Font Previewer! 🌠",
+            description="Use the dropdown menu below to test out any of our custom fonts available! It will generate a private preview card just for you so you can see how your name and levels look before choosing.",
+            color=discord.Color.purple()
+        )
+        await interaction.channel.send(embed=embed, view=FontView(self))
+        await interaction.response.send_message("✅ Font preview menu deployed!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))
