@@ -466,8 +466,8 @@ class Leveling(commands.Cog):
                         img.putalpha(a)
                     booster_icon = Editor(img).resize((35, 35))
                     
-                    # X=230 aligns with the start of the progress bar. Y=225 places it right beneath it.
-                    background.paste(booster_icon, (230, 225))
+                    # Moved down to Y=232 so it clears the expanded glowing border
+                    background.paste(booster_icon, (230, 232))
                         
             except Exception as e:
                 print(f"Error drawing rank card icons: {e}")
@@ -508,7 +508,7 @@ class Leveling(commands.Cog):
             background.text((830, 155), f"Next level: {xp_within_level} / {needed_for_level} XP", font=font_small, color="white", align="right", stroke_width=st_width, stroke_fill=st_col)
             
             # Bottom Text: Total lifetime XP currently held
-            background.text((830, 228), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
+            background.text((830, 238), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
         except Exception as e:
