@@ -76,7 +76,8 @@ class FontPreviewSelect(discord.ui.Select):
         super().__init__(placeholder="Choose a font to preview...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
         chosen_font = self.values[0]
         member = interaction.user
         
@@ -263,7 +264,7 @@ class FontPreviewSelect(discord.ui.Select):
         background.text((830, 238), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
         file = discord.File(fp=background.image_bytes, filename="preview.png")
-        await interaction.followup.send(content=f"🎨 Previewing font: **{self.values[0]}**", file=file, ephemeral=True)
+        await interaction.edit_original_response(content=f"🎨 Previewing font: **{self.values[0]}**", attachments=[file])
 
 class FontView(discord.ui.View):
     def __init__(self, cog):
