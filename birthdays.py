@@ -213,7 +213,7 @@ class BirthdayCog(commands.Cog):
                 )
 
                 await channel.send(
-                    content=f"Hey <@&{BIRTHDAY_ROLE_ID}>, Happy Birthday!",
+                    content=f"Happy birthday, {', '.join(birthday_members)}! 🎉🎂✨",
                     embed=shoutout_embed
                 )
 

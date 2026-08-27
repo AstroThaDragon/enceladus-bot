@@ -33,23 +33,75 @@ AUTO_RESPONSES = {
         "*Toaster noises*",
         "*DING*",
         "Want toast? I gotchu"
+    ],
+
+    "poptart": [
+        "Blueberry or strawberry?",
+        "Yummers",
+        "😋",
+        "*Toaster noises*"
+    ],
+
+    "cheese": [
+        "🧀",
+        "*Cheese slap*",
+        "Munster be my fav frfr",
+        "I promise I'm not a mouse 🫣"
+    ],
+
+    "shawty": [
+        "You called?",
+        "🎶 Shawtys like a melody in my head.. 🎶"
+    ],
+
+    "uwu": [
+        "UwU"
+    ],
+
+    "owo": [
+        "OwO"
+    ],
+
+    "water": [
+        "HYDRATE",
+        "I don't need it... I *definitely* don't need it... 🧽"
     ]
 }
 
 
 AUTO_REACTIONS = {
     "dragon": "🐉",
-    "moon": "🌙",
+    "moon": "🌕",
     "star": "⭐",
     "fortune": "🥠",
     "cosmic": "🌌",
     "void": "🕳️",
     "proot": "🍞",
     "toaster": "🍞",
-    "morning": "👋",
-    "good morning": "👋",
+    "morning": "🌅",
     "good night": "🌙",
-    "goodnight": "🌙"
+    "goodnight": "🌙",
+    "good morning": "👋",
+    "astro": "☄️",
+    "space": "🪐",
+    "happy birthday": "🎉",
+    "happy halloween": "🎃",
+    "happy holidays": "🎄",
+    "merry christmas": "🎄",
+    "happy new year": "🎆",
+    "happy valentines": "💌",
+    "happy easter": "🐰",
+    "happy thanksgiving": "🦃",
+    "happy hanukkah": "🕎",
+    "happy kwanzaa": "🕯️",
+    "happy pride": "🏳️‍🌈",
+    "fih": "🐟",
+    "ayo": "👀",
+    "nsfw": "😏",
+    "uwu": "😺",
+    "owo": "😺",
+    "freaky": "🤨",
+    "sus": "🫣"
 }
 
 
