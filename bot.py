@@ -35,7 +35,7 @@ class Enceladus(commands.Bot):
 
     async def setup_hook(self):
         # 1. Initialize all databases FIRST
-        init_db()
+        await init_db()
         await init_bump_db()
         await init_fun_db()
         print("🌌 Databases initialized and ready!")
@@ -57,6 +57,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("profile")
         await self.load_extension("pets")
         await self.load_extension("inventory")
+        await self.load_extension("debug")
         print("🌌 All cogs loaded!")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
