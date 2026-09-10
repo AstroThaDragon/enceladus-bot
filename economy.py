@@ -109,6 +109,9 @@ class Economy(commands.Cog):
             "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 750, "desc": "Protects one missed fortune streak day."},
             "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 450, "desc": "Open it for an unpredictable Stardust payoff."},
             "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 700, "desc": "Revives an unconscious explorer at 50% HP."},
+            "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
+            "title_starborn": {"name": "✨ Title: Starborn", "cost": 750, "type": "title", "desc": "A prestigious title for those touched by the stars."},
+            "title_voidfarer": {"name": "🌌 Title: Voidfarer", "cost": 750, "type": "title", "desc": "For those brave enough to chart the endless void."},
         }
 
     def rotation_date(self):
@@ -291,16 +294,33 @@ class Economy(commands.Cog):
             # Process purchase based on item type.
             new_stardust = stardust - cost
 
-            if rotating_item:
+            if rotating_item is not None:
+                item = rotating_item
+                item_type = item.get("type", "consumable")
+
+                # Titles are unlocks, so don't allow the same title to be purchased twice.
+                if item_type == "title":
+                    async with db.execute(
+                        "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?",
+                        (user_id, item_id)
+                    ) as cursor:
+                        already_owned = await cursor.fetchone()
+
+                    if already_owned:
+                        await db.rollback()
+                        return await ctx.send(
+                            "⚠️ You already own this title!"
+                        )
+
                 await db.execute(
                     """
                     INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', 1)
+                    VALUES (?, ?, ?, 1)
                     ON CONFLICT(user_id, item_id) DO UPDATE SET
                         item_type = excluded.item_type,
                         quantity = quantity + 1
                     """,
-                    (user_id, item_id)
+                    (user_id, item_id, item_type)
                 )
 
                 await db.execute(
@@ -309,6 +329,12 @@ class Economy(commands.Cog):
                 )
 
                 await db.commit()
+
+                if item_type == "title":
+                    return await ctx.send(
+                        f"🏷️ **Title Unlocked!** You purchased "
+                        f"**{item['name']}** for **{cost:,} Stardust**!"
+                    )
 
                 return await ctx.send(
                     f"🔄 **Rotating-market purchase complete!** "

@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import aiosqlite
 import asyncio
 import time
@@ -80,6 +81,129 @@ class Inventory(commands.Cog):
         if "active_effects" not in columns:
             await db.execute("ALTER TABLE users ADD COLUMN active_effects TEXT DEFAULT '{}'")
             await db.commit()
+
+    async def title_autocomplete(self, interaction: discord.Interaction, current: str):
+        """Show the user's owned profile titles in the Discord autocomplete menu."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            async with db.execute(
+                """
+                SELECT item_id
+                FROM inventory
+                WHERE user_id = ? AND item_type = 'title'
+                ORDER BY item_id
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+
+        # Allow the user to remove their currently equipped title.
+        if not current or "none" in "none":
+            choices.append(app_commands.Choice(name="❌ Unequip current title", value="none"))
+
+        for (item_id,) in rows:
+            # Convert IDs such as title_outer_rim_wanderer
+            # into readable names such as Outer Rim Wanderer.
+            display_name = item_id.removeprefix("title_").replace("_", " ").title()
+
+            if current and current not in display_name.lower():
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"🏷️ {display_name}",
+                    value=item_id
+                )
+            )
+
+        return choices[:25]
+
+    @commands.hybrid_group(
+        name="equip",
+        description="Equip an unlocked Station cosmetic."
+    )
+    async def equip(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send(
+                "Use `/equip title` to equip one of your unlocked profile titles."
+            )
+
+    @equip.command(
+        name="title",
+        description="Equip one of your unlocked profile titles."
+    )
+    @app_commands.describe(title="Choose a title you own.")
+    @app_commands.autocomplete(title=title_autocomplete)
+    async def equip_title(self, ctx: commands.Context, title: str):
+        await ctx.defer()
+        user_id = ctx.author.id
+        title = title.lower().strip()
+
+        # Reuse the same per-user lock used by /use, /mine, and /scavenge.
+        exploration_cog = self.bot.get_cog("Exploration")
+
+        if exploration_cog is not None:
+            lock = exploration_cog._user_locks.setdefault(user_id, asyncio.Lock())
+        else:
+            if not hasattr(self, "_user_locks"):
+                self._user_locks = {}
+            lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            from database import ECONOMY_DB_NAME
+
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+
+                # Unequip the current title.
+                if title == "none":
+                    await db.execute(
+                        "UPDATE users SET equipped_title = '' WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    await db.commit()
+
+                    return await ctx.send(
+                        "❌ **Title unequipped.** Your profile is now title-free."
+                    )
+
+                # Make sure the player actually owns this title.
+                async with db.execute(
+                    """
+                    SELECT 1
+                    FROM inventory
+                    WHERE user_id = ?
+                      AND item_id = ?
+                      AND item_type = 'title'
+                      AND quantity > 0
+                    """,
+                    (user_id, title)
+                ) as cursor:
+                    owned = await cursor.fetchone()
+
+                if not owned:
+                    return await ctx.send(
+                        "🔒 **You don't own that title!** "
+                        "Purchase it from the rotating shop first."
+                    )
+
+                await db.execute(
+                    "UPDATE users SET equipped_title = ? WHERE user_id = ?",
+                    (title, user_id)
+                )
+                await db.commit()
+
+            display_name = title.removeprefix("title_").replace("_", " ").title()
+
+            await ctx.send(
+                f"🏷️ **Title Equipped!** Your profile title is now "
+                f"**{display_name}**."
+            )
 
     @commands.hybrid_command(name="inventory", description="Open your station storage locker to view collected items and vouchers.")
     async def inventory(self, ctx: commands.Context):

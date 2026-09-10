@@ -40,7 +40,8 @@ async def init_economy_db():
                 nanite_patchs INTEGER DEFAULT 0,
                 medkits INTEGER DEFAULT 0,
                 bio TEXT DEFAULT 'Exploring the outer rims of Enceladus Station. 🚀',
-                profile_card TEXT DEFAULT 'default_nebula'
+                profile_card TEXT DEFAULT 'default_nebula',
+                equipped_title TEXT DEFAULT ''
             )
         """)
 

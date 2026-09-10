@@ -23,7 +23,8 @@ class Profile(commands.Cog):
         required_columns = {
             "stardust": "INTEGER DEFAULT 0",
             "bio": "TEXT DEFAULT NULL",
-            "profile_card": "TEXT DEFAULT 'default_nebula'"
+            "profile_card": "TEXT DEFAULT 'default_nebula'",
+            "equipped_title": "TEXT DEFAULT ''"
         }
 
         for column, column_type in required_columns.items():
@@ -55,7 +56,7 @@ class Profile(commands.Cog):
 
             async with db.execute(
                 """
-                SELECT stardust, bio, profile_card
+                SELECT stardust, bio, profile_card, equipped_title
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -83,7 +84,8 @@ class Profile(commands.Cog):
                 "stardust": 0,
                 "bio": "Exploring the outer rims of Enceladus Station. 🚀",
                 "bg": "default_nebula",
-                "pet": "egg"
+                "pet": "egg",
+                "title": "",
             }
 
         stored_level = leveling_data[0] if leveling_data else 0
@@ -92,6 +94,7 @@ class Profile(commands.Cog):
         stardust = economy_data[0] if economy_data else 0
         bio = economy_data[1] if economy_data else None
         profile_card = economy_data[2] if economy_data else None
+        equipped_title = economy_data[3] if economy_data else ""
 
         # Calculate true level dynamically from accumulated XP.
         leveling_cog = self.bot.get_cog("Leveling")
@@ -112,6 +115,7 @@ class Profile(commands.Cog):
             "xp": xp or 0,
             "stardust": stardust or 0,
             "bio": bio or "Exploring the outer rims of Enceladus Station. 🚀",
+            "title": equipped_title or "",
             "bg": profile_card or "default_nebula",
             "pet": pet_data[0] if pet_data else "egg"
         }
@@ -136,7 +140,7 @@ class Profile(commands.Cog):
 
         # Load Background Environment
         try:
-            bg_image = Editor(f"assets/presets/{bg_name}.png").resize((viewport_w, viewport_h))
+            bg_image = Editor(f"assets/presets/backgrounds/{bg_name}.png").resize((viewport_w, viewport_h))
             viewport.paste(bg_image, (0, 0))
         except FileNotFoundError:
             viewport.rectangle((0, 0), width=viewport_w, height=viewport_h, fill="#1E2333")
@@ -154,7 +158,12 @@ class Profile(commands.Cog):
         # 3. Assemble Embed
         embed = discord.Embed(
             title=f"🛸 Personnel Record — {target.display_name}",
-            description=f"📜 *{data['bio']}*",
+            description=(
+                f"🏷️ **{data['title']}**\n"
+                f"📜 *{data['bio']}*"
+                if data["title"]
+                else f"📜 *{data['bio']}*"
+            ),
             color=target.color or discord.Color.blue()
         )
         
