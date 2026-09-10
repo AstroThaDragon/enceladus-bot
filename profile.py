@@ -180,6 +180,98 @@ class Profile(commands.Cog):
 
         await ctx.send(file=file, embed=embed)
 
+    @commands.hybrid_command(
+        name="bio",
+        description="Set your Enceladus Station profile biography."
+    )
+    @app_commands.describe(
+        text="The biography you want displayed on your profile."
+    )
+    async def bio(self, ctx: commands.Context, text: str):
+        await ctx.defer()
+
+        text = text.strip()
+
+        # Keep profile bios short enough to fit nicely on the profile card.
+        if len(text) > 180:
+            return await ctx.send(
+                f"❌ **Your bio is too long!** "
+                f"Please keep it to **180 characters or fewer** "
+                f"({len(text)}/180)."
+            )
+
+        if not text:
+            return await ctx.send(
+                "❌ **Your bio can't be empty.** "
+                "Use `/bio reset` if you want to restore the default bio."
+            )
+
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, bio)
+                VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    bio = excluded.bio
+                """,
+                (ctx.author.id, text)
+            )
+            await db.commit()
+
+        await ctx.send(
+            f"📜 **Bio updated!**\n"
+            f"> {text}"
+        )
+
+    @commands.hybrid_command(
+        name="moderatebio",
+        description="Force a user's profile bio to be marked as Moderated."
+    )
+    @app_commands.describe(
+        member="The user whose bio should be moderated.",
+        reason="Optional reason for the moderation action."
+    )
+    async def moderatebio(
+        self, ctx: commands.Context,
+        member: discord.Member,
+        reason: str = "No reason provided"
+    ):
+        if not ctx.guild:
+            return await ctx.send(
+                "❌ This command can only be used in a server."
+            )
+
+        is_owner = await self.bot.is_owner(ctx.author)
+        has_staff_role = any(
+            role.name in {"Moderator", "Admin"}
+            for role in ctx.author.roles
+        )
+
+        if not (is_owner or has_staff_role):
+            return 
+
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, bio)
+                VALUES (?, 'Moderated')
+                ON CONFLICT(user_id) DO UPDATE SET
+                    bio = 'Moderated'
+                """,
+                (member.id,)
+            )
+            await db.commit()
+
+        await ctx.send(
+            f"🛡️ **Bio Moderated**\n"
+            f"User: {member.mention}\n"
+            f"Reason: {reason}"
+        )
+
     @commands.hybrid_command(name="background", description="Equip an unlocked background voucher for your profile card.")
     @app_commands.describe(background_id="The background style code to equip")
     @app_commands.choices(background_id=[

@@ -63,7 +63,12 @@ ITEM_REGISTRY = {
     # Background Vouchers
     "neon_grid": {"name": "Background Voucher: Neon Grid", "emoji": "🌆", "type": "Voucher", "desc": "Unlocks the Cyberpunk Neon Grid profile card."},
     "deep_void": {"name": "Background Voucher: Deep Void", "emoji": "🌌", "type": "Voucher", "desc": "Unlocks the Deep Void galaxy profile card."},
-    "solaris_ring": {"name": "Background Voucher: Solaris Ring", "emoji": "☀️", "type": "Voucher", "desc": "Unlocks the Solaris Ring star system profile card."}
+    "solaris_ring": {"name": "Background Voucher: Solaris Ring", "emoji": "☀️", "type": "Voucher", "desc": "Unlocks the Solaris Ring star system profile card."},
+
+    # Profile Titles
+    "title_outer_rim_wanderer": {"name": "Outer Rim Wanderer", "emoji": "🏷️", "type": "Title","desc": "A title for explorers who venture beyond the station."},
+    "title_starborn": {"name": "Starborn", "emoji": "✨", "type": "Title", "desc": "A prestigious title for those touched by the stars."},
+    "title_voidfarer": {"name": "Voidfarer", "emoji": "🌌", "type": "Title", "desc": "For those brave enough to chart the endless void."}
 }
 
 class Inventory(commands.Cog):

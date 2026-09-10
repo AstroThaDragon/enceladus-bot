@@ -7,7 +7,9 @@ import json
 
 import discord
 from discord.ext import commands
+from discord.ext import app_commands
 from database import ECONOMY_DB_NAME
+import aiosqlite
 
 
 class Debug(commands.Cog):
