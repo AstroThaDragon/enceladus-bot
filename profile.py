@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import aiosqlite
+import os
 from easy_pil import Canvas, Editor, Font, load_image_async
 
 class Profile(commands.Cog):
@@ -244,13 +245,17 @@ class Profile(commands.Cog):
             )
 
         is_owner = await self.bot.is_owner(ctx.author)
+
+        mod_role_id = int(os.getenv("MOD_ROLE_ID", "0"))
+        admin_role_id = int(os.getenv("ADMIN_ROLE_ID", "0"))
+
         has_staff_role = any(
-            role.name in {"Moderator", "Admin"}
+            role.id in {mod_role_id, admin_role_id}
             for role in ctx.author.roles
         )
 
         if not (is_owner or has_staff_role):
-            return 
+            return
 
         from database import ECONOMY_DB_NAME
 
