@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import sqlite3
+import aiosqlite
 from easy_pil import Canvas, Editor, Font, load_image_async
 
 class Profile(commands.Cog):
@@ -15,10 +15,10 @@ class Profile(commands.Cog):
             return leveling_cog.db_path
         return "levels.db"
 
-    def ensure_schema(self, cursor):
+    async def ensure_schema(self, db):
         """Ensures all required columns exist in the users table without resetting data."""
-        cursor.execute("PRAGMA table_info(users)")
-        existing_columns = {row[1] for row in cursor.fetchall()}
+        async with db.execute("PRAGMA table_info(users)") as cursor:
+            existing_columns = {row[1] async for row in cursor}
 
         required_columns = {
             "stardust": "INTEGER DEFAULT 0",
@@ -28,61 +28,91 @@ class Profile(commands.Cog):
 
         for column, column_type in required_columns.items():
             if column not in existing_columns:
-                cursor.execute(f"ALTER TABLE users ADD COLUMN {column} {column_type}")
+                await db.execute(
+                    f"ALTER TABLE users ADD COLUMN {column} {column_type}"
+                )
 
-    def get_user_profile(self, user_id):
-        """Fetches user and pet data from the database and calculates true level from XP."""
-        db_path = self.get_db_path()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Self-heal missing database columns
-        self.ensure_schema(cursor)
-        conn.commit()
+    async def get_user_profile(self, user_id):
+        """Fetches leveling data from levels.db and Station data from economy.db."""
+        from database import DB_NAME, ECONOMY_DB_NAME
 
-        # Grab main user stats
-        cursor.execute("SELECT level, xp, stardust, bio, profile_card FROM users WHERE user_id = ?", (user_id,))
-        user_data = cursor.fetchone()
-        
-        # Grab pet data (gracefully handle missing pets table)
-        try:
-            cursor.execute("SELECT pet_stage FROM pets WHERE user_id = ?", (user_id,))
-            pet_data = cursor.fetchone()
-        except sqlite3.OperationalError:
-            pet_data = None
-        
-        conn.close()
+        # Read XP and level from the leveling/Fortune database.
+        async with aiosqlite.connect(DB_NAME) as db:
+            async with db.execute(
+                """
+                SELECT level, xp
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                leveling_data = await cursor.fetchone()
 
-        # Fallback values if user is not in database yet
-        if not user_data:
+        # Read Station/economy data and pet data from economy.db.
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.commit()
+
+            async with db.execute(
+                """
+                SELECT stardust, bio, profile_card
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                economy_data = await cursor.fetchone()
+
+            async with db.execute(
+                """
+                SELECT pet_stage
+                FROM pets
+                WHERE user_id = ?
+                ORDER BY pet_id DESC
+                LIMIT 1
+                """,
+                (user_id,)
+            ) as cursor:
+                pet_data = await cursor.fetchone()
+
+        # Fallback values if the user has not been initialized yet.
+        if not leveling_data and not economy_data:
             return {
-                "level": 0, 
-                "xp": 0, 
-                "stardust": 0, 
-                "bio": "Exploring the outer rims of Enceladus Station. 🚀", 
-                "bg": "default_nebula", 
+                "level": 0,
+                "xp": 0,
+                "stardust": 0,
+                "bio": "Exploring the outer rims of Enceladus Station. 🚀",
+                "bg": "default_nebula",
                 "pet": "egg"
             }
 
-        stored_level, xp, stardust, bio, profile_card = user_data[0], user_data[1], user_data[2] or 0, user_data[3], user_data[4]
+        stored_level = leveling_data[0] if leveling_data else 0
+        xp = leveling_data[1] if leveling_data else 0
 
-        # Calculate true level dynamically from accumulated XP
+        stardust = economy_data[0] if economy_data else 0
+        bio = economy_data[1] if economy_data else None
+        profile_card = economy_data[2] if economy_data else None
+
+        # Calculate true level dynamically from accumulated XP.
         leveling_cog = self.bot.get_cog("Leveling")
         calculated_level = stored_level or 0
+
         if leveling_cog and hasattr(leveling_cog, "get_xp_for_level"):
             temp_level = 0
+
             while (xp or 0) >= leveling_cog.get_xp_for_level(temp_level + 1):
                 temp_level += 1
+
             calculated_level = temp_level
 
         final_level = max(stored_level or 0, calculated_level)
-            
+
         return {
             "level": final_level,
             "xp": xp or 0,
-            "stardust": stardust,
+            "stardust": stardust or 0,
             "bio": bio or "Exploring the outer rims of Enceladus Station. 🚀",
-            "bg": profile_card if profile_card else "default_nebula",
+            "bg": profile_card or "default_nebula",
             "pet": pet_data[0] if pet_data else "egg"
         }
 
@@ -93,7 +123,7 @@ class Profile(commands.Cog):
         await ctx.defer()
 
         # 1. Fetch user data
-        data = self.get_user_profile(target.id)
+        data = await self.get_user_profile(target.id)
 
         # 2. Render Station Viewport (600x300 Environment Window)
         viewport_w, viewport_h = 600, 300
@@ -161,28 +191,35 @@ class Profile(commands.Cog):
             "solaris_ring": "Solaris Ring System"
         }
 
-        db_path = self.get_db_path()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        from database import ECONOMY_DB_NAME
+        db_path = ECONOMY_DB_NAME
 
-        self.ensure_schema(cursor)
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
 
-        # Check ownership if it's not default
-        if background_id != "default":
-            try:
-                cursor.execute("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, background_id))
-                has_item = cursor.fetchone()
-            except sqlite3.OperationalError:
-                has_item = False
+            # Check ownership if it's not default
+            if background_id != "default":
+                try:
+                    async with db.execute(
+                        "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?",
+                        (user_id, background_id)
+                    ) as cursor:
+                        has_item = await cursor.fetchone()
+                except aiosqlite.OperationalError:
+                    has_item = False
 
-            if not has_item:
-                conn.close()
-                return await ctx.send(f"🔒 **Locked!** You don't own the voucher for `{background_id}` yet. Check the `/shop` or hunt for it while mining!")
+                if not has_item:
+                    return await ctx.send(
+                        f"🔒 **Locked!** You don't own the voucher for `{background_id}` yet. "
+                        f"Check the `/shop` or hunt for it while mining!"
+                    )
 
-        # Update profile card column
-        cursor.execute("UPDATE users SET profile_card = ? WHERE user_id = ?", (background_id, user_id))
-        conn.commit()
-        conn.close()
+            # Update profile card column
+            await db.execute(
+                "UPDATE users SET profile_card = ? WHERE user_id = ?",
+                (background_id, user_id)
+            )
+            await db.commit()
 
         await ctx.send(f"🌟 **Profile Updated!** Successfully equipped **{valid_backgrounds.get(background_id, background_id)}** as your active profile background. Run `/profile` to check it out!")
 

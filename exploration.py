@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import aiosqlite
+import asyncio
 import time
 import random
 import json
@@ -11,6 +12,7 @@ import pytz
 class Exploration(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._user_locks = {}
         self.COOLDOWN_SECONDS = 4 * 3600  # 4-hour cooldown
         self.SCAVENGE_HAZARDS = [
             # Minor hazards are common: funny setbacks, small damage.
@@ -73,11 +75,9 @@ class Exploration(commands.Cog):
         ]
 
     def get_db_path(self):
-        """Fetches active dynamic database path or defaults to levels.db."""
-        leveling_cog = self.bot.get_cog("Leveling")
-        if leveling_cog and hasattr(leveling_cog, "db_path"):
-            return leveling_cog.db_path
-        return "levels.db"
+        """Return the separate Station economy database."""
+        from database import ECONOMY_DB_NAME
+        return ECONOMY_DB_NAME
 
     async def ensure_schema(self, db):
         """Ensures scavenging and health tracking columns exist in the database."""
@@ -134,6 +134,14 @@ class Exploration(commands.Cog):
     ])
     async def heal(self, ctx: commands.Context, item: str):
         await ctx.defer()
+
+        user_id = ctx.author.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._heal_impl(ctx, item)
+
+    async def _heal_impl(self, ctx: commands.Context, item: str):
         user_id = ctx.author.id
 
         heal_data = {
@@ -158,13 +166,21 @@ class Exploration(commands.Cog):
             if col_name not in cols:
                 return await ctx.send(f"❌ You don't have any **{selected['name']}s** in your inventory!")
 
-            async with db.execute(f"SELECT hp, max_hp, {col_name}, knocked_out_until FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                f"SELECT hp, max_hp, {col_name}, knocked_out_until FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
                 row = await cursor.fetchone()
 
             if not row:
                 return await ctx.send("❌ Profile not found!")
 
-            current_hp, max_hp, item_count, knocked_out_until = row[0] or 0, row[1] or 100, row[2] or 0, row[3] or ""
+            current_hp, max_hp, item_count, knocked_out_until = (
+                row[0] or 0,
+                row[1] or 100,
+                row[2] or 0,
+                row[3] or ""
+            )
 
             if current_hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
@@ -173,7 +189,9 @@ class Exploration(commands.Cog):
                 return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
 
             if current_hp >= max_hp:
-                return await ctx.send(f"❤️ **Full Health!** You are already at max HP (**{max_hp}/{max_hp} HP**).")
+                return await ctx.send(
+                    f"❤️ **Full Health!** You are already at max HP (**{max_hp}/{max_hp} HP**)."
+                )
 
             new_hp = min(max_hp, current_hp + selected["amount"])
             healed_by = new_hp - current_hp
@@ -197,6 +215,15 @@ class Exploration(commands.Cog):
     @commands.hybrid_command(name="mine", description="Deploy your starship mining laser to scout for stardust and rare loot.")
     async def mine(self, ctx: commands.Context):
         await ctx.defer()
+
+        user_id = ctx.author.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._mine_impl(ctx)
+
+
+    async def _mine_impl(self, ctx: commands.Context):
         user_id = ctx.author.id
         current_time = time.time()
         db_path = self.get_db_path()
@@ -204,20 +231,32 @@ class Exploration(commands.Cog):
         async with aiosqlite.connect(db_path) as db:
             await self.ensure_schema(db)
             await db.commit()
+
+            # Recover knockout status before starting the mining transaction.
             await self.recover_if_new_day(db, user_id)
 
-            async with db.execute("SELECT mining_charges, last_mined, stardust, xp, hp, knocked_out_until, active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                "SELECT mining_charges, last_mined, stardust, hp, knocked_out_until, active_effects FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
                 row = await cursor.fetchone()
 
             if not row:
                 await db.execute("""
-                    INSERT OR IGNORE INTO users (user_id, mining_charges, last_mined, stardust, xp) 
-                    VALUES (?, 5, 0, 0, 0)
+                    INSERT OR IGNORE INTO users (user_id, mining_charges, last_mined, stardust)
+                    VALUES (?, 5, 0, 0)
                 """, (user_id,))
-                await db.commit()
-                charges, last_mined, stardust, current_xp, hp, knocked_out_until, effects_raw = 5, 0, 0, 0, 100, "", "{}"
+                charges, last_mined, stardust, hp, knocked_out_until, effects_raw = 5, 0, 0, 100, "", "{}"
             else:
-                charges, last_mined, stardust, current_xp, hp, knocked_out_until, effects_raw = row[0] if row[0] is not None else 5, row[1] or 0, row[2] or 0, row[3] or 0, row[4] if row[4] is not None else 100, row[5] or "", row[6] or "{}"
+                charges, last_mined, stardust, hp, knocked_out_until, effects_raw = (
+                    row[0] if row[0] is not None else 5,
+                    row[1] or 0,
+                    row[2] or 0,
+                    row[3] if row[3] is not None else 100,
+                    row[4] or "",
+                    row[5] or "{}"
+                )
+
             effects = json.loads(effects_raw)
 
             if hp <= 0:
@@ -330,6 +369,15 @@ class Exploration(commands.Cog):
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds.")
     async def scavenge(self, ctx: commands.Context):
         await ctx.defer()
+
+        user_id = ctx.author.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._scavenge_impl(ctx)
+
+
+    async def _scavenge_impl(self, ctx: commands.Context):
         user_id = ctx.author.id
         current_time = time.time()
         db_path = self.get_db_path()
@@ -469,36 +517,74 @@ class Exploration(commands.Cog):
     @commands.hybrid_command(name="revive", description="Use an Emergency Revival Kit to return at half health.")
     async def revive(self, ctx: commands.Context):
         await ctx.defer()
+
+        user_id = ctx.author.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._revive_impl(ctx)
+
+    async def _revive_impl(self, ctx: commands.Context):
         user_id = ctx.author.id
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             await self.ensure_schema(db)
             await self.recover_if_new_day(db, user_id)
 
-            async with db.execute("SELECT hp, max_hp FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                "SELECT hp, max_hp FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
                 user = await cursor.fetchone()
+
             if not user:
                 return await ctx.send("❌ Profile not found! Explore Enceladus first.")
 
             hp, max_hp = user[0] or 0, user[1] or 100
-            if hp > 0:
-                return await ctx.send("⚠️ You are already conscious and do not need a revival.")
 
-            async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'revive_kit'", (user_id,)) as cursor:
+            if hp > 0:
+                return await ctx.send(
+                    "⚠️ You are already conscious and do not need a revival."
+                )
+
+            async with db.execute(
+                "SELECT quantity FROM inventory "
+                "WHERE user_id = ? AND item_id = 'revive_kit'",
+                (user_id,)
+            ) as cursor:
                 kit = await cursor.fetchone()
+
             if not kit or (kit[0] or 0) <= 0:
-                return await ctx.send("❌ You do not have an Emergency Revival Kit. Buy a full revival at `/shop buy full_revive`, or recover tomorrow.")
+                return await ctx.send(
+                    "❌ You do not have an Emergency Revival Kit. "
+                    "Buy a full revival at `/shop buy full_revive`, or recover tomorrow."
+                )
 
             if kit[0] > 1:
-                await db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = 'revive_kit'", (user_id,))
+                await db.execute(
+                    "UPDATE inventory SET quantity = quantity - 1 "
+                    "WHERE user_id = ? AND item_id = 'revive_kit'",
+                    (user_id,)
+                )
             else:
-                await db.execute("DELETE FROM inventory WHERE user_id = ? AND item_id = 'revive_kit'", (user_id,))
+                await db.execute(
+                    "DELETE FROM inventory "
+                    "WHERE user_id = ? AND item_id = 'revive_kit'",
+                    (user_id,)
+                )
 
             recovered_hp = max(1, (max_hp + 1) // 2)
-            await db.execute("UPDATE users SET hp = ?, knocked_out_until = '' WHERE user_id = ?", (recovered_hp, user_id))
+
+            await db.execute(
+                "UPDATE users SET hp = ?, knocked_out_until = '' WHERE user_id = ?",
+                (recovered_hp, user_id)
+            )
+
             await db.commit()
 
-        await ctx.send(f"💉 **Revival complete!** Your Emergency Revival Kit restored you to **{recovered_hp}/{max_hp} HP**.")
-
+        await ctx.send(
+            f"💉 **Revival complete!** Your Emergency Revival Kit restored you to "
+            f"**{recovered_hp}/{max_hp} HP**."
+        )
 async def setup(bot):
     await bot.add_cog(Exploration(bot))

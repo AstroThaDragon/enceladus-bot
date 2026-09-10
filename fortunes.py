@@ -3,6 +3,7 @@ import json
 import random
 import json
 import datetime
+import asyncio
 import pytz
 import aiosqlite
 import aiohttp
@@ -619,6 +620,25 @@ class Fortunes(commands.Cog):
 
     @commands.hybrid_command(name="fortune", description="Open your daily cosmic fortune cookie!")
     async def fortune(self, ctx):
+        user_id = ctx.author.id
+
+        # Reuse Exploration's per-user lock so /fortune cannot race
+        # against other economy/exploration operations for the same user.
+        exploration_cog = self.bot.get_cog("Exploration")
+
+        if exploration_cog is not None:
+            lock = exploration_cog._user_locks.setdefault(user_id, asyncio.Lock())
+        else:
+            # Fallback for unusual startup/test situations where Exploration
+            # has not loaded yet.
+            if not hasattr(self, "_user_locks"):
+                self._user_locks = {}
+            lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._fortune_impl(ctx)
+
+    async def _fortune_impl(self, ctx):
         user_id = ctx.author.id
 
         et_timezone = pytz.timezone("US/Eastern")

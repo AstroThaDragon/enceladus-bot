@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import aiosqlite
+import asyncio
 import time
 import json
 import random
@@ -69,11 +70,9 @@ class Inventory(commands.Cog):
         self.bot = bot
 
     def get_db_path(self):
-        """Use the same database as the rest of the economy system."""
-        leveling_cog = self.bot.get_cog("Leveling")
-        if leveling_cog and hasattr(leveling_cog, "db_path"):
-            return leveling_cog.db_path
-        return "levels.db"
+        """Return the separate Station economy database."""
+        from database import ECONOMY_DB_NAME
+        return ECONOMY_DB_NAME
 
     async def ensure_effect_schema(self, db):
         async with db.execute("PRAGMA table_info(users)") as cursor:
@@ -144,6 +143,27 @@ class Inventory(commands.Cog):
     @commands.hybrid_command(name="use", description="Use a consumable from your inventory.")
     async def use_item(self, ctx: commands.Context, item_id: str, target: str = None):
         await ctx.defer()
+
+        user_id = ctx.author.id
+
+        # Reuse Exploration's per-user lock so /use, /mine, and /scavenge
+        # cannot modify the same user's state simultaneously.
+        exploration_cog = self.bot.get_cog("Exploration")
+
+        if exploration_cog is not None:
+            lock = exploration_cog._user_locks.setdefault(user_id, asyncio.Lock())
+        else:
+            # Fallback for unusual startup/test situations where Exploration
+            # has not loaded yet.
+            if not hasattr(self, "_user_locks"):
+                self._user_locks = {}
+            lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+
+        async with lock:
+            return await self._use_item_impl(ctx, item_id, target)
+
+
+    async def _use_item_impl(self, ctx: commands.Context, item_id: str, target: str = None):
         user_id = ctx.author.id
         item_id = item_id.lower().strip()
         valid = {"fuel_stabilizer", "station_rations", "hazard_shield", "drone_battery", "lucky_scanner", "ore_magnet", "prototype_drill_bit", "time_warp_coupon", "salvage_insurance", "fate_anchor", "stardust_cache"}

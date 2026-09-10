@@ -1,6 +1,6 @@
 import os
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import aiosqlite
 import random
@@ -13,22 +13,110 @@ import aiohttp
 from PIL import Image
 
 class ResetConfirm(discord.ui.View):
-    def __init__(self, cog, member):
+    def __init__(self, cog, member, admin_id):
         super().__init__(timeout=30)
         self.cog = cog
         self.member = member
+        self.admin_id = admin_id
 
-    @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger)
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.admin_id:
+            await interaction.response.send_message(
+                "❌ This reset confirmation belongs to another administrator.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Confirm XP Reset", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         async with aiosqlite.connect(self.cog.db_path) as db:
-            await db.execute("DELETE FROM users WHERE user_id = ?", (self.member.id,))
+            await db.execute("""
+                UPDATE users
+                SET xp = 0,
+                    level = 0
+                WHERE user_id = ?
+            """, (self.member.id,))
             await db.commit()
-        await interaction.response.edit_message(content=f"♻️ **{self.member.name}** has been reset to Level 0.", view=None)
+
+        await self.cog._update_member_roles(self.member, 0)
+
+        await interaction.response.edit_message(
+            content=f"♻️ **{self.member.name}**'s XP and Level have been reset to 0.",
+            view=None
+        )
         self.stop()
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ Reset cancelled.", view=None)
+        await interaction.response.edit_message(
+            content="❌ Reset cancelled.",
+            view=None
+        )
+        self.stop()
+
+class FullResetConfirm(discord.ui.View):
+    def __init__(self, cog, member, admin_id):
+        super().__init__(timeout=30)
+        self.cog = cog
+        self.member = member
+        self.admin_id = admin_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.admin_id:
+            await interaction.response.send_message(
+                "❌ This reset confirmation belongs to another administrator.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="☢️ Confirm Full Wipe", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(self.cog.db_path) as db:
+            await db.execute("ATTACH DATABASE ? AS economy", (ECONOMY_DB_NAME,))
+
+            await db.execute(
+                "DELETE FROM economy.inventory WHERE user_id = ?",
+                (self.member.id,)
+            )
+
+            await db.execute(
+                "DELETE FROM economy.pets WHERE user_id = ?",
+                (self.member.id,)
+            )
+
+            await db.execute(
+                "DELETE FROM economy.users WHERE user_id = ?",
+                (self.member.id,)
+            )
+
+            await db.execute(
+                "DELETE FROM main.users WHERE user_id = ?",
+                (self.member.id,)
+            )
+
+            await db.commit()
+            await db.execute("DETACH DATABASE economy")
+
+        await interaction.response.edit_message(
+            content=(
+                f"☢️ **{self.member.name}**'s Enceladus account has been "
+                f"completely wiped.\n"
+                f"XP, Level, economy, profile data, inventory, and pets were deleted."
+            ),
+            view=None
+        )
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="❌ Full wipe cancelled.",
+            view=None
+        )
         self.stop()
 
 class LeaderboardView(discord.ui.View):
@@ -405,6 +493,13 @@ class Leveling(commands.Cog):
                              bg_url TEXT DEFAULT 'default')''')
 
             try:
+                await db.execute(
+                    "ALTER TABLE users ADD COLUMN left_at INTEGER DEFAULT NULL"
+                )
+            except:
+                pass
+
+            try:
                 await db.execute("ALTER TABLE users ADD COLUMN bar_color TEXT DEFAULT '#8a2be2'")
             except:
                 pass 
@@ -425,6 +520,11 @@ class Leveling(commands.Cog):
                 pass
                 
             await db.commit()
+
+        self.cleanup_departed_users.start()
+
+    def cog_unload(self):
+        self.cleanup_departed_users.cancel()
 
     def get_xp_for_level(self, level):
         if level <= 0: return 0
@@ -462,43 +562,144 @@ class Leveling(commands.Cog):
                 await member.remove_roles(*[r for r in roles_to_remove if r])
 
     async def add_xp(self, member: discord.Member, amount: int):
-        if member.bot: return
+        if member.bot:
+            return False, 0
 
         user_id = member.id
+
         async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                "SELECT xp, level FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
                 result = await cursor.fetchone()
 
             if result is None:
                 xp, level = amount, 0
-                await db.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
+
+                new_level = level
+                while xp >= self.get_xp_for_level(new_level + 1):
+                    new_level += 1
+
+                await db.execute(
+                    "INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)",
+                    (user_id, xp, new_level)
+                )
+
+                if new_level > 0:
+                    await self._update_member_roles(member, new_level)
+
+                await db.commit()
+                return new_level > 0, new_level
+
+            xp, level = result
+            new_xp = xp + amount
+
+            temp_level = level
+
+            while new_xp >= self.get_xp_for_level(temp_level + 1):
+                temp_level += 1
+
+            leveled_up = temp_level > level
+
+            if leveled_up:
+                await self._update_member_roles(member, temp_level)
+                await db.execute(
+                    "UPDATE users SET xp = ?, level = ? WHERE user_id = ?",
+                    (new_xp, temp_level, user_id)
+                )
             else:
-                xp, level = result
-                new_xp = xp + amount
-                
-                temp_level = level
-                while new_xp >= self.get_xp_for_level(temp_level + 1):
-                    temp_level += 1
-                
-                if temp_level > level:
-                    await self._update_member_roles(member, temp_level)
-                    await db.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, temp_level, user_id))
-                else:
-                    await db.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
-            
+                await db.execute(
+                    "UPDATE users SET xp = ? WHERE user_id = ?",
+                    (new_xp, user_id)
+                )
+
             await db.commit()
+
+            return leveled_up, temp_level
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        if member.bot: return
-        await self._update_member_roles(member, 0)
+        if member.bot:
+            return
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE users SET left_at = NULL WHERE user_id = ?",
+                (member.id,)
+            )
+            await db.commit()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT level FROM users WHERE user_id = ?",
+                (member.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            level = row[0] if row else 0
+
+        await self._update_member_roles(member, level)
+
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        if member.bot: return
+        if member.bot:
+            return
+
+        left_at = int(time.time())
+
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("DELETE FROM users WHERE user_id = ?", (member.id,))
+            await db.execute(
+                "UPDATE users SET left_at = ? WHERE user_id = ?",
+                (left_at, member.id)
+            )
             await db.commit()
+
+    @tasks.loop(hours=24)
+    async def cleanup_departed_users(self):
+        if not self.bot.is_ready():
+            return
+
+        cutoff = int(time.time()) - (14 * 24 * 60 * 60)
+
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("ATTACH DATABASE ? AS economy", (ECONOMY_DB_NAME,))
+
+            async with db.execute(
+                "SELECT user_id FROM main.users WHERE left_at IS NOT NULL AND left_at <= ?",
+                (cutoff,)
+            ) as cursor:
+                expired_users = await cursor.fetchall()
+
+            for (user_id,) in expired_users:
+                await db.execute(
+                    "DELETE FROM economy.inventory WHERE user_id = ?",
+                    (user_id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM economy.pets WHERE user_id = ?",
+                    (user_id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM economy.users WHERE user_id = ?",
+                    (user_id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM main.users WHERE user_id = ?",
+                    (user_id,)
+                )
+
+            await db.commit()
+            await db.execute("DETACH DATABASE economy")
+
+        if expired_users:
+            print(f"[Leveling] Cleaned up {len(expired_users)} departed user(s).")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -956,25 +1157,88 @@ class Leveling(commands.Cog):
     async def purge_left_members(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
+        from database import ECONOMY_DB_NAME
+
         async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute("SELECT user_id FROM users") as cursor:
+            await db.execute("ATTACH DATABASE ? AS economy", (ECONOMY_DB_NAME,))
+
+            async with db.execute("SELECT user_id FROM main.users") as cursor:
                 rows = await cursor.fetchall()
-            
+
             deleted_count = 0
+
             for row in rows:
                 user_id = row[0]
+
                 # Check if the member is still in the guild
                 if interaction.guild.get_member(user_id) is None:
-                    await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+                    await db.execute(
+                        "DELETE FROM economy.inventory WHERE user_id = ?",
+                        (user_id,)
+                    )
+
+                    await db.execute(
+                        "DELETE FROM economy.pets WHERE user_id = ?",
+                        (user_id,)
+                    )
+
+                    await db.execute(
+                        "DELETE FROM economy.users WHERE user_id = ?",
+                        (user_id,)
+                    )
+
+                    await db.execute(
+                        "DELETE FROM main.users WHERE user_id = ?",
+                        (user_id,)
+                    )
+
                     deleted_count += 1
+
             await db.commit()
+            await db.execute("DETACH DATABASE economy")
             
         await interaction.followup.send(f"✅ Cleaned up {deleted_count} former members from the database!", ephemeral=True)
 
-    @app_commands.command(name="reset", description="Wipe a user's XP and Level (Admin only)")
+    @commands.hybrid_command(name="reset", description="Reset a user's Enceladus data.")
     @commands.has_permissions(administrator=True)
-    async def reset(self, interaction: discord.Interaction, member: discord.Member):
-        await interaction.response.send_message(content=f"⚠️ Reset all data for **{member.mention}**?", view=ResetConfirm(self, member), ephemeral=True)
+    @app_commands.describe(
+        reset_type="Choose what data to reset.",
+        member="The member whose data you want to reset."
+    )
+    @app_commands.choices(reset_type=[
+        app_commands.Choice(name="all", value="all"),
+        app_commands.Choice(name="xp", value="xp")
+    ])
+    async def reset(
+        self,
+        ctx: commands.Context,
+        reset_type: app_commands.Choice[str],
+        member: discord.Member
+    ):
+        if reset_type.value == "xp":
+            await ctx.send(
+                content=(
+                    f"⚠️ Reset **XP and Level only** for {member.mention}?\n"
+                    f"💰 Stardust, inventory, pets, profile data, and other progress "
+                    f"will remain untouched."
+                ),
+                view=ResetConfirm(self, member, ctx.author.id),
+                ephemeral=True
+            )
+
+        elif reset_type.value == "all":
+            await ctx.send(
+                content=(
+                    f"☢️ **DANGER — COMPLETE ACCOUNT WIPE**\n\n"
+                    f"This will permanently delete **ALL Enceladus data** for "
+                    f"{member.mention}, including XP, Level, Stardust, profile data, "
+                    f"inventory, and pets. This is a **dangerous** operation and "
+                    f"**irreversible!**\n\n"
+                    f"Are you ***absolutely*** sure?"
+                ),
+                view=FullResetConfirm(self, member, ctx.author.id),
+                ephemeral=True
+            )
 
     @app_commands.command(name="font_preview_setup", description="Sends the interactive font preview dropdown (Admin only)")
     @commands.has_permissions(administrator=True)

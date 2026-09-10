@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import sqlite3
+import aiosqlite
 import random
 from datetime import datetime
 import pytz
@@ -120,54 +120,55 @@ class Economy(commands.Cog):
         return generator.sample(list(self.ROTATING_ITEMS), k=3)
 
     def get_db_path(self):
-        """Fetches active database path from Leveling cog or defaults to levels.db."""
-        leveling_cog = self.bot.get_cog("Leveling")
-        if leveling_cog and hasattr(leveling_cog, "db_path"):
-            return leveling_cog.db_path
-        return "levels.db"
+        """Return the separate Station economy database."""
+        from database import ECONOMY_DB_NAME
+        return ECONOMY_DB_NAME
 
-    def ensure_schema(self, cursor):
-        cursor.execute("PRAGMA table_info(users)")
-        existing_columns = {row[1] for row in cursor.fetchall()}
+    async def ensure_schema(self, db):
+        async with db.execute("PRAGMA table_info(users)") as cursor:
+            rows = await cursor.fetchall()
+
+        existing_columns = {row[1] for row in rows}
 
         if "time_crystals" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN time_crystals INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN time_crystals INTEGER DEFAULT 0"
+            )
+
         if "tc_uses_this_month" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN tc_uses_this_month INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN tc_uses_this_month INTEGER DEFAULT 0"
+            )
+
         if "tc_last_used_month" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN tc_last_used_month TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN tc_last_used_month TEXT DEFAULT ''"
+            )
 
-        # Snapshot column for legacy level bonus
+        # Legacy payout column
         if "legacy_payout" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN legacy_payout INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN legacy_payout INTEGER DEFAULT 0"
+            )
 
-            # ONE-TIME SNAPSHOT: Lock in payouts for existing users right now based on current levels
-            cursor.execute("SELECT user_id, level FROM users")
-            existing_users = cursor.fetchall()
-
-            for u_id, u_level in existing_users:
-                lvl = u_level or 0
-                payout = 0
-                if lvl >= 70: payout = 25000
-                elif lvl >= 60: payout = 18000
-                elif lvl >= 50: payout = 12000
-                elif lvl >= 40: payout = 8000
-                elif lvl >= 30: payout = 5000
-                elif lvl >= 20: payout = 3000
-                elif lvl >= 15: payout = 2000
-                elif lvl >= 10: payout = 1200
-                elif lvl >= 5: payout = 500
-
-                if payout > 0:
-                    cursor.execute("UPDATE users SET legacy_payout = ? WHERE user_id = ?", (payout, u_id))
+        # Legacy payouts are initialized to 0 in the new economy database.
+        # No snapshot migration is needed because this Station database
+        # starts fresh and leveling data remains in levels.db.
 
         if "hp" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN hp INTEGER DEFAULT 100")
-        if "max_hp" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN max_hp INTEGER DEFAULT 100")
-        if "knocked_out_until" not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN knocked_out_until TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN hp INTEGER DEFAULT 100"
+            )
 
+        if "max_hp" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN max_hp INTEGER DEFAULT 100"
+            )
+
+        if "knocked_out_until" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN knocked_out_until TEXT DEFAULT ''"
+            )
     @commands.hybrid_group(name="shop", description="Browse and trade at the Enceladus Station Trading Post.")
     async def shop(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
@@ -199,6 +200,7 @@ class Economy(commands.Cog):
             await ctx.send(embed=embed)
 
     @shop.command(name="rotating", description="View today's three shared rotating-shop offers.")
+    @commands.has_permissions(administrator=True)
     async def rotating(self, ctx: commands.Context):
         rotation = self.daily_rotation()
         embed = discord.Embed(
@@ -235,191 +237,354 @@ class Economy(commands.Cog):
         item_id = item_id.lower()
 
         rotating_item = self.ROTATING_ITEMS.get(item_id)
+
         if item_id not in self.SHOP_ITEMS and not rotating_item:
-            return await ctx.send("❌ Invalid item ID! Check available items using `/shop`.")
+            return await ctx.send(
+                "❌ Invalid item ID! Check available items using `/shop`."
+            )
 
         if rotating_item and item_id not in self.daily_rotation():
-            return await ctx.send("⏳ That item is not in today's rotating market. Check `/shop rotating` for the current offers.")
+            return await ctx.send(
+                "⏳ That item is not in today's rotating market. "
+                "Check `/shop rotating` for the current offers."
+            )
 
         item = self.SHOP_ITEMS.get(item_id, rotating_item)
         cost = item["cost"]
 
         db_path = self.get_db_path()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
 
-        self.ensure_schema(cursor)
+        async with aiosqlite.connect(db_path) as db:
+            # Run schema/migration work before starting the purchase transaction.
+            await self.ensure_schema(db)
+            await db.commit()
 
-        # Check user's stardust balance and current health state.
-        cursor.execute("SELECT stardust, mining_charges, hp, max_hp FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
+            # Lock the database for the entire purchase transaction.
+            # This prevents two simultaneous purchases from spending
+            # the same Stardust balance.
+            await db.execute("BEGIN IMMEDIATE")
 
-        if not row:
-            conn.close()
-            return await ctx.send("❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!")
+            # Check user's Stardust balance and current health state.
+            async with db.execute(
+                "SELECT stardust, mining_charges, hp, max_hp "
+                "FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
 
-        stardust, charges, hp, max_hp = row
+            if not row:
+                await db.rollback()
+                return await ctx.send(
+                    "❌ You don't have an active station profile yet. "
+                    "Run `/profile` or `/mine` first!"
+                )
 
-        if stardust < cost:
-            conn.close()
-            return await ctx.send(f"💸 **Insufficient Stardust!** You have `{stardust}` Stardust, but this item costs `{cost}`.")
+            stardust, charges, hp, max_hp = row
 
-        # Process purchase based on item type
-        new_stardust = stardust - cost
+            if stardust < cost:
+                await db.rollback()
+                return await ctx.send(
+                    f"💸 **Insufficient Stardust!** You have `{stardust}` "
+                    f"Stardust, but this item costs `{cost}`."
+                )
 
-        if rotating_item:
-            cursor.execute("""
-                INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                VALUES (?, ?, 'consumable', 1)
-                ON CONFLICT(user_id, item_id) DO UPDATE SET
-                    item_type = excluded.item_type,
-                    quantity = quantity + 1
-            """, (user_id, item_id))
-            cursor.execute("UPDATE users SET stardust = ? WHERE user_id = ?", (new_stardust, user_id))
-            conn.commit()
-            conn.close()
-            return await ctx.send(f"🔄 **Rotating-market purchase complete!** Added **{item['name']}** to your inventory for **{cost:,} Stardust**.")
+            # Process purchase based on item type.
+            new_stardust = stardust - cost
 
-        if item["type"] == "revive":
-            if (hp or 0) > 0:
-                conn.close()
-                return await ctx.send("⚠️ You are conscious already—save a full revival for when you are knocked out.")
+            if rotating_item:
+                await db.execute(
+                    """
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'consumable', 1)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET
+                        item_type = excluded.item_type,
+                        quantity = quantity + 1
+                    """,
+                    (user_id, item_id)
+                )
 
-            cursor.execute(
-                "UPDATE users SET stardust = ?, hp = ?, knocked_out_until = '' WHERE user_id = ?",
-                (new_stardust, max_hp or 100, user_id),
-            )
-            conn.commit()
-            conn.close()
-            return await ctx.send(f"⚕️ **Full Revival Complete!** You are back on your feet with **{max_hp or 100}/{max_hp or 100} HP**.")
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
 
-        if item["type"] == "consumable" and item_id == "fuel_refill":
-            if charges >= 5:
-                conn.close()
-                return await ctx.send("⚠️ Your mining laser fuel charges are already full (`5/5`)!")
-            
-            cursor.execute("UPDATE users SET stardust = ?, mining_charges = 5 WHERE user_id = ?", (new_stardust, user_id))
-            conn.commit()
-            conn.close()
-            return await ctx.send(f"⚡ **Purchase Successful!** Refilled your mining laser charges back to `5/5` for `{cost}` Stardust.")
+                await db.commit()
 
-        elif item["type"] == "consumable" and item_id == "pet_snack":
-            cursor.execute("""
-                INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                VALUES (?, ?, 'consumable', 1)
-                ON CONFLICT(user_id, item_id) DO UPDATE SET
-                    item_type = excluded.item_type,
-                    quantity = quantity + 1
-            """, (user_id, item_id))
-            cursor.execute("UPDATE users SET stardust = ? WHERE user_id = ?", (new_stardust, user_id))
-            conn.commit()
-            conn.close()
-            return await ctx.send(f"🧬 **Purchase Successful!** Added a Cosmic Bio-Feed to your inventory for `{cost}` Stardust.")
+                return await ctx.send(
+                    f"🔄 **Rotating-market purchase complete!** "
+                    f"Added **{item['name']}** to your inventory for "
+                    f"**{cost:,} Stardust**."
+                )
 
-        elif item_id == "time_crystal":
-            self.ensure_schema(cursor)
-            cursor.execute("""
-                UPDATE users 
-                SET stardust = ?, 
-                    time_crystals = COALESCE(time_crystals, 0) + 1 
-                WHERE user_id = ?
-            """, (new_stardust, user_id))
-            conn.commit()
-            conn.close()
-            
-            return await ctx.send(
-                f"💎 **Purchase Successful!** You bought a **Dilated Time Crystal** for **{cost:,} Stardust**!\n"
-                f"If you miss a fortune streak, run `/usecrystal` to repair it."
-            )
+            if item["type"] == "revive":
+                if (hp or 0) > 0:
+                    await db.rollback()
+                    return await ctx.send(
+                        "⚠️ You are conscious already—save a full revival "
+                        "for when you are knocked out."
+                    )
 
-        elif item["type"] == "background_voucher":
-            cursor.execute("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id))
-            if cursor.fetchone():
-                conn.close()
-                return await ctx.send("⚠️ You already own this background voucher!")
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET stardust = ?, hp = ?, knocked_out_until = ''
+                    WHERE user_id = ?
+                    """,
+                    (new_stardust, max_hp or 100, user_id)
+                )
 
-            cursor.execute("""
-                INSERT INTO inventory (user_id, item_id, item_type) 
-                VALUES (?, ?, 'background_voucher')
-            """, (user_id, item_id))
-            cursor.execute("UPDATE users SET stardust = ? WHERE user_id = ?", (new_stardust, user_id))
-            conn.commit()
-            conn.close()
-            return await ctx.send(f"🌟 **Purchase Successful!** Unlocked background voucher `{item_id}` for `{cost}` Stardust!")
+                await db.commit()
 
-        elif item["type"] == "heal":
-            # Item key format: medkit -> inventory column medkits / nanite_patch -> nanite_patches
-            col_name = f"{item_id}s"
-            
-            # Ensure inventory column exists dynamically
-            cursor.execute("PRAGMA table_info(users)")
-            existing_cols = {row[1] for row in cursor.fetchall()}
-            if col_name not in existing_cols:
-                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} INTEGER DEFAULT 0")
+                return await ctx.send(
+                    f"⚕️ **Full Revival Complete!** You are back on your feet "
+                    f"with **{max_hp or 100}/{max_hp or 100} HP**."
+                )
 
-            cursor.execute(f"""
-                UPDATE users 
-                SET stardust = ?, 
-                    {col_name} = COALESCE({col_name}, 0) + 1 
-                WHERE user_id = ?
-            """, (new_stardust, user_id))
-            conn.commit()
-            conn.close()
+            if item["type"] == "consumable" and item_id == "fuel_refill":
+                if charges >= 5:
+                    await db.rollback()
+                    return await ctx.send(
+                        "⚠️ Your mining laser fuel charges are already full (`5/5`)!"
+                    )
 
-            return await ctx.send(f"✅ **Purchased!** You bought **1x {item['name']}** for **{cost:,} Stardust**!")
+                await db.execute(
+                    "UPDATE users SET stardust = ?, mining_charges = 5 "
+                    "WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
 
-        conn.close()
+                await db.commit()
+
+                return await ctx.send(
+                    f"⚡ **Purchase Successful!** Refilled your mining laser "
+                    f"charges back to `5/5` for `{cost}` Stardust."
+                )
+
+            if item["type"] == "consumable" and item_id == "pet_snack":
+                await db.execute(
+                    """
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'consumable', 1)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET
+                        item_type = excluded.item_type,
+                        quantity = quantity + 1
+                    """,
+                    (user_id, item_id)
+                )
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"🧬 **Purchase Successful!** Added a Cosmic Bio-Feed "
+                    f"to your inventory for `{cost}` Stardust."
+                )
+
+            if item_id == "time_crystal":
+                # Schema is already ensured before the transaction.
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET stardust = ?,
+                        time_crystals = COALESCE(time_crystals, 0) + 1
+                    WHERE user_id = ?
+                    """,
+                    (new_stardust, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"💎 **Purchase Successful!** You bought a "
+                    f"**Dilated Time Crystal** for **{cost:,} Stardust**!\n"
+                    f"If you miss a fortune streak, run `/usecrystal` to repair it."
+                )
+
+            if item["type"] == "background_voucher":
+                async with db.execute(
+                    "SELECT 1 FROM inventory "
+                    "WHERE user_id = ? AND item_id = ?",
+                    (user_id, item_id)
+                ) as cursor:
+                    already_owned = await cursor.fetchone()
+
+                if already_owned:
+                    await db.rollback()
+                    return await ctx.send(
+                        "⚠️ You already own this background voucher!"
+                    )
+
+                await db.execute(
+                    """
+                    INSERT INTO inventory
+                        (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'background_voucher', 1)
+                    """,
+                    (user_id, item_id)
+                )
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"🌟 **Purchase Successful!** Unlocked background "
+                    f"voucher `{item_id}` for `{cost}` Stardust!"
+                )
+
+            if item["type"] == "heal":
+                # Item key format:
+                # medkit -> medkits
+                # nanite_patch -> nanite_patchs
+                col_name = f"{item_id}s"
+
+                # Ensure inventory column exists dynamically.
+                async with db.execute("PRAGMA table_info(users)") as cursor:
+                    rows = await cursor.fetchall()
+
+                existing_cols = {row[1] for row in rows}
+
+                if col_name not in existing_cols:
+                    await db.execute(
+                        f"ALTER TABLE users ADD COLUMN "
+                        f"{col_name} INTEGER DEFAULT 0"
+                    )
+
+                await db.execute(
+                    f"""
+                    UPDATE users
+                    SET stardust = ?,
+                        {col_name} = COALESCE({col_name}, 0) + 1
+                    WHERE user_id = ?
+                    """,
+                    (new_stardust, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"✅ **Purchased!** You bought **1x {item['name']}** "
+                    f"for **{cost:,} Stardust**!"
+                )
+
+            await db.rollback()
+
         await ctx.send("❌ An error occurred processing your transaction.")
 
     @shop.command(name="sell", description="Sell salvaged space junk from your inventory for Stardust.")
     @app_commands.describe(item="The junk item ID to sell, or 'all' to sell every piece of space junk.")
     async def sell(self, ctx: commands.Context, item: str):
         await ctx.defer()
+
         user_id = ctx.author.id
         target_item = item.lower().strip()
-
         db_path = self.get_db_path()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
 
-        # Option A: Sell ALL space junk
-        if target_item == "all":
-            cursor.execute("SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_type = 'space_junk'", (user_id,))
-            junk_rows = cursor.fetchall()
+        async with aiosqlite.connect(db_path) as db:
+            # Ensure any required schema exists before the transaction.
+            await self.ensure_schema(db)
+            await db.commit()
 
-            if not junk_rows:
-                conn.close()
-                return await ctx.send("🎒 **Inventory Empty!** You don't have any space junk to sell.")
+            # Serialize the entire sale so two simultaneous sales cannot
+            # both spend the same inventory quantity.
+            await db.execute("BEGIN IMMEDIATE")
 
-            total_payout = sum(self.JUNK_PRICES.get(row[0], 25) * (row[1] or 1) for row in junk_rows)
-            item_count = sum(row[1] or 1 for row in junk_rows)
+            # Option A: Sell ALL space junk
+            if target_item == "all":
+                async with db.execute(
+                    "SELECT item_id, quantity "
+                    "FROM inventory "
+                    "WHERE user_id = ? AND item_type = 'space_junk'",
+                    (user_id,)
+                ) as cursor:
+                    junk_rows = await cursor.fetchall()
 
-            cursor.execute("DELETE FROM inventory WHERE user_id = ? AND item_type = 'space_junk'", (user_id,))
-            cursor.execute("UPDATE users SET stardust = stardust + ? WHERE user_id = ?", (total_payout, user_id))
-            conn.commit()
-            conn.close()
+                if not junk_rows:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🎒 **Inventory Empty!** You don't have any space junk to sell."
+                    )
 
-            return await ctx.send(f"🛍️ **Salvage Vendor:** Sold **{item_count} items** for a total of ✨ **{total_payout:,} Stardust**!")
+                total_payout = sum(
+                    self.JUNK_PRICES.get(row[0], 25) * (row[1] or 1)
+                    for row in junk_rows
+                )
+                item_count = sum(
+                    row[1] or 1
+                    for row in junk_rows
+                )
 
-        # Option B: Sell a SINGLE specific junk item
-        cursor.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'", (user_id, target_item))
-        row = cursor.fetchone()
+                await db.execute(
+                    "DELETE FROM inventory "
+                    "WHERE user_id = ? AND item_type = 'space_junk'",
+                    (user_id,)
+                )
 
-        if not row:
-            conn.close()
-            return await ctx.send(f"❌ You don't have `{target_item}` in your space junk inventory!")
+                await db.execute(
+                    "UPDATE users "
+                    "SET stardust = stardust + ? "
+                    "WHERE user_id = ?",
+                    (total_payout, user_id)
+                )
 
-        payout = self.JUNK_PRICES.get(target_item, 25)
+                await db.commit()
 
-        if (row[0] or 1) > 1:
-            cursor.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?", (user_id, target_item))
-        else:
-            cursor.execute("DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'", (user_id, target_item))
-        cursor.execute("UPDATE users SET stardust = stardust + ? WHERE user_id = ?", (payout, user_id))
-        conn.commit()
-        conn.close()
+                return await ctx.send(
+                    f"🛍️ **Salvage Vendor:** Sold **{item_count} items** "
+                    f"for a total of ✨ **{total_payout:,} Stardust**!"
+                )
 
-        await ctx.send(f"🛍️ **Salvage Vendor:** Sold `{target_item}` for ✨ **{payout} Stardust**!")
+            # Option B: Sell a SINGLE specific junk item
+            async with db.execute(
+                "SELECT quantity "
+                "FROM inventory "
+                "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                (user_id, target_item)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row:
+                await db.rollback()
+                return await ctx.send(
+                    f"❌ You don't have `{target_item}` in your space junk inventory!"
+                )
+
+            payout = self.JUNK_PRICES.get(target_item, 25)
+
+            if (row[0] or 1) > 1:
+                await db.execute(
+                    "UPDATE inventory "
+                    "SET quantity = quantity - 1 "
+                    "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                    (user_id, target_item)
+                )
+            else:
+                await db.execute(
+                    "DELETE FROM inventory "
+                    "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                    (user_id, target_item)
+                )
+
+            await db.execute(
+                "UPDATE users "
+                "SET stardust = stardust + ? "
+                "WHERE user_id = ?",
+                (payout, user_id)
+            )
+
+            await db.commit()
+
+        await ctx.send(
+            f"🛍️ **Salvage Vendor:** Sold `{target_item}` "
+            f"for ✨ **{payout} Stardust**!"
+        )
 
     @commands.hybrid_command(name="item", description="Inspect an item from the station database to check its properties.")
     async def item_lookup(self, ctx: commands.Context, item_id: str):
@@ -439,50 +604,69 @@ class Economy(commands.Cog):
         embed.set_footer(text=f"System Item ID: {item_id}")
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="claimlegacy", description="Claim your one-time Stardust snapshot payout from before the Shop & Exploration update!")
+    @commands.hybrid_command(
+        name="claimlegacy",
+        description="Claim your one-time Stardust snapshot payout from before the Shop & Exploration update!"
+    )
     async def claim_legacy_bonus(self, ctx: commands.Context):
         await ctx.defer()
+
         user_id = ctx.author.id
-
         db_path = self.get_db_path()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
 
-        self.ensure_schema(cursor)
-        conn.commit()
+        async with aiosqlite.connect(db_path) as db:
+            # Ensure the legacy payout column and migration exist.
+            await self.ensure_schema(db)
+            await db.commit()
 
-        cursor.execute("""
-            SELECT stardust, legacy_payout 
-            FROM users WHERE user_id = ?
-        """, (user_id,))
-        row = cursor.fetchone()
+            # Lock the transaction so two simultaneous /claimlegacy
+            # commands cannot both redeem the same payout.
+            await db.execute("BEGIN IMMEDIATE")
 
-        if not row:
-            conn.close()
-            return await ctx.send("❌ You don't have an active profile!")
+            async with db.execute(
+                """
+                SELECT stardust, legacy_payout
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
 
-        current_stardust, legacy_payout = row[0] or 0, row[1] or 0
+            if not row:
+                await db.rollback()
+                return await ctx.send(
+                    "❌ You don't have an active profile!"
+                )
 
-        if legacy_payout <= 0:
-            conn.close()
-            return await ctx.send("⚠️ **Not Eligible or Already Claimed!** Either you weren't Level 5+ when the update snapshot was taken, or you've already redeemed your legacy payout.")
+            current_stardust = row[0] or 0
+            legacy_payout = row[1] or 0
 
-        new_stardust = current_stardust + legacy_payout
+            if legacy_payout <= 0:
+                await db.rollback()
+                return await ctx.send(
+                    "⚠️ **Not Eligible or Already Claimed!** "
+                    "Either you weren't Level 5+ when the update snapshot "
+                    "was taken, or you've already redeemed your legacy payout."
+                )
 
-        # Clear the snapshot payout so it can never be claimed again
-        cursor.execute("""
-            UPDATE users
-            SET stardust = ?,
-                legacy_payout = 0
-            WHERE user_id = ?
-        """, (new_stardust, user_id))
+            # Add the snapshot payout and clear it in the same transaction.
+            await db.execute(
+                """
+                UPDATE users
+                SET stardust = ?,
+                    legacy_payout = 0
+                WHERE user_id = ?
+                """,
+                (current_stardust + legacy_payout, user_id)
+            )
 
-        conn.commit()
-        conn.close()
+            await db.commit()
 
         await ctx.send(
             f"🎉 **Legacy Snapshot Claimed!**\n"
-            f"Thanks for being a server veteran! Your pre-update level snapshot rewarded you with ✨ **{legacy_payout:,} Stardust**!"
+            f"Thanks for being a server veteran! Your pre-update level "
+            f"snapshot rewarded you with ✨ **{legacy_payout:,} Stardust**!"
         )
 
 async def setup(bot):
