@@ -23,7 +23,7 @@ class Admin(commands.Cog):
         command="Choose an administrative action.",
         member="The member to modify.",
         streak="The fortune streak to set.",
-        amount="The XP amount to set."
+        amount="The XP amount to set.",
         level="The level to set.",
         reset_type="Choose what data to reset."
     )
