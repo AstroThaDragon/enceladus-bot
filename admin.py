@@ -4,7 +4,7 @@ import datetime
 import pytz
 from discord import app_commands
 from discord.ext import commands
-from leveling import ResetConfirm, FullResetConfirm, FontView
+from leveling import FontView
 from moderation import VerifyView
 from verification import VerificationPanelView
 
@@ -351,37 +351,174 @@ class ResetTypeSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if self.values[0] == "xp":
+        if interaction.user.id != self.admin_user_id:
+            await interaction.response.send_message(
+                "❌ This reset panel belongs to another administrator.",
+                ephemeral=True
+            )
+            return
+
+        reset_type = self.values[0]
+
+        if reset_type == "xp":
             await interaction.response.send_message(
                 content=(
-                    f"⚠️ Reset **XP and Level only** for {self.member.mention}?\n"
-                    f"💰 Stardust, inventory, pets, profile data, and other progress "
-                    f"will remain untouched."
+                    f"⚠️ Reset **XP and Level only** for "
+                    f"{self.member.mention}?\n\n"
+                    f"💰 Stardust, inventory, pets, profile data, and "
+                    f"other progress will remain untouched."
                 ),
-                view=ResetConfirm(
+                view=ResetConfirmationView(
                     self.admin_cog,
                     self.member,
-                    self.admin_user_id
+                    self.admin_user_id,
+                    "xp"
                 ),
                 ephemeral=True
             )
+
         else:
             await interaction.response.send_message(
                 content=(
                     f"☢️ **DANGER — COMPLETE ACCOUNT WIPE**\n\n"
-                    f"This will permanently delete **ALL Enceladus data** for "
-                    f"{self.member.mention}, including XP, Level, Stardust, profile data, "
-                    f"inventory, and pets. This is a **dangerous** operation and "
-                    f"**irreversible!**\n\n"
+                    f"This will permanently delete **ALL Enceladus data** "
+                    f"for {self.member.mention}, including XP, Level, "
+                    f"Stardust, profile data, inventory, and pets.\n\n"
+                    f"This is a **dangerous** operation and **irreversible!**\n\n"
                     f"Are you ***absolutely*** sure?"
                 ),
-                view=FullResetConfirm(
+                view=ResetConfirmationView(
                     self.admin_cog,
                     self.member,
-                    self.admin_user_id
+                    self.admin_user_id,
+                    "all"
                 ),
                 ephemeral=True
             )
+
+class ResetConfirmationView(discord.ui.View):
+    def __init__(self, admin_cog, member, admin_user_id, reset_type):
+        super().__init__(timeout=30)
+        self.admin_cog = admin_cog
+        self.member = member
+        self.admin_user_id = admin_user_id
+        self.reset_type = reset_type
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.admin_user_id:
+            await interaction.response.send_message(
+                "❌ This reset confirmation belongs to another administrator.",
+                ephemeral=True
+            )
+            return False
+
+        return True
+
+    @discord.ui.button(
+        label="Confirm Reset",
+        style=discord.ButtonStyle.danger
+    )
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        # Acknowledge the interaction immediately.
+        await interaction.response.defer()
+
+        leveling_cog = self.admin_cog.bot.get_cog("Leveling")
+
+        if leveling_cog is None:
+            await interaction.edit_original_response(
+                content="❌ The leveling system is currently unavailable.",
+                view=None
+            )
+            return
+
+        if self.reset_type == "xp":
+            async with aiosqlite.connect(leveling_cog.db_path) as db:
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET xp = 0,
+                        level = 0
+                    WHERE user_id = ?
+                    """,
+                    (self.member.id,)
+                )
+                await db.commit()
+
+            await leveling_cog._update_member_roles(
+                self.member,
+                0
+            )
+
+            await interaction.edit_original_response(
+                content=(
+                    f"♻️ **{self.member.name}**'s XP and Level "
+                    f"have been reset to 0."
+                ),
+                view=None
+            )
+
+        else:
+            from database import ECONOMY_DB_NAME
+
+            async with aiosqlite.connect(leveling_cog.db_path) as db:
+                await db.execute(
+                    "ATTACH DATABASE ? AS economy",
+                    (ECONOMY_DB_NAME,)
+                )
+
+                await db.execute(
+                    "DELETE FROM economy.inventory WHERE user_id = ?",
+                    (self.member.id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM economy.pets WHERE user_id = ?",
+                    (self.member.id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM economy.users WHERE user_id = ?",
+                    (self.member.id,)
+                )
+
+                await db.execute(
+                    "DELETE FROM main.users WHERE user_id = ?",
+                    (self.member.id,)
+                )
+
+                await db.commit()
+                await db.execute("DETACH DATABASE economy")
+
+            await interaction.edit_original_response(
+                content=(
+                    f"☢️ **{self.member.name}**'s Enceladus account "
+                    f"has been completely wiped.\n"
+                    f"XP, Level, economy, profile data, inventory, "
+                    f"and pets were deleted."
+                ),
+                view=None
+            )
+
+        self.stop()
+
+    @discord.ui.button(
+        label="Cancel",
+        style=discord.ButtonStyle.secondary
+    )
+    async def cancel(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.edit_message(
+            content="❌ Reset cancelled.",
+            view=None
+        )
+        self.stop()
 
 
 class ResetTypeView(discord.ui.View):
