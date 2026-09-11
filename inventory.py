@@ -16,6 +16,7 @@ ITEM_REGISTRY = {
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": "🩹", "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
     "medkit": {"name": "Field Trauma Medkit", "emoji": "🧰", "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
+    "full_revive": {"name": "Emergency Full Revival", "emoji": "⚕️", "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
     "revive_kit": {"name": "Emergency Revival Kit", "emoji": "💉", "type": "Consumable", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
     "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": "🛢️", "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
     "station_rations": {"name": "Station Rations", "emoji": "🥫", "type": "Consumable", "desc": "Restores 15 HP."},
@@ -109,8 +110,13 @@ class Inventory(commands.Cog):
         choices = []
 
         # Allow the user to remove their currently equipped title.
-        if not current or "none" in "none":
-            choices.append(app_commands.Choice(name="❌ Unequip current title", value="none"))
+        if not current or "none" in current:
+            choices.append(
+                app_commands.Choice(
+                    name="❌ Unequip current title",
+                    value="none"
+                )
+            )
 
         for (item_id,) in rows:
             # Convert IDs such as title_outer_rim_wanderer
@@ -249,10 +255,13 @@ class Inventory(commands.Cog):
         # Format and append items tracked in the users table
         for item_id, count in user_items:
             item_info = ITEM_REGISTRY.get(item_id)
+            if not item_info:
+                continue
+
             cat = item_info.get("type", "Consumable")
             if cat not in categories:
                 categories[cat] = []
-            categories[cat].append(f"{item_info['emoji']} **{item_info['name']}** (x{count})\n└ *{item_info['desc']}* (`{item_id}`)")
+            categories[cat].append(f"{item_info['emoji']} **{item_info['name']}** (x{count})\n└ *{item_info['desc']}*")
 
         # Format and append items tracked in the inventory table
         for item_id, item_type, quantity in inv_rows:
@@ -260,7 +269,7 @@ class Inventory(commands.Cog):
             cat = item_info.get("type", "Space Junk")
             if cat not in categories:
                 categories[cat] = []
-            categories[cat].append(f"{item_info['emoji']} **{item_info['name']}** (x{quantity or 1})\n└ *{item_info['desc']}* (`{item_id}`)")
+            categories[cat].append(f"{item_info['emoji']} **{item_info['name']}** (x{quantity or 1})\n└ *{item_info['desc']}*")
 
         for cat_name, items in categories.items():
             if items:
@@ -269,7 +278,76 @@ class Inventory(commands.Cog):
         embed.set_footer(text="Tip: Sell your unwanted salvage at the trading post using /shop sell <item_id>")
         await ctx.send(embed=embed)
 
+    async def use_item_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show items the user owns that can currently be used."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+
+        # Items that /use currently supports.
+        usable_items = {
+            "full_revive",
+            "fuel_refill",
+            "fuel_stabilizer",
+            "station_rations",
+            "hazard_shield",
+            "drone_battery",
+            "lucky_scanner",
+            "ore_magnet",
+            "prototype_drill_bit",
+            "time_warp_coupon",
+            "salvage_insurance",
+            "fate_anchor",
+            "stardust_cache",
+        }
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ?
+                  AND quantity > 0
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+
+        for item_id, quantity in rows:
+            if item_id not in usable_items:
+                continue
+
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+
+            display_name = info["name"]
+
+            if current and current not in display_name.lower():
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{info['emoji']} {display_name} (x{quantity})",
+                    value=item_id
+                )
+            )
+
+        choices.sort(key=lambda choice: choice.name.lower())
+
+        return choices[:25]
+
     @commands.hybrid_command(name="use", description="Use a consumable from your inventory.")
+    @app_commands.describe(
+        item_id="Choose an item from your inventory.",
+        target="Only needed for Time Warp Coupon: mine or scavenge."
+    )
+    @app_commands.autocomplete(item_id=use_item_autocomplete)
     async def use_item(self, ctx: commands.Context, item_id: str, target: str = None):
         await ctx.defer()
 
@@ -295,7 +373,7 @@ class Inventory(commands.Cog):
     async def _use_item_impl(self, ctx: commands.Context, item_id: str, target: str = None):
         user_id = ctx.author.id
         item_id = item_id.lower().strip()
-        valid = {"fuel_stabilizer", "station_rations", "hazard_shield", "drone_battery", "lucky_scanner", "ore_magnet", "prototype_drill_bit", "time_warp_coupon", "salvage_insurance", "fate_anchor", "stardust_cache"}
+        valid = {"full_revive", "fuel_refill", "fuel_stabilizer", "station_rations", "hazard_shield", "drone_battery", "lucky_scanner", "ore_magnet", "prototype_drill_bit", "time_warp_coupon", "salvage_insurance", "fate_anchor", "stardust_cache"}
         if item_id not in valid:
             return await ctx.send("❌ That item cannot be used here. Use `/revive` for an Emergency Revival Kit.")
 
@@ -313,6 +391,26 @@ class Inventory(commands.Cog):
             hp, max_hp, mining, scavenging, last_mined, last_scavenged, effects_raw = user
             effects = json.loads(effects_raw or "{}")
             message = ""
+
+            if item_id == "full_revive":
+                if (hp or 0) > 0:
+                    return await ctx.send("⚠️ You are conscious already! Save a full revival for when you are knocked out.")
+                hp = max_hp or 100
+                await db.execute(
+                    "UPDATE users SET hp = ?, knocked_out_until = '' WHERE user_id = ?",
+                    (hp, user_id)
+                )
+                message = f"⚕️ **Full revival complete!** You are back on your feet with **{hp}/{hp} HP**."
+
+            if item_id == "fuel_refill":
+                if (mining or 0) >= 10:
+                    return await ctx.send("⚠️ Your mining laser fuel charges are already full (`10/10`)!")
+                mining = 10
+                await db.execute(
+                    "UPDATE users SET mining_charges = ? WHERE user_id = ?",
+                    (mining, user_id)
+                )
+                message = "⚡ **Fuel Cell Used!** Your mining laser is refilled to `10/10` charges."
 
             if item_id == "station_rations":
                 if (hp or 0) <= 0: return await ctx.send("💀 Rations cannot revive an unconscious explorer.")

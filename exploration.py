@@ -13,7 +13,7 @@ class Exploration(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._user_locks = {}
-        self.COOLDOWN_SECONDS = 4 * 3600  # 4-hour cooldown
+        self.COOLDOWN_SECONDS = 30 * 60  # 30-minute cooldown
         self.SCAVENGE_HAZARDS = [
             # Minor hazards are common: funny setbacks, small damage.
             ("tripped over a strategically placed space wrench", 5, 10, 18),
@@ -244,12 +244,12 @@ class Exploration(commands.Cog):
             if not row:
                 await db.execute("""
                     INSERT OR IGNORE INTO users (user_id, mining_charges, last_mined, stardust)
-                    VALUES (?, 5, 0, 0)
+                    VALUES (?, 10, 0, 0)
                 """, (user_id,))
-                charges, last_mined, stardust, hp, knocked_out_until, effects_raw = 5, 0, 0, 100, "", "{}"
+                charges, last_mined, stardust, hp, knocked_out_until, effects_raw = 10, 0, 0, 100, "", "{}"
             else:
                 charges, last_mined, stardust, hp, knocked_out_until, effects_raw = (
-                    row[0] if row[0] is not None else 5,
+                    row[0] if row[0] is not None else 10,
                     row[1] or 0,
                     row[2] or 0,
                     row[3] if row[3] is not None else 100,
@@ -263,8 +263,8 @@ class Exploration(commands.Cog):
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
 
             elapsed = current_time - last_mined
-            if charges < 5 and elapsed >= self.COOLDOWN_SECONDS:
-                charges = min(5, charges + int(elapsed // self.COOLDOWN_SECONDS))
+            if charges < 10 and elapsed >= self.COOLDOWN_SECONDS:
+                charges = min(10, charges + int(elapsed // self.COOLDOWN_SECONDS))
             if elapsed < self.COOLDOWN_SECONDS:
                 remaining = int(self.COOLDOWN_SECONDS - elapsed)
                 hours = remaining // 3600
@@ -278,7 +278,7 @@ class Exploration(commands.Cog):
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
             new_charges = charges if effects.pop("fuel_stabilizer", False) else charges - 1
             
-            found_stardust = random.randint(40, 100)
+            found_stardust = random.randint(35, 85)
             if effects.pop("prototype_drill_bit", False):
                 found_stardust = int(found_stardust * 1.5)
             new_stardust = stardust + found_stardust
@@ -362,7 +362,7 @@ class Exploration(commands.Cog):
             description=f"Laser beam fired into the sector debris field...\n\n{loot_description}",
             color=colors.get(rarity_badge, discord.Color.blue())
         )
-        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/5 • Cooldown: 4h")
+        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
         
         await ctx.send(embed=embed)
 
@@ -393,12 +393,12 @@ class Exploration(commands.Cog):
             if not row:
                 await db.execute("""
                     INSERT OR IGNORE INTO users (user_id, scavenge_charges, last_scavenged, stardust, hp, max_hp) 
-                    VALUES (?, 5, 0, 0, 100, 100)
+                    VALUES (?, 10, 0, 0, 100, 100)
                 """, (user_id,))
                 await db.commit()
-                charges, last_scavenged, stardust, hp, max_hp, knocked_out_until, effects_raw = 5, 0, 0, 100, 100, "", "{}"
+                charges, last_scavenged, stardust, hp, max_hp, knocked_out_until, effects_raw = 10, 0, 0, 100, 100, "", "{}"
             else:
-                charges = row[0] if row[0] is not None else 5
+                charges = row[0] if row[0] is not None else 10
                 last_scavenged = row[1] if row[1] is not None else 0
                 stardust = row[2] if row[2] is not None else 0
                 hp = row[3] if row[3] is not None else 100
@@ -408,8 +408,8 @@ class Exploration(commands.Cog):
             effects = json.loads(effects_raw)
 
             elapsed = current_time - last_scavenged
-            if charges < 5 and elapsed >= self.COOLDOWN_SECONDS:
-                charges = min(5, charges + int(elapsed // self.COOLDOWN_SECONDS))
+            if charges < 10 and elapsed >= self.COOLDOWN_SECONDS:
+                charges = min(10, charges + int(elapsed // self.COOLDOWN_SECONDS))
 
             # Health Knockout Check
             if hp <= 0:
@@ -461,7 +461,7 @@ class Exploration(commands.Cog):
                 item_id, item_name = random.choice(list(junk_items.items()))
                 item_type = "space_junk"
             new_charges = charges - 1
-            found_stardust = random.randint(15, 50)
+            found_stardust = random.randint(15, 35)
             new_stardust = stardust + found_stardust
 
             # 30% Environmental Hazard Chance during Scavenging.
@@ -510,7 +510,7 @@ class Exploration(commands.Cog):
             description=f"Scavenge drone deployed into abandoned sector wreckage...\n\n✨ **Scrap Stardust:** `{found_stardust}`\n🛸 **Salvaged Item:** `{item_name}`{hazard_note}\n\n{status_text}",
             color=discord.Color.dark_gold()
         )
-        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/5 • Cooldown: 4h")
+        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
 
         await ctx.send(embed=embed)
 

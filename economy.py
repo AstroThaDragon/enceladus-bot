@@ -3,6 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 import aiosqlite
 import random
+import datetime
+import time
 from datetime import datetime
 import pytz
 
@@ -172,30 +174,37 @@ class Economy(commands.Cog):
             await db.execute(
                 "ALTER TABLE users ADD COLUMN knocked_out_until TEXT DEFAULT ''"
             )
+
+        if "last_chat_reward" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN last_chat_reward REAL DEFAULT 0"
+            )
+
+        
     @commands.hybrid_group(name="shop", description="Browse and trade at the Enceladus Station Trading Post.")
     async def shop(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             embed = discord.Embed(
                 title="🛒 Enceladus Station Trading Post",
-                description="Use `/shop buy <item_id>` to purchase items, or `/shop sell <item>` to turn in salvaged junk for Stardust.",
+                description="Use `/shop buy` to purchase items, or `/shop sell` to turn in salvaged junk for Stardust.",
                 color=discord.Color.from_rgb(0, 229, 255)
             )
 
             for item_id, details in self.SHOP_ITEMS.items():
                 embed.add_field(
-                    name=f"{details['name']} (`{item_id}`)",
+                    name=details["name"],
                     value=f"💰 Price: **{details['cost']} Stardust**\n📖 {details['desc']}",
                     inline=False
                 )
 
             rotation = self.daily_rotation()
             rotating_text = "\n".join(
-                f"{self.ROTATING_ITEMS[item_id]['name']} (`{item_id}`) — **{self.ROTATING_ITEMS[item_id]['cost']} Stardust**"
+                f"{self.ROTATING_ITEMS[item_id]['name']} — **{self.ROTATING_ITEMS[item_id]['cost']} Stardust**"
                 for item_id in rotation
             )
             embed.add_field(
                 name=f"🔄 Daily Rotating Offers — {self.rotation_date()}",
-                value=f"Use `/shop rotating` for descriptions and `/shop buy <item_id>` to purchase.\n{rotating_text}",
+                value=f"Use `/shop rotating` for descriptions and `/shop buy` to purchase.\n{rotating_text}",
                 inline=False,
             )
 
@@ -203,7 +212,6 @@ class Economy(commands.Cog):
             await ctx.send(embed=embed)
 
     @shop.command(name="rotating", description="View today's three shared rotating-shop offers.")
-    @commands.has_permissions(administrator=True)
     async def rotating(self, ctx: commands.Context):
         rotation = self.daily_rotation()
         embed = discord.Embed(
@@ -214,7 +222,7 @@ class Economy(commands.Cog):
         for item_id in rotation:
             item = self.ROTATING_ITEMS[item_id]
             embed.add_field(
-                name=f"{item['name']} (`{item_id}`)",
+                name=item["name"],
                 value=f"💰 **{item['cost']} Stardust**\n{item['desc']}",
                 inline=False,
             )
@@ -224,20 +232,73 @@ class Economy(commands.Cog):
     async def browse(self, ctx: commands.Context):
         embed = discord.Embed(
             title="🛒 Enceladus Station Trading Post",
-            description="Use `/shop buy <item_id>` to purchase items, or `/shop sell <item>` to sell salvage.",
+            description="Use `/shop buy` to purchase items., or `/shop sell` to sell salvage.",
             color=discord.Color.from_rgb(0, 229, 255),
         )
         for item_id, details in self.SHOP_ITEMS.items():
-            embed.add_field(name=f"{details['name']} (`{item_id}`)", value=f"💰 **{details['cost']} Stardust**\n{details['desc']}", inline=False)
+            embed.add_field(name=details["name"], value=f"💰 **{details['cost']} Stardust**\n{details['desc']}", inline=False)
         embed.set_footer(text="Use /shop rotating to view today's temporary offers.")
         await ctx.send(embed=embed)
 
+    async def shop_buy_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show items currently available in the station shop."""
+        current = current.lower().strip()
+
+        available_items = []
+
+        # Permanent shop items.
+        for item_id, info in self.SHOP_ITEMS.items():
+            display_name = info["name"]
+
+            if current and current not in display_name.lower():
+                continue
+
+            available_items.append(
+                app_commands.Choice(
+                    name=display_name,
+                    value=item_id
+                )
+            )
+
+        # Today's rotating items.
+        for item_id in self.daily_rotation():
+            info = self.ROTATING_ITEMS.get(item_id)
+            if not info:
+                continue
+
+            display_name = info["name"]
+
+            if current and current not in display_name.lower():
+                continue
+
+            available_items.append(
+                app_commands.Choice(
+                    name=display_name,
+                    value=item_id
+                )
+            )
+
+        available_items.sort(key=lambda choice: choice.name.lower())
+
+        return available_items[:25]
+
     @shop.command(name="buy", description="Purchase an item from the station vendor catalog.")
-    @app_commands.describe(item_id="The ID code of the item to buy")
-    async def buy(self, ctx: commands.Context, item_id: str):
+    @app_commands.describe(
+        item_id="Choose an item to purchase.",
+        quantity="How many would you like to buy? (1-99)"
+    )
+    @app_commands.autocomplete(item_id=shop_buy_autocomplete)
+    async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
         await ctx.defer()
         user_id = ctx.author.id
         item_id = item_id.lower()
+
+        if quantity < 1 or quantity > 99:
+            return await ctx.send("❌ Quantity must be between **1 and 99**.")
 
         rotating_item = self.ROTATING_ITEMS.get(item_id)
 
@@ -252,8 +313,13 @@ class Economy(commands.Cog):
                 "Check `/shop rotating` for the current offers."
             )
 
-        item = self.SHOP_ITEMS.get(item_id, rotating_item)
-        cost = item["cost"]
+        item = self.SHOP_ITEMS.get(item_id) or rotating_item
+
+        if item is None:
+            return await ctx.send("❌ That item could not be loaded from the shop catalog.")
+
+        unit_cost = item["cost"]
+        cost = unit_cost * quantity
 
         db_path = self.get_db_path()
 
@@ -315,12 +381,12 @@ class Economy(commands.Cog):
                 await db.execute(
                     """
                     INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, ?, 1)
+                    VALUES (?, ?, 'consumable', ?)
                     ON CONFLICT(user_id, item_id) DO UPDATE SET
                         item_type = excluded.item_type,
-                        quantity = quantity + 1
+                        quantity = quantity + excluded.quantity
                     """,
-                    (user_id, item_id, item_type)
+                    (user_id, item_id, item_type, quantity)
                 )
 
                 await db.execute(
@@ -337,65 +403,21 @@ class Economy(commands.Cog):
                     )
 
                 return await ctx.send(
-                    f"🔄 **Rotating-market purchase complete!** "
-                    f"Added **{item['name']}** to your inventory for "
-                    f"**{cost:,} Stardust**."
+                    f"🔄 **Purchase Successful!** Added **{quantity}x "
+                    f"{item['name']}** to your inventory for "
+                    f"**{cost:,} Stardust**!"
                 )
 
             if item["type"] == "revive":
-                if (hp or 0) > 0:
-                    await db.rollback()
-                    return await ctx.send(
-                        "⚠️ You are conscious already—save a full revival "
-                        "for when you are knocked out."
-                    )
-
-                await db.execute(
-                    """
-                    UPDATE users
-                    SET stardust = ?, hp = ?, knocked_out_until = ''
-                    WHERE user_id = ?
-                    """,
-                    (new_stardust, max_hp or 100, user_id)
-                )
-
-                await db.commit()
-
-                return await ctx.send(
-                    f"⚕️ **Full Revival Complete!** You are back on your feet "
-                    f"with **{max_hp or 100}/{max_hp or 100} HP**."
-                )
-
-            if item["type"] == "consumable" and item_id == "fuel_refill":
-                if charges >= 5:
-                    await db.rollback()
-                    return await ctx.send(
-                        "⚠️ Your mining laser fuel charges are already full (`5/5`)!"
-                    )
-
-                await db.execute(
-                    "UPDATE users SET stardust = ?, mining_charges = 5 "
-                    "WHERE user_id = ?",
-                    (new_stardust, user_id)
-                )
-
-                await db.commit()
-
-                return await ctx.send(
-                    f"⚡ **Purchase Successful!** Refilled your mining laser "
-                    f"charges back to `5/5` for `{cost}` Stardust."
-                )
-
-            if item["type"] == "consumable" and item_id == "pet_snack":
                 await db.execute(
                     """
                     INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', 1)
+                    VALUES (?, ?, 'consumable', ?)
                     ON CONFLICT(user_id, item_id) DO UPDATE SET
                         item_type = excluded.item_type,
-                        quantity = quantity + 1
+                        quantity = quantity + excluded.quantity
                     """,
-                    (user_id, item_id)
+                    (user_id, item_id, quantity)
                 )
 
                 await db.execute(
@@ -406,28 +428,78 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🧬 **Purchase Successful!** Added a Cosmic Bio-Feed "
-                    f"to your inventory for `{cost}` Stardust."
+                    f"⚕️ **Purchase Successful!** Added **{quantity}x "
+                    f"{item['name']}** to your inventory for "
+                    f"**{cost:,} Stardust**!"
                 )
 
-            if item_id == "time_crystal":
-                # Schema is already ensured before the transaction.
+            if item["type"] == "consumable" and item_id == "fuel_refill":
                 await db.execute(
                     """
-                    UPDATE users
-                    SET stardust = ?,
-                        time_crystals = COALESCE(time_crystals, 0) + 1
-                    WHERE user_id = ?
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'consumable', ?)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET
+                        item_type = excluded.item_type,
+                        quantity = quantity + excluded.quantity
                     """,
+                    (user_id, item_id, quantity)
+                )
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
                     (new_stardust, user_id)
                 )
 
                 await db.commit()
 
                 return await ctx.send(
-                    f"💎 **Purchase Successful!** You bought a "
-                    f"**Dilated Time Crystal** for **{cost:,} Stardust**!\n"
-                    f"If you miss a fortune streak, run `/usecrystal` to repair it."
+                    f"⚡ **Purchase Successful!** Added **{quantity}x "
+                    f"{item['name']}** to your inventory for "
+                    f"**{cost:,} Stardust**!"
+                )
+
+            if item["type"] == "consumable" and item_id == "pet_snack":
+                await db.execute(
+                    """
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'consumable', ?)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET
+                        item_type = excluded.item_type,
+                        quantity = quantity + excluded.quantity
+                    """,
+                    (user_id, item_id, quantity)
+                )
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"🧬 **Purchase Successful!** Added **{quantity}x {item['name']}** "
+                    f"to your inventory for **{cost:,} Stardust**!"
+                )
+            if item_id == "time_crystal":
+                # Schema is already ensured before the transaction.
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET stardust = ?,
+                        time_crystals = COALESCE(time_crystals, 0) + ?
+                    WHERE user_id = ?
+                    """,
+                    (new_stardust, quantity, user_id)
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"💎 **Purchase Successful!** Added **{quantity}x "
+                    f"{item['name']}** to your inventory for "
+                    f"**{cost:,} Stardust**!\n"
+                    f"If you miss a fortune streak, use `/usecrystal` to repair it."
                 )
 
             if item["type"] == "background_voucher":
@@ -461,8 +533,8 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🌟 **Purchase Successful!** Unlocked background "
-                    f"voucher `{item_id}` for `{cost}` Stardust!"
+                    f"🌟 **Purchase Successful!** Unlocked "
+                    f"**{item['name']}** for **{cost:,} Stardust**!"
                 )
 
             if item["type"] == "heal":
@@ -487,25 +559,85 @@ class Economy(commands.Cog):
                     f"""
                     UPDATE users
                     SET stardust = ?,
-                        {col_name} = COALESCE({col_name}, 0) + 1
+                        {col_name} = COALESCE({col_name}, 0) + ?
                     WHERE user_id = ?
                     """,
-                    (new_stardust, user_id)
+                    (new_stardust, quantity, user_id)
                 )
 
                 await db.commit()
 
                 return await ctx.send(
-                    f"✅ **Purchased!** You bought **1x {item['name']}** "
-                    f"for **{cost:,} Stardust**!"
+                    f"🛒 **Purchase Successful!** Added **{quantity}x {item['name']}** "
+                    f"to your inventory for **{cost:,} Stardust**!"
                 )
 
             await db.rollback()
 
         await ctx.send("❌ An error occurred processing your transaction.")
 
+    async def shop_sell_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show space junk the user currently owns and can sell."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+
+        from inventory import ITEM_REGISTRY
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ?
+                  AND item_type = 'space_junk'
+                  AND quantity > 0
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+
+        # Always offer the option to sell all junk.
+        if not current or "sell all" in current:
+            choices.append(
+                app_commands.Choice(
+                    name="🗑️ Sell All Space Junk",
+                    value="all"
+                )
+            )
+
+        for item_id, quantity in rows:
+            if item_id not in self.JUNK_PRICES:
+                continue
+
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+
+            display_name = info["name"]
+
+            if current and current not in display_name.lower():
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{info['emoji']} {display_name} (x{quantity})",
+                    value=item_id
+                )
+            )
+
+        choices.sort(key=lambda choice: choice.name.lower())
+
+        return choices[:25]
+
     @shop.command(name="sell", description="Sell salvaged space junk from your inventory for Stardust.")
-    @app_commands.describe(item="The junk item ID to sell, or 'all' to sell every piece of space junk.")
+    @app_commands.describe(item="Choose the space junk you want to sell.")
+    @app_commands.autocomplete(item=shop_sell_autocomplete)
     async def sell(self, ctx: commands.Context, item: str):
         await ctx.defer()
 
@@ -527,7 +659,7 @@ class Economy(commands.Cog):
                 async with db.execute(
                     "SELECT item_id, quantity "
                     "FROM inventory "
-                    "WHERE user_id = ? AND item_type = 'space_junk'",
+                    "WHERE user_id = ? AND item_type = 'space_junk' AND quantity > 0",
                     (user_id,)
                 ) as cursor:
                     junk_rows = await cursor.fetchall()
@@ -569,42 +701,32 @@ class Economy(commands.Cog):
 
             # Option B: Sell a SINGLE specific junk item
             async with db.execute(
-                "SELECT quantity "
-                "FROM inventory "
-                "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
                 (user_id, target_item)
             ) as cursor:
                 row = await cursor.fetchone()
 
-            if not row:
-                await db.rollback()
-                return await ctx.send(
-                    f"❌ You don't have `{target_item}` in your space junk inventory!"
-                )
+            if not row or (row[0] or 0) <= 0:
+                return await ctx.send(f"❌ You don't have `{target_item}` in your space junk inventory!")
 
             payout = self.JUNK_PRICES.get(target_item, 25)
+            new_quantity = (row[0] or 0) - 1
 
-            if (row[0] or 1) > 1:
+            if new_quantity > 0:
                 await db.execute(
-                    "UPDATE inventory "
-                    "SET quantity = quantity - 1 "
-                    "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
-                    (user_id, target_item)
+                    "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                    (new_quantity, user_id, target_item)
                 )
             else:
                 await db.execute(
-                    "DELETE FROM inventory "
-                    "WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
                     (user_id, target_item)
                 )
 
             await db.execute(
-                "UPDATE users "
-                "SET stardust = stardust + ? "
-                "WHERE user_id = ?",
+                "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
                 (payout, user_id)
             )
-
             await db.commit()
 
         await ctx.send(
@@ -612,13 +734,172 @@ class Economy(commands.Cog):
             f"for ✨ **{payout} Stardust**!"
         )
 
-    @commands.hybrid_command(name="item", description="Inspect an item from the station database to check its properties.")
-    async def item_lookup(self, ctx: commands.Context, item_id: str):
-        item_id = item_id.lower()
+    async def item_category_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show the available item catalog categories."""
+        categories = [
+            ("❤️ Healing", "healing"),
+            ("🛠️ Upgrades", "upgrades"),
+            ("🎒 Consumables", "consumables"),
+            ("🐾 Pet Items", "pet_items"),
+            ("✨ Special", "special"),
+            ("🗑️ Space Junk A–M", "junk_am"),
+            ("🗑️ Space Junk N–Z", "junk_nz"),
+            ("💎 Minerals", "minerals"),
+            ("🏷️ Titles", "titles"),
+            ("🖼️ Backgrounds", "backgrounds"),
+            ("🎟️ Vouchers", "vouchers"),
+            ("🪙 Currency", "currency"),
+        ]
+
+        current = current.lower().strip()
+
+        choices = [
+            app_commands.Choice(name=name, value=value)
+            for name, value in categories
+            if not current or current in name.lower()
+        ]
+
+        return choices[:25]
+
+
+    async def item_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show items belonging to the selected catalog category."""
+        from inventory import ITEM_REGISTRY
+
+        category = interaction.namespace.category
+        current = current.lower().strip()
+
+        category_map = {
+            "healing": {
+                "nanite_patch",
+                "medkit",
+                "full_revive",
+                "revive_kit",
+            },
+            "upgrades": {
+                "fuel_stabilizer",
+                "hazard_shield",
+                "drone_battery",
+                "lucky_scanner",
+                "ore_magnet",
+                "prototype_drill_bit",
+                "time_warp_coupon",
+                "salvage_insurance",
+                "fate_anchor",
+                "stardust_cache",
+            },
+            "consumables": {
+                "fuel_refill",
+            },
+            "pet_items": {
+                "pet_snack",
+            },
+            "special": {
+                "time_crystal",
+            },
+            "junk_am": {
+                "space_pizza",
+                "floppy_disk",
+                "meteorite",
+                "rubber_duck",
+                "rusty_gear",
+                "tape_deck",
+                "alien_artifact",
+                "space_boot",
+                "cosmic_coin",
+                "holo_poster",
+                "broken_laser",
+                "lost_logbook",
+                "left_sock",
+            },
+            "junk_nz": {
+                "warp_mug",
+                "space_pudding",
+                "tangled_cables",
+                "screaming_crystal",
+                "moon_cheese",
+                "alien_spatula",
+                "parking_ticket",
+                "floating_plant",
+                "tinted_visor",
+                "purring_lint",
+                "pet_rock",
+                "haunted_circuit",
+                "space_taco",
+            },
+            "minerals": {
+                "titanium_chunk",
+            },
+            "titles": {
+                "title_outer_rim_wanderer",
+                "title_starborn",
+                "title_voidfarer",
+            },
+            "backgrounds": {
+                "neon_grid",
+                "deep_void",
+                "solaris_ring",
+            },
+            "vouchers": {
+                "neon_grid",
+                "deep_void",
+                "solaris_ring",
+            },
+            "currency": {
+                "arcade_token",
+            },
+        }
+
+        allowed_items = category_map.get(category, set())
+
+        choices = []
+
+        for item_id in allowed_items:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+
+            display_name = info["name"]
+
+            if current and current not in display_name.lower():
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=display_name,
+                    value=item_id
+                )
+            )
+
+        choices.sort(key=lambda choice: choice.name.lower())
+
+        return choices[:25]
+
+    @commands.hybrid_command(name="item", description="Inspect an item from the station catalog.")
+    @app_commands.describe(
+        category="Choose an item category.",
+        item="Choose an item to inspect."
+    )
+    @app_commands.autocomplete(
+        category=item_category_autocomplete,
+        item=item_autocomplete
+    )
+    async def item_lookup(self, ctx: commands.Context, category: str, item: str):
+        item_id = item.lower()
         from inventory import ITEM_REGISTRY
 
         if item_id not in ITEM_REGISTRY:
-            return await ctx.send(f"❌ Unknown item code `'{item_id}'`. Check the `/shop` or your `/inventory` for valid item IDs.")
+            return await ctx.send(
+                "❌ I couldn't find that item. Please choose an item from the dropdown."
+            )
 
         info = ITEM_REGISTRY[item_id]
         
@@ -627,7 +908,7 @@ class Economy(commands.Cog):
             description=f"**Category:** {info['type']}\n**Description:** {info['desc']}",
             color=discord.Color.from_rgb(120, 140, 160)
         )
-        embed.set_footer(text=f"System Item ID: {item_id}")
+        embed.set_footer(text="Enceladus Station Catalog")
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -694,6 +975,54 @@ class Economy(commands.Cog):
             f"Thanks for being a server veteran! Your pre-update level "
             f"snapshot rewarded you with ✨ **{legacy_payout:,} Stardust**!"
         )
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.bot or message.guild is None:
+            return
+
+        user_id = message.author.id
+        now = time.time()
+        reward = random.randint(10, 25)
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            await self.ensure_schema(db)
+            await db.commit()
+            await db.execute("BEGIN IMMEDIATE")
+
+            async with db.execute(
+                "SELECT last_chat_reward FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row:
+                await db.execute(
+                    """
+                    INSERT INTO users (user_id, stardust, last_chat_reward)
+                    VALUES (?, ?, ?)
+                    """,
+                    (user_id, reward, now)
+                )
+                await db.commit()
+                return
+
+            last_reward = row[0] or 0
+
+            if now - last_reward < 120:
+                await db.rollback()
+                return
+
+            await db.execute(
+                """
+                UPDATE users
+                SET stardust = COALESCE(stardust, 0) + ?,
+                    last_chat_reward = ?
+                WHERE user_id = ?
+                """,
+                (reward, now, user_id)
+            )
+            await db.commit()
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))

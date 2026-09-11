@@ -223,7 +223,8 @@ class Profile(commands.Cog):
 
         await ctx.send(
             f"📜 **Bio updated!**\n"
-            f"> {text}"
+            f"> {text}",
+            ephemeral=True
         )
 
     @commands.hybrid_command(
@@ -277,14 +278,72 @@ class Profile(commands.Cog):
             f"Reason: {reason}"
         )
 
+    async def background_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show the default background and backgrounds the user owns."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+
+        backgrounds = {
+            "default": "Default Nebula",
+            "neon_grid": "Cyberpunk Neon Grid",
+            "deep_void": "Deep Void Galaxy",
+            "solaris_ring": "Solaris Ring System",
+        }
+
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            async with db.execute(
+                """
+                SELECT item_id
+                FROM inventory
+                WHERE user_id = ?
+                  AND item_type = 'background_voucher'
+                  AND quantity > 0
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        owned_backgrounds = {"default"}
+
+        for (item_id,) in rows:
+            if item_id in backgrounds:
+                owned_backgrounds.add(item_id)
+
+        choices = []
+
+        for item_id in owned_backgrounds:
+            display_name = backgrounds[item_id]
+
+            if current and current not in display_name.lower():
+                continue
+
+            emoji = {
+                "default": "🌌",
+                "neon_grid": "🌆",
+                "deep_void": "🌌",
+                "solaris_ring": "💫",
+            }.get(item_id, "🖼️")
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{emoji} {display_name}",
+                    value=item_id
+                )
+            )
+
+        choices.sort(key=lambda choice: choice.name.lower())
+
+        return choices[:25]
+
     @commands.hybrid_command(name="background", description="Equip an unlocked background voucher for your profile card.")
-    @app_commands.describe(background_id="The background style code to equip")
-    @app_commands.choices(background_id=[
-        app_commands.Choice(name="Default Nebula", value="default"),
-        app_commands.Choice(name="Cyberpunk Neon Grid", value="neon_grid"),
-        app_commands.Choice(name="Deep Void Galaxy", value="deep_void"),
-        app_commands.Choice(name="Solaris Ring System", value="solaris_ring")
-    ])
+    @app_commands.describe(background_id="Choose a background for your profile card.")
+    @app_commands.autocomplete(background_id=background_autocomplete)
     async def background(self, ctx: commands.Context, background_id: str):
         await ctx.defer()
         user_id = ctx.author.id
@@ -297,6 +356,11 @@ class Profile(commands.Cog):
             "solaris_ring": "Solaris Ring System"
         }
 
+        if background_id not in valid_backgrounds:
+            return await ctx.send(
+                "❌ That background isn't available. Please choose one from the dropdown."
+            )
+
         from database import ECONOMY_DB_NAME
         db_path = ECONOMY_DB_NAME
 
@@ -307,7 +371,7 @@ class Profile(commands.Cog):
             if background_id != "default":
                 try:
                     async with db.execute(
-                        "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?",
+                        "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'background_voucher' AND quantity > 0",
                         (user_id, background_id)
                     ) as cursor:
                         has_item = await cursor.fetchone()

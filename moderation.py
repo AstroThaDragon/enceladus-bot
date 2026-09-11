@@ -7,6 +7,10 @@ import asyncio
 import aiosqlite
 from datetime import datetime, timedelta, timezone
 
+SPOILER_REQUIRED_CHANNELS = {
+    1519740977865162772 # selfies channel
+}
+
 MIN_ACCOUNT_AGE_DAYS = 30
 
 VERIFY_CHANNEL_ID = 1296962529989361685
@@ -294,6 +298,41 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+
+        # Enforce spoilered images and videos in designated channels.
+        if message.author.bot:
+            return
+
+        if message.channel.id in SPOILER_REQUIRED_CHANNELS:
+            has_unspoilered_media = any(
+                attachment.content_type
+                and (
+                    attachment.content_type.startswith("image/")
+                    or attachment.content_type.startswith("video/")
+                )
+                and not attachment.is_spoiler()
+                for attachment in message.attachments
+            )
+
+            if has_unspoilered_media:
+                try:
+                    await message.delete()
+                except (discord.Forbidden, discord.NotFound):
+                    return
+
+                try:
+                    await message.channel.send(
+                        f"⚠️ {message.author.mention}, your message was removed "
+                        f"because images and videos in this channel must be marked "
+                        f"as spoilers.\n"
+                        f"Please repost the photo/video with Discord's spoiler "
+                        f"option enabled.",
+                        delete_after=30
+                    )
+                except discord.Forbidden:
+                    pass
+
+                return
 
         if (
             message.channel.id != VERIFY_CHANNEL_ID
