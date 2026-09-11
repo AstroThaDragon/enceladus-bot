@@ -4,7 +4,9 @@ import datetime
 import pytz
 from discord import app_commands
 from discord.ext import commands
-from leveling import ResetConfirm, FullResetConfirm
+from leveling import ResetConfirm, FullResetConfirm, FontView
+from moderation import VerifyView
+from verification import VerificationPanelView
 
 
 class Admin(commands.Cog):
@@ -58,6 +60,18 @@ class Admin(commands.Cog):
             app_commands.Choice(
             name="♻️ Reset",
             value="reset"
+            ),
+            app_commands.Choice(
+            name="🖼️ Font Preview Setup",
+            value="font_preview_setup"
+            ),
+            app_commands.Choice(
+            name="🔒 Send Verify Panel",
+            value="sendverifypanel"
+            ),
+            app_commands.Choice(
+            name="🔞 Send NSFW Verification Panel",
+            value="sendverificationpanel"
             ),
         ]
     )
@@ -442,6 +456,95 @@ class Admin(commands.Cog):
                     view=FullResetConfirm(self, member, interaction.user.id),
                     ephemeral=True
                 )
+
+        elif command.value == "font_preview_setup":
+            leveling_cog = self.bot.get_cog("Leveling")
+
+            if leveling_cog is None:
+                return await interaction.response.send_message(
+                    "❌ The leveling system is currently unavailable.",
+                    ephemeral=True
+                )
+
+            embed = discord.Embed(
+                title="Rank Card Font Previewer! 🌠",
+                description=(
+                    "Use the dropdown menu below to test out any of our custom "
+                    "fonts available! It will generate a private preview card "
+                    "just for you so you can see how your name and levels look "
+                    "before choosing."
+                ),
+                color=discord.Color.purple()
+            )
+
+            await interaction.channel.send(
+                embed=embed,
+                view=FontView(leveling_cog)
+            )
+
+            await interaction.response.send_message(
+                "✅ Font preview menu deployed!",
+                ephemeral=True
+            )
+
+        elif command.value == "sendverifypanel":
+            moderation_cog = self.bot.get_cog("Moderation")
+
+            if moderation_cog is None:
+                return await interaction.response.send_message(
+                    "❌ The moderation system is currently unavailable.",
+                    ephemeral=True
+                )
+
+            embed = discord.Embed(
+                title="🔒 Server Verification",
+                description=(
+                    "To gain access to The Cosmic Lair, click the button below.\n\n"
+                    "I, Enceladus, will DM you a code. Return here and type "
+                    "`-verifycode <YOUR-CODE>` to verify."
+                ),
+                color=discord.Color.blurple()
+            )
+
+            await interaction.channel.send(
+                embed=embed,
+                view=VerifyView(moderation_cog)
+            )
+
+            await interaction.response.send_message(
+                "✅ Server verification panel deployed!",
+                ephemeral=True
+            )
+
+        elif command.value == "sendverificationpanel":
+            verification_cog = self.bot.get_cog("Verification")
+
+            if verification_cog is None:
+                return await interaction.response.send_message(
+                    "❌ The verification system is currently unavailable.",
+                    ephemeral=True
+                )
+
+            embed = discord.Embed(
+                title="🔞 Verification Center",
+                description=(
+                    "Select the type of verification you want below.\n\n"
+                    "Verification is manually reviewed by staff.\n"
+                    "Please follow all instructions carefully!\n\n"
+                    "**Please note: You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.**"
+                ),
+                color=discord.Color.red()
+            )
+
+            await interaction.channel.send(
+                embed=embed,
+                view=VerificationPanelView(verification_cog)
+            )
+
+            await interaction.response.send_message(
+                "✅ NSFW verification panel deployed!",
+                ephemeral=True
+            )
 
 
 async def setup(bot):
