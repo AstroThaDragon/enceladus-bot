@@ -290,12 +290,13 @@ class PingView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         pings = [
-            ("Announcements", 1117441565657419787, "📢"), ("Bump Reminder", 1295212860720418887, "🔔"),
-            ("Welcome Ping", 1295670300674883646, "👋"), ("Giveaways", 1295670387501436970, "🎁"),
-            ("Events", 1158309071187882034, "🎭"), ("Partnerships", 1306077625428611082, "🤝"),
-            ("Stream Alerts", 1307275275431841802, "📺"), ("Astro Content Alerts", 1440168122639454380, "🐲"),
-            ("Fact of the Day", 1473410135161573416, "💡"), ("Question of the Day", 1473410588557185209, "❓"),
-            ("Poll Alerts", 1496356983320743946, "🗳️"), ("Daily Fortune Ping", 1503642487586029568, "🥠")
+            ("Announcements", 1117441565657419787, "📢"), ("Enceladus Updates", 1547571649891540992, "🛰️"),
+            ("Bump Reminder", 1295212860720418887, "🔔"), ("Welcome Ping", 1295670300674883646, "👋"),
+            ("Giveaways", 1295670387501436970, "🎁"), ("Events", 1158309071187882034, "🎭"),
+            ("Partnerships", 1306077625428611082, "🤝"), ("Stream Alerts", 1307275275431841802, "📺"),
+            ("Astro Content Alerts", 1440168122639454380, "🐲"), ("Fact of the Day", 1473410135161573416, "💡"),
+            ("Question of the Day", 1473410588557185209, "❓"), ("Poll Alerts", 1496356983320743946, "🗳️"),
+            ("Daily Fortune Ping", 1503642487586029568, "🥠")
         ]
         for label, rid, emo in pings:
             self.add_item(RoleButton(label, rid, emo))
@@ -397,7 +398,7 @@ class RoleCog(commands.Cog):
         emb_spec = discord.Embed(title="🐾 OC Species", description="Choose your primary fursona species.", color=0x6a0dad)
         await interaction.channel.send(embed=emb_spec, view=SpeciesSelectView())
 
-        # 4. Post Sexuality
+        # 4. Post Sexualities
         emb_sex = discord.Embed(title="🌈 Orientation", description="Select your orientation.", color=0x6a0dad)
         await interaction.channel.send(embed=emb_sex, view=SexualityView())
 
@@ -458,6 +459,42 @@ class RoleCog(commands.Cog):
 
         await interaction.response.send_message(
             "Platform role panel updated!",
+            ephemeral=True
+        )
+
+    @app_commands.command(name="edit_ping_roles", description="Updates the existing ping role panel")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def edit_ping_roles(self, interaction: discord.Interaction):
+        CHANNEL_ID = 927536823746580570
+        MESSAGE_ID = 1530787956405829873
+
+        channel = interaction.guild.get_channel(CHANNEL_ID)
+
+        if channel is None:
+            return await interaction.response.send_message(
+            "Could not find the channel!",
+            ephemeral=True
+        )
+
+        try:
+            message = await channel.fetch_message(MESSAGE_ID)
+
+        except Exception as e:
+            return await interaction.response.send_message(
+                f"Failed to fetch message: {e}",
+                ephemeral=True
+            )
+
+        emb_ping = discord.Embed(
+            title="🔔 Community Notifications",
+            description="What should we ping you for?",
+            color=0x6a0dad
+        )
+
+        await message.edit(embed=emb_ping, view=PingView())
+
+        await interaction.response.send_message(
+            "Ping role panel updated!",
             ephemeral=True
         )
 
