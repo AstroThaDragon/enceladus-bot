@@ -767,7 +767,7 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Fun & Games (2) & Rhythm**",
+            title="**🛰️ Enceladus Command Directory — Fun & Games (2)**",
             description="Fortunes, music searches, and cosmic tracking! 🎶",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
@@ -805,6 +805,36 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
+            title="**🛰️ Enceladus Command Directory — Station Economy & Exploration**",
+            description="Manage your station profile, explore the outer rims, collect salvage, and spend your Stardust! 🚀",
+            color=discord.Color.from_rgb(138, 43, 226)
+        ).add_field(
+            name="__🚀 Station & Exploration__",
+            value=(
+                "`/background <background_id>` - Equip an unlocked background voucher for your profile card.\n"
+                "`/bio <text>` - Set the biography displayed on your Station profile.\n"
+                "`/heal <item>` - Use a healing item to restore HP.\n"
+                "`/mine` - Deploy your starship mining laser to collect Stardust and discover rare loot.\n"
+                "`/profile [member]` - View your Station personnel record, level, XP, Stardust, companion, and environment.\n"
+                "`/revive` - Use an Emergency Revival Kit to return at half health.\n"
+                "`/scavenge` - Search derelict wreckage for salvage, Stardust, and rare finds.\n"
+                "`/status` - Check your health, exploration charges, and cooldowns.\n"
+            ),
+            inline=False
+        ).add_field(
+            name="__💰 Station Economy & Inventory__",
+            value=(
+                "`/claimlegacy` - Claim your one-time legacy Stardust payout from before the Shop & Exploration update.\n"
+                "`/inventory` - Open your storage locker and view collected items, minerals, salvage, and vouchers.\n"
+                "`/item <category> <item>` - Inspect an item from the Station catalog.\n"
+                "`/shop` - Browse the Enceladus Station Trading Post.\n"
+                "`/shop buy <item_id>` - Purchase an item from the Station shop.\n"
+                "`/shop sell <item>` - Sell salvaged space junk for Stardust.\n"
+                "`/use <item_id> [target]` - Use a consumable or activate an item from your inventory.\n"
+            ),
+            inline=False
+        ),
+        discord.Embed(
             title="**🛰️ Enceladus Command Directory — Server Tools**",
             description="Community tags and utility commands! 🛠️",
             color=discord.Color.from_rgb(138, 43, 226)
@@ -820,20 +850,28 @@ async def help_command(ctx):
         )
     ]
 
-    # Dynamically append Station Admin page if the user is an administrator
+    # Dynamically append 'Station Admin' page if the user is an administrator.
     if ctx.author.guild_permissions.administrator:
-        pages.append(
+         pages.append(
             discord.Embed(
-                title="**🛰️ Enceladus Command Directory — Station Admin**",
-                description="Administrative commands for server management. 🛡️",
+                title="**🛰️ Enceladus Command Directory — Lair Admin**",
+                description="Administrative controls for authorized staff. 🛡️",
                 color=discord.Color.from_rgb(138, 43, 226)
             ).add_field(
-                name="__ 🛡️ Station Admin (Admin Staff Only)__",
+                name="__ 🛡️ Lair Admin (Admin Staff Only)__",
                 value=(
-                    "`/reset <member>` - Wipe all leveling progress for a member.\n"
-                    "`/setlevel <member> <level>` / `/setxp <member> <xp>` - Manually adjust a user's stats.\n"
-                    "`/sync_levels` - Calibrate levels based on roles (ONLY FOR EMERGENCY USE! Do not use unless instructed by server owner.).\n"
-                    "`/purge_left_members` - Removes users from the database who left the server."
+                    "`/admin` - Open the administrator control panel and choose from all available administrative actions below:\n"
+                    "🔄 Reset Bump Timer\n"
+                    "🔥 Set Fortune Streak\n"
+                    "📈 Set XP\n"
+                    "⭐ Set Level\n"
+                    "➕ Add XP\n"
+                    "🔄 Sync Levels\n"
+                    "🧹 Purge Left Members\n"
+                    "♻️ Reset\n"
+                    "🖼️ Font Preview Setup\n"
+                    "🔒 Send Verify Panel\n"
+                    "🔞 Send NSFW Verification Panel"
                 ),
                 inline=False
             )
