@@ -9,6 +9,422 @@ from moderation import VerifyView
 from verification import VerificationPanelView
 
 
+class SetXPModal(discord.ui.Modal):
+    amount = discord.ui.TextInput(
+        label="XP Amount",
+        placeholder="Enter the XP amount to set...",
+        required=True
+    )
+
+    def __init__(self, admin_cog, member):
+        super().__init__(title="Set Member XP")
+        self.admin_cog = admin_cog
+        self.member = member
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            amount = int(self.amount.value)
+            if amount < 0:
+                return await interaction.response.send_message(
+                    "⚠️ XP cannot be negative.",
+                    ephemeral=True
+                )
+        except ValueError:
+            return await interaction.response.send_message(
+                "⚠️ Please enter a valid whole number for XP.",
+                ephemeral=True
+            )
+
+        leveling_cog = self.admin_cog.bot.get_cog("Leveling")
+        if leveling_cog is None:
+            return await interaction.response.send_message(
+                "❌ The leveling system is currently unavailable.",
+                ephemeral=True
+            )
+
+        temp_level = 0
+        while amount >= leveling_cog.get_xp_for_level(temp_level + 1):
+            temp_level += 1
+
+        async with aiosqlite.connect(leveling_cog.db_path) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, xp, level)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id)
+                DO UPDATE SET
+                    xp = excluded.xp,
+                    level = excluded.level
+                """,
+                (self.member.id, amount, temp_level)
+            )
+            await db.commit()
+
+        await leveling_cog._update_member_roles(self.member, temp_level)
+
+        await interaction.response.send_message(
+            f"✅ Set {self.member.name}'s XP to {amount} "
+            f"(Level {temp_level}).",
+            ephemeral=True
+        )
+
+
+class SetXPView(discord.ui.View):
+    def __init__(self, admin_cog):
+        super().__init__(timeout=120)
+        self.admin_cog = admin_cog
+
+        self.member_select = discord.ui.UserSelect(
+            placeholder="Select the member...",
+            min_values=1,
+            max_values=1
+        )
+        self.member_select.callback = self.member_selected
+        self.add_item(self.member_select)
+
+    async def member_selected(self, interaction: discord.Interaction):
+        member = self.member_select.values[0]
+        await interaction.response.send_modal(
+            SetXPModal(self.admin_cog, member)
+        )
+
+
+class SetLevelModal(discord.ui.Modal):
+    level = discord.ui.TextInput(
+        label="Level",
+        placeholder="Enter the level to set...",
+        required=True
+    )
+
+    def __init__(self, admin_cog, member):
+        super().__init__(title="Set Member Level")
+        self.admin_cog = admin_cog
+        self.member = member
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            level = int(self.level.value)
+            if level < 0:
+                return await interaction.response.send_message(
+                    "⚠️ Level cannot be negative.",
+                    ephemeral=True
+                )
+        except ValueError:
+            return await interaction.response.send_message(
+                "⚠️ Please enter a valid whole number for level.",
+                ephemeral=True
+            )
+
+        leveling_cog = self.admin_cog.bot.get_cog("Leveling")
+        if leveling_cog is None:
+            return await interaction.response.send_message(
+                "❌ The leveling system is currently unavailable.",
+                ephemeral=True
+            )
+
+        new_xp = leveling_cog.get_xp_for_level(level)
+
+        async with aiosqlite.connect(leveling_cog.db_path) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, xp, level)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id)
+                DO UPDATE SET
+                    xp = excluded.xp,
+                    level = excluded.level
+                """,
+                (self.member.id, new_xp, level)
+            )
+            await db.commit()
+
+        await leveling_cog._update_member_roles(self.member, level)
+
+        await interaction.response.send_message(
+            f"✅ Set {self.member.mention} to **Level {level}** "
+            f"({new_xp} XP).",
+            ephemeral=True
+        )
+
+
+class SetLevelView(discord.ui.View):
+    def __init__(self, admin_cog):
+        super().__init__(timeout=120)
+        self.admin_cog = admin_cog
+
+        self.member_select = discord.ui.UserSelect(
+            placeholder="Select the member...",
+            min_values=1,
+            max_values=1
+        )
+        self.member_select.callback = self.member_selected
+        self.add_item(self.member_select)
+
+    async def member_selected(self, interaction: discord.Interaction):
+        member = self.member_select.values[0]
+        await interaction.response.send_modal(
+            SetLevelModal(self.admin_cog, member)
+        )
+
+
+class AddXPModal(discord.ui.Modal):
+    amount = discord.ui.TextInput(
+        label="XP Amount",
+        placeholder="Enter the XP amount to add...",
+        required=True
+    )
+
+    def __init__(self, admin_cog, member):
+        super().__init__(title="Add Member XP")
+        self.admin_cog = admin_cog
+        self.member = member
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            amount = int(self.amount.value)
+            if amount < 0:
+                return await interaction.response.send_message(
+                    "⚠️ XP cannot be negative.",
+                    ephemeral=True
+                )
+        except ValueError:
+            return await interaction.response.send_message(
+                "⚠️ Please enter a valid whole number for XP.",
+                ephemeral=True
+            )
+
+        leveling_cog = self.admin_cog.bot.get_cog("Leveling")
+        if leveling_cog is None:
+            return await interaction.response.send_message(
+                "❌ The leveling system is currently unavailable.",
+                ephemeral=True
+            )
+
+        await leveling_cog.add_xp(self.member, amount)
+
+        async with aiosqlite.connect(leveling_cog.db_path) as db:
+            async with db.execute(
+                "SELECT xp, level FROM users WHERE user_id = ?",
+                (self.member.id,)
+            ) as cursor:
+                result = await cursor.fetchone()
+
+        if result:
+            new_xp, new_level = result
+            await interaction.response.send_message(
+                f"✅ Added {amount} XP to {self.member.mention}! "
+                f"They now have **{new_xp} XP** (Level {new_level}).",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                f"✅ Added {amount} XP to {self.member.mention}!",
+                ephemeral=True
+            )
+
+
+class AddXPView(discord.ui.View):
+    def __init__(self, admin_cog):
+        super().__init__(timeout=120)
+        self.admin_cog = admin_cog
+
+        self.member_select = discord.ui.UserSelect(
+            placeholder="Select the member...",
+            min_values=1,
+            max_values=1
+        )
+        self.member_select.callback = self.member_selected
+        self.add_item(self.member_select)
+
+    async def member_selected(self, interaction: discord.Interaction):
+        member = self.member_select.values[0]
+        await interaction.response.send_modal(
+            AddXPModal(self.admin_cog, member)
+        )
+
+
+class FortuneStreakModal(discord.ui.Modal):
+    streak = discord.ui.TextInput(
+        label="Fortune Streak",
+        placeholder="Enter the streak to set...",
+        required=True
+    )
+
+    def __init__(self, admin_cog, member):
+        super().__init__(title="Set Fortune Streak")
+        self.admin_cog = admin_cog
+        self.member = member
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            streak = int(self.streak.value)
+            if streak < 0:
+                return await interaction.response.send_message(
+                    "⚠️ Streak cannot be negative.",
+                    ephemeral=True
+                )
+        except ValueError:
+            return await interaction.response.send_message(
+                "⚠️ Please enter a valid whole number for the streak.",
+                ephemeral=True
+            )
+
+        et_timezone = pytz.timezone("US/Eastern")
+        now_et = datetime.datetime.now(et_timezone)
+        current_date_et = now_et.strftime("%Y-%m-%d")
+
+        async with aiosqlite.connect("/app/data/levels.db") as db:
+            await db.execute(
+                """
+                INSERT INTO users (
+                    user_id,
+                    fortune_streak,
+                    last_fortune_streak_date
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id)
+                DO UPDATE SET
+                    fortune_streak = excluded.fortune_streak,
+                    last_fortune_streak_date = excluded.last_fortune_streak_date
+                """,
+                (
+                    self.member.id,
+                    streak,
+                    current_date_et
+                )
+            )
+            await db.commit()
+
+        await interaction.response.send_message(
+            f"✅ Restored {self.member.mention}'s fortune streak to "
+            f"**{streak} day{'s' if streak != 1 else ''}**.",
+            ephemeral=True
+        )
+
+
+class FortuneStreakView(discord.ui.View):
+    def __init__(self, admin_cog):
+        super().__init__(timeout=120)
+        self.admin_cog = admin_cog
+
+        self.member_select = discord.ui.UserSelect(
+            placeholder="Select the member...",
+            min_values=1,
+            max_values=1
+        )
+        self.member_select.callback = self.member_selected
+        self.add_item(self.member_select)
+
+    async def member_selected(self, interaction: discord.Interaction):
+        member = self.member_select.values[0]
+        await interaction.response.send_modal(
+            FortuneStreakModal(self.admin_cog, member)
+        )
+
+
+class ResetTypeSelect(discord.ui.Select):
+    def __init__(self, admin_cog, member, admin_user_id):
+        self.admin_cog = admin_cog
+        self.member = member
+        self.admin_user_id = admin_user_id
+
+        options = [
+            discord.SelectOption(
+                label="XP & Level Only",
+                value="xp",
+                emoji="📈",
+                description="Reset XP and Level; keep economy/profile data."
+            ),
+            discord.SelectOption(
+                label="Complete Account Wipe",
+                value="all",
+                emoji="☢️",
+                description="Permanently delete all Enceladus data."
+            ),
+        ]
+
+        super().__init__(
+            placeholder="Choose the reset type...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "xp":
+            await interaction.response.send_message(
+                content=(
+                    f"⚠️ Reset **XP and Level only** for {self.member.mention}?\n"
+                    f"💰 Stardust, inventory, pets, profile data, and other progress "
+                    f"will remain untouched."
+                ),
+                view=ResetConfirm(
+                    self.admin_cog,
+                    self.member,
+                    self.admin_user_id
+                ),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                content=(
+                    f"☢️ **DANGER — COMPLETE ACCOUNT WIPE**\n\n"
+                    f"This will permanently delete **ALL Enceladus data** for "
+                    f"{self.member.mention}, including XP, Level, Stardust, profile data, "
+                    f"inventory, and pets. This is a **dangerous** operation and "
+                    f"**irreversible!**\n\n"
+                    f"Are you ***absolutely*** sure?"
+                ),
+                view=FullResetConfirm(
+                    self.admin_cog,
+                    self.member,
+                    self.admin_user_id
+                ),
+                ephemeral=True
+            )
+
+
+class ResetTypeView(discord.ui.View):
+    def __init__(self, admin_cog, member, admin_user_id):
+        super().__init__(timeout=120)
+        self.add_item(
+            ResetTypeSelect(
+                admin_cog,
+                member,
+                admin_user_id
+            )
+        )
+
+
+class ResetMemberView(discord.ui.View):
+    def __init__(self, admin_cog, admin_user_id):
+        super().__init__(timeout=120)
+        self.admin_cog = admin_cog
+        self.admin_user_id = admin_user_id
+
+        self.member_select = discord.ui.UserSelect(
+            placeholder="Select the member to reset...",
+            min_values=1,
+            max_values=1
+        )
+        self.member_select.callback = self.member_selected
+        self.add_item(self.member_select)
+
+    async def member_selected(self, interaction: discord.Interaction):
+        member = self.member_select.values[0]
+
+        await interaction.response.send_message(
+            "♻️ **Reset**\n\n"
+            "Now choose what kind of reset you want to perform.",
+            view=ResetTypeView(
+                self.admin_cog,
+                member,
+                self.admin_user_id
+            ),
+            ephemeral=True
+        )
+
+
 class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -20,12 +436,7 @@ class Admin(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(
-        command="Choose an administrative action.",
-        member="The member to modify.",
-        streak="The fortune streak to set.",
-        amount="The XP amount to set.",
-        level="The level to set.",
-        reset_type="Choose what data to reset."
+        command="Choose an administrative action."
     )
     @app_commands.choices(
         command=[
@@ -42,48 +453,43 @@ class Admin(commands.Cog):
                 value="setxp"
             ),
             app_commands.Choice(
-            name="⭐ Set Level",
-            value="setlevel"
+                name="⭐ Set Level",
+                value="setlevel"
             ),
             app_commands.Choice(
-            name="➕ Add XP",
-            value="addxp"
+                name="➕ Add XP",
+                value="addxp"
             ),
             app_commands.Choice(
-            name="🔄 Sync Levels",
-            value="sync_levels"
+                name="🔄 Sync Levels",
+                value="sync_levels"
             ),
             app_commands.Choice(
-            name="🧹 Purge Left Members",
-            value="purge_left_members"
+                name="🧹 Purge Left Members",
+                value="purge_left_members"
             ),
             app_commands.Choice(
-            name="♻️ Reset",
-            value="reset"
+                name="♻️ Reset",
+                value="reset"
             ),
             app_commands.Choice(
-            name="🖼️ Font Preview Setup",
-            value="font_preview_setup"
+                name="🖼️ Font Preview Setup",
+                value="font_preview_setup"
             ),
             app_commands.Choice(
-            name="🔒 Send Verify Panel",
-            value="sendverifypanel"
+                name="🔒 Send Verify Panel",
+                value="sendverifypanel"
             ),
             app_commands.Choice(
-            name="🔞 Send NSFW Verification Panel",
-            value="sendverificationpanel"
+                name="🔞 Send NSFW Verification Panel",
+                value="sendverificationpanel"
             ),
         ]
     )
     async def admin(
         self,
         interaction: discord.Interaction,
-        command: app_commands.Choice[str],
-        member: discord.Member = None,
-        streak: int = None,
-        amount: int = None,
-        level: int = None,
-        reset_type: app_commands.Choice[str] = None
+        command: app_commands.Choice[str]
     ):
         if command.value == "resetbump":
             async with aiosqlite.connect("/app/data/levels.db") as db:
@@ -96,198 +502,36 @@ class Admin(commands.Cog):
             )
 
         elif command.value == "setfortunestreak":
-            if member is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please select a member whose fortune streak you want to set.",
-                    ephemeral=True
-                )
-
-            if streak is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please enter the fortune streak amount you want to set.",
-                    ephemeral=True
-                )
-
-            if streak < 0:
-                return await interaction.response.send_message(
-                    "⚠️ Streak cannot be negative.",
-                    ephemeral=True
-                )
-
-            et_timezone = pytz.timezone("US/Eastern")
-            now_et = datetime.datetime.now(et_timezone)
-            current_date_et = now_et.strftime("%Y-%m-%d")
-
-            async with aiosqlite.connect("/app/data/levels.db") as db:
-                await db.execute(
-                    """
-                    INSERT INTO users (
-                        user_id,
-                        fortune_streak,
-                        last_fortune_streak_date
-                    )
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(user_id)
-                    DO UPDATE SET
-                        fortune_streak = excluded.fortune_streak,
-                        last_fortune_streak_date = excluded.last_fortune_streak_date
-                    """,
-                    (
-                        member.id,
-                        streak,
-                        current_date_et
-                    )
-                )
-
-                await db.commit()
-
             await interaction.response.send_message(
-                f"✅ Restored {member.mention}'s fortune streak to "
-                f"**{streak} day{'s' if streak != 1 else ''}**.",
+                "🔥 **Set Fortune Streak**\n\n"
+                "Select the member whose fortune streak you want to set below.",
+                view=FortuneStreakView(self),
                 ephemeral=True
             )
 
         elif command.value == "setxp":
-            if member is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please select a member whose XP you want to set.",
-                    ephemeral=True
-                )
-
-            if amount is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please enter the XP amount you want to set.",
-                    ephemeral=True
-                )
-
-            leveling_cog = self.bot.get_cog("Leveling")
-
-            if leveling_cog is None:
-                return await interaction.response.send_message(
-                    "❌ The leveling system is currently unavailable.",
-                    ephemeral=True
-                )
-
-            temp_level = 0
-            while amount >= leveling_cog.get_xp_for_level(temp_level + 1):
-                temp_level += 1
-
-            async with aiosqlite.connect(leveling_cog.db_path) as db:
-                await db.execute(
-                    """
-                    INSERT INTO users (user_id, xp, level)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(user_id)
-                    DO UPDATE SET
-                        xp = excluded.xp,
-                        level = excluded.level
-                    """,
-                    (member.id, amount, temp_level)
-                )
-                await db.commit()
-
-            await leveling_cog._update_member_roles(member, temp_level)
-
             await interaction.response.send_message(
-                f"✅ Set {member.name}'s XP to {amount} "
-                f"(Level {temp_level}).",
+                "📈 **Set XP**\n\n"
+                "Select the member whose XP you want to change below.",
+                view=SetXPView(self),
                 ephemeral=True
             )
 
         elif command.value == "setlevel":
-            if member is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please select a member whose level you want to set.",
-                    ephemeral=True
-                )
-
-            if level is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please enter the level you want to set.",
-                    ephemeral=True
-                )
-
-            if level < 0:
-                return await interaction.response.send_message(
-                    "⚠️ Level cannot be negative.",
-                    ephemeral=True
-                )
-
-            leveling_cog = self.bot.get_cog("Leveling")
-
-            if leveling_cog is None:
-                return await interaction.response.send_message(
-                    "❌ The leveling system is currently unavailable.",
-                    ephemeral=True
-                )
-
-            new_xp = leveling_cog.get_xp_for_level(level)
-
-            async with aiosqlite.connect(leveling_cog.db_path) as db:
-                await db.execute(
-                    """
-                    INSERT INTO users (user_id, xp, level)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(user_id)
-                    DO UPDATE SET
-                        xp = excluded.xp,
-                        level = excluded.level
-                    """,
-                    (member.id, new_xp, level)
-                )
-                await db.commit()
-
-            await leveling_cog._update_member_roles(member, level)
-
             await interaction.response.send_message(
-                f"✅ Set {member.mention} to **Level {level}** "
-                f"({new_xp} XP).",
+                "⭐ **Set Level**\n\n"
+                "Select the member whose level you want to change below.",
+                view=SetLevelView(self),
                 ephemeral=True
             )
 
         elif command.value == "addxp":
-            if member is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please select a member to give XP to.",
-                    ephemeral=True
-                )
-
-            if amount is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please enter the amount of XP to add.",
-                    ephemeral=True
-                )
-
-            leveling_cog = self.bot.get_cog("Leveling")
-
-            if leveling_cog is None:
-                return await interaction.response.send_message(
-                    "❌ The leveling system is currently unavailable.",
-                    ephemeral=True
-                )
-
-            await leveling_cog.add_xp(member, amount)
-
-            async with aiosqlite.connect(leveling_cog.db_path) as db:
-                async with db.execute(
-                    "SELECT xp, level FROM users WHERE user_id = ?",
-                    (member.id,)
-                ) as cursor:
-                    result = await cursor.fetchone()
-
-            if result:
-                new_xp, new_level = result
-
-                await interaction.response.send_message(
-                    f"✅ Added {amount} XP to {member.mention}! "
-                    f"They now have **{new_xp} XP** (Level {new_level}).",
-                    ephemeral=True
-                )
-            else:
-                await interaction.response.send_message(
-                    f"✅ Added {amount} XP to {member.mention}!",
-                    ephemeral=True
-                )
+            await interaction.response.send_message(
+                "➕ **Add XP**\n\n"
+                "Select the member who should receive XP below.",
+                view=AddXPView(self),
+                ephemeral=True
+            )
 
         elif command.value == "sync_levels":
             await interaction.response.defer(ephemeral=True)
@@ -420,42 +664,12 @@ class Admin(commands.Cog):
             )
 
         elif command.value == "reset":
-            if member is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please select the member whose data you want to reset.",
-                    ephemeral=True
-                )
-
-            if reset_type is None:
-                return await interaction.response.send_message(
-                    "⚠️ Please choose what type of reset you want to perform.",
-                    ephemeral=True
-                )
-
-            if reset_type.value == "xp":
-                await interaction.response.send_message(
-                    content=(
-                        f"⚠️ Reset **XP and Level only** for {member.mention}?\n"
-                        f"💰 Stardust, inventory, pets, profile data, and other progress "
-                        f"will remain untouched."
-                    ),
-                    view=ResetConfirm(self, member, interaction.user.id),
-                    ephemeral=True
-                )
-
-            elif reset_type.value == "all":
-                await interaction.response.send_message(
-                    content=(
-                        f"☢️ **DANGER — COMPLETE ACCOUNT WIPE**\n\n"
-                        f"This will permanently delete **ALL Enceladus data** for "
-                        f"{member.mention}, including XP, Level, Stardust, profile data, "
-                        f"inventory, and pets. This is a **dangerous** operation and "
-                        f"**irreversible!**\n\n"
-                        f"Are you ***absolutely*** sure?"
-                    ),
-                    view=FullResetConfirm(self, member, interaction.user.id),
-                    ephemeral=True
-                )
+            await interaction.response.send_message(
+                "♻️ **Reset**\n\n"
+                "Select the member whose data you want to reset below.",
+                view=ResetMemberView(self, interaction.user.id),
+                ephemeral=True
+            )
 
         elif command.value == "font_preview_setup":
             leveling_cog = self.bot.get_cog("Leveling")
