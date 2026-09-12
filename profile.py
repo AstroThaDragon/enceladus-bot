@@ -189,7 +189,7 @@ class Profile(commands.Cog):
         text="The biography you want displayed on your profile."
     )
     async def bio(self, ctx: commands.Context, text: str):
-        await ctx.defer()
+        await ctx.defer(ephemeral=True)
 
         text = text.strip()
 
@@ -222,7 +222,8 @@ class Profile(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"📜 **Bio updated!**\n"
+            f"**Bio updated!**"
+            f"Use `/profile` to check it out!\n"
             f"> {text}",
             ephemeral=True
         )
@@ -351,9 +352,9 @@ class Profile(commands.Cog):
 
         valid_backgrounds = {
             "default": "Default Nebula",
-            "neon_grid": "Cyberpunk Neon Grid",
-            "deep_void": "Deep Void Galaxy",
-            "solaris_ring": "Solaris Ring System"
+            "neon_grid": "Cyberpunk Neon Grid City",
+            "deep_void": "Deep Void",
+            "solaris_ring": "Solaris Ring"
         }
 
         if background_id not in valid_backgrounds:

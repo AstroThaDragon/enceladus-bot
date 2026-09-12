@@ -8,6 +8,7 @@ import random
 import json
 from datetime import datetime, timedelta
 import pytz
+from inventory import add_inventory_item
 
 class Exploration(commands.Cog):
     def __init__(self, bot):
@@ -16,60 +17,60 @@ class Exploration(commands.Cog):
         self.COOLDOWN_SECONDS = 30 * 60  # 30-minute cooldown
         self.SCAVENGE_HAZARDS = [
             # Minor hazards are common: funny setbacks, small damage.
-            ("tripped over a strategically placed space wrench", 5, 10, 18),
-            ("was judged by a maintenance Roomba and lost the argument", 5, 10, 18),
-            ("bonked their helmet on a low-gravity ceiling sign", 6, 12, 16),
-            ("got lightly zapped by a suspiciously cheerful control panel", 7, 12, 16),
-            ("slipped on a patch of moon-cheese residue", 4, 9, 16),
-            ("was startled by a toaster that insisted it was sentient", 5, 11, 14),
-            ("got tangled in a cable that had clearly been waiting for this moment", 6, 12, 14),
-            ("walked into a door that was technically open", 4, 8, 14),
-            ("was pelted by an aggressively enthusiastic air filter", 5, 10, 12),
-            ("lost a staring contest with a suspicious houseplant", 6, 11, 12),
+            ("tripped over a strategically placed wrench", 5, 7, 10),
+            ("were judged by a maintenance Roomba, lost the argument", 5, 7, 10),
+            ("bonked your helmet on a ceiling sign", 6, 12, 16),
+            ("got lightly zapped by a broken control panel", 7, 12, 16),
+            ("slipped on a patch of moon-cheese residue", 4, 9, 14),
+            ("were startled by a toaster that was still active after all this time, hit your head", 5, 11, 12),
+            ("got tangled in a cable that had clearly been waiting for this VERY moment", 4, 7, 10),
+            ("walked into a door without looking", 2, 4, 8),
+            ("were pelted with dirty air by a faulty air filter", 5, 10, 12),
+            ("lost a staring contest with a Suspicious Houseplant, it bonked you in the head", 6, 10, 12),
             # Moderate hazards are the usual danger of wreckage exploration.
             ("inhaled sharp hull-debris dust", 12, 20, 14),
-            ("was scraped by sharp alien metal", 12, 22, 14),
-            ("triggered an electrical spark while searching wreckage", 14, 24, 12),
-            ("was chased through a corridor by an overenthusiastic security drone", 15, 25, 10),
-            ("fell through a floor panel that looked emotionally stable", 13, 23, 12),
-            ("caught a blast of freezer-cold life-support exhaust", 12, 21, 12),
-            ("activated a cleaning bot's 'deep clean' setting", 14, 24, 10),
-            ("was sideswiped by a runaway supply crate", 15, 25, 10),
+            ("were scraped by sharp alien metal (probably need a tetnis shot now)", 15, 25, 20),
+            ("triggered an electrical spark while searching wreckage", 15, 25, 10),
+            ("were chased through a corridor by an overenthusiastic security drone, ran into a wall head-first", 15, 25, 10),
+            ("fell through a floor panel that looked stable... but wasn't", 12, 25, 15),
+            ("caught a blast of frigid-cold life-support exhaust, nearly got frostbite", 12, 21, 12),
+            ("activated a cleaning bot's 'deep clean' setting, it ran you down in the process", 14, 24, 10),
+            ("were sideswiped by a runaway supply crate sliding down a staircase", 15, 25, 10),
             ("opened a locker full of spring-loaded asteroid samples", 13, 22, 10),
-            ("discovered that the abandoned ship still had its alarms set to rude", 14, 23, 10),
-            ("briefly became the target of an antique defense turret's welcome sequence", 16, 25, 8),
+            ("discovered that the abandoned ship still had its security system set to hostile", 14, 23, 10),
+            ("briefly became the target of an old defense turret", 16, 25, 8),
             # Severe hazards are uncommon, but should make a run feel memorable.
-            ("tried to pet a reactor leak and immediately regretted it", 24, 35, 5),
+            ("tried to go through a reactor leak and *immediately* regretted it", 24, 35, 10),
             ("lost a wrestling match with an unsecured cargo loader", 26, 38, 4),
             ("opened a door marked 'definitely not haunted'", 25, 40, 3),
-            ("was introduced to a malfunctioning gravity plate at full enthusiasm", 24, 36, 5),
+            ("were introduced to a malfunctioning gravity plate", 24, 36, 5),
             ("accidentally attended a security drone's very personal laser presentation", 25, 38, 4),
-            ("found the source of the ominous humming, and it found them back", 27, 40, 3),
-            ("triggered an escape pod launch rehearsal without the escape pod", 23, 35, 4),
-            ("attempted to outrun a decompression warning and lost on points", 26, 39, 3),
+            ("found the source of the ominous humming, and *it* found you back", 27, 40, 3),
+            ("triggered an escape pod launch without the escape pod, nearly sucking you out into space", 23, 35, 4),
+            ("attempted to outrun a hull decompression warning", 35, 40, 15),
         ]
         self.KNOCKOUT_LINES = [
-            "Station AI report: explorer status changed to *crispy but recoverable*.",
+            "Station AI Report: explorer status changed to 'crispy, but recoverable.'",
             "The station medic has added your name to the 'please stop touching things' list.",
-            "A nearby drone recorded the incident for training purposes. Unfortunately, it was laughing.",
+            "A nearby drone recorded the incident for training purposes.",
             "Your insurance provider has described this as 'an ambitious interpretation of safety protocol.'",
             "Enceladus Station would like to remind you that gravity is not a personal challenge.",
             "The wreckage won this round. It has been insufferable about it.",
             "Your emergency beacon activated itself out of professional concern.",
-            "The station's accident report form has auto-filled your name. Again.",
-            "A maintenance bot placed a tiny traffic cone beside you. Respectfully.",
+            "The Station's accident report form has auto-filled your name. *Again.*",
+            "A maintenance bot placed a tiny traffic cone beside you. Respectfully, of course.",
             "The ship's computer has labeled this event: 'operator-adjacent malfunction.'",
-            "A passing astronaut gave you a thumbs-up. It was not reassuring.",
-            "Your helmet camera saved the footage under 'definitely_do_not_share.mp4'.",
+            "A passing astronaut gave you a thumbs-up. It was not reassuring. It was actually kinda sad.",
+            "Your helmet camera saved the footage under 'please_do_not_share.mp4'.",
             "The local ghost has filed a noise complaint about your landing.",
             "Station morale improved by 0.3%. The reason has been redacted.",
-            "A janitorial drone swept around you and whispered, 'same.'",
+            "A janitorial drone swept around you and whispered, 'same, bro.'",
             "The cargo loader has requested a rematch, which feels unnecessary.",
-            "A safety poster peeled off the wall, sighed, and pointed at itself.",
-            "Your distress signal was answered by hold music. Very dramatic hold music.",
+            "A safety poster peeled off the wall right next to you as you fainted.",
+            "Your distress signal was answered by hold music. *Very dramatic* hold music.",
             "The nearest vending machine dispensed a consolation pretzel.",
-            "Medical bay has prepared a blanket, juice box, and a strongly worded pamphlet.",
-            "The station AI has awarded you the badge: 'Unscheduled Floor Inspection.'",
+            "Station's Medical Bay has prepared a blanket, a juice box, and a strongly worded pamphlet, while also calling you a 'weenie.'",
+            "The Station AI has awarded you the badge: 'Unscheduled Floor Inspection.'",
             "Someone has added 'avoid haunted doors' to the next crew briefing.",
             "Your future self briefly appeared, shook their head, and vanished.",
         ]
@@ -85,7 +86,7 @@ class Exploration(commands.Cog):
             existing_columns = {row[1] async for row in cursor}
 
         if "scavenge_charges" not in existing_columns:
-            await db.execute("ALTER TABLE users ADD COLUMN scavenge_charges INTEGER DEFAULT 5")
+            await db.execute("ALTER TABLE users ADD COLUMN scavenge_charges INTEGER DEFAULT 10")
         if "last_scavenged" not in existing_columns:
             await db.execute("ALTER TABLE users ADD COLUMN last_scavenged REAL DEFAULT 0")
         if "hp" not in existing_columns:
@@ -212,7 +213,7 @@ class Exploration(commands.Cog):
             f"*(Items Remaining: {new_count})*"
         )
 
-    @commands.hybrid_command(name="mine", description="Deploy your starship mining laser to scout for stardust and rare loot.")
+    @commands.hybrid_command(name="mine", description="Deploy your starship mining laser to scout for Stardust and rare loot!")
     async def mine(self, ctx: commands.Context):
         await ctx.defer()
 
@@ -262,28 +263,60 @@ class Exploration(commands.Cog):
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
 
+            # Daily charge reset: charges refresh to 10 once per calendar day.
+            current_date = self.game_date()
+            last_mined_date = (
+                datetime.fromtimestamp(
+                    last_mined,
+                    tz=pytz.timezone("US/Eastern")
+                ).date()
+                if last_mined > 0
+                else None
+            )
+
+            if last_mined_date != current_date:
+                charges = 10
+                await db.execute(
+                    "UPDATE users SET mining_charges = ? WHERE user_id = ?",
+                    (10, user_id)
+                )
+                await db.commit()
+
             elapsed = current_time - last_mined
-            if charges < 10 and elapsed >= self.COOLDOWN_SECONDS:
-                charges = min(10, charges + int(elapsed // self.COOLDOWN_SECONDS))
+
             if elapsed < self.COOLDOWN_SECONDS:
                 remaining = int(self.COOLDOWN_SECONDS - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
                 return await ctx.send(f"⚠️ **Mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**.")
 
-            if charges <= 0:
-                return await ctx.send("🚨 **Laser Depleted!** You are out of fuel charges. Visit the station shop for an emergency refill.")
+            if charges <= 0 and not effects.get("fuel_stabilizer"):
+                return await ctx.send(
+                    "🚨 **Laser Depleted!** You are out of fuel charges. "
+                    "Visit the station shop for an emergency refill or wait until daily reset."
+                )
 
             # --- TIERED LOOT ROLL ---
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
             new_charges = charges if effects.pop("fuel_stabilizer", False) else charges - 1
             
             found_stardust = random.randint(35, 85)
+
             if effects.pop("prototype_drill_bit", False):
                 found_stardust = int(found_stardust * 1.5)
+
+            if effects.pop("quantum_battery", False):
+                found_stardust *= 3
+                loot_bonus_note = "\n⚛️ **Quantum Battery:** Stardust tripled!"
+            else:
+                loot_bonus_note = ""
+
             new_stardust = stardust + found_stardust
             
-            loot_description = f"✨ **Stardust Collected:** `{found_stardust}`"
+            loot_description = (
+                f"✨ **Stardust Collected:** `{found_stardust}`"
+                f"{loot_bonus_note}"
+            )
             rarity_badge = "common"
 
             if roll < 0.40:
@@ -305,40 +338,126 @@ class Exploration(commands.Cog):
 
             elif roll < 0.75:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
-                await db.execute("""
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, 'titanium_chunk', 'mineral', 1)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + 1
-                """, (user_id,))
-                
-                loot_description += f"\n⛏️ **Rare Ore Extracted:** Refined a `Titanium Ore Chunk`!"
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    "titanium_chunk",
+                    "mineral",
+                    1
+                )
+
+                if added_amount == 1:
+                    loot_description += (
+                        f"\n⛏️ **Rare Ore Extracted:** Refined a "
+                        f"`Titanium Ore Chunk`! ({new_quantity}/{max_quantity})"
+                    )
+                else:
+                    overflow_stardust = 75
+                    new_stardust += overflow_stardust
+
+                    loot_description += (
+                        f"\n📦 **Inventory Full:** Your Titanium Ore Chunk stack "
+                        f"is already at **{max_quantity}/{max_quantity}**!"
+                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                    )
+
                 rarity_badge = "rare"
 
             elif roll < 0.88:
                 # Tier 4: Rare/Epic (Arcade Token for future minigames)
-                await db.execute("""
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, 'arcade_token', 'currency', 1)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + 1
-                """, (user_id,))
-                loot_description += f"\n🪙 **Holodeck Find:** Discovered a shiny **Arcade Token**!"
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    "arcade_token",
+                    "currency",
+                    1
+                )
+
+                if added_amount == 1:
+                    loot_description += (
+                        f"\n🪙 **Holodeck Find:** Discovered a shiny "
+                        f"**Arcade Token**! ({new_quantity}/{max_quantity})"
+                    )
+                else:
+                    overflow_stardust = 50
+                    new_stardust += overflow_stardust
+
+                    loot_description += (
+                        f"\n📦 **Inventory Full:** Your Arcade Token stack "
+                        f"is already at **{max_quantity}/{max_quantity}**!"
+                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                    )
+
                 rarity_badge = "rare"
 
             elif roll < 0.96:
                 # Tier 5: Epic (Dilated Time Crystal)
-                await db.execute("UPDATE users SET time_crystals = COALESCE(time_crystals, 0) + 1 WHERE user_id = ?", (user_id,))
-                loot_description += f"\n💎 **Rare Discovery:** Acquired a stable **Dilated Time Crystal**!"
+                from inventory import ITEM_REGISTRY
+
+                max_quantity = ITEM_REGISTRY["time_crystal"].get("max_quantity", 10)
+
+                async with db.execute(
+                    "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    crystal_row = await cursor.fetchone()
+
+                current_crystals = crystal_row[0] if crystal_row else 0
+
+                if current_crystals < max_quantity:
+                    await db.execute(
+                        """
+                        UPDATE users
+                        SET time_crystals = COALESCE(time_crystals, 0) + 1
+                        WHERE user_id = ?
+                        """,
+                        (user_id,)
+                    )
+
+                    loot_description += (
+                        f"\n💎 **Rare Discovery:** Acquired a stable "
+                        f"**Dilated Time Crystal**! "
+                        f"({current_crystals + 1}/{max_quantity})"
+                    )
+                else:
+                    overflow_stardust = 350
+                    new_stardust += overflow_stardust
+
+                    loot_description += (
+                        f"\n📦 **Inventory Full:** Your Dilated Time Crystal "
+                        f"stack is already at **{max_quantity}/{max_quantity}**!"
+                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                    )
+
                 rarity_badge = "epic"
 
             else:
-                # Tier 6: Legendary (Secret Background Voucher)
-                voucher_id = random.choice(["neon_grid", "deep_void", "solaris_ring"])
-                await db.execute("""
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'background_voucher', 1)
-                    ON CONFLICT(user_id, item_id) DO NOTHING
-                """, (user_id, voucher_id))
-                loot_description += f"\n🌟 **Legendary Find:** Unlocked blueprint voucher `[{voucher_id}]`!"
+                # Tier 6: Legendary (Astral Core)
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    "astral_core",
+                    "special",
+                    1
+                )
+
+                if added_amount == 1:
+                    loot_description += (
+                        "\n🌟 **Legendary Find:** Recovered an "
+                        f"**Astral Core**! ({new_quantity}/{max_quantity})"
+                        "\n*Its purpose is currently unknown...*"
+                    )
+                else:
+                    overflow_stardust = 750
+                    new_stardust += overflow_stardust
+
+                    loot_description += (
+                        f"\n📦 **Inventory Full:** Your Astral Core stack "
+                        f"is already at **{max_quantity}/{max_quantity}**!"
+                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        "\n*The mysterious core was too much for your inventory to contain.*"
+                    )
+
                 rarity_badge = "legendary"
 
             await db.execute("""
@@ -359,14 +478,14 @@ class Exploration(commands.Cog):
 
         embed = discord.Embed(
             title="🌌 Starship Mining Log",
-            description=f"Laser beam fired into the sector debris field...\n\n{loot_description}",
+            description=f"Laser beam fired into the debris field...\n\n{loot_description}",
             color=colors.get(rarity_badge, discord.Color.blue())
         )
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
         
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds.")
+    @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds!")
     async def scavenge(self, ctx: commands.Context):
         await ctx.defer()
 
@@ -407,9 +526,26 @@ class Exploration(commands.Cog):
                 effects_raw = row[6] or "{}"
             effects = json.loads(effects_raw)
 
+            # Daily charge reset: charges refresh to 10 once per calendar day.
+            current_date = self.game_date()
+            last_scavenged_date = (
+                datetime.fromtimestamp(
+                    last_scavenged,
+                    tz=pytz.timezone("US/Eastern")
+                ).date()
+                if last_scavenged > 0
+                else None
+            )
+
+            if last_scavenged_date != current_date:
+                charges = 10
+                await db.execute(
+                    "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
+                    (10, user_id)
+                )
+                await db.commit()
+
             elapsed = current_time - last_scavenged
-            if charges < 10 and elapsed >= self.COOLDOWN_SECONDS:
-                charges = min(10, charges + int(elapsed // self.COOLDOWN_SECONDS))
 
             # Health Knockout Check
             if hp <= 0:
@@ -431,37 +567,68 @@ class Exploration(commands.Cog):
                 "rubber_duck": "🐤 Rubber Duck in a Micro-Spacesuit (how cute!)",
                 "rusty_gear": "⚙️ Tarnished Station Gear (still turns, but squeaks)",
                 "tape_deck": "📼 Broken Cassette Player (plays static)",
-                "alien_artifact": "🛸 Miniature Alien Artifact (Glows faintly)",
-                "space_boot": "🥾 Single Space Boot",
-                "cosmic_coin": "🪙 Cosmic Coin (Heads: Unknown, Tails: Mystery)",
+                "alien_artifact": "🛸 Miniature Alien Artifact (glows faintly)",
+                "space_boot": "🥾 Singular Space Boot (wonder where the other one went...)",
+                "cosmic_coin": "🪙 Cosmic Coin (give it a flip!)",
                 "holo_poster": "🖼️ Faded Holographic Poster of a Galactic Band",
                 "broken_laser": "🔫 Broken Laser Pistol (sparks occasionally)",
                 "lost_logbook": "📓 Waterlogged Starship Logbook (unreadable)",
-                "left_sock": "🧦 Single Left Space Sock (the right one was lost to a wormhole)",
+                "left_sock": "🧦 Left Sock (the right one is missing)",
                 "warp_mug": "☕ Leaky Thermal Mug (holds coffee across space-time, leaks in 3D)",
-                "space_pudding": "🍮 Expired Void Pudding (tastes suspiciously like dark matter)",
+                "space_pudding": "🍮 Expired Pudding (tastes like dark matter)",
                 "tangled_cables": "🔌 Quantum Cable Knot (physically impossible to untangle)",
                 "screaming_crystal": "💎 Screaming Crystal (relentlessly sings 80s synth-pop)",
                 "moon_cheese": "🧀 Chunk of Moon Cheese (smells like sharp cheddar)",
-                "alien_spatula": "🛸 Intergalactic Spatula (slightly sticky with cosmic grease)",
-                "parking_ticket": "📜 Cosmic Parking Ticket (overdue by 400 light-years)",
-                "floating_plant": "🪴 Suspicious Houseplant (directly stares at you when you turn around)",
+                "golden_spatula": "🍳 Golden Spatula (maybe SpongeBob had it?)",
+                "parking_ticket": "📜 Cosmic Parking Ticket (overdue by 400 years! That's a big fine...)",
+                "floating_plant": "🪴 Suspicious Houseplant (stares at you when you turn around...)",
                 "tinted_visor": "🕶️ Broken Solar Visor (now just regular 3D glasses)",
-                "purring_lint": "🧶 Ball of Space Lint (it purrs when you touch it)",
-                "pet_rock": "🪨 Asteroid Pet Rock (includes tiny drawn-on googly eyes)",
+                "purring_lint": "🧶 Ball of Space Lint (it purrs when you touch it?)",
+                "pet_rock": "🪨 Asteroid Pet Rock (includes tiny glued-on googly eyes)",
                 "haunted_circuit": "⚡ Haunted Circuit Board (sparks every time you whisper near it)",
-                "space_taco": "🌮 Cosmic Taco (the salsa is surprisingly unaffected by zero-G)"
+                "space_taco": "🌮 Cosmic Taco (the salsa is surprisingly unaffected by zero-G)",
+                "rusty_wrench": "🔧 Rusty Wrench (still works, but squeaks a lot)",
+                "alien_fossil": "🦴 Alien Fossil Fragment (looks like it could bite back)",
+                "big_red_button": "🔴 A Big Red Button (labeled 'do not press', but you pressed it anyway. It did nothing...)",
+                "antique_compass": "🧭 Antique Compass (points to the nearest space anomaly, which is currently a black hole)",
+                "broken_clock": "⏰ Broken Clock (stuck at 3:00AM. Witching hour... spooky)",
+                "perplexing_painting": "🖌️ Perplexing Painting (the eyes seem to follow you, but it's a 2D image)",
+                "cosmic_banana": "🍌 Cosmic Banana (peels itself, but tastes like stardust)"
             }
             
-            if random.random() < (0.25 if effects.pop("lucky_scanner", False) else 0.05):
-                item_id = "revive_kit"
-                item_name = "💉 Emergency Revival Kit (rare recovery salvage)"
+            # --- TIERED SCAVENGING LOOT ROLL ---
+            # Legendary loot has a flat 4% chance.
+            # Quantum Batteries are exclusive to scavenging.
+            legendary_roll = random.random()
+
+            if legendary_roll >= 0.96:
+                item_id = "quantum_battery"
+                item_name = "⚛️ Quantum Battery (legendary)"
                 item_type = "consumable"
+                loot_rarity_note = (
+                    "\n🌟 **Legendary Find:** Recovered a "
+                    "**Quantum Battery**!"
+                )
+
+            elif random.random() < (0.15 if effects.pop("lucky_scanner", False) else 0.02):
+                item_id = "revive_kit"
+                item_name = "💉 Emergency Revival Kit (rare)"
+                item_type = "consumable"
+                loot_rarity_note = ""
+
             else:
                 item_id, item_name = random.choice(list(junk_items.items()))
                 item_type = "space_junk"
+                loot_rarity_note = ""
             new_charges = charges - 1
             found_stardust = random.randint(15, 35)
+
+            if effects.pop("quantum_battery", False):
+                found_stardust *= 3
+                quantum_bonus_note = "\n⚛️ **Quantum Battery:** Stardust tripled!"
+            else:
+                quantum_bonus_note = ""
+
             new_stardust = stardust + found_stardust
 
             # 30% Environmental Hazard Chance during Scavenging.
@@ -478,22 +645,84 @@ class Exploration(commands.Cog):
                 hazard_note = f"\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
 
             new_hp = max(0, hp - damage_taken)
-            if new_hp <= 0 and effects.pop("salvage_insurance", False):
+            if new_hp <= 0 and effects.pop("cosmic_insurance", False):
                 new_hp = 1
-                hazard_note += "\n📋 **Salvage Insurance:** Your emergency coverage kept you at **1 HP**."
+                hazard_note += "\n📋 **Cosmic Insurance:** Your coverage kept you at **1 HP**."
 
             knocked_out_until = ""
             if new_hp <= 0:
                 knocked_out_until = (self.game_date() + timedelta(days=1)).isoformat()
                 hazard_note += f"\n💀 **Knockout Report:** {random.choice(self.KNOCKOUT_LINES)}"
 
-            await db.execute("""
-                INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                VALUES (?, ?, ?, 1)
-                ON CONFLICT(user_id, item_id) DO UPDATE SET
-                    item_type = excluded.item_type,
-                    quantity = quantity + 1
-            """, (user_id, item_id, item_type))
+            added_amount, new_quantity, max_quantity = await add_inventory_item(
+                db,
+                user_id,
+                item_id,
+                item_type,
+                1
+            )
+
+            if added_amount == 1:
+                loot_name_with_quantity = f"{item_name} ({new_quantity}/{max_quantity})"
+            else:
+                # ─────────────────────────────────────────────
+                # SCAVENGE OVERFLOW VALUES
+                # Adjust these Stardust values individually as desired.
+                # ─────────────────────────────────────────────
+                overflow_values = {
+                    # Legendary / Rare
+                    "quantum_battery": 800,
+                    "revive_kit": 300,
+
+                    # Space Junk
+                    "space_pizza": 10,
+                    "floppy_disk": 10,
+                    "meteorite": 10,
+                    "rubber_duck": 10,
+                    "rusty_gear": 10,
+                    "tape_deck": 10,
+                    "alien_artifact": 10,
+                    "space_boot": 10,
+                    "cosmic_coin": 10,
+                    "holo_poster": 10,
+                    "broken_laser": 10,
+                    "lost_logbook": 10,
+                    "left_sock": 10,
+                    "warp_mug": 10,
+                    "space_pudding": 10,
+                    "tangled_cables": 10,
+                    "screaming_crystal": 10,
+                    "moon_cheese": 10,
+                    "golden_spatula": 10,
+                    "parking_ticket": 10,
+                    "floating_plant": 10,
+                    "tinted_visor": 10,
+                    "purring_lint": 10,
+                    "pet_rock": 10,
+                    "haunted_circuit": 10,
+                    "space_taco": 10,
+                    "rusty_wrench": 10,
+                    "alien_fossil": 10,
+                    "big_red_button": 10,
+                    "antique_compass": 10,
+                    "broken_clock": 10,
+                    "perplexing_painting": 10,
+                    "cosmic_banana": 10,
+                }
+
+                # Use the item's individual overflow value.
+                # The fallback protects against a newly added loot item
+                # accidentally having no configured overflow value.
+                overflow_stardust = overflow_values.get(item_id, 10)
+
+                new_stardust += overflow_stardust
+
+                loot_name_with_quantity = (
+                    f"{item_name}\n"
+                    f"📦 **Inventory Full:** Stack is already "
+                    f"**{max_quantity}/{max_quantity}**!"
+                    f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                )
 
             await db.execute("""
                 UPDATE users 
@@ -507,14 +736,25 @@ class Exploration(commands.Cog):
 
         embed = discord.Embed(
             title="🛠️ Derelict Salvage Log",
-            description=f"Scavenge drone deployed into abandoned sector wreckage...\n\n✨ **Scrap Stardust:** `{found_stardust}`\n🛸 **Salvaged Item:** `{item_name}`{hazard_note}\n\n{status_text}",
+            description=(
+                f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
+                f"✨ **Found Stardust:** `{found_stardust}`"
+                f"{quantum_bonus_note}\n"
+                f"🛸 **Salvaged Item:** `{loot_name_with_quantity}`"
+                f"{loot_rarity_note}"
+                f"{hazard_note}\n\n"
+                f"{status_text}"
+            ),
             color=discord.Color.dark_gold()
         )
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
 
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="revive", description="Use an Emergency Revival Kit to return at half health.")
+    @commands.hybrid_command(
+        name="revive",
+        description="Choose a revival item to return to consciousness."
+    )
     async def revive(self, ctx: commands.Context):
         await ctx.defer()
 
@@ -538,7 +778,9 @@ class Exploration(commands.Cog):
                 user = await cursor.fetchone()
 
             if not user:
-                return await ctx.send("❌ Profile not found! Explore Enceladus first.")
+                return await ctx.send(
+                    "❌ Profile not found! Explore Enceladus first."
+                )
 
             hp, max_hp = user[0] or 0, user[1] or 100
 
@@ -548,43 +790,252 @@ class Exploration(commands.Cog):
                 )
 
             async with db.execute(
-                "SELECT quantity FROM inventory "
-                "WHERE user_id = ? AND item_id = 'revive_kit'",
+                """
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ?
+                  AND item_id IN ('revive', 'revive_kit', 'full_revive')
+                  AND quantity > 0
+                """,
                 (user_id,)
             ) as cursor:
-                kit = await cursor.fetchone()
+                inventory_rows = await cursor.fetchall()
 
-            if not kit or (kit[0] or 0) <= 0:
-                return await ctx.send(
-                    "❌ You do not have an Emergency Revival Kit. "
-                    "Buy a full revival at `/shop buy full_revive`, or recover tomorrow."
+            available = {
+                item_id: quantity
+                for item_id, quantity in inventory_rows
+            }
+
+        # ─────────────────────────────────────────────
+        # REVIVAL SELECTION VIEW
+        # ─────────────────────────────────────────────
+
+        exploration = self
+
+        class RevivalView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=60)
+
+                revive_button = discord.ui.Button(
+                    label="Revival Kit",
+                    emoji="⚕️",
+                    style=discord.ButtonStyle.secondary,
+                    disabled=available.get("revive", 0) <= 0
+                )
+                revive_button.callback = self.use_revive_kit
+                self.add_item(revive_button)
+
+                kit_button = discord.ui.Button(
+                    label="Emergency Revival Kit",
+                    emoji="💉",
+                    style=discord.ButtonStyle.primary,
+                    disabled=available.get("revive_kit", 0) <= 0
+                )
+                kit_button.callback = self.use_emergency_kit
+                self.add_item(kit_button)
+
+                full_button = discord.ui.Button(
+                    label="Emergency Full Revival",
+                    emoji="🚑",
+                    style=discord.ButtonStyle.success,
+                    disabled=available.get("full_revive", 0) <= 0
+                )
+                full_button.callback = self.use_full
+                self.add_item(full_button)
+
+            async def use_revive_kit(self, interaction: discord.Interaction):
+                await self.use_revive(interaction, "revive", 0.35)
+
+            async def use_emergency_kit(self, interaction: discord.Interaction):
+                await self.use_revive(interaction, "revive_kit", 0.50)
+
+            async def use_full(self, interaction: discord.Interaction):
+                await self.use_revive(interaction, "full_revive", 1.00)
+
+            async def use_revive(
+                self,
+                interaction: discord.Interaction,
+                item_id: str,
+                heal_percent: float
+            ):
+                if interaction.user.id != user_id:
+                    return await interaction.response.send_message(
+                        "❌ This revival menu belongs to someone else.",
+                        ephemeral=True
+                    )
+
+                await interaction.response.defer()
+
+                async with aiosqlite.connect(
+                    exploration.get_db_path()
+                ) as db:
+                    await exploration.ensure_schema(db)
+
+                    async with db.execute(
+                        "SELECT hp, max_hp FROM users WHERE user_id = ?",
+                        (user_id,)
+                    ) as cursor:
+                        user_row = await cursor.fetchone()
+
+                    if not user_row:
+                        return await interaction.followup.send(
+                            "❌ Profile not found!",
+                            ephemeral=True
+                        )
+
+                    current_hp, max_hp = (
+                        user_row[0] or 0,
+                        user_row[1] or 100
+                    )
+
+                    if current_hp > 0:
+                        return await interaction.followup.send(
+                            "⚠️ You are already conscious!",
+                            ephemeral=True
+                        )
+
+                    async with db.execute(
+                        """
+                        SELECT quantity
+                        FROM inventory
+                        WHERE user_id = ?
+                          AND item_id = ?
+                        """,
+                        (user_id, item_id)
+                    ) as cursor:
+                        item_row = await cursor.fetchone()
+
+                    if not item_row or (item_row[0] or 0) <= 0:
+                        item_name = (
+                            "Emergency Revival Kit"
+                            if item_id == "revive_kit"
+                            else "Emergency Full Revival"
+                        )
+
+                        return await interaction.followup.send(
+                            f"❌ You don't have an **{item_name}**!",
+                            ephemeral=True
+                        )
+
+                    # Consume exactly one revival item.
+                    if item_row[0] > 1:
+                        await db.execute(
+                            """
+                            UPDATE inventory
+                            SET quantity = quantity - 1
+                            WHERE user_id = ?
+                              AND item_id = ?
+                            """,
+                            (user_id, item_id)
+                        )
+                    else:
+                        await db.execute(
+                            """
+                            DELETE FROM inventory
+                            WHERE user_id = ?
+                              AND item_id = ?
+                            """,
+                            (user_id, item_id)
+                        )
+
+                    if heal_percent >= 1.0:
+                        recovered_hp = max_hp
+                    else:
+                        recovered_hp = max(
+                            1,
+                            (max_hp + 1) // 2
+                        )
+
+                    await db.execute(
+                        """
+                        UPDATE users
+                        SET hp = ?,
+                            knocked_out_until = ''
+                        WHERE user_id = ?
+                        """,
+                        (recovered_hp, user_id)
+                    )
+
+                    await db.commit()
+
+                item_name = (
+                    "Emergency Revival Kit"
+                    if item_id == "revive_kit"
+                    else "Emergency Full Revival"
                 )
 
-            if kit[0] > 1:
-                await db.execute(
-                    "UPDATE inventory SET quantity = quantity - 1 "
-                    "WHERE user_id = ? AND item_id = 'revive_kit'",
-                    (user_id,)
-                )
-            else:
-                await db.execute(
-                    "DELETE FROM inventory "
-                    "WHERE user_id = ? AND item_id = 'revive_kit'",
-                    (user_id,)
+                if heal_percent >= 1.0:
+                    message = (
+                        f"🚑 **Full Revival complete!**\n"
+                        f"Your **{item_name}** restored you to "
+                        f"❤️ **{recovered_hp}/{max_hp} HP**!"
+                    )
+                else:
+                    message = (
+                        f"💉 **Revival complete!**\n"
+                        f"Your **{item_name}** restored you to "
+                        f"❤️ **{recovered_hp}/{max_hp} HP**!"
+                    )
+
+                await interaction.edit_original_response(
+                    content=message,
+                    view=None
                 )
 
-            recovered_hp = max(1, (max_hp + 1) // 2)
-
-            await db.execute(
-                "UPDATE users SET hp = ?, knocked_out_until = '' WHERE user_id = ?",
-                (recovered_hp, user_id)
+        if not available:
+            return await ctx.send(
+                "❌ You don't have any revival items.\n"
+                "You can buy an **Emergency Full Revival** from "
+                "`/shop buy full_revive`, or recover automatically tomorrow."
             )
 
-            await db.commit()
+        embed = discord.Embed(
+            title="💀 Revival Required",
+            description=(
+                "You are currently unconscious.\n\n"
+                "Choose a revival method:"
+            ),
+            color=discord.Color.red()
+        )
+
+        revive_count = available.get("revive", 0)
+        kit_count = available.get("revive_kit", 0)
+        full_count = available.get("full_revive", 0)
+
+        embed.add_field(
+            name="⚕️ Revival Kit",
+            value=(
+                "Restores **35% HP**\n"
+                f"Owned: **{revive_count}**"
+            ),
+            inline=True
+        )
+
+        embed.add_field(
+            name="💉 Emergency Revival Kit",
+            value=(
+                "Restores **50% HP**\n"
+                f"Owned: **{kit_count}**"
+            ),
+            inline=True
+        )
+
+        embed.add_field(
+            name="🚑 Emergency Full Revival",
+            value=(
+                "Restores **100% HP**\n"
+                f"Owned: **{full_count}**"
+            ),
+            inline=True
+        )
+
+        embed.set_footer(
+            text="This revival menu will expire in 60 seconds."
+        )
 
         await ctx.send(
-            f"💉 **Revival complete!** Your Emergency Revival Kit restored you to "
-            f"**{recovered_hp}/{max_hp} HP**."
+            embed=embed,
+            view=RevivalView()
         )
 async def setup(bot):
     await bot.add_cog(Exploration(bot))

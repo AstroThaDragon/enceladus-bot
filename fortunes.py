@@ -420,21 +420,40 @@ class Fortunes(commands.Cog):
 
                     # If they missed yesterday, streak dies
                     if last_date != yesterday_et:
-
-                        if streak >= 3: # Only mention if they lose a streak of 3 or more for spam reasons
-                            lost_streak_messages.append(
-                                f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
-                            )
-
-                        await db.execute(
-                            """
-                            UPDATE users
-                            SET last_broken_streak = fortune_streak,
-                                fortune_streak = 0
-                            WHERE user_id = ?
-                            """,
+                        # Fate Anchor protects the streak from being broken at reset.
+                        async with db.execute(
+                            "SELECT active_effects FROM users WHERE user_id = ?",
                             (user_id,)
-                        )
+                        ) as effects_cursor:
+                            effects_row = await effects_cursor.fetchone()
+
+                        active_effects = json.loads(effects_row[0] or "{}") if effects_row else {}
+
+                        if active_effects.pop("fate_anchor", False):
+                            await db.execute(
+                                """
+                                UPDATE users
+                                SET last_broken_streak = 0,
+                                    active_effects = ?
+                                WHERE user_id = ?
+                                """,
+                                (json.dumps(active_effects), user_id)
+                            )
+                        else:
+                            if streak >= 3:  # Only mention if they lose a streak of 3 or more for spam reasons
+                                lost_streak_messages.append(
+                                    f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
+                                )
+
+                            await db.execute(
+                                """
+                                UPDATE users
+                                SET last_broken_streak = fortune_streak,
+                                    fortune_streak = 0
+                                WHERE user_id = ?
+                                """,
+                                (user_id,)
+                            )
 
                 await db.commit()
 

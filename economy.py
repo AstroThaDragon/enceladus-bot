@@ -16,104 +16,152 @@ class Economy(commands.Cog):
         self.SHOP_ITEMS = {
             "nanite_patch": {
                 "name": "🩹 Nanite Stim-Patch",
-                "cost": 150,
+                "cost": 400,
                 "type": "heal",
                 "heal_amount": 35,
                 "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."
             },
             "medkit": {
                 "name": "🧰 Field Trauma Medkit",
-                "cost": 300,
+                "cost": 750,
                 "type": "heal",
                 "heal_amount": 100,
                 "desc": "Standard planetary survival trauma kit. Restores +100 HP."
             },
+            "revive": {
+                "name": "⚕️ Revival Kit",
+                "cost": 350,
+                "type": "revive",
+                "desc": "Immediately revives an unconscious explorer at 50% HP."
+            },
             "full_revive": {
                 "name": "⚕️ Emergency Full Revival",
-                "cost": 1000,
+                "cost": 600,
                 "type": "revive",
                 "desc": "Immediately revives an unconscious explorer at full HP."
             },
             "fuel_refill": {
-                "name": "⚡ Emergency Fuel Cell (5 Charges)",
-                "cost": 250,
+                "name": "⚡ Emergency Fuel Cell",
+                "cost": 700,
                 "type": "consumable",
-                "desc": "Instantly refills your starship mining laser back to 5/5 charges."
+                "desc": "Instantly refills your starship mining laser back to 10/10 charges."
             },
             "pet_snack": {
                 "name": "🧬 Cosmic Bio-Feed (Pet Snack)",
-                "cost": 400,
+                "cost": 350,
                 "type": "consumable",
                 "desc": "Nutrient pack used to feed your station pet companion."
             },
             "time_crystal": {
                 "name": "💎 Dilated Time Crystal",
-                "cost": 2000,
+                "cost": 3500,
                 "type": "special",
                 "desc": "Bends time backwards to restore a fortune streak missed yesterday (Max 2 uses/month)."
             },
             "neon_grid": {
                 "name": "🌆 Background Voucher: Neon Grid",
-                "cost": 1000,
+                "cost": 4000,
                 "type": "background_voucher",
-                "desc": "Unlocks the Cyberpunk Neon Grid background preset for your /profile card."
+                "desc": "Unlocks the 'Cyberpunk Neon Grid City' background photo for your /profile card."
             },
             "deep_void": {
                 "name": "🌌 Background Voucher: Deep Void",
-                "cost": 1200,
+                "cost": 4500,
                 "type": "background_voucher",
-                "desc": "Unlocks the Deep Void galaxy background preset for your /profile card."
-            }
+                "desc": "Unlocks the 'Deep Void' background photo for your /profile card."
+            },
+            "solaris_ring": {
+                "name": "💫 Background Voucher: Solaris Ring",
+                "cost": 5000,
+                "type": "background_voucher",
+                "desc": "Unlocks the 'Solaris Ring' background photo for your /profile card."
         }
-
+    }
         # Stardust buyback values for space junk items
         self.JUNK_PRICES = {
-            "space_pizza": 35,
+            "space_pizza": 30,
             "floppy_disk": 50,
             "meteorite": 85,
-            "rubber_duck": 40,
-            "rusty_gear": 25,
+            "rubber_duck": 50,
+            "rusty_gear": 15,
             "tape_deck": 45,
-            "alien_artifact": 75,
-            "space_boot": 55,
+            "alien_artifact": 80,
+            "space_boot": 25,
             "cosmic_coin": 80,
-            "holo_poster": 65,
-            "broken_laser": 30,
+            "holo_poster": 35,
+            "broken_laser": 20,
             "lost_logbook": 20,
-            "left_sock": 15,
+            "left_sock": 10,
             "warp_mug": 30,
-            "space_pudding": 20,
-            "tangled_cables": 35,
+            "space_pudding": 10,
+            "tangled_cables": 25,
             "screaming_crystal": 100,
             "moon_cheese": 60,
-            "alien_spatula": 40,
+            "golden_spatula": 120,
             "parking_ticket": 10,
             "floating_plant": 70,
             "tinted_visor": 25,
-            "purring_lint": 50,
-            "pet_rock": 30,
+            "purring_lint": 30,
+            "pet_rock": 40,
             "haunted_circuit": 90,
-            "space_taco": 45
+            "space_taco": 35,
+            "rusty_wrench": 25,
+            "alien_fossil": 75,
+            "big_red_button": 10,
+            "antique_compass": 30,
+            "broken_clock": 20,
+            "perplexing_painting": 80,
+            "cosmic_banana": 5
         }
 
         # Add future daily offers here.  Each player sees the same three offers
         # for the whole Eastern-time day.
         self.ROTATING_ITEMS = {
-            "fuel_stabilizer": {"name": "🛢️ Fuel Stabilizer", "cost": 225, "desc": "Makes your next mining run cost no fuel charge."},
-            "station_rations": {"name": "🥫 Station Rations", "cost": 60, "desc": "Restores a modest 15 HP."},
-            "hazard_shield": {"name": "🛡️ Hazard Shield", "cost": 300, "desc": "Blocks the next scavenging hazard."},
-            "drone_battery": {"name": "🔋 Drone Battery Pack", "cost": 350, "desc": "Restores two scavenge charges."},
-            "lucky_scanner": {"name": "📡 Deep-Space Scanner", "cost": 425, "desc": "Improves rare-find odds on your next scavenging run."},
+            "fuel_stabilizer": {"name": "🛢️ Fuel Stabilizer", "cost": 800, "desc": "Makes your next mining run cost no fuel charge."},
+            "station_rations": {"name": "🥫 Station Rations", "cost": 150, "desc": "Restores a modest 15 HP."},
+            "hazard_shield": {"name": "🛡️ Hazard Shield", "cost": 1000, "desc": "Blocks the next scavenging hazard."},
+            "drone_battery": {"name": "🔋 Drone Battery Pack", "cost": 900, "desc": "Restores two scavenge charges."},
+            "lucky_scanner": {"name": "📡 Deep-Space Scanner", "cost": 700, "desc": "Improves rare-find odds on your next scavenging run."},
             "ore_magnet": {"name": "🧲 Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
-            "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 275, "desc": "Boosts Stardust from your next mining run."},
-            "time_warp_coupon": {"name": "⏳ Time Warp Coupon", "cost": 650, "desc": "Reduces one exploration cooldown by one hour."},
-            "salvage_insurance": {"name": "📋 Salvage Insurance", "cost": 600, "desc": "Prevents a knockout from your next scavenging hazard."},
-            "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 750, "desc": "Protects one missed fortune streak day."},
-            "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 450, "desc": "Open it for an unpredictable Stardust payoff."},
-            "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 700, "desc": "Revives an unconscious explorer at 50% HP."},
+            "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
+            "cosmic_insurance": {"name": "📋 Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
+            "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
+            "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
+            "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
             "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
-            "title_starborn": {"name": "✨ Title: Starborn", "cost": 750, "type": "title", "desc": "A prestigious title for those touched by the stars."},
-            "title_voidfarer": {"name": "🌌 Title: Voidfarer", "cost": 750, "type": "title", "desc": "For those brave enough to chart the endless void."},
+            "title_starborn": {"name": "🏷️ Title: Starborn", "cost": 750, "type": "title", "desc": "A prestigious title for those touched by the stars."},
+            "title_voidfarer": {"name": "🏷️ Title: Voidfarer", "cost": 750, "type": "title", "desc": "For those brave enough to chart the endless void."},
+        }
+
+        # Purchase limits for shop items.
+        # Format: item_id: (maximum_quantity, period)
+        # Periods: daily, weekly, monthly, lifetime
+        self.SHOP_LIMITS = {
+            # Permanent shop
+            "nanite_patch": (10, "daily"),
+            "medkit": (5, "daily"),
+            "full_revive": (2, "weekly"),
+            "fuel_refill": (3, "daily"),
+            "pet_snack": (30, "daily"),
+            "time_crystal": (2, "monthly"),
+
+            # Rotating shop
+            "fuel_stabilizer": (5, "daily"),
+            "station_rations": (15, "daily"),
+            "hazard_shield": (5, "daily"),
+            "drone_battery": (5, "daily"),
+            "lucky_scanner": (5, "daily"),
+            "ore_magnet": (5, "daily"),
+            "prototype_drill_bit": (5, "daily"),
+            "cosmic_insurance": (5, "daily"),
+            "fate_anchor": (3, "daily"),
+            "stardust_cache": (3, "daily"),
+            "revive_kit": (3, "daily"),
+
+            # Rotating titles are permanent unlocks.
+            "title_outer_rim_wanderer": (1, "lifetime"),
+            "title_starborn": (1, "lifetime"),
+            "title_voidfarer": (1, "lifetime"),
         }
 
     def rotation_date(self):
@@ -128,6 +176,43 @@ class Economy(commands.Cog):
         """Return the separate Station economy database."""
         from database import ECONOMY_DB_NAME
         return ECONOMY_DB_NAME
+
+    def purchase_period_key(self, period):
+        """Return the current Eastern-time period key for a shop limit."""
+        now = datetime.now(pytz.timezone("US/Eastern"))
+
+        if period == "daily":
+            return f"daily:{now.date().isoformat()}"
+
+        if period == "weekly":
+            iso_year, iso_week, _ = now.isocalendar()
+            return f"weekly:{iso_year}-W{iso_week:02d}"
+
+        if period == "monthly":
+            return f"monthly:{now.strftime('%Y-%m')}"
+
+        if period == "lifetime":
+            return "lifetime"
+
+        return f"unknown:{now.date().isoformat()}"
+
+    def shop_limit_text(self, item_id):
+        """Return a human-readable purchase limit for a shop item."""
+        limit_info = self.SHOP_LIMITS.get(item_id)
+
+        if not limit_info:
+            return ""
+
+        limit, period = limit_info
+
+        labels = {
+            "daily": "per day",
+            "weekly": "per week",
+            "monthly": "per month",
+            "lifetime": "per user",
+        }
+
+        return f" • Limit: {limit} {labels.get(period, period)}"
 
     async def ensure_schema(self, db):
         async with db.execute("PRAGMA table_info(users)") as cursor:
@@ -150,15 +235,11 @@ class Economy(commands.Cog):
                 "ALTER TABLE users ADD COLUMN tc_last_used_month TEXT DEFAULT ''"
             )
 
-        # Legacy payout column
-        if "legacy_payout" not in existing_columns:
+        # Legacy claim tracker
+        if "legacy_claimed" not in existing_columns:
             await db.execute(
-                "ALTER TABLE users ADD COLUMN legacy_payout INTEGER DEFAULT 0"
+                "ALTER TABLE users ADD COLUMN legacy_claimed INTEGER DEFAULT 0"
             )
-
-        # Legacy payouts are initialized to 0 in the new economy database.
-        # No snapshot migration is needed because this Station database
-        # starts fresh and leveling data remains in levels.db.
 
         if "hp" not in existing_columns:
             await db.execute(
@@ -180,20 +261,39 @@ class Economy(commands.Cog):
                 "ALTER TABLE users ADD COLUMN last_chat_reward REAL DEFAULT 0"
             )
 
+        # Shop purchase-limit tracking.
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS shop_purchase_limits (
+                user_id INTEGER NOT NULL,
+                item_id TEXT NOT NULL,
+                period_key TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, item_id, period_key)
+            )
+            """
+        )
+
         
     @commands.hybrid_group(name="shop", description="Browse and trade at the Enceladus Station Trading Post.")
     async def shop(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             embed = discord.Embed(
                 title="🛒 Enceladus Station Trading Post",
-                description="Use `/shop buy` to purchase items, or `/shop sell` to turn in salvaged junk for Stardust.",
+                description="Use `/shop buy` to purchase items, or `/shop sell` to turn in salvaged space junk for Stardust.",
                 color=discord.Color.from_rgb(0, 229, 255)
             )
 
             for item_id, details in self.SHOP_ITEMS.items():
+                limit_text = self.shop_limit_text(item_id)
+
                 embed.add_field(
                     name=details["name"],
-                    value=f"💰 Price: **{details['cost']} Stardust**\n📖 {details['desc']}",
+                    value=(
+                        f"💰 Price: **{details['cost']:,} Stardust**\n"
+                        f"📖 {details['desc']}\n"
+                        f"📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
+                    ),
                     inline=False
                 )
 
@@ -211,7 +311,7 @@ class Economy(commands.Cog):
             embed.set_footer(text="Tip: Check your wallet balance using /profile")
             await ctx.send(embed=embed)
 
-    @shop.command(name="rotating", description="View today's three shared rotating-shop offers.")
+    @shop.command(name="rotating", description="View today's three rotating-shop offers.")
     async def rotating(self, ctx: commands.Context):
         rotation = self.daily_rotation()
         embed = discord.Embed(
@@ -221,10 +321,16 @@ class Economy(commands.Cog):
         )
         for item_id in rotation:
             item = self.ROTATING_ITEMS[item_id]
+            limit_text = self.shop_limit_text(item_id)
+
             embed.add_field(
                 name=item["name"],
-                value=f"💰 **{item['cost']} Stardust**\n{item['desc']}",
-                inline=False,
+                value=(
+                    f"💰 **{item['cost']:,} Stardust**\n"
+                    f"{item['desc']}\n"
+                    f"📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
+                ),
+                inline=False
             )
         await ctx.send(embed=embed)
 
@@ -324,9 +430,55 @@ class Economy(commands.Cog):
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
+            
             # Run schema/migration work before starting the purchase transaction.
             await self.ensure_schema(db)
             await db.commit()
+
+            from inventory import ITEM_REGISTRY, add_inventory_item
+
+            item_info = ITEM_REGISTRY.get(item_id)
+
+            if not item_info:
+                return await ctx.send(
+                    "❌ This item is not registered in the master item registry."
+                )
+
+            max_stack = item_info.get("max_quantity", 10)
+
+            # These items are stored directly on the users table.
+            legacy_columns = {
+                "time_crystal": "time_crystals",
+                "nanite_patch": "nanite_patchs",
+                "medkit": "medkits",
+            }
+
+            if item_id in legacy_columns:
+                column = legacy_columns[item_id]
+
+                async with db.execute(
+                    f"SELECT {column} FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                current_quantity = (row[0] or 0) if row else 0
+
+            else:
+                async with db.execute(
+                    "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
+                    (user_id, item_id)
+                ) as cursor:
+                    inventory_row = await cursor.fetchone()
+
+                current_quantity = (inventory_row[0] or 0) if inventory_row else 0
+
+            if current_quantity + quantity > max_stack:
+                return await ctx.send(
+                    f"📦 **Inventory Full!** You can only hold **{max_stack}x** "
+                    f"**{item_info['name']}**.\n"
+                    f"You currently have **{current_quantity}x**."
+                )
 
             # Lock the database for the entire purchase transaction.
             # This prevents two simultaneous purchases from spending
@@ -354,7 +506,71 @@ class Economy(commands.Cog):
                 await db.rollback()
                 return await ctx.send(
                     f"💸 **Insufficient Stardust!** You have `{stardust}` "
-                    f"Stardust, but this item costs `{cost}`."
+                    f"Stardust, but this item costs `{cost:,}`."
+                )
+
+            # ─────────────────────────────────────────────
+            # SHOP PURCHASE LIMIT
+            # ─────────────────────────────────────────────
+            limit_info = self.SHOP_LIMITS.get(item_id)
+
+            if limit_info:
+                max_quantity, period = limit_info
+                period_key = self.purchase_period_key(period)
+
+                async with db.execute(
+                    """
+                    SELECT quantity
+                    FROM shop_purchase_limits
+                    WHERE user_id = ?
+                      AND item_id = ?
+                      AND period_key = ?
+                    """,
+                    (user_id, item_id, period_key)
+                ) as cursor:
+                    limit_row = await cursor.fetchone()
+
+                purchased_quantity = (limit_row[0] or 0) if limit_row else 0
+                remaining = max_quantity - purchased_quantity
+
+                if quantity > remaining:
+                    await db.rollback()
+
+                    if remaining <= 0:
+                        return await ctx.send(
+                            f"🚫 **Purchase Limit Reached!** "
+                            f"You've already bought the maximum **{max_quantity}x** "
+                            f"**{item['name']}** allowed {period}."
+                        )
+
+                    return await ctx.send(
+                        f"🚫 **Purchase Limit Exceeded!** "
+                        f"You can only buy **{remaining} more** "
+                        f"**{item['name']}** this {period}."
+                    )
+
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    item_info.get("type", item.get("type", "consumable")),
+                    quantity
+                )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
+
+            # Backgrounds are individual permanent unlocks.
+            # They cannot be purchased in bulk.
+            if item["type"] == "background_voucher" and quantity != 1:
+                await db.rollback()
+                return await ctx.send(
+                    "🖼️ Background vouchers can only be purchased **one at a time**."
                 )
 
             # Process purchase based on item type.
@@ -364,8 +580,14 @@ class Economy(commands.Cog):
                 item = rotating_item
                 item_type = item.get("type", "consumable")
 
-                # Titles are unlocks, so don't allow the same title to be purchased twice.
+                # Titles are permanent unlocks.
                 if item_type == "title":
+                    if quantity != 1:
+                        await db.rollback()
+                        return await ctx.send(
+                            "🏷️ Titles can only be purchased **once.**"
+                        )
+
                     async with db.execute(
                         "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?",
                         (user_id, item_id)
@@ -378,16 +600,23 @@ class Economy(commands.Cog):
                             "⚠️ You already own this title!"
                         )
 
-                await db.execute(
-                    """
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', ?)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET
-                        item_type = excluded.item_type,
-                        quantity = quantity + excluded.quantity
-                    """,
-                    (user_id, item_id, item_type, quantity)
+                # Add the item through the master inventory helper so the
+                # registry stack limit is enforced inside the locked transaction.
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    item_type,
+                    quantity
                 )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
 
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
@@ -409,16 +638,21 @@ class Economy(commands.Cog):
                 )
 
             if item["type"] == "revive":
-                await db.execute(
-                    """
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', ?)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET
-                        item_type = excluded.item_type,
-                        quantity = quantity + excluded.quantity
-                    """,
-                    (user_id, item_id, quantity)
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    "consumable",
+                    quantity
                 )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
 
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
@@ -434,16 +668,21 @@ class Economy(commands.Cog):
                 )
 
             if item["type"] == "consumable" and item_id == "fuel_refill":
-                await db.execute(
-                    """
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', ?)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET
-                        item_type = excluded.item_type,
-                        quantity = quantity + excluded.quantity
-                    """,
-                    (user_id, item_id, quantity)
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    "consumable",
+                    quantity
                 )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
 
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
@@ -459,16 +698,21 @@ class Economy(commands.Cog):
                 )
 
             if item["type"] == "consumable" and item_id == "pet_snack":
-                await db.execute(
-                    """
-                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                    VALUES (?, ?, 'consumable', ?)
-                    ON CONFLICT(user_id, item_id) DO UPDATE SET
-                        item_type = excluded.item_type,
-                        quantity = quantity + excluded.quantity
-                    """,
-                    (user_id, item_id, quantity)
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    "consumable",
+                    quantity
                 )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
 
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
@@ -482,7 +726,24 @@ class Economy(commands.Cog):
                     f"to your inventory for **{cost:,} Stardust**!"
                 )
             if item_id == "time_crystal":
-                # Schema is already ensured before the transaction.
+                max_stack = item_info.get("max_quantity", 10)
+
+                async with db.execute(
+                    "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                current_quantity = row[0] if row else 0
+
+                if current_quantity + quantity > max_stack:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_stack}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{current_quantity}x**."
+                    )
+
                 await db.execute(
                     """
                     UPDATE users
@@ -543,6 +804,8 @@ class Economy(commands.Cog):
                 # nanite_patch -> nanite_patchs
                 col_name = f"{item_id}s"
 
+                max_stack = item_info.get("max_quantity", 10)
+
                 # Ensure inventory column exists dynamically.
                 async with db.execute("PRAGMA table_info(users)") as cursor:
                     rows = await cursor.fetchall()
@@ -553,6 +816,22 @@ class Economy(commands.Cog):
                     await db.execute(
                         f"ALTER TABLE users ADD COLUMN "
                         f"{col_name} INTEGER DEFAULT 0"
+                    )
+
+                async with db.execute(
+                    f"SELECT COALESCE({col_name}, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                current_quantity = row[0] if row else 0
+
+                if current_quantity + quantity > max_stack:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_stack}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{current_quantity}x**."
                     )
 
                 await db.execute(
@@ -791,8 +1070,7 @@ class Economy(commands.Cog):
                 "lucky_scanner",
                 "ore_magnet",
                 "prototype_drill_bit",
-                "time_warp_coupon",
-                "salvage_insurance",
+                "cosmic_insurance",
                 "fate_anchor",
                 "stardust_cache",
             },
@@ -806,34 +1084,42 @@ class Economy(commands.Cog):
                 "time_crystal",
             },
             "junk_am": {
-                "space_pizza",
-                "floppy_disk",
-                "meteorite",
-                "rubber_duck",
-                "rusty_gear",
-                "tape_deck",
                 "alien_artifact",
-                "space_boot",
-                "cosmic_coin",
-                "holo_poster",
+                "alien_fossil",
+                "antique_compass",
+                "big_red_button",
+                "broken_clock",
                 "broken_laser",
-                "lost_logbook",
+                "cosmic_banana",
+                "cosmic_coin",
+                "floating_plant",
+                "floppy_disk",
+                "golden_spatula",
+                "haunted_circuit",
+                "holo_poster",
                 "left_sock",
+                "lost_logbook",
+                "meteorite",
+                "moon_cheese",
             },
             "junk_nz": {
-                "warp_mug",
-                "space_pudding",
-                "tangled_cables",
-                "screaming_crystal",
-                "moon_cheese",
-                "alien_spatula",
                 "parking_ticket",
-                "floating_plant",
-                "tinted_visor",
-                "purring_lint",
                 "pet_rock",
-                "haunted_circuit",
+                "perplexing_painting",
+                "purring_lint",
+                "rubber_duck",
+                "rusty_gear",
+                "rusty_wrench",
+                "screaming_crystal",
+                "space_boot",
+                "space_pizza",
+                "space_pudding",
                 "space_taco",
+                "tape_deck",
+                "tangled_cables",
+                "tinted_visor",
+                "warp_mug",
+
             },
             "minerals": {
                 "titanium_chunk",
@@ -913,26 +1199,51 @@ class Economy(commands.Cog):
 
     @commands.hybrid_command(
         name="claimlegacy",
-        description="Claim your one-time Stardust snapshot payout from before the Shop & Exploration update!"
+        description="Claim your one-time Stardust bonus for being in the server before the **Frontier** update!"
     )
     async def claim_legacy_bonus(self, ctx: commands.Context):
         await ctx.defer()
 
+        # This command only makes sense inside the server.
+        if ctx.guild is None:
+            return await ctx.send(
+                "❌ This command can only be used **inside** The Cosmic Lair server."
+            )
+
         user_id = ctx.author.id
+
+        # September 10, 2026 is the Shop & Exploration update date.
+        # Anyone who joined BEFORE that date is considered a server veteran.
+        eastern = pytz.timezone("US/Eastern")
+        cutoff_date = eastern.localize(datetime(2026, 9, 10))
+
+        joined_at = ctx.author.joined_at
+
+        if joined_at is None:
+            return await ctx.send(
+                "❌ I couldn't determine when you joined The Cosmic Lair server."
+            )
+
+        if joined_at >= cutoff_date:
+            return await ctx.send(
+                "⚠️ **Not Eligible!** "
+                "Sorry! But the legacy veteran bonus is only available to members "
+                "who joined the server before **September 10, 2026!**"
+            )
+
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
-            # Ensure the legacy payout column and migration exist.
             await self.ensure_schema(db)
             await db.commit()
 
             # Lock the transaction so two simultaneous /claimlegacy
-            # commands cannot both redeem the same payout.
+            # commands cannot both redeem the bonus.
             await db.execute("BEGIN IMMEDIATE")
 
             async with db.execute(
                 """
-                SELECT stardust, legacy_payout
+                SELECT stardust, legacy_claimed
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -947,33 +1258,35 @@ class Economy(commands.Cog):
                 )
 
             current_stardust = row[0] or 0
-            legacy_payout = row[1] or 0
+            legacy_claimed = row[1] or 0
 
-            if legacy_payout <= 0:
+            if legacy_claimed:
                 await db.rollback()
                 return await ctx.send(
-                    "⚠️ **Not Eligible or Already Claimed!** "
-                    "Either you weren't Level 5+ when the update snapshot "
-                    "was taken, or you've already redeemed your legacy payout."
+                    "⚠️ **Already Claimed!** "
+                    "You've already redeemed your 5,000 Stardust "
+                    "legacy veteran bonus."
                 )
 
-            # Add the snapshot payout and clear it in the same transaction.
+            legacy_bonus = 5000
+
             await db.execute(
                 """
                 UPDATE users
                 SET stardust = ?,
-                    legacy_payout = 0
+                    legacy_claimed = 1
                 WHERE user_id = ?
                 """,
-                (current_stardust + legacy_payout, user_id)
+                (current_stardust + legacy_bonus, user_id)
             )
 
             await db.commit()
 
         await ctx.send(
-            f"🎉 **Legacy Snapshot Claimed!**\n"
-            f"Thanks for being a server veteran! Your pre-update level "
-            f"snapshot rewarded you with ✨ **{legacy_payout:,} Stardust**!"
+            f"🎉 **Legacy Veteran Bonus Claimed!**\n"
+            f"Thanks for being a server veteran! You received "
+            f"✨ **{legacy_bonus:,} Stardust** as a thank-you for being "
+            f"here before the **Frontier** update."
         )
 
     @commands.Cog.listener()
@@ -983,7 +1296,7 @@ class Economy(commands.Cog):
 
         user_id = message.author.id
         now = time.time()
-        reward = random.randint(10, 25)
+        reward = random.randint(5, 15)
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             await self.ensure_schema(db)

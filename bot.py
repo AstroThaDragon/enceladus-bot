@@ -118,20 +118,25 @@ status_list = [
     "Scanning the cosmos 🌌",
     "Powered by stardust!",
     "Harvesting moon rocks",
-    "Beep boop?",
+    "🎶 Shawtys like a melody in my head... 🎶",
     "Playing FNF",
     "Watching SpongeBob",
     "Guarding the Astral Relic",
     "Chillin' and vibin' with the stars",
     "Calculating the meaning of life...",
-    "Sipping on some cosmic tea ☕",
-    "Waiting for the next big space event 🌠",
-    "Just a bot, living in a cosmic world",
-    "Looking up at the stars and wondering...",
+    "Sipping on some cosmic-flavored tea ☕",
+    "Waiting for the next big space event to occur 🌠",
+    "🎶 I'm just a bot, living in a bot-woooorld... 🎶",
+    "Looking up at the stars and thinking...",
     "Stargazing",
     "Quietly judging your memes",
-    "Reading the latest space news 📰",
-    "Searching for the best space puns... 🪐"
+    "Reading the latest cosmic news 📰",
+    "Searching for the best space puns...",
+    "Listening to 'Coral Chorus'. It's a banger, trust.",
+    "MI HOY MINOY!! ✏️",
+    "🎶 Sweeeet victory, yeah! 🎶",
+    "There were dragons when I was a boy...",
+    "Trolls exist! They steal your socks, but only the left ones. What's up with that?"
 ]
 
 @tasks.loop(minutes=15)
