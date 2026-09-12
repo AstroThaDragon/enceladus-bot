@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 import aiosqlite
 import asyncio
 import time
@@ -9,6 +9,9 @@ import json
 from datetime import datetime, timedelta
 import pytz
 from inventory import add_inventory_item
+
+COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
+
 
 class Exploration(commands.Cog):
     def __init__(self, bot):
@@ -75,6 +78,12 @@ class Exploration(commands.Cog):
             "Your future self briefly appeared, shook their head, and vanished.",
         ]
 
+    def cog_unload(self):
+        getattr(self.cooldown_alert_checker, "cancel")()
+
+    async def cog_load(self):
+        getattr(self.cooldown_alert_checker, "start")()
+
     def get_db_path(self):
         """Return the separate Station economy database."""
         from database import ECONOMY_DB_NAME
@@ -97,6 +106,111 @@ class Exploration(commands.Cog):
             await db.execute("ALTER TABLE users ADD COLUMN knocked_out_until TEXT DEFAULT ''")
         if "active_effects" not in existing_columns:
             await db.execute("ALTER TABLE users ADD COLUMN active_effects TEXT DEFAULT '{}'")
+        if "mining_alert_sent" not in existing_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN mining_alert_sent REAL DEFAULT 0")
+        if "scavenge_alert_sent" not in existing_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN scavenge_alert_sent REAL DEFAULT 0")
+        if "cooldown_alerts" not in existing_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN cooldown_alerts INTEGER DEFAULT 0")
+
+    @tasks.loop(seconds=60)
+    async def cooldown_alert_checker(self):
+        """Check for completed mining/scavenging cooldowns and notify opted-in users."""
+        try:
+            channel = self.bot.get_channel(COOLDOWN_ALERT_CHANNEL_ID)
+
+            if channel is None:
+                return
+
+            db_path = self.get_db_path()
+            current_time = time.time()
+
+            async with aiosqlite.connect(db_path) as db:
+                await self.ensure_schema(db)
+
+                async with db.execute(
+                    """
+                    SELECT
+                        user_id,
+                        last_mined,
+                        last_scavenged,
+                        mining_alert_sent,
+                        scavenge_alert_sent
+                    FROM users
+                    WHERE cooldown_alerts = 1
+                      AND (
+                          last_mined > 0
+                          OR last_scavenged > 0
+                      )
+                    """
+                ) as cursor:
+                    users = await cursor.fetchall()
+
+                for (
+                    user_id,
+                    last_mined,
+                    last_scavenged,
+                    mining_alert_sent,
+                    scavenge_alert_sent
+                ) in users:
+
+                    # Mining cooldown
+                    if (
+                        last_mined
+                        and current_time - last_mined >= self.COOLDOWN_SECONDS
+                        and mining_alert_sent != last_mined
+                    ):
+                        try:
+                            await channel.send(
+                                f"<@{user_id}> ⛏️ **Your mining cooldown is ready!** "
+                                f"You can use `/mine` again."
+                            )
+
+                            await db.execute(
+                                """
+                                UPDATE users
+                                SET mining_alert_sent = ?
+                                WHERE user_id = ?
+                                """,
+                                (last_mined, user_id)
+                            )
+
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass
+
+                    # Scavenging cooldown
+                    if (
+                        last_scavenged
+                        and current_time - last_scavenged >= self.COOLDOWN_SECONDS
+                        and scavenge_alert_sent != last_scavenged
+                    ):
+                        try:
+                            await channel.send(
+                                f"<@{user_id}> 🔎 **Your scavenging cooldown is ready!** "
+                                f"You can use `/scavenge` again."
+                            )
+
+                            await db.execute(
+                                """
+                                UPDATE users
+                                SET scavenge_alert_sent = ?
+                                WHERE user_id = ?
+                                """,
+                                (last_scavenged, user_id)
+                            )
+
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass
+
+                await db.commit()
+
+        except Exception:
+            # Never let the background task die because of one unexpected error.
+            pass
+
+    @cooldown_alert_checker.before_loop
+    async def before_cooldown_alert_checker(self):
+        await self.bot.wait_until_ready()
 
     def game_date(self):
         return datetime.now(pytz.timezone("US/Eastern")).date()
@@ -212,6 +326,116 @@ class Exploration(commands.Cog):
             f"Restored **+{healed_by} HP**! Current Health: ❤️ **{new_hp}/{max_hp} HP** "
             f"*(Items Remaining: {new_count})*"
         )
+
+    @commands.hybrid_command(
+        name="cooldown_alerts",
+        description="Toggle notifications when your mining and scavenging cooldowns finish."
+    )
+    async def cooldown_alerts(self, ctx: commands.Context):
+        await ctx.defer()
+
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+
+            async with db.execute(
+                """
+                SELECT cooldown_alerts, last_mined, last_scavenged
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row:
+                await db.execute(
+                    """
+                    INSERT OR IGNORE INTO users (
+                        user_id,
+                        cooldown_alerts,
+                        mining_alert_sent,
+                        scavenge_alert_sent
+                    )
+                    VALUES (?, 1, 0, 0)
+                    """,
+                    (user_id,)
+                )
+                await db.commit()
+
+                return await ctx.send(
+                    "🔔 **Cooldown Alerts: ON**\n"
+                    "You'll be pinged in the Exploration channel "
+                    "when your mining or scavenging cooldown finishes!"
+                )
+
+            current = bool(row[0])
+            new_value = 0 if current else 1
+
+            if new_value:
+                # Mark the current cooldown state as already seen.
+                # This prevents an immediate notification if the cooldown
+                # was already finished before the user enabled alerts.
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET cooldown_alerts = ?,
+                        mining_alert_sent = COALESCE(last_mined, 0),
+                        scavenge_alert_sent = COALESCE(last_scavenged, 0)
+                    WHERE user_id = ?
+                    """,
+                    (new_value, user_id)
+                )
+            else:
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET cooldown_alerts = ?
+                    WHERE user_id = ?
+                    """,
+                    (new_value, user_id)
+                )
+
+            await db.commit()
+
+        if new_value:
+            await ctx.send(
+                "🔔 **Cooldown Alerts: ON**\n"
+                "You'll be pinged in the Exploration channel "
+                "when your mining or scavenging cooldown finishes!"
+            )
+        else:
+            await ctx.send(
+                "🔕 **Cooldown Alerts: OFF**\n"
+                "You won't receive mining or scavenging cooldown notifications."
+            )
+
+    async def maybe_suggest_cooldown_alerts(self, ctx):
+        """Occasionally suggest cooldown alerts to users who have them disabled."""
+        if random.random() > 0.10:
+            return
+
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+
+            async with db.execute(
+                "SELECT cooldown_alerts FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        if row and not row[0]:
+            await ctx.send(
+                "💡 **Want a little heads-up from time-to-time?** You can use `/cooldown_alerts` "
+                "to get pinged when your mining and/or scavenging cooldown finishes!"
+            )
+
+
 
     @commands.hybrid_command(name="mine", description="Deploy your starship mining laser to scout for Stardust and rare loot!")
     async def mine(self, ctx: commands.Context):
@@ -484,6 +708,7 @@ class Exploration(commands.Cog):
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
         
         await ctx.send(embed=embed)
+        await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds!")
     async def scavenge(self, ctx: commands.Context):
@@ -599,9 +824,10 @@ class Exploration(commands.Cog):
             # --- TIERED SCAVENGING LOOT ROLL ---
             # Legendary loot has a flat 4% chance.
             # Quantum Batteries are exclusive to scavenging.
-            legendary_roll = random.random()
+            loot_roll = random.random()
+            lucky_scanner_active = effects.pop("lucky_scanner", False)
 
-            if legendary_roll >= 0.96:
+            if loot_roll >= 0.96:
                 item_id = "quantum_battery"
                 item_name = "⚛️ Quantum Battery (legendary)"
                 item_type = "consumable"
@@ -610,9 +836,21 @@ class Exploration(commands.Cog):
                     "**Quantum Battery**!"
                 )
 
-            elif random.random() < (0.15 if effects.pop("lucky_scanner", False) else 0.02):
+            elif loot_roll < (0.10 if lucky_scanner_active else 0.02):
                 item_id = "revive_kit"
                 item_name = "💉 Emergency Revival Kit (rare)"
+                item_type = "consumable"
+                loot_rarity_note = ""
+
+            elif loot_roll < (0.20 if lucky_scanner_active else 0.05):
+                item_id = "laser_charge_cell"
+                item_name = "🔋 Laser Charge Cell (rare)"
+                item_type = "consumable"
+                loot_rarity_note = ""
+
+            elif loot_roll < (0.32 if lucky_scanner_active else 0.08):
+                item_id = "drone_battery"
+                item_name = "🔋 Drone Battery Pack (rare)"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
@@ -672,7 +910,9 @@ class Exploration(commands.Cog):
                 overflow_values = {
                     # Legendary / Rare
                     "quantum_battery": 800,
-                    "revive_kit": 300,
+                    "revive_kit": 200,
+                    "laser_charge_cell": 50,
+                    "drone_battery": 50,
 
                     # Space Junk
                     "space_pizza": 10,
@@ -693,7 +933,7 @@ class Exploration(commands.Cog):
                     "tangled_cables": 10,
                     "screaming_crystal": 10,
                     "moon_cheese": 10,
-                    "golden_spatula": 10,
+                    "golden_spatula": 60,
                     "parking_ticket": 10,
                     "floating_plant": 10,
                     "tinted_visor": 10,
@@ -750,6 +990,7 @@ class Exploration(commands.Cog):
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
 
         await ctx.send(embed=embed)
+        await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(
         name="revive",

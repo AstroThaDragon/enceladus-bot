@@ -41,7 +41,8 @@ async def init_economy_db():
                 medkits INTEGER DEFAULT 0,
                 bio TEXT DEFAULT 'Exploring the outer rims of Enceladus Station. 🚀',
                 profile_card TEXT DEFAULT 'default_nebula',
-                equipped_title TEXT DEFAULT ''
+                equipped_title TEXT DEFAULT '',
+                cooldown_alerts INTEGER DEFAULT 0
             )
         """)
 
@@ -118,7 +119,8 @@ async def init_db(db_path: str = DB_NAME):
             "nanite_patchs": "INTEGER DEFAULT 0",
             "medkits": "INTEGER DEFAULT 0",
             "bio": "TEXT DEFAULT 'Exploring the outer rims of Enceladus Station. 🚀'",
-            "profile_card": "TEXT DEFAULT 'default_nebula'"
+            "profile_card": "TEXT DEFAULT 'default_nebula'",
+            "cooldown_alerts": "INTEGER DEFAULT 0"
         }
 
         for col, col_def in columns_to_add.items():

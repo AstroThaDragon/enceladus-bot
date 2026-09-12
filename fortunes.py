@@ -434,10 +434,15 @@ class Fortunes(commands.Cog):
                                 """
                                 UPDATE users
                                 SET last_broken_streak = 0,
+                                    last_fortune_streak_date = ?,
                                     active_effects = ?
                                 WHERE user_id = ?
                                 """,
-                                (json.dumps(active_effects), user_id)
+                                (
+                                    yesterday_et,
+                                    json.dumps(active_effects),
+                                    user_id
+                                )
                             )
                         else:
                             if streak >= 3:  # Only mention if they lose a streak of 3 or more for spam reasons
@@ -541,7 +546,7 @@ class Fortunes(commands.Cog):
         # Easter window: Good Friday through the following Sunday
         easter_date = self.get_easter_date(today.year)
         easter_start = easter_date - datetime.timedelta(days=2)
-        easter_end = easter_date + datetime.timedelta(days=7)
+        easter_end = easter_date
 
         if easter_start <= today <= easter_end:
             return "easter"

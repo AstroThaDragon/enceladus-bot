@@ -8,6 +8,232 @@ import time
 from datetime import datetime
 import pytz
 
+class ShopCategorySelect(discord.ui.Select):
+    def __init__(self, shop_view):
+        self.shop_view = shop_view
+
+        options = [
+            discord.SelectOption(
+                label="Healing",
+                emoji="❤️",
+                value="healing",
+                description="Nanite patches, medkits, and revival items."
+            ),
+            discord.SelectOption(
+                label="Recharge",
+                emoji="🔋",
+                value="recharge",
+                description="Mining laser and scavenging drone recharge items."
+            ),
+            discord.SelectOption(
+                label="Upgrades",
+                emoji="🛠️",
+                value="upgrades",
+                description="Temporary equipment and exploration upgrades."
+            ),
+            discord.SelectOption(
+                label="Pet Items",
+                emoji="🐾",
+                value="pet_items",
+                description="Items for your station pet."
+            ),
+            discord.SelectOption(
+                label="Special",
+                emoji="✨",
+                value="special",
+                description="Rare and unusual station items."
+            ),
+            discord.SelectOption(
+                label="Backgrounds",
+                emoji="🖼️",
+                value="backgrounds",
+                description="Profile background vouchers."
+            ),
+            discord.SelectOption(
+                label="Daily Offers",
+                emoji="🔄",
+                value="daily",
+                description="Today's rotating station offers."
+            ),
+        ]
+
+        super().__init__(
+            placeholder="📂 Select a shop category...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.shop_view.user_id:
+            return await interaction.response.send_message(
+                "⚠️ This shop menu belongs to the person who opened it.",
+                ephemeral=True
+            )
+
+        category = self.values[0]
+
+        embed = self.shop_view.build_embed(category)
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=self.shop_view
+        )
+
+
+class ShopView(discord.ui.View):
+    def __init__(self, cog, user_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+
+        self.add_item(ShopCategorySelect(self))
+
+    def build_embed(self, category):
+        cog = self.cog
+
+        embed = discord.Embed(
+            title="🛒 Enceladus Station Trading Post",
+            color=discord.Color.from_rgb(0, 229, 255)
+        )
+
+        if category == "healing":
+            embed.description = (
+                "❤️ **Medical Supplies**\n"
+                "Keep yourself alive out there, explorer."
+            )
+
+            item_ids = [
+                "nanite_patch",
+                "medkit",
+                "revive",
+                "full_revive",
+            ]
+
+        elif category == "recharge":
+            embed.description = (
+                "🔋 **Power & Recharge Supplies**\n"
+                "Restore charges to your mining laser or scavenging drone."
+            )
+
+            item_ids = [
+                "laser_charge_cell",
+                "laser_power_cell",
+                "fuel_refill",
+                "drone_battery",
+                "drone_power_cell",
+                "drone_quantum_battery",
+            ]
+
+        elif category == "upgrades":
+            embed.description = (
+                "🛠️ **Station Upgrades**\n"
+                "Special equipment to improve your next expedition."
+            )
+
+            item_ids = [
+                item_id
+                for item_id in cog.daily_rotation()
+                if item_id in {
+                    "fuel_stabilizer",
+                    "hazard_shield",
+                    "lucky_scanner",
+                    "ore_magnet",
+                    "prototype_drill_bit",
+                    "cosmic_insurance",
+                    "fate_anchor",
+                    "stardust_cache",
+                }
+            ]
+
+        elif category == "pet_items":
+            embed.description = (
+                "🐾 **Pet Supplies**\n"
+                "Because even station companions need snacks."
+            )
+
+            item_ids = [
+                "pet_snack",
+            ]
+
+        elif category == "special":
+            embed.description = (
+                "✨ **Special Items**\n"
+                "Unusual technology with unusual consequences."
+            )
+
+            item_ids = [
+                "time_crystal",
+            ]
+
+        elif category == "backgrounds":
+            embed.description = (
+                "🖼️ **Profile Backgrounds**\n"
+                "Customize the look of your station profile."
+            )
+
+            item_ids = [
+                "neon_grid",
+                "deep_void",
+                "solaris_ring",
+            ]
+
+        elif category == "daily":
+            embed.description = (
+                "🔄 **Daily Rotating Offers**\n"
+                f"Today's station market — **{cog.rotation_date()}**\n\n"
+                "These offers rotate at midnight Eastern time."
+            )
+
+            for item_id in cog.daily_rotation():
+                item = cog.ROTATING_ITEMS[item_id]
+                limit_text = cog.shop_limit_text(item_id)
+
+                embed.add_field(
+                    name=item["name"],
+                    value=(
+                        f"💰 Price: **{item['cost']:,} Stardust**\n"
+                        f"📖 {item['desc']}\n"
+                        f"📦 **Purchase Limit:** "
+                        f"{limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
+                    ),
+                    inline=False
+                )
+
+            embed.set_footer(
+                text="Use /shop buy to purchase an item."
+            )
+
+            return embed
+
+        else:
+            item_ids = []
+
+        for item_id in item_ids:
+            item = cog.SHOP_ITEMS.get(item_id)
+
+            if not item:
+                continue
+
+            limit_text = cog.shop_limit_text(item_id)
+
+            embed.add_field(
+                name=item["name"],
+                value=(
+                    f"💰 Price: **{item['cost']:,} Stardust**\n"
+                    f"📖 {item['desc']}\n"
+                    f"📦 **Purchase Limit:** "
+                    f"{limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
+                ),
+                inline=False
+            )
+
+        embed.set_footer(
+            text="Use /shop buy to purchase an item."
+        )
+
+        return embed
+
 class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -32,19 +258,49 @@ class Economy(commands.Cog):
                 "name": "⚕️ Revival Kit",
                 "cost": 350,
                 "type": "revive",
-                "desc": "Immediately revives an unconscious explorer at 50% HP."
+                "desc": "Immediately revives an unconscious explorer at 35% HP."
             },
             "full_revive": {
                 "name": "⚕️ Emergency Full Revival",
-                "cost": 600,
+                "cost": 800,
                 "type": "revive",
                 "desc": "Immediately revives an unconscious explorer at full HP."
             },
-            "fuel_refill": {
-                "name": "⚡ Emergency Fuel Cell",
-                "cost": 700,
+            "laser_charge_cell": {
+                "name": "🔋 Laser Charge Cell",
+                "cost": 400,
                 "type": "consumable",
-                "desc": "Instantly refills your starship mining laser back to 10/10 charges."
+                "desc": "Restores 2 mining laser charges."
+            },
+            "laser_power_cell": {
+                "name": "⚡ Laser Power Cell",
+                "cost": 750,
+                "type": "consumable",
+                "desc": "Restores 5 mining laser charges."
+            },
+            "fuel_refill": {
+                "name": "⚛️ Laser Quantum Cell",
+                "cost": 1200,
+                "type": "consumable",
+                "desc": "Instantly refills your mining laser to 10/10 charges."
+            },
+            "drone_battery": {
+                "name": "🔋 Drone Battery Pack",
+                "cost": 400,
+                "type": "consumable",
+                "desc": "Restores 2 scavenge charges."
+            },
+            "drone_power_cell": {
+                "name": "⚡ Drone Power Cell",
+                "cost": 750,
+                "type": "consumable",
+                "desc": "Restores 5 scavenge charges."
+            },
+            "drone_quantum_battery": {
+                "name": "⚛️ Drone Quantum Battery",
+                "cost": 1200,
+                "type": "consumable",
+                "desc": "Instantly refills your scavenging drone to 10/10 charges."
             },
             "pet_snack": {
                 "name": "🧬 Cosmic Bio-Feed (Pet Snack)",
@@ -120,7 +376,6 @@ class Economy(commands.Cog):
             "fuel_stabilizer": {"name": "🛢️ Fuel Stabilizer", "cost": 800, "desc": "Makes your next mining run cost no fuel charge."},
             "station_rations": {"name": "🥫 Station Rations", "cost": 150, "desc": "Restores a modest 15 HP."},
             "hazard_shield": {"name": "🛡️ Hazard Shield", "cost": 1000, "desc": "Blocks the next scavenging hazard."},
-            "drone_battery": {"name": "🔋 Drone Battery Pack", "cost": 900, "desc": "Restores two scavenge charges."},
             "lucky_scanner": {"name": "📡 Deep-Space Scanner", "cost": 700, "desc": "Improves rare-find odds on your next scavenging run."},
             "ore_magnet": {"name": "🧲 Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
             "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
@@ -141,7 +396,12 @@ class Economy(commands.Cog):
             "nanite_patch": (10, "daily"),
             "medkit": (5, "daily"),
             "full_revive": (2, "weekly"),
-            "fuel_refill": (3, "daily"),
+            "laser_charge_cell": (5, "daily"),
+            "laser_power_cell": (3, "daily"),
+            "fuel_refill": (2, "daily"),
+            "drone_battery": (5, "daily"),
+            "drone_power_cell": (3, "daily"),
+            "drone_quantum_battery": (2, "daily"),
             "pet_snack": (30, "daily"),
             "time_crystal": (2, "monthly"),
 
@@ -149,7 +409,6 @@ class Economy(commands.Cog):
             "fuel_stabilizer": (5, "daily"),
             "station_rations": (15, "daily"),
             "hazard_shield": (5, "daily"),
-            "drone_battery": (5, "daily"),
             "lucky_scanner": (5, "daily"),
             "ore_magnet": (5, "daily"),
             "prototype_drill_bit": (5, "daily"),
@@ -214,6 +473,32 @@ class Economy(commands.Cog):
 
         return f" • Limit: {limit} {labels.get(period, period)}"
 
+    async def record_shop_purchase(self, db, user_id, item_id, quantity):
+        """Record a successful shop purchase against the item's current limit period."""
+        limit_info = self.SHOP_LIMITS.get(item_id)
+
+        if not limit_info:
+            return
+
+        max_quantity, period = limit_info
+        period_key = self.purchase_period_key(period)
+
+        await db.execute(
+            """
+            INSERT INTO shop_purchase_limits
+                (user_id, item_id, period_key, quantity)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, item_id, period_key)
+            DO UPDATE SET quantity = quantity + excluded.quantity
+            """,
+            (
+                user_id,
+                item_id,
+                period_key,
+                quantity
+            )
+        )
+
     async def ensure_schema(self, db):
         async with db.execute("PRAGMA table_info(users)") as cursor:
             rows = await cursor.fetchall()
@@ -275,47 +560,26 @@ class Economy(commands.Cog):
         )
 
         
-    @commands.hybrid_group(name="shop", description="Browse and trade at the Enceladus Station Trading Post.")
+    @commands.hybrid_group(
+        name="shop",
+        description="Browse and trade at the Enceladus Station Trading Post."
+    )
     async def shop(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
-            embed = discord.Embed(
-                title="🛒 Enceladus Station Trading Post",
-                description="Use `/shop buy` to purchase items, or `/shop sell` to turn in salvaged space junk for Stardust.",
-                color=discord.Color.from_rgb(0, 229, 255)
+            view = ShopView(self, ctx.author.id)
+
+            embed = view.build_embed("healing")
+
+            await ctx.send(
+                embed=embed,
+                view=view
             )
-
-            for item_id, details in self.SHOP_ITEMS.items():
-                limit_text = self.shop_limit_text(item_id)
-
-                embed.add_field(
-                    name=details["name"],
-                    value=(
-                        f"💰 Price: **{details['cost']:,} Stardust**\n"
-                        f"📖 {details['desc']}\n"
-                        f"📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
-                    ),
-                    inline=False
-                )
-
-            rotation = self.daily_rotation()
-            rotating_text = "\n".join(
-                f"{self.ROTATING_ITEMS[item_id]['name']} — **{self.ROTATING_ITEMS[item_id]['cost']} Stardust**"
-                for item_id in rotation
-            )
-            embed.add_field(
-                name=f"🔄 Daily Rotating Offers — {self.rotation_date()}",
-                value=f"Use `/shop rotating` for descriptions and `/shop buy` to purchase.\n{rotating_text}",
-                inline=False,
-            )
-
-            embed.set_footer(text="Tip: Check your wallet balance using /profile")
-            await ctx.send(embed=embed)
 
     @shop.command(name="rotating", description="View today's three rotating-shop offers.")
     async def rotating(self, ctx: commands.Context):
         rotation = self.daily_rotation()
         embed = discord.Embed(
-            title=f"🔄 Daily Station Market — {self.rotation_date()}",
+            title=f"🔄 Daily Station Market",
             description="These three offers rotate at midnight Eastern time for the entire station.",
             color=discord.Color.purple(),
         )
@@ -549,21 +813,8 @@ class Economy(commands.Cog):
                         f"**{item['name']}** this {period}."
                     )
 
-                added_amount, new_quantity, max_quantity = await add_inventory_item(
-                    db,
-                    user_id,
-                    item_id,
-                    item_info.get("type", item.get("type", "consumable")),
-                    quantity
-                )
-
-                if added_amount != quantity:
+                if quantity > remaining:
                     await db.rollback()
-                    return await ctx.send(
-                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
-                        f"**{item['name']}**.\n"
-                        f"You currently have **{new_quantity}x**."
-                    )
 
             # Backgrounds are individual permanent unlocks.
             # They cannot be purchased in bulk.
@@ -623,6 +874,29 @@ class Economy(commands.Cog):
                     (new_stardust, user_id)
                 )
 
+                # Record this purchase against the item's current limit period.
+                limit_info = self.SHOP_LIMITS.get(item_id)
+
+                if limit_info:
+                    max_quantity, period = limit_info
+                    period_key = self.purchase_period_key(period)
+
+                    await db.execute(
+                        """
+                        INSERT INTO shop_purchase_limits
+                            (user_id, item_id, period_key, quantity)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(user_id, item_id, period_key)
+                        DO UPDATE SET quantity = quantity + excluded.quantity
+                        """,
+                        (
+                            user_id,
+                            item_id,
+                            period_key,
+                            quantity
+                        )
+                    )
+
                 await db.commit()
 
                 if item_type == "title":
@@ -659,6 +933,10 @@ class Economy(commands.Cog):
                     (new_stardust, user_id)
                 )
 
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
+                )
+
                 await db.commit()
 
                 return await ctx.send(
@@ -667,32 +945,38 @@ class Economy(commands.Cog):
                     f"**{cost:,} Stardust**!"
                 )
 
-            if item["type"] == "consumable" and item_id == "fuel_refill":
-                added_amount, new_quantity, max_quantity = await add_inventory_item(
-                    db,
-                    user_id,
-                    item_id,
-                    "consumable",
-                    quantity
+            if item["type"] == "consumable" and item_id in {
+                "fuel_refill",
+                "laser_charge_cell",
+                "laser_power_cell",
+                "drone_battery",
+                "drone_power_cell",
+                "drone_quantum_battery",
+            }:
+                await db.execute(
+                    """
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'consumable', ?)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET
+                        item_type = excluded.item_type,
+                        quantity = quantity + excluded.quantity
+                    """,
+                    (user_id, item_id, quantity)
                 )
-
-                if added_amount != quantity:
-                    await db.rollback()
-                    return await ctx.send(
-                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
-                        f"**{item['name']}**.\n"
-                        f"You currently have **{new_quantity}x**."
-                    )
 
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
                     (new_stardust, user_id)
                 )
 
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
+                )
+
                 await db.commit()
 
                 return await ctx.send(
-                    f"⚡ **Purchase Successful!** Added **{quantity}x "
+                    f"🔋 **Purchase Successful!** Added **{quantity}x "
                     f"{item['name']}** to your inventory for "
                     f"**{cost:,} Stardust**!"
                 )
@@ -717,6 +1001,10 @@ class Economy(commands.Cog):
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
                     (new_stardust, user_id)
+                )
+
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
                 )
 
                 await db.commit()
@@ -754,6 +1042,10 @@ class Economy(commands.Cog):
                     (new_stardust, quantity, user_id)
                 )
 
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
+                )
+
                 await db.commit()
 
                 return await ctx.send(
@@ -789,6 +1081,10 @@ class Economy(commands.Cog):
                 await db.execute(
                     "UPDATE users SET stardust = ? WHERE user_id = ?",
                     (new_stardust, user_id)
+                )
+
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
                 )
 
                 await db.commit()
@@ -842,6 +1138,10 @@ class Economy(commands.Cog):
                     WHERE user_id = ?
                     """,
                     (new_stardust, quantity, user_id)
+                )
+
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
                 )
 
                 await db.commit()
@@ -915,8 +1215,9 @@ class Economy(commands.Cog):
         return choices[:25]
 
     @shop.command(name="sell", description="Sell salvaged space junk from your inventory for Stardust.")
-    @app_commands.describe(item="Choose the space junk you want to sell.")
-    @app_commands.autocomplete(item=shop_sell_autocomplete)
+    @app_commands.describe(
+        item="The junk item ID to sell, or 'all' to sell every piece of space junk."
+    )
     async def sell(self, ctx: commands.Context, item: str):
         await ctx.defer()
 
@@ -925,49 +1226,48 @@ class Economy(commands.Cog):
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
-            # Ensure any required schema exists before the transaction.
-            await self.ensure_schema(db)
-            await db.commit()
-
-            # Serialize the entire sale so two simultaneous sales cannot
-            # both spend the same inventory quantity.
-            await db.execute("BEGIN IMMEDIATE")
 
             # Option A: Sell ALL space junk
             if target_item == "all":
                 async with db.execute(
-                    "SELECT item_id, quantity "
-                    "FROM inventory "
-                    "WHERE user_id = ? AND item_type = 'space_junk' AND quantity > 0",
+                    """
+                    SELECT item_id, quantity
+                    FROM inventory
+                    WHERE user_id = ?
+                      AND item_type = 'space_junk'
+                      AND quantity > 0
+                    """,
                     (user_id,)
                 ) as cursor:
                     junk_rows = await cursor.fetchall()
 
                 if not junk_rows:
-                    await db.rollback()
                     return await ctx.send(
                         "🎒 **Inventory Empty!** You don't have any space junk to sell."
                     )
 
                 total_payout = sum(
-                    self.JUNK_PRICES.get(row[0], 25) * (row[1] or 1)
-                    for row in junk_rows
-                )
-                item_count = sum(
-                    row[1] or 1
-                    for row in junk_rows
+                    self.JUNK_PRICES.get(item_id, 25) * quantity
+                    for item_id, quantity in junk_rows
                 )
 
+                item_count = sum(quantity for _, quantity in junk_rows)
+
                 await db.execute(
-                    "DELETE FROM inventory "
-                    "WHERE user_id = ? AND item_type = 'space_junk'",
+                    """
+                    DELETE FROM inventory
+                    WHERE user_id = ?
+                      AND item_type = 'space_junk'
+                    """,
                     (user_id,)
                 )
 
                 await db.execute(
-                    "UPDATE users "
-                    "SET stardust = stardust + ? "
-                    "WHERE user_id = ?",
+                    """
+                    UPDATE users
+                    SET stardust = stardust + ?
+                    WHERE user_id = ?
+                    """,
                     (total_payout, user_id)
                 )
 
@@ -978,40 +1278,67 @@ class Economy(commands.Cog):
                     f"for a total of ✨ **{total_payout:,} Stardust**!"
                 )
 
-            # Option B: Sell a SINGLE specific junk item
+            # Option B: Sell ONE unit of a specific junk item
             async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                """
+                SELECT quantity
+                FROM inventory
+                WHERE user_id = ?
+                  AND item_id = ?
+                  AND item_type = 'space_junk'
+                """,
                 (user_id, target_item)
             ) as cursor:
                 row = await cursor.fetchone()
 
             if not row or (row[0] or 0) <= 0:
-                return await ctx.send(f"❌ You don't have `{target_item}` in your space junk inventory!")
+                return await ctx.send(
+                    f"❌ You don't have `{target_item}` in your space junk inventory!"
+                )
 
+            quantity = row[0] or 0
             payout = self.JUNK_PRICES.get(target_item, 25)
-            new_quantity = (row[0] or 0) - 1
 
-            if new_quantity > 0:
+            if quantity > 1:
                 await db.execute(
-                    "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
-                    (new_quantity, user_id, target_item)
+                    """
+                    UPDATE inventory
+                    SET quantity = quantity - 1
+                    WHERE user_id = ?
+                      AND item_id = ?
+                      AND item_type = 'space_junk'
+                    """,
+                    (user_id, target_item)
                 )
             else:
                 await db.execute(
-                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                    """
+                    DELETE FROM inventory
+                    WHERE user_id = ?
+                      AND item_id = ?
+                      AND item_type = 'space_junk'
+                    """,
                     (user_id, target_item)
                 )
 
             await db.execute(
-                "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                """
+                UPDATE users
+                SET stardust = stardust + ?
+                WHERE user_id = ?
+                """,
                 (payout, user_id)
             )
+
             await db.commit()
 
-        await ctx.send(
-            f"🛍️ **Salvage Vendor:** Sold `{target_item}` "
-            f"for ✨ **{payout} Stardust**!"
-        )
+            remaining = quantity - 1
+
+            await ctx.send(
+                f"🛍️ **Salvage Vendor:** Sold **1x `{target_item}`** "
+                f"for ✨ **{payout:,} Stardust**!\n"
+                f"📦 **Remaining:** `{remaining}x`"
+            )
 
     async def item_category_autocomplete(
         self,
@@ -1025,8 +1352,8 @@ class Economy(commands.Cog):
             ("🎒 Consumables", "consumables"),
             ("🐾 Pet Items", "pet_items"),
             ("✨ Special", "special"),
-            ("🗑️ Space Junk A–M", "junk_am"),
-            ("🗑️ Space Junk N–Z", "junk_nz"),
+            ("🗑️ Space Junk A-M", "junk_am"),
+            ("🗑️ Space Junk N-Z", "junk_nz"),
             ("💎 Minerals", "minerals"),
             ("🏷️ Titles", "titles"),
             ("🖼️ Backgrounds", "backgrounds"),
@@ -1076,6 +1403,11 @@ class Economy(commands.Cog):
             },
             "consumables": {
                 "fuel_refill",
+                "laser_charge_cell",
+                "laser_power_cell",
+                "drone_battery",
+                "drone_power_cell",
+                "drone_quantum_battery",
             },
             "pet_items": {
                 "pet_snack",
@@ -1322,7 +1654,7 @@ class Economy(commands.Cog):
 
             last_reward = row[0] or 0
 
-            if now - last_reward < 120:
+            if now - last_reward < 180:
                 await db.rollback()
                 return
 

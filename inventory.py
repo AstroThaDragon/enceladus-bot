@@ -13,7 +13,12 @@ import random
 # Master Item Registry used across inventory, shop, and exploration
 ITEM_REGISTRY = {
     # Currencies & Consumables
-    "fuel_refill": {"name": "Emergency Fuel Cell", "emoji": "⚡", "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser back to 10/10 charges."},
+    "laser_charge_cell": {"name": "Laser Charge Cell", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 mining laser charges."},
+    "laser_power_cell": {"name": "Laser Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 mining laser charges."},
+    "fuel_refill": {"name": "Laser Quantum Cell", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser back to 10/10 charges."},
+    "drone_battery": {"name": "Drone Battery Pack", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 scavenge charges."},
+    "drone_power_cell": {"name": "Drone Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
+    "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to 10/10 charges."},
     "pet_snack": {"name": "Cosmic Bio-Feed", "emoji": "🧬", "max_quantity": 50, "type": "Consumable", "desc": "Nutrient pack for your station pet."},
     "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 100, "type": "Currency", "desc": "Shiny token for future station mini-games."},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
@@ -25,7 +30,6 @@ ITEM_REGISTRY = {
     "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": "🛢️", "max_quantity": 5, "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
     "station_rations": {"name": "Station Rations", "emoji": "🥫", "max_quantity": 99, "type": "Consumable", "desc": "Restores 15 HP."},
     "hazard_shield": {"name": "Hazard Shield", "emoji": "🛡️", "max_quantity": 5, "type": "Consumable", "desc": "Blocks the next scavenging hazard."},
-    "drone_battery": {"name": "Drone Battery Pack", "emoji": "🔋", "max_quantity": 5, "type": "Consumable", "desc": "Restores two scavenge charges."},
     "lucky_scanner": {"name": "Deep-Space Scanner", "emoji": "📡", "max_quantity": 5, "type": "Consumable", "desc": "Improves rare-find odds on the next scavenging run."},
     "ore_magnet": {"name": "Ore Magnet", "emoji": "🧲", "max_quantity": 5, "type": "Consumable", "desc": "Guarantees a titanium ore find on the next mining run."},
     "prototype_drill_bit": {"name": "Prototype Drill Bit", "emoji": "⚙️", "max_quantity": 5, "type": "Consumable", "desc": "Boosts Stardust from the next mining run."},
@@ -279,8 +283,19 @@ class Inventory(commands.Cog):
         user_id = ctx.author.id
 
         async with aiosqlite.connect(self.get_db_path()) as db:
-            # 1. Fetch standard items from the inventory table
-            async with db.execute("SELECT item_id, item_type, quantity FROM inventory WHERE user_id = ?", (user_id,)) as cursor:
+            # 1. Fetch standard items from the inventory table.
+            # Healing items and time crystals are tracked in the users table below,
+            # so exclude them here to prevent duplicate inventory entries from
+            # older deployments that may have stored them in the inventory table.
+            async with db.execute(
+                """
+                SELECT item_id, item_type, quantity
+                FROM inventory
+                WHERE user_id = ?
+                AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit')
+                """,
+                (user_id,)
+            ) as cursor:
                 inv_rows = await cursor.fetchall()
 
             # 2. Fetch healing items and time crystals from the users table
@@ -360,11 +375,21 @@ class Inventory(commands.Cog):
             if current_chunk:
                 chunks.append(current_chunk)
 
+            category_names = {
+                "Space Junk": "Space Junk",
+                "Mineral": "Minerals",
+                "Consumable": "Consumables",
+                "Voucher": "Vouchers",
+                "Currency": "Currencies",
+            }
+
             for index, chunk in enumerate(chunks):
+                display_category = category_names.get(cat_name, cat_name)
+
                 field_name = (
-                    f"✨ {cat_name}s"
+                    f"✨ {display_category}"
                     if len(chunks) == 1
-                    else f"✨ {cat_name}s ({index + 1}/{len(chunks)})"
+                    else f"✨ {display_category} ({index + 1}/{len(chunks)})"
                 )
 
                 embed.add_field(
@@ -388,10 +413,14 @@ class Inventory(commands.Cog):
         # Items that /use currently supports.
         usable_items = {
             "fuel_refill",
+            "laser_charge_cell",
+            "laser_power_cell",
+            "drone_battery",
+            "drone_power_cell",
+            "drone_quantum_battery",
             "fuel_stabilizer",
             "station_rations",
             "hazard_shield",
-            "drone_battery",
             "lucky_scanner",
             "ore_magnet",
             "prototype_drill_bit",
@@ -469,12 +498,17 @@ class Inventory(commands.Cog):
     async def _use_item_impl(self, ctx: commands.Context, item_id: str):
         user_id = ctx.author.id
         item_id = item_id.lower().strip()
+
         valid = {
             "fuel_refill",
+            "laser_charge_cell",
+            "laser_power_cell",
+            "drone_battery",
+            "drone_power_cell",
+            "drone_quantum_battery",
             "fuel_stabilizer",
             "station_rations",
             "hazard_shield",
-            "drone_battery",
             "lucky_scanner",
             "ore_magnet",
             "prototype_drill_bit",
@@ -483,44 +517,154 @@ class Inventory(commands.Cog):
             "stardust_cache",
             "quantum_battery",
         }
+
         if item_id not in valid:
-            return await ctx.send("❌ That item cannot be used here. Use `/revive` for an Emergency Revival Kit.")
+            return await ctx.send(
+                "❌ That item cannot be used here. Use `/revive` for an Emergency Revival Kit."
+            )
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             await self.ensure_effect_schema(db)
-            async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id)) as cursor:
-                row = await cursor.fetchone()
-            if not row or (row[0] or 0) <= 0:
-                return await ctx.send(f"❌ You do not have `{item_id}` in your inventory.")
 
-            async with db.execute("SELECT hp, max_hp, mining_charges, scavenge_charges, last_mined, last_scavenged, active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                """
+                SELECT quantity
+                FROM inventory
+                WHERE user_id = ? AND item_id = ?
+                """,
+                (user_id, item_id)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row or (row[0] or 0) <= 0:
+                return await ctx.send(
+                    f"❌ You do not have `{item_id}` in your inventory."
+                )
+
+            async with db.execute(
+                """
+                SELECT hp, max_hp, mining_charges, scavenge_charges,
+                       last_mined, last_scavenged, active_effects
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
                 user = await cursor.fetchone()
+
             if not user:
-                return await ctx.send("❌ Profile not found! Explore Enceladus first.")
+                return await ctx.send(
+                    "❌ Profile not found! Explore Enceladus first."
+                )
+
             hp, max_hp, mining, scavenging, last_mined, last_scavenged, effects_raw = user
             effects = json.loads(effects_raw or "{}")
             message = ""
 
-            if item_id == "fuel_refill":
+            if item_id == "laser_charge_cell":
                 if (mining or 0) >= 10:
-                    return await ctx.send("⚠️ Your mining laser fuel charges are already full (`10/10`)!")
-                mining = 10
+                    return await ctx.send(
+                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                    )
+
+                mining = min(10, (mining or 0) + 2)
+
                 await db.execute(
                     "UPDATE users SET mining_charges = ? WHERE user_id = ?",
                     (mining, user_id)
                 )
-                message = "⚡ **Fuel Cell Used!** Your mining laser is refilled to `10/10` charges."
+
+                message = f"🔋 Mining laser charges restored to **{mining}/10**."
+
+            elif item_id == "laser_power_cell":
+                if (mining or 0) >= 10:
+                    return await ctx.send(
+                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                    )
+
+                mining = min(10, (mining or 0) + 5)
+
+                await db.execute(
+                    "UPDATE users SET mining_charges = ? WHERE user_id = ?",
+                    (mining, user_id)
+                )
+
+                message = f"⚡ Mining laser charges restored to **{mining}/10**."
+
+            elif item_id == "fuel_refill":
+                if (mining or 0) >= 10:
+                    return await ctx.send(
+                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                    )
+
+                mining = 10
+
+                await db.execute(
+                    "UPDATE users SET mining_charges = ? WHERE user_id = ?",
+                    (mining, user_id)
+                )
+
+                message = "🌌 Mining laser fully recharged to **10/10**."
+
+            elif item_id == "drone_battery":
+                if (scavenging or 0) >= 10:
+                    return await ctx.send(
+                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                    )
+
+                scavenging = min(10, (scavenging or 0) + 2)
+
+                await db.execute(
+                    "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
+                    (scavenging, user_id)
+                )
+
+                message = f"🔋 Scavenge drone charges restored to **{scavenging}/10**."
+
+            elif item_id == "drone_power_cell":
+                if (scavenging or 0) >= 10:
+                    return await ctx.send(
+                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                    )
+
+                scavenging = min(10, (scavenging or 0) + 5)
+
+                await db.execute(
+                    "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
+                    (scavenging, user_id)
+                )
+
+                message = f"⚡ Scavenge drone charges restored to **{scavenging}/10**."
+
+            elif item_id == "drone_quantum_battery":
+                if (scavenging or 0) >= 10:
+                    return await ctx.send(
+                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                    )
+
+                scavenging = 10
+
+                await db.execute(
+                    "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
+                    (scavenging, user_id)
+                )
+
+                message = "🌌 Scavenge drone fully recharged to **10/10**."
 
             elif item_id == "station_rations":
                 if (hp or 0) <= 0:
-                    return await ctx.send("💀 Rations cannot revive an unconscious explorer.")
+                    return await ctx.send(
+                        "💀 Rations cannot revive an unconscious explorer."
+                    )
 
                 old_hp = hp or 0
                 hp = min(max_hp or 100, old_hp + 15)
                 restored = hp - old_hp
 
                 if restored <= 0:
-                    return await ctx.send("⚠️ Your HP is already full!")
+                    return await ctx.send(
+                        "⚠️ Your HP is already full!"
+                    )
 
                 await db.execute(
                     "UPDATE users SET hp = ? WHERE user_id = ?",
@@ -532,24 +676,14 @@ class Inventory(commands.Cog):
                     f"Current health: **{hp}/{max_hp or 100}**."
                 )
 
-            elif item_id == "drone_battery":
-                if (scavenging or 0) >= 10:
-                    return await ctx.send(
-                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
-                    )
-
-                scavenging = min(10, (scavenging or 0) + 2)
-                await db.execute(
-                    "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
-                    (scavenging, user_id)
-                )
-                message = f"🔋 Drone charges restored to **{scavenging}/10**."
             elif item_id == "stardust_cache":
                 payout = random.randint(150, 700)
+
                 await db.execute(
                     "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
                     (payout, user_id)
                 )
+
                 message = f"🎁 Cache opened: **{payout:,} Stardust** recovered."
 
             elif item_id == "quantum_battery":
@@ -560,10 +694,12 @@ class Inventory(commands.Cog):
                     )
 
                 effects["quantum_battery"] = True
+
                 await db.execute(
                     "UPDATE users SET active_effects = ? WHERE user_id = ?",
                     (json.dumps(effects), user_id)
                 )
+
                 message = (
                     "⚛️ **Quantum Battery Activated!**\n"
                     "Your next mining or scavenging run will produce "
@@ -588,6 +724,7 @@ class Inventory(commands.Cog):
                     )
 
                 effects[item_id] = True
+
                 await db.execute(
                     "UPDATE users SET active_effects = ? WHERE user_id = ?",
                     (json.dumps(effects), user_id)
@@ -608,9 +745,27 @@ class Inventory(commands.Cog):
                     f"your {labels[item_id]}."
                 )
 
-            if row[0] > 1: await db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?", (user_id, item_id))
-            else: await db.execute("DELETE FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id))
+            # Consume exactly one item after a successful use.
+            if row[0] > 1:
+                await db.execute(
+                    """
+                    UPDATE inventory
+                    SET quantity = quantity - 1
+                    WHERE user_id = ? AND item_id = ?
+                    """,
+                    (user_id, item_id)
+                )
+            else:
+                await db.execute(
+                    """
+                    DELETE FROM inventory
+                    WHERE user_id = ? AND item_id = ?
+                    """,
+                    (user_id, item_id)
+                )
+
             await db.commit()
+
         await ctx.send(message)
 
     @commands.hybrid_command(name="status", description="View your health, exploration charges, and cooldowns.")
