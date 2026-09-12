@@ -210,7 +210,7 @@ class ShopView(discord.ui.View):
             item_ids = []
 
         for item_id in item_ids:
-            item = cog.SHOP_ITEMS.get(item_id)
+            item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
 
             if not item:
                 continue
@@ -575,41 +575,6 @@ class Economy(commands.Cog):
                 view=view
             )
 
-    @shop.command(name="rotating", description="View today's three rotating-shop offers.")
-    async def rotating(self, ctx: commands.Context):
-        rotation = self.daily_rotation()
-        embed = discord.Embed(
-            title=f"🔄 Daily Station Market",
-            description="These three offers rotate at midnight Eastern time for the entire station.",
-            color=discord.Color.purple(),
-        )
-        for item_id in rotation:
-            item = self.ROTATING_ITEMS[item_id]
-            limit_text = self.shop_limit_text(item_id)
-
-            embed.add_field(
-                name=item["name"],
-                value=(
-                    f"💰 **{item['cost']:,} Stardust**\n"
-                    f"{item['desc']}\n"
-                    f"📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
-                ),
-                inline=False
-            )
-        await ctx.send(embed=embed)
-
-    @shop.command(name="browse", description="Browse the permanent catalog and today's rotating offers.")
-    async def browse(self, ctx: commands.Context):
-        embed = discord.Embed(
-            title="🛒 Enceladus Station Trading Post",
-            description="Use `/shop buy` to purchase items., or `/shop sell` to sell salvage.",
-            color=discord.Color.from_rgb(0, 229, 255),
-        )
-        for item_id, details in self.SHOP_ITEMS.items():
-            embed.add_field(name=details["name"], value=f"💰 **{details['cost']} Stardust**\n{details['desc']}", inline=False)
-        embed.set_footer(text="Use /shop rotating to view today's temporary offers.")
-        await ctx.send(embed=embed)
-
     async def shop_buy_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -737,17 +702,17 @@ class Economy(commands.Cog):
 
                 current_quantity = (inventory_row[0] or 0) if inventory_row else 0
 
+            # Lock the database before checking inventory, balance, and
+            # purchase limits so the entire purchase is atomic.
+            await db.execute("BEGIN IMMEDIATE")
+
             if current_quantity + quantity > max_stack:
+                await db.rollback()
                 return await ctx.send(
                     f"📦 **Inventory Full!** You can only hold **{max_stack}x** "
                     f"**{item_info['name']}**.\n"
                     f"You currently have **{current_quantity}x**."
                 )
-
-            # Lock the database for the entire purchase transaction.
-            # This prevents two simultaneous purchases from spending
-            # the same Stardust balance.
-            await db.execute("BEGIN IMMEDIATE")
 
             # Check user's Stardust balance and current health state.
             async with db.execute(
@@ -812,9 +777,6 @@ class Economy(commands.Cog):
                         f"You can only buy **{remaining} more** "
                         f"**{item['name']}** this {period}."
                     )
-
-                if quantity > remaining:
-                    await db.rollback()
 
             # Backgrounds are individual permanent unlocks.
             # They cannot be purchased in bulk.

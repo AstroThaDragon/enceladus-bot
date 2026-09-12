@@ -5,7 +5,6 @@ import aiosqlite
 import asyncio
 import time
 import json
-import random
 from datetime import datetime
 import pytz
 import random
@@ -379,6 +378,7 @@ class Inventory(commands.Cog):
                 "Space Junk": "Space Junk",
                 "Mineral": "Minerals",
                 "Consumable": "Consumables",
+                "Healing": "Healing",
                 "Voucher": "Vouchers",
                 "Currency": "Currencies",
             }
