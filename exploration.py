@@ -783,7 +783,7 @@ class Exploration(commands.Cog):
                 return await ctx.send(f"⚠️ **Scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
 
             if charges <= 0:
-                return await ctx.send("🚨 **Drone Depleted!** You are out of scavenge charges. Visit the station shop for a recharge.")
+                return await ctx.send("🚨 **Drone Depleted!** You are out of scavenge charges. Visit the station shop for a recharge or wait until daily reset.")
 
             junk_items = {
                 "space_pizza": "🍕 Dehydrated Space Pizza (slightly freezer-burned)",

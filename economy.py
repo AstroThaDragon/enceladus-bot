@@ -186,13 +186,28 @@ class ShopView(discord.ui.View):
             )
 
             for item_id in cog.daily_rotation():
-                item = cog.ROTATING_ITEMS[item_id]
+                item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
+                if not item:
+                    continue
+
+                is_permanent = item_id in cog.SHOP_ITEMS
+
+                if is_permanent:
+                    daily_cost = int(item["cost"] * 0.85)
+                    price_text = (
+                        f"💰 ~~{item['cost']:,}~~ → **{daily_cost:,} Stardust** 🔥\n"
+                        "🏷️ **15% Daily Discount**"
+                    )
+                else:
+                    daily_cost = item["cost"]
+                    price_text = f"💰 Price: **{daily_cost:,} Stardust**"
+
                 limit_text = cog.shop_limit_text(item_id)
 
                 embed.add_field(
                     name=item["name"],
                     value=(
-                        f"💰 Price: **{item['cost']:,} Stardust**\n"
+                        f"{price_text}\n"
                         f"📖 {item['desc']}\n"
                         f"📦 **Purchase Limit:** "
                         f"{limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
@@ -201,7 +216,7 @@ class ShopView(discord.ui.View):
                 )
 
             embed.set_footer(
-                text="Use /shop buy to purchase an item."
+                text="Use /shop_buy to purchase an item."
             )
 
             return embed
@@ -229,7 +244,7 @@ class ShopView(discord.ui.View):
             )
 
         embed.set_footer(
-            text="Use /shop buy to purchase an item."
+            text="Use /shop_buy to purchase an item."
         )
 
         return embed
@@ -304,7 +319,7 @@ class Economy(commands.Cog):
             },
             "pet_snack": {
                 "name": "🧬 Cosmic Bio-Feed (Pet Snack)",
-                "cost": 350,
+                "cost": 200,
                 "type": "consumable",
                 "desc": "Nutrient pack used to feed your station pet companion."
             },
@@ -427,9 +442,24 @@ class Economy(commands.Cog):
         return datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
 
     def daily_rotation(self):
-        """Return the same three distinct offers for every user on a given day."""
+        """Return the same three distinct offers for every user on a given day.
+
+        Daily Offers can feature any normal shop item, including permanent
+        shop items and rotating items, but exclude backgrounds and titles.
+        """
+        excluded_types = {"background_voucher", "title"}
+        eligible_items = []
+
+        for item_id, item in self.SHOP_ITEMS.items():
+            if item.get("type") not in excluded_types:
+                eligible_items.append(item_id)
+
+        for item_id, item in self.ROTATING_ITEMS.items():
+            if item.get("type") not in excluded_types and item_id not in eligible_items:
+                eligible_items.append(item_id)
+
         generator = random.Random(f"enceladus-rotation-{self.rotation_date()}")
-        return generator.sample(list(self.ROTATING_ITEMS), k=3)
+        return generator.sample(eligible_items, k=3)
 
     def get_db_path(self):
         """Return the separate Station economy database."""
@@ -560,20 +590,19 @@ class Economy(commands.Cog):
         )
 
         
-    @commands.hybrid_group(
+    @commands.hybrid_command(
         name="shop",
-        description="Browse and trade at the Enceladus Station Trading Post."
+        description="Open the Enceladus Station Trading Post."
     )
     async def shop(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            view = ShopView(self, ctx.author.id)
+        view = ShopView(self, ctx.author.id)
 
-            embed = view.build_embed("healing")
+        embed = view.build_embed("healing")
 
-            await ctx.send(
-                embed=embed,
-                view=view
-            )
+        await ctx.send(
+            embed=embed,
+            view=view
+        )
 
     async def shop_buy_autocomplete(
         self,
@@ -584,6 +613,7 @@ class Economy(commands.Cog):
         current = current.lower().strip()
 
         available_items = []
+        seen_items = set()
 
         # Permanent shop items.
         for item_id, info in self.SHOP_ITEMS.items():
@@ -598,9 +628,13 @@ class Economy(commands.Cog):
                     value=item_id
                 )
             )
+            seen_items.add(item_id)
 
-        # Today's rotating items.
+        # Today's rotating-only items.
         for item_id in self.daily_rotation():
+            if item_id in seen_items:
+                continue
+
             info = self.ROTATING_ITEMS.get(item_id)
             if not info:
                 continue
@@ -616,12 +650,16 @@ class Economy(commands.Cog):
                     value=item_id
                 )
             )
+            seen_items.add(item_id)
 
         available_items.sort(key=lambda choice: choice.name.lower())
 
         return available_items[:25]
 
-    @shop.command(name="buy", description="Purchase an item from the station vendor catalog.")
+    @commands.hybrid_command(
+        name="shop_buy",
+        description="Purchase an item from the station vendor catalog."
+    )
     @app_commands.describe(
         item_id="Choose an item to purchase.",
         quantity="How many would you like to buy? (1-99)"
@@ -645,7 +683,7 @@ class Economy(commands.Cog):
         if rotating_item and item_id not in self.daily_rotation():
             return await ctx.send(
                 "⏳ That item is not in today's rotating market. "
-                "Check `/shop rotating` for the current offers."
+                "Check `/shop` and select 🔄️ Daily Offers for the current offers."
             )
 
         item = self.SHOP_ITEMS.get(item_id) or rotating_item
@@ -653,7 +691,16 @@ class Economy(commands.Cog):
         if item is None:
             return await ctx.send("❌ That item could not be loaded from the shop catalog.")
 
-        unit_cost = item["cost"]
+        # Permanent items receive 15% off when featured in today's Daily Offers.
+        # Rotating-only items keep their normal listed price.
+        is_daily_offer = item_id in self.daily_rotation()
+        is_permanent_item = item_id in self.SHOP_ITEMS
+
+        if is_daily_offer and is_permanent_item:
+            unit_cost = int(item["cost"] * 0.85)
+        else:
+            unit_cost = item["cost"]
+
         cost = unit_cost * quantity
 
         db_path = self.get_db_path()
@@ -1176,7 +1223,10 @@ class Economy(commands.Cog):
 
         return choices[:25]
 
-    @shop.command(name="sell", description="Sell salvaged space junk from your inventory for Stardust.")
+    @commands.hybrid_command(
+        name="shop_sell",
+        description="Sell salvaged space junk from your inventory for Stardust."
+    )
     @app_commands.describe(
         item="The junk item ID to sell, or 'all' to sell every piece of space junk."
     )
@@ -1349,13 +1399,15 @@ class Economy(commands.Cog):
             "healing": {
                 "nanite_patch",
                 "medkit",
-                "full_revive",
+                "revive",
                 "revive_kit",
+                "full_revive",
             },
+
             "upgrades": {
                 "fuel_stabilizer",
+                "station_rations",
                 "hazard_shield",
-                "drone_battery",
                 "lucky_scanner",
                 "ore_magnet",
                 "prototype_drill_bit",
@@ -1363,20 +1415,26 @@ class Economy(commands.Cog):
                 "fate_anchor",
                 "stardust_cache",
             },
+
             "consumables": {
-                "fuel_refill",
                 "laser_charge_cell",
                 "laser_power_cell",
+                "fuel_refill",
                 "drone_battery",
                 "drone_power_cell",
                 "drone_quantum_battery",
+                "quantum_battery",
+                "time_crystal",
             },
+
             "pet_items": {
                 "pet_snack",
             },
+
             "special": {
-                "time_crystal",
+                "astral_core",
             },
+
             "junk_am": {
                 "alien_artifact",
                 "alien_fossil",
@@ -1396,6 +1454,7 @@ class Economy(commands.Cog):
                 "meteorite",
                 "moon_cheese",
             },
+
             "junk_nz": {
                 "parking_ticket",
                 "pet_rock",
@@ -1413,26 +1472,30 @@ class Economy(commands.Cog):
                 "tangled_cables",
                 "tinted_visor",
                 "warp_mug",
-
             },
+
             "minerals": {
                 "titanium_chunk",
             },
+
             "titles": {
                 "title_outer_rim_wanderer",
                 "title_starborn",
                 "title_voidfarer",
             },
+
             "backgrounds": {
                 "neon_grid",
                 "deep_void",
                 "solaris_ring",
             },
+
             "vouchers": {
                 "neon_grid",
                 "deep_void",
                 "solaris_ring",
             },
+
             "currency": {
                 "arcade_token",
             },
