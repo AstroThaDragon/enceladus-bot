@@ -245,6 +245,7 @@ class ShopView(discord.ui.View):
 class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.VAULT_CAPACITY = 250_000
         
         # Define shop catalog
         self.SHOP_ITEMS = {
@@ -599,6 +600,197 @@ class Economy(commands.Cog):
         )
 
         
+    @commands.hybrid_group(
+        name="bank",
+        description="Manage your Stardust bank."
+    )
+    async def bank(self, ctx: commands.Context):
+        """Show your available Stardust and stored vault balance."""
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                (user_id,)
+            )
+            await db.commit()
+
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        stardust = row[0] if row else 0
+        vault = row[1] if row else 0
+        total = stardust + vault
+
+        embed = discord.Embed(
+            title=f"🏦 {ctx.author.display_name}'s Stardust Bank",
+            description=(
+                f"💫 **Available:** {stardust:,} Stardust\n"
+                f"🔐 **Vault:** {vault:,} Stardust\n\n"
+                f"📊 **Total owned:** {total:,} Stardust"
+            ),
+            color=discord.Color.from_rgb(0, 229, 255)
+        )
+        embed.add_field(
+            name="🔐 Vault",
+            value=(
+                "Store Stardust here so it cannot be spent by shop purchases or other normal spending. "
+                "Use `/bank deposit` and `/bank withdraw` to move it."
+            ),
+            inline=False
+        )
+        embed.set_footer(text="Enceladus Station Economy")
+
+        await ctx.send(embed=embed)
+
+    @bank.command(
+        name="vault",
+        description="View your protected Stardust vault."
+    )
+    async def bank_vault(self, ctx: commands.Context):
+        """Show the Stardust stored safely in the vault."""
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                (user_id,)
+            )
+            await db.commit()
+
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        stardust = row[0] if row else 0
+        vault = row[1] if row else 0
+
+        embed = discord.Embed(
+            title="🔐 Stardust Vault",
+            description=(
+                f"Your vault contains **{vault:,} Stardust**.\n\n"
+                "Stardust stored here is protected from normal spending.\n"
+                "Use `/bank deposit` to store more or `/bank withdraw` to take it back out."
+            ),
+            color=discord.Color.from_rgb(120, 90, 220)
+        )
+        embed.add_field(name="💫 Available to Spend", value=f"{stardust:,} Stardust")
+        embed.add_field(name="🔐 Protected in Vault", value=f"{vault:,} Stardust")
+        embed.set_footer(text="Enceladus Station Economy")
+
+        await ctx.send(embed=embed)
+
+    @bank.command(
+        name="deposit",
+        description="Move Stardust into your protected vault."
+    )
+    @app_commands.describe(amount="How much Stardust to store in the vault")
+    async def bank_deposit(self, ctx: commands.Context, amount: int):
+        """Deposit available Stardust into the protected vault."""
+        if amount <= 0:
+            return await ctx.send("⚠️ The deposit amount must be greater than 0.")
+
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                (user_id,)
+            )
+            await db.commit()
+
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            stardust, vault = row if row else (0, 0)
+
+            if amount > stardust:
+                await db.rollback()
+                return await ctx.send(
+                    f"💸 You only have **{stardust:,} Stardust** available to deposit."
+                )
+
+            if vault + amount > self.VAULT_CAPACITY:
+                await db.rollback()
+                remaining_space = max(0, self.VAULT_CAPACITY - vault)
+                return await ctx.send(
+                    f"🔐 Your vault can only hold **{self.VAULT_CAPACITY:,} Stardust**. "
+                    f"You can deposit **{remaining_space:,}** Stardust."
+                )
+
+            await db.execute(
+                "UPDATE users SET stardust = ?, vault_stardust = ? WHERE user_id = ?",
+                (stardust - amount, vault + amount, user_id)
+            )
+            await db.commit()
+
+        await ctx.send(
+            f"🔐 Deposited **{amount:,} Stardust** into your vault. "
+            f"Your vault now holds **{vault + amount:,} Stardust**."
+        )
+
+    @bank.command(
+        name="withdraw",
+        description="Move Stardust from your vault back to your spendable balance."
+    )
+    @app_commands.describe(amount="How much Stardust to withdraw from the vault")
+    async def bank_withdraw(self, ctx: commands.Context, amount: int):
+        """Withdraw Stardust from the protected vault."""
+        if amount <= 0:
+            return await ctx.send("⚠️ The withdrawal amount must be greater than 0.")
+
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                (user_id,)
+            )
+            await db.commit()
+
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            stardust, vault = row if row else (0, 0)
+
+            if amount > vault:
+                await db.rollback()
+                return await ctx.send(
+                    f"🔐 You only have **{vault:,} Stardust** stored in your vault."
+                )
+
+            await db.execute(
+                "UPDATE users SET stardust = ?, vault_stardust = ? WHERE user_id = ?",
+                (stardust + amount, vault - amount, user_id)
+            )
+            await db.commit()
+
+        await ctx.send(
+            f"💫 Withdrew **{amount:,} Stardust** from your vault. "
+            f"You now have **{stardust + amount:,} Stardust** available to spend."
+        )
+
     @commands.hybrid_command(
         name="shop",
         description="Open the Enceladus Station Trading Post."

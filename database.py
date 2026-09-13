@@ -25,6 +25,7 @@ async def init_economy_db():
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 stardust INTEGER DEFAULT 0,
+                vault_stardust INTEGER DEFAULT 0,
                 hp INTEGER DEFAULT 100,
                 max_hp INTEGER DEFAULT 100,
                 mining_charges INTEGER DEFAULT 10,
@@ -77,6 +78,7 @@ async def init_db(db_path: str = DB_NAME):
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 stardust INTEGER DEFAULT 0,
+                vault_stardust INTEGER DEFAULT 0,
                 xp INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
                 hp INTEGER DEFAULT 100,
@@ -104,6 +106,7 @@ async def init_db(db_path: str = DB_NAME):
 
         columns_to_add = {
             "stardust": "INTEGER DEFAULT 0",
+            "vault_stardust": "INTEGER DEFAULT 0",
             "hp": "INTEGER DEFAULT 100",
             "max_hp": "INTEGER DEFAULT 100",
             "mining_charges": "INTEGER DEFAULT 10",
