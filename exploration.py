@@ -702,7 +702,7 @@ class Exploration(commands.Cog):
         }
 
         embed = discord.Embed(
-            title=f"🌌 Starship Mining Log — {ctx.author.mention}",
+            title=f"🌌 Starship Mining Log — {ctx.author.display_name}",
             description=(
                 f"Laser beam fired into the debris field...\n\n"
                 f"{loot_description}"
@@ -711,7 +711,7 @@ class Exploration(commands.Cog):
         )
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
         
-        await ctx.send(embed=embed)
+        await ctx.send(content=ctx.author.mention, embed=embed)
         await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds!")
@@ -980,7 +980,7 @@ class Exploration(commands.Cog):
         status_text = f"❤️ **Health:** `{new_hp}/{max_hp} HP`" if new_hp > 0 else f"💀 **Knocked Out!** Use `/revive`, buy `/shop buy full_revive`, or recover at 50% HP on **{knocked_out_until}**."
 
         embed = discord.Embed(
-            title=f"🛠️ Derelict Salvage Log — {ctx.author.mention}",
+            title=f"🛰️ Derelict Salvage Log — {ctx.author.display_name}",
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
                 f"✨ **Found Stardust:** `{found_stardust}`"
@@ -994,7 +994,7 @@ class Exploration(commands.Cog):
         )
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
 
-        await ctx.send(embed=embed)
+        await ctx.send(content=ctx.author.mention, embed=embed)
         await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(
