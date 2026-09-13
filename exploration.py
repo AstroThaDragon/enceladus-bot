@@ -822,12 +822,13 @@ class Exploration(commands.Cog):
             }
             
             # --- TIERED SCAVENGING LOOT ROLL ---
-            # Legendary loot has a flat 4% chance.
+            # Quantum Batteries have a 2% base chance.
+            # The Deep-Space Scanner boosts that to 4%.
             # Quantum Batteries are exclusive to scavenging.
             loot_roll = random.random()
             lucky_scanner_active = effects.pop("lucky_scanner", False)
 
-            if loot_roll >= 0.96:
+            if loot_roll >= (0.96 if lucky_scanner_active else 0.98):
                 item_id = "quantum_battery"
                 item_name = "⚛️ Quantum Battery (legendary)"
                 item_type = "consumable"
