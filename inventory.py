@@ -38,7 +38,7 @@ ITEM_REGISTRY = {
 
     # Legendary Loot
     "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. May be used in the future..."},
-    "quantum_battery": {"name": "Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Powers your next mining or scavenging run, tripling its Stardust yield."},
+    "quantum_battery": {"name": "Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Minerals
     "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": "⛏️", "max_quantity": 50, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
@@ -693,17 +693,25 @@ class Inventory(commands.Cog):
                         "Use `/mine` or `/scavenge` first."
                     )
 
+                current_mining = mining or 0
+                current_scavenge = scavenging or 0
+                new_mining = min(10, current_mining + 5)
+                new_scavenge = min(10, current_scavenge + 5)
+                mining_added = new_mining - current_mining
+                scavenge_added = new_scavenge - current_scavenge
+
                 effects["quantum_battery"] = True
 
                 await db.execute(
-                    "UPDATE users SET active_effects = ? WHERE user_id = ?",
-                    (json.dumps(effects), user_id)
+                    "UPDATE users SET mining_charges = ?, scavenge_charges = ?, active_effects = ? WHERE user_id = ?",
+                    (new_mining, new_scavenge, json.dumps(effects), user_id)
                 )
 
                 message = (
                     "⚛️ **Quantum Battery Activated!**\n"
-                    "Your next mining or scavenging run will produce "
-                    "**3x Stardust**!"
+                    f"🔫 Mining laser: **+{mining_added}** charges → **{new_mining}/10**\n"
+                    f"🤖 Scavenging drone: **+{scavenge_added}** charges → **{new_scavenge}/10**\n"
+                    "✨ Your next mining or scavenging run will produce **3x Stardust**!"
                 )
 
             else:

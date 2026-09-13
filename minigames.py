@@ -653,22 +653,72 @@ class Minigames(commands.Cog):
     DICE_PAYOUTS = {
         "low": 2,       # 2-6: 2x total return, 41.7% hit chance.
         "high": 2,      # 8-12: 2x total return, 41.7% hit chance.
-        "seven": 5,     # Exact 7: 5x total return, 16.7% hit chance.
+        "seven": 3,     # Exact 7: 5x total return, 16.7% hit chance.
     }
 
     TRIVIA_QUESTIONS = [
-        ("Which planet has the shortest day in the Solar System?", ["Jupiter", "Mercury", "Mars", "Neptune"], 0),
-        ("Which moon is famous for its thick nitrogen atmosphere and methane lakes?", ["Europa", "Titan", "Io", "Triton"], 1),
-        ("What is the largest volcano in the Solar System?", ["Olympus Mons", "Mauna Kea", "Elysium Mons", "Maxwell Montes"], 0),
-        ("Which planet is known for having the strongest winds in the Solar System?", ["Saturn", "Uranus", "Neptune", "Venus"], 2),
-        ("What is the primary component of the Sun?", ["Oxygen", "Hydrogen", "Helium", "Carbon"], 1),
-        ("Which spacecraft was the first to enter interstellar space?", ["Voyager 1", "Voyager 2", "New Horizons", "Pioneer 10"], 0),
-        ("Which planet has the Great Red Spot?", ["Jupiter", "Saturn", "Neptune", "Mars"], 0),
-        ("What is the name of Saturn's largest moon?", ["Rhea", "Titan", "Enceladus", "Iapetus"], 1),
-        ("Which dwarf planet is located in the Kuiper Belt?", ["Ceres", "Vesta", "Pluto", "Io"], 2),
-        ("What galaxy contains our Solar System?", ["Andromeda", "Triangulum", "Whirlpool", "Milky Way"], 3),
-        ("Which planet rotates on its side with an axial tilt of about 98 degrees?", ["Uranus", "Venus", "Saturn", "Mercury"], 0),
-        ("What is the name of the boundary beyond which the Sun's solar wind is no longer dominant?", ["Magnetopause", "Heliopause", "Photosphere", "Roche limit"], 1),
+        ('Which planet has the shortest day in the Solar System?', ['Jupiter', 'Mercury', 'Mars', 'Neptune'], 0),
+        ('Which moon is famous for its thick nitrogen atmosphere and methane lakes?', ['Europa', 'Titan', 'Io', 'Triton'], 1),
+        ('What is the largest volcano in the Solar System?', ['Olympus Mons', 'Mauna Kea', 'Elysium Mons', 'Maxwell Montes'], 0),
+        ('Which planet is known for having the strongest winds in the Solar System?', ['Saturn', 'Uranus', 'Neptune', 'Venus'], 2),
+        ('What is the primary component of the Sun?', ['Oxygen', 'Hydrogen', 'Helium', 'Carbon'], 1),
+        ('Which spacecraft was the first to enter interstellar space?', ['Voyager 1', 'Voyager 2', 'New Horizons', 'Pioneer 10'], 0),
+        ('Which planet has the Great Red Spot?', ['Jupiter', 'Saturn', 'Neptune', 'Mars'], 0),
+        ("What is the name of Saturn's largest moon?", ['Rhea', 'Titan', 'Enceladus', 'Iapetus'], 1),
+        ('Which dwarf planet is located in the Kuiper Belt?', ['Ceres', 'Vesta', 'Pluto', 'Io'], 2),
+        ('What galaxy contains our Solar System?', ['Andromeda', 'Triangulum', 'Whirlpool', 'Milky Way'], 3),
+        ('Which planet rotates on its side with an axial tilt of about 98 degrees?', ['Uranus', 'Venus', 'Saturn', 'Mercury'], 0),
+        ("What is the name of the boundary beyond which the Sun's solar wind is no longer dominant?", ['Magnetopause', 'Heliopause', 'Photosphere', 'Roche limit'], 1),
+        ('What is the largest planet in our Solar System?', ['Saturn', 'Jupiter', 'Neptune', 'Earth'], 1),
+        ('Which planet is closest to the Sun?', ['Venus', 'Earth', 'Mars', 'Mercury'], 3),
+        ('Which planet is known for its prominent ring system?', ['Uranus', 'Saturn', 'Neptune', 'Jupiter'], 1),
+        ("What is the name of Earth's natural satellite?", ['Europa', 'Phobos', 'The Moon', 'Titan'], 2),
+        ('Which planet is often called the Red Planet?', ['Venus', 'Mars', 'Jupiter', 'Mercury'], 1),
+        ('Which planet is the hottest in our Solar System?', ['Mercury', 'Mars', 'Jupiter', 'Venus'], 3),
+        ('What type of object is the Sun?', ['Comet', 'Asteroid', 'Star', 'Planet'], 2),
+        ('Which planet has the Great Red Spot?', ['Neptune', 'Mars', 'Jupiter', 'Saturn'], 2),
+        ('What is the smallest planet in our Solar System?', ['Earth', 'Venus', 'Mercury', 'Mars'], 2),
+        ('Which planet is famous for rotating on its side?', ['Saturn', 'Uranus', 'Venus', 'Neptune'], 1),
+        ('Which planet is farthest from the Sun?', ['Jupiter', 'Saturn', 'Neptune', 'Uranus'], 2),
+        ('What is the asteroid belt primarily located between?', ['Earth and Mars', 'Jupiter and Saturn', 'Venus and Earth', 'Mars and Jupiter'], 3),
+        ('Which planet has the shortest year?', ['Venus', 'Mercury', 'Mars', 'Earth'], 1),
+        ('Which planet has the longest day, measured by one rotation?', ['Mercury', 'Jupiter', 'Venus', 'Mars'], 2),
+        ("What is a space rock called when it survives passage through Earth's atmosphere and reaches the ground?", ['Asteroid', 'Meteor', 'Comet', 'Meteorite'], 3),
+        ("What is the glowing streak produced when a space rock enters Earth's atmosphere?", ['Meteorite', 'Meteor', 'Asteroid', 'Moon'], 1),
+        ('What is the icy object that develops a tail when it approaches the Sun?', ['Planet', 'Comet', 'Asteroid', 'Meteorite'], 1),
+        ('Which moon is the largest moon in the Solar System?', ['Titan', 'Europa', 'Callisto', 'Ganymede'], 3),
+        ('Which moon is famous for its subsurface ocean and icy surface?', ['Europa', 'Titan', 'Triton', 'Phobos'], 0),
+        ('Which moon is known for its thick atmosphere and methane lakes?', ['Io', 'Europa', 'Titan', 'Ganymede'], 2),
+        ('Which moon of Mars is the larger of the two?', ['Deimos', 'Phobos', 'Triton', 'Titan'], 1),
+        ('Which planet has the moon Triton?', ['Saturn', 'Jupiter', 'Neptune', 'Uranus'], 2),
+        ('Which moon of Jupiter is known for intense volcanic activity?', ['Europa', 'Callisto', 'Ganymede', 'Io'], 3),
+        ('What is the name of the region beyond Neptune containing many icy bodies?', ['Van Allen Belt', 'Kuiper Belt', 'Asteroid Belt', 'Oort Belt'], 1),
+        ('What is the enormous, distant cloud of icy objects thought to surround the Solar System?', ['Heliosphere', 'Asteroid Belt', 'Oort Cloud', 'Kuiper Belt'], 2),
+        ('What force keeps planets in orbit around the Sun?', ['Gravity', 'Magnetism', 'Electricity', 'Friction'], 0),
+        ("What is the name of the boundary where the Sun's solar wind meets interstellar space?", ['Photosphere', 'Magnetopause', 'Event Horizon', 'Heliopause'], 3),
+        ('What is the visible surface of the Sun called?', ['Corona', 'Photosphere', 'Core', 'Chromosphere'], 1),
+        ('Which layer of the Sun is its outer atmosphere?', ['Photosphere', 'Radiative Zone', 'Corona', 'Core'], 2),
+        ('Where does nuclear fusion occur inside the Sun?', ['Chromosphere', 'Core', 'Corona', 'Photosphere'], 1),
+        ('What element makes up most of the Sun?', ['Carbon', 'Iron', 'Oxygen', 'Hydrogen'], 3),
+        ('What is a supernova?', ['A type of comet', 'A galaxy collision', 'A powerful stellar explosion', 'A newborn planet'], 2),
+        ('What remains after a massive star explodes as a supernova, if its core collapses into an extremely dense object?', ['Red giant', 'Neutron star or black hole', 'Gas giant', 'White dwarf'], 1),
+        ('What type of star is the Sun classified as?', ['White dwarf', 'Red giant', 'Neutron star', 'G-type main-sequence star'], 3),
+        ('What is a white dwarf?', ['A giant planet', 'A type of galaxy', 'The dense remnant of a low- or medium-mass star', 'A newborn star'], 2),
+        ('What is a neutron star?', ['A type of planet', 'An extremely dense stellar remnant', 'A comet nucleus', 'A failed galaxy'], 1),
+        ('What is a pulsar?', ['A type of asteroid', 'A solar flare', 'A young galaxy', 'A rapidly rotating neutron star that emits beams of radiation'], 3),
+        ('What is the boundary around a black hole beyond which light cannot escape?', ['Accretion disk', 'Photosphere', 'Event horizon', 'Heliopause'], 2),
+        ('What is an accretion disk?', ['A cloud of frozen comets', "A planet's ring system", 'A disk of matter spiraling around a massive object', "A galaxy's outer edge"], 2),
+        ('What galaxy contains our Solar System?', ['Whirlpool', 'Milky Way', 'Andromeda', 'Triangulum'], 1),
+        ('What type of galaxy is the Milky Way?', ['Irregular galaxy', 'Ring galaxy', 'Elliptical galaxy', 'Barred spiral galaxy'], 3),
+        ('Which galaxy is expected to eventually interact and merge with the Milky Way?', ['Whirlpool', 'Sombrero', 'Andromeda', 'Triangulum'], 2),
+        ('What is a galaxy?', ['A type of black hole', 'A huge collection of stars, gas, dust, and dark matter', 'A cluster of planets only', 'A single enormous star'], 1),
+        ('What is the name of the galaxy nearest to the Milky Way among the major spiral galaxies?', ['Cartwheel Galaxy', 'Whirlpool Galaxy', 'Sombrero Galaxy', 'Andromeda Galaxy'], 3),
+        ('What does NASA stand for?', ['National Aeronautics and Space Administration', 'National Aerospace Science Association', 'North American Space Administration', 'National Astronomy and Space Agency'], 0),
+        ('Which spacecraft was the first human-made object to enter interstellar space?', ['Pioneer 10', 'New Horizons', 'Voyager 1', 'Apollo 11'], 2),
+        ('Which mission first landed humans on the Moon?', ['Apollo 13', 'Gemini 4', 'Apollo 8', 'Apollo 11'], 3),
+        ('What was the first artificial satellite launched into space?', ['Explorer 1', 'Sputnik 1', 'Apollo 1', 'Vostok 1'], 1),
+        ('Which spacecraft explored Pluto during its historic 2015 flyby?', ['Juno', 'Cassini', 'Voyager 2', 'New Horizons'], 3),
+        ('Which spacecraft orbited Saturn and studied the planet and its moons for many years?', ['Cassini', 'Galileo', 'Magellan', 'Juno'], 0),
     ]
 
     def __init__(self, bot):
@@ -1265,13 +1315,17 @@ class Minigames(commands.Cog):
             )
 
         question, options, answer = random.choice(self.TRIVIA_QUESTIONS)
-        reward = 150
-        view = TriviaView(self, interaction, question, options, answer, reward)
+        shuffled_options = list(options)
+        correct_answer = shuffled_options[answer]
+        random.shuffle(shuffled_options)
+        shuffled_answer = shuffled_options.index(correct_answer)
+        reward = 100
+        view = TriviaView(self, interaction, question, shuffled_options, shuffled_answer, reward)
         embed = discord.Embed(
             title="🚀 Enceladus Space Trivia",
             description=(
                 f"**{question}**\n\nChoose the answer before the terminal times out.\n"
-                f"💰 Correct answer: **+{reward:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**"
+                f"💰 Correct answer: **+{reward:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n🔀 Answer choices are shuffled each time."
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
