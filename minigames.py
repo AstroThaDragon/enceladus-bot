@@ -44,16 +44,20 @@ class BlackjackView(discord.ui.View):
     def hand_text(self, hand):
         return " ".join(self.card_text(card) for card in hand)
 
-    def build_embed(self, finished=False, status=None):
+    def build_embed(self, finished=False, status=None, show_entry_fee=True):
         player_total = self.hand_value(self.player)
         dealer_text = self.hand_text(self.dealer) if finished else f"{self.card_text(self.dealer[0])} 🂠"
         dealer_total = self.hand_value(self.dealer) if finished else "?"
+
         description = (
             f"**Your hand:** {self.hand_text(self.player)}  → **{player_total}**\n"
             f"**Dealer:** {dealer_text}  → **{dealer_total}**\n\n"
-            f"💰 Bet: **{self.bet:,} Stardust**\n"
-            "🪙 Entry fee: **1 Arcade Coin**"
+            f"💰 Bet: **{self.bet:,} Stardust**"
         )
+
+        if show_entry_fee and not finished:
+            description += "\n🪙 Entry fee: **1 Arcade Coin**"
+
         if status:
             description += f"\n\n{status}"
         else:
@@ -175,7 +179,10 @@ class BlackjackView(discord.ui.View):
             return
         message = self.message
         if message is not None:
-            await message.edit(embed=self.build_embed(), view=self)
+            await message.edit(
+                embed=self.build_embed(show_entry_fee=False),
+                view=self
+            )
 
     async def dealer_turn(self):
         while self.hand_value(self.dealer) < 17:
@@ -1183,8 +1190,11 @@ class Minigames(commands.Cog):
         player = [deck.pop(), deck.pop()]
         dealer = [deck.pop(), deck.pop()]
         view = BlackjackView(self, interaction, bet, deck, player, dealer)
-        await interaction.followup.send(embed=view.build_embed(), view=view)
-        view.message = await interaction.original_response()
+        view.message = await interaction.followup.send(
+            embed=view.build_embed(),
+            view=view,
+            wait=True
+        )
 
         player_total = view.hand_value(player)
         dealer_total = view.hand_value(dealer)
@@ -1345,8 +1355,11 @@ class Minigames(commands.Cog):
             button.callback = callback
             view.add_item(button)
 
-        await interaction.response.send_message(embed=embed, view=view)
-        view.message = await interaction.original_response()
+        view.message = await interaction.followup.send(
+            embed=view.build_embed(),
+            view=view,
+            wait=True
+        )
 
     @commands.hybrid_command(
         name="minigames",
