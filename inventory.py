@@ -19,7 +19,7 @@ ITEM_REGISTRY = {
     "drone_power_cell": {"name": "Drone Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
     "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to 10/10 charges."},
     "pet_snack": {"name": "Cosmic Bio-Feed", "emoji": "🧬", "max_quantity": 50, "type": "Consumable", "desc": "Nutrient pack for your station pet."},
-    "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 100, "type": "Currency", "desc": "Shiny token for future station mini-games."},
+    "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 100, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": "🩹", "max_quantity": 50, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
     "medkit": {"name": "Field Trauma Medkit", "emoji": "🧰", "max_quantity": 25, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},

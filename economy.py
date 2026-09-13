@@ -1708,7 +1708,10 @@ class Economy(commands.Cog):
             },
         }
 
-        allowed_items = category_map.get(category, set())
+        allowed_items = category_map.get(category)
+
+        if allowed_items is None:
+            allowed_items = ITEM_REGISTRY.keys()
 
         choices = []
 
