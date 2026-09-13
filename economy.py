@@ -131,19 +131,18 @@ class ShopView(discord.ui.View):
                 "Special equipment to improve your next expedition."
             )
 
+            # Upgrades is the permanent catalog for these items. Daily Offers
+            # separately selects three items and applies the daily discount to
+            # permanent items when they are featured.
             item_ids = [
-                item_id
-                for item_id in cog.daily_rotation()
-                if item_id in {
-                    "fuel_stabilizer",
-                    "hazard_shield",
-                    "lucky_scanner",
-                    "ore_magnet",
-                    "prototype_drill_bit",
-                    "cosmic_insurance",
-                    "fate_anchor",
-                    "stardust_cache",
-                }
+                "fuel_stabilizer",
+                "hazard_shield",
+                "lucky_scanner",
+                "ore_magnet",
+                "prototype_drill_bit",
+                "cosmic_insurance",
+                "fate_anchor",
+                "stardust_cache",
             ]
 
         elif category == "pet_items":
@@ -329,6 +328,12 @@ class Economy(commands.Cog):
                 "type": "special",
                 "desc": "Bends time backwards to restore a fortune streak missed yesterday (Max 2 uses/month)."
             },
+            "fate_anchor": {
+                "name": "⚓ Fate Anchor",
+                "cost": 2250,
+                "type": "upgrade",
+                "desc": "Protects one missed fortune streak day."
+            },
             "neon_grid": {
                 "name": "🌆 Background Voucher: Neon Grid",
                 "cost": 4000,
@@ -395,7 +400,6 @@ class Economy(commands.Cog):
             "ore_magnet": {"name": "🧲 Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
             "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
             "cosmic_insurance": {"name": "📋 Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
-            "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
             "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
             "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
             "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
@@ -419,6 +423,7 @@ class Economy(commands.Cog):
             "drone_quantum_battery": (2, "daily"),
             "pet_snack": (30, "daily"),
             "time_crystal": (2, "monthly"),
+            "fate_anchor": (3, "daily"),
 
             # Rotating shop
             "fuel_stabilizer": (5, "daily"),
@@ -428,7 +433,6 @@ class Economy(commands.Cog):
             "ore_magnet": (5, "daily"),
             "prototype_drill_bit": (5, "daily"),
             "cosmic_insurance": (5, "daily"),
-            "fate_anchor": (3, "daily"),
             "stardust_cache": (3, "daily"),
             "revive_kit": (3, "daily"),
 
