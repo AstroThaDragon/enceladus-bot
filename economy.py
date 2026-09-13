@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import aiosqlite
 import random
+from typing import Any
 import datetime
 import time
 from datetime import datetime
@@ -131,18 +132,11 @@ class ShopView(discord.ui.View):
                 "Special equipment to improve your next expedition."
             )
 
-            # Upgrades is the permanent catalog for these items. Daily Offers
-            # separately selects three items and applies the daily discount to
-            # permanent items when they are featured.
             item_ids = [
                 "fuel_stabilizer",
                 "hazard_shield",
                 "lucky_scanner",
-                "ore_magnet",
                 "prototype_drill_bit",
-                "cosmic_insurance",
-                "fate_anchor",
-                "stardust_cache",
             ]
 
         elif category == "pet_items":
@@ -328,12 +322,6 @@ class Economy(commands.Cog):
                 "type": "special",
                 "desc": "Bends time backwards to restore a fortune streak missed yesterday (Max 2 uses/month)."
             },
-            "fate_anchor": {
-                "name": "⚓ Fate Anchor",
-                "cost": 2250,
-                "type": "upgrade",
-                "desc": "Protects one missed fortune streak day."
-            },
             "neon_grid": {
                 "name": "🌆 Background Voucher: Neon Grid",
                 "cost": 4000,
@@ -351,8 +339,24 @@ class Economy(commands.Cog):
                 "cost": 5000,
                 "type": "background_voucher",
                 "desc": "Unlocks the 'Solaris Ring' background photo for your /profile card."
+            },
+            "fuel_stabilizer": {
+                "name": "🛢️ Fuel Stabilizer", "cost": 800, "type": "consumable",
+                "desc": "Makes your next mining run cost no fuel charge."
+            },
+            "hazard_shield": {
+                "name": "🛡️ Hazard Shield", "cost": 1000, "type": "consumable",
+                "desc": "Blocks the next scavenging hazard."
+            },
+            "lucky_scanner": {
+                "name": "📡 Deep-Space Scanner", "cost": 700, "type": "consumable",
+                "desc": "Improves rare-find odds on your next scavenging run."
+            },
+            "prototype_drill_bit": {
+                "name": "⚙️ Prototype Drill Bit", "cost": 1000, "type": "consumable",
+                "desc": "Boosts Stardust from your next mining run."
+            },
         }
-    }
         # Stardust buyback values for space junk items
         self.JUNK_PRICES = {
             "space_pizza": 30,
@@ -400,6 +404,7 @@ class Economy(commands.Cog):
             "ore_magnet": {"name": "🧲 Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
             "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
             "cosmic_insurance": {"name": "📋 Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
+            "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
             "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
             "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
             "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
@@ -423,7 +428,6 @@ class Economy(commands.Cog):
             "drone_quantum_battery": (2, "daily"),
             "pet_snack": (30, "daily"),
             "time_crystal": (2, "monthly"),
-            "fate_anchor": (3, "daily"),
 
             # Rotating shop
             "fuel_stabilizer": (5, "daily"),
@@ -433,6 +437,7 @@ class Economy(commands.Cog):
             "ore_magnet": (5, "daily"),
             "prototype_drill_bit": (5, "daily"),
             "cosmic_insurance": (5, "daily"),
+            "fate_anchor": (3, "daily"),
             "stardust_cache": (3, "daily"),
             "revive_kit": (3, "daily"),
 
@@ -448,8 +453,8 @@ class Economy(commands.Cog):
     def daily_rotation(self):
         """Return the same three distinct offers for every user on a given day.
 
-        Daily Offers can feature any normal shop item, including permanent
-        shop items and rotating items, but exclude backgrounds and titles.
+        Daily Offers feature permanent shop items or rotation-only items, but exclude
+        backgrounds and titles. Rotation-only items receive no permanent-item discount.
         """
         excluded_types = {"background_voucher", "title"}
         eligible_items = []
@@ -678,27 +683,33 @@ class Economy(commands.Cog):
             return await ctx.send("❌ Quantity must be between **1 and 99**.")
 
         rotating_item = self.ROTATING_ITEMS.get(item_id)
+        is_permanent_item = item_id in self.SHOP_ITEMS
 
-        if item_id not in self.SHOP_ITEMS and not rotating_item:
+        if not is_permanent_item and rotating_item is None:
             return await ctx.send(
                 "❌ Invalid item ID! Check available items using `/shop`."
             )
 
-        if rotating_item and item_id not in self.daily_rotation():
-            return await ctx.send(
-                "⏳ That item is not in today's rotating market. "
-                "Check `/shop` and select 🔄️ Daily Offers for the current offers."
-            )
+        # Rotation-only items must be featured today. Permanent items may also
+        # appear in ROTATING_ITEMS and receive the Daily Offer discount.
+        if not is_permanent_item:
+            if rotating_item is None:
+                return await ctx.send("❌ That rotating item could not be loaded.")
+            if item_id not in self.daily_rotation():
+                return await ctx.send(
+                    "⏳ That item is not in today's rotating market. "
+                    "Check `/shop` and select 🔄️ Daily Offers for the current offers."
+                )
 
-        item = self.SHOP_ITEMS.get(item_id) or rotating_item
-
+        item: dict[str, Any] | None = self.SHOP_ITEMS.get(item_id)
         if item is None:
-            return await ctx.send("❌ That item could not be loaded from the shop catalog.")
+            if rotating_item is None:
+                return await ctx.send("❌ That item could not be loaded from the shop catalog.")
+            item = rotating_item
 
         # Permanent items receive 15% off when featured in today's Daily Offers.
         # Rotating-only items keep their normal listed price.
         is_daily_offer = item_id in self.daily_rotation()
-        is_permanent_item = item_id in self.SHOP_ITEMS
 
         if is_daily_offer and is_permanent_item:
             unit_cost = int(item["cost"] * 0.85)
@@ -842,7 +853,7 @@ class Economy(commands.Cog):
 
             if rotating_item is not None:
                 item = rotating_item
-                item_type = item.get("type", "consumable")
+                item_type = rotating_item.get("type", "consumable")
 
                 # Titles are permanent unlocks.
                 if item_type == "title":
