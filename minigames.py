@@ -1168,7 +1168,7 @@ class Minigames(commands.Cog):
                 payout = bet * 2 if won else 0
                 bet_type = "even-money"
             else:
-                payout = bet * 36 if won else 0
+                payout = bet * 10 if won else 0
                 bet_type = "straight-up"
 
             color = "🟢 Green" if result == 0 else ("🔴 Red" if is_red else "⚫ Black")
