@@ -53,6 +53,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("sword")
         await self.load_extension("dragonrider")
         await self.load_extension("economy")
+        await self.load_extension("minigames")
         await self.load_extension("exploration")
         await self.load_extension("profile")
         await self.load_extension("pets")
