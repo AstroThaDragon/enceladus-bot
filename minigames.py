@@ -21,6 +21,7 @@ class BlackjackView(discord.ui.View):
         self.ctx = ctx
         user = getattr(ctx, "author", None) or getattr(ctx, "user", None)
         self.user_id = user.id if user is not None else 0
+        self.display_name = user.display_name if user is not None else "Explorer"
         self.bet = bet
         self.deck = deck
         self.player = player
@@ -64,7 +65,7 @@ class BlackjackView(discord.ui.View):
             description += "\n\nChoose **Hit**, **Stand**, or **Double Down**."
 
         embed = discord.Embed(
-            title="🃏 Enceladus Blackjack",
+            title=f"🃏 Enceladus Blackjack — {self.display_name}",
             description=description,
             color=discord.Color.from_rgb(0, 229, 255)
         )
@@ -264,6 +265,7 @@ class TriviaView(discord.ui.View):
         self.ctx = ctx
         user = getattr(ctx, "author", None) or getattr(ctx, "user", None)
         self.user_id = user.id if user is not None else 0
+        self.display_name = user.display_name if user is not None else "Explorer"
         self.question = question
         self.options = options
         self.answer = answer
@@ -314,7 +316,7 @@ class TriviaView(discord.ui.View):
             result = f"❌ **Incorrect.** The correct answer was **{self.options[self.answer]}**."
 
         embed = discord.Embed(
-            title="🚀 Enceladus Space Trivia",
+            title=f"🚀 Enceladus Space Trivia — {self.display_name}",
             description=f"**{self.question}**\n\n{result}",
             color=discord.Color.from_rgb(0, 229, 255)
         )
@@ -337,7 +339,7 @@ class TriviaView(discord.ui.View):
             )
             await db.commit()
         embed = discord.Embed(
-            title="🚀 Enceladus Space Trivia",
+            title=f"🚀 Enceladus Space Trivia — {self.display_name}",
             description=(
                 f"**{self.question}**\n\n"
                 f"⏰ **Time's up!** The correct answer was **{self.options[self.answer]}**."
@@ -548,7 +550,7 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             await db.commit()
 
         embed = discord.Embed(
-            title="🪙 Arcade Coin Exchange",
+            title=f"🪙 Arcade Coin Exchange — {interaction.user.display_name}",
             description=(
                 f"You exchanged **{cost:,} Stardust** for **{coins:,} Arcade Coins**.\n\n"
                 f"🪙 Arcade Coins: **{new_coins:,}**\n"
@@ -1052,7 +1054,7 @@ class Minigames(commands.Cog):
             outcome = "💨 No match. The house wins this spin."
 
         embed = discord.Embed(
-            title="🎰 Enceladus Station Slots",
+            title=f"🎰 Enceladus Station Slots — {interaction.user.display_name}",
             description=f"**{display}**\n\n💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n{outcome}",
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -1118,7 +1120,7 @@ class Minigames(commands.Cog):
             outcome = "💨 **No hit.** The house keeps your wager."
 
         embed = discord.Embed(
-            title="🎲 Enceladus Dice Table",
+            title=f"🎲 Enceladus Dice Table — {interaction.user.display_name}",
             description=(
                 f"🎲 **{result['die_one']} + {result['die_two']} = {result['total']}**\n\n"
                 f"💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n🎯 Choice: **{choice_names[choice]}**\n{outcome}"
@@ -1268,7 +1270,7 @@ class Minigames(commands.Cog):
             status = f"💀 **The house wins.** You lose **{bet:,} Stardust**."
 
         embed = discord.Embed(
-            title="🎡 Enceladus Roulette",
+            title=f"🎡 Enceladus Roulette — {interaction.user.display_name}",
             description=(
                 f"**The wheel lands on:** {result['result']} — {result['color']}\n\n"
                 f"🎟️ Your bet: **{bet:,} Stardust** on **{choice}**\n"
@@ -1332,14 +1334,14 @@ class Minigames(commands.Cog):
         reward = 100
         view = TriviaView(self, interaction, question, shuffled_options, shuffled_answer, reward)
         embed = discord.Embed(
-            title="🚀 Enceladus Space Trivia",
+            title=f"🚀 Enceladus Space Trivia — {self.ctx.author.display_name}",
             description=(
                 f"**{question}**\n\nChoose the answer before the terminal times out.\n"
                 f"💰 Correct answer: **+{reward:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n🔀 Answer choices are shuffled each time."
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        for index, option in enumerate(options):
+        for index, option in enumerate(shuffled_options):
             embed.add_field(name=f"{chr(65 + index)}.", value=option, inline=False)
 
         for index, option in enumerate(options):

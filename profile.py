@@ -392,7 +392,11 @@ class Profile(commands.Cog):
             )
             await db.commit()
 
-        await ctx.send(f"🌟 **Profile Updated!** Successfully equipped **{valid_backgrounds.get(background_id, background_id)}** as your active profile background. Run `/profile` to check it out!")
+        await ctx.send(
+            f"{ctx.author.mention} 🌟 **Profile Updated!** Successfully equipped "
+            f"**{valid_backgrounds.get(background_id, background_id)}** as your active "
+            f"profile background. Run `/profile` to check it out!"
+        )
 
 async def setup(bot):
     await bot.add_cog(Profile(bot))

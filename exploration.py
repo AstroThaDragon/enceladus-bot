@@ -236,9 +236,10 @@ class Exploration(commands.Cog):
             return True
         return False
 
-    def knockout_message(self, knocked_out_until):
+    def knockout_message(self, knocked_out_until, mention=None):
+        prefix = f"{mention} " if mention else ""
         return (
-            f"💀 **You are unconscious.** You can use `/revive` or buy `/shop buy full_revive` "
+            f"{prefix}💀 **You are unconscious.** You can use `/revive` or buy `/shop buy full_revive` "
             f"to return now; otherwise you will recover at 50% HP on **{knocked_out_until}**."
         )
 
@@ -298,7 +299,7 @@ class Exploration(commands.Cog):
             )
 
             if current_hp <= 0:
-                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
+                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
 
             if item_count <= 0:
                 return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
@@ -322,7 +323,7 @@ class Exploration(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"💉 **Used {selected['name']}!**\n"
+            f"{ctx.author.mention} 💉 **Used {selected['name']}!**\n"
             f"Restored **+{healed_by} HP**! Current Health: ❤️ **{new_hp}/{max_hp} HP** "
             f"*(Items Remaining: {new_count})*"
         )
@@ -485,7 +486,7 @@ class Exploration(commands.Cog):
             effects = json.loads(effects_raw)
 
             if hp <= 0:
-                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
+                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
 
             # Daily charge reset: charges refresh to 10 once per calendar day.
             current_date = self.game_date()
@@ -512,11 +513,11 @@ class Exploration(commands.Cog):
                 remaining = int(self.COOLDOWN_SECONDS - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
-                return await ctx.send(f"⚠️ **Mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**.")
+                return await ctx.send(f"{ctx.author.mention} ⚠️ **Mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**.")
 
             if charges <= 0 and not effects.get("fuel_stabilizer"):
                 return await ctx.send(
-                    "🚨 **Laser Depleted!** You are out of fuel charges. "
+                    f"{ctx.author.mention} 🚨 **Laser Depleted!** You are out of fuel charges. "
                     "Visit the station shop for an emergency refill or wait until daily reset."
                 )
 
@@ -701,8 +702,11 @@ class Exploration(commands.Cog):
         }
 
         embed = discord.Embed(
-            title="🌌 Starship Mining Log",
-            description=f"Laser beam fired into the debris field...\n\n{loot_description}",
+            title=f"🌌 Starship Mining Log — {ctx.author.display_name}",
+            description=(
+                f"Laser beam fired into the debris field...\n\n"
+                f"{loot_description}"
+            ),
             color=colors.get(rarity_badge, discord.Color.blue())
         )
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
@@ -774,16 +778,16 @@ class Exploration(commands.Cog):
 
             # Health Knockout Check
             if hp <= 0:
-                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow"))
+                return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
 
             if elapsed < self.COOLDOWN_SECONDS:
                 remaining = int(self.COOLDOWN_SECONDS - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
-                return await ctx.send(f"⚠️ **Scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
+                return await ctx.send(f"{ctx.author.mention} ⚠️ **Scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
 
             if charges <= 0:
-                return await ctx.send("🚨 **Drone Depleted!** You are out of scavenge charges. Visit the station shop for a recharge or wait until daily reset.")
+                return await ctx.send(f"{ctx.author.mention} 🚨 **Drone Depleted!** You are out of scavenge charges. Visit the station shop for a recharge or wait until daily reset.")
 
             junk_items = {
                 "space_pizza": "🍕 Dehydrated Space Pizza (slightly freezer-burned)",
@@ -976,7 +980,7 @@ class Exploration(commands.Cog):
         status_text = f"❤️ **Health:** `{new_hp}/{max_hp} HP`" if new_hp > 0 else f"💀 **Knocked Out!** Use `/revive`, buy `/shop buy full_revive`, or recover at 50% HP on **{knocked_out_until}**."
 
         embed = discord.Embed(
-            title="🛠️ Derelict Salvage Log",
+            title=f"🛠️ Derelict Salvage Log — {ctx.author.display_name}",
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
                 f"✨ **Found Stardust:** `{found_stardust}`"
@@ -1021,14 +1025,14 @@ class Exploration(commands.Cog):
 
             if not user:
                 return await ctx.send(
-                    "❌ Profile not found! Explore Enceladus first."
+                    f"{ctx.author.mention} ❌ Profile not found! Explore Enceladus first."
                 )
 
             hp, max_hp = user[0] or 0, user[1] or 100
 
             if hp > 0:
                 return await ctx.send(
-                    "⚠️ You are already conscious and do not need a revival."
+                    f"{ctx.author.mention} ⚠️ You are already conscious and do not need a revival."
                 )
 
             async with db.execute(
@@ -1232,7 +1236,7 @@ class Exploration(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="💀 Revival Required",
+            title=f"💀 {ctx.author.display_name} — Revival Required",
             description=(
                 "You are currently unconscious.\n\n"
                 "Choose a revival method:"

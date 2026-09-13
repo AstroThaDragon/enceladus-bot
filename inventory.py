@@ -240,7 +240,7 @@ class Inventory(commands.Cog):
                     await db.commit()
 
                     return await ctx.send(
-                        "❌ **Title unequipped.** Your profile is now title-free."
+                        f"{ctx.author.mention} ❌ **Title unequipped.** Your profile is now title-free."
                     )
 
                 # Make sure the player actually owns this title.
@@ -272,7 +272,7 @@ class Inventory(commands.Cog):
             display_name = title.removeprefix("title_").replace("_", " ").title()
 
             await ctx.send(
-                f"🏷️ **Title Equipped!** Your profile title is now "
+                f"{ctx.author.mention} 🏷️ **Title Equipped!** Your profile title is now "
                 f"**{display_name}**."
             )
 
@@ -774,7 +774,7 @@ class Inventory(commands.Cog):
 
             await db.commit()
 
-        await ctx.send(message)
+        await ctx.send(f"{ctx.author.mention} {message}")
 
     @commands.hybrid_command(name="status", description="View your health, exploration charges, and cooldowns.")
     async def status(self, ctx: commands.Context):

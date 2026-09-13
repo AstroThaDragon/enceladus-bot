@@ -675,7 +675,7 @@ class Economy(commands.Cog):
         vault = row[1] if row else 0
 
         embed = discord.Embed(
-            title="🔐 Stardust Vault",
+            title=f"🔐 {ctx.author.display_name}'s Stardust Vault",
             description=(
                 f"Your vault contains **{vault:,} Stardust**.\n\n"
                 "Stardust stored here is protected from normal spending.\n"
@@ -740,7 +740,7 @@ class Economy(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🔐 Deposited **{amount:,} Stardust** into your vault. "
+            f"{ctx.author.mention} 🔐 Deposited **{amount:,} Stardust** into your vault. "
             f"Your vault now holds **{vault + amount:,} Stardust**."
         )
 
@@ -787,7 +787,7 @@ class Economy(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"💫 Withdrew **{amount:,} Stardust** from your vault. "
+            f"{ctx.author.mention} 💫 Withdrew **{amount:,} Stardust** from your vault. "
             f"You now have **{stardust + amount:,} Stardust** available to spend."
         )
 
@@ -1122,7 +1122,7 @@ class Economy(commands.Cog):
                     )
 
                 return await ctx.send(
-                    f"🔄 **Purchase Successful!** Added **{quantity}x "
+                    f"{ctx.author.mention} 🔄 **Purchase Successful!** Added **{quantity}x "
                     f"{item['name']}** to your inventory for "
                     f"**{cost:,} Stardust**!"
                 )
@@ -1156,7 +1156,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"⚕️ **Purchase Successful!** Added **{quantity}x "
+                    f"{ctx.author.mention} ⚕️ **Purchase Successful!** Added **{quantity}x "
                     f"{item['name']}** to your inventory for "
                     f"**{cost:,} Stardust**!"
                 )
@@ -1192,7 +1192,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🔋 **Purchase Successful!** Added **{quantity}x "
+                    f"{ctx.author.mention} 🔋 **Purchase Successful!** Added **{quantity}x "
                     f"{item['name']}** to your inventory for "
                     f"**{cost:,} Stardust**!"
                 )
@@ -1226,7 +1226,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🧬 **Purchase Successful!** Added **{quantity}x {item['name']}** "
+                    f"{ctx.author.mention} 🧬 **Purchase Successful!** Added **{quantity}x {item['name']}** "
                     f"to your inventory for **{cost:,} Stardust**!"
                 )
             if item_id == "time_crystal":
@@ -1265,7 +1265,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"💎 **Purchase Successful!** Added **{quantity}x "
+                    f"{ctx.author.mention} 💎 **Purchase Successful!** Added **{quantity}x "
                     f"{item['name']}** to your inventory for "
                     f"**{cost:,} Stardust**!\n"
                     f"If you miss a fortune streak, use `/usecrystal` to repair it."
@@ -1306,7 +1306,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🌟 **Purchase Successful!** Unlocked "
+                    f"{ctx.author.mention} 🌟 **Purchase Successful!** Unlocked "
                     f"**{item['name']}** for **{cost:,} Stardust**!"
                 )
 
@@ -1363,7 +1363,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🛒 **Purchase Successful!** Added **{quantity}x {item['name']}** "
+                    f"{ctx.author.mention} 🛒 **Purchase Successful!** Added **{quantity}x {item['name']}** "
                     f"to your inventory for **{cost:,} Stardust**!"
                 )
 
@@ -1493,7 +1493,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"🛍️ **Salvage Vendor:** Sold **{item_count} items** "
+                    f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
                     f"for a total of ✨ **{total_payout:,} Stardust**!"
                 )
 
@@ -1554,7 +1554,7 @@ class Economy(commands.Cog):
             remaining = quantity - 1
 
             await ctx.send(
-                f"🛍️ **Salvage Vendor:** Sold **1x `{target_item}`** "
+                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **1x `{target_item}`** "
                 f"for ✨ **{payout:,} Stardust**!\n"
                 f"📦 **Remaining:** `{remaining}x`"
             )
@@ -1847,7 +1847,7 @@ class Economy(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🎉 **Legacy Veteran Bonus Claimed!**\n"
+            f"{ctx.author.mention} 🎉 **Legacy Veteran Bonus Claimed!**\n"
             f"Thanks for being a server veteran! You received "
             f"✨ **{legacy_bonus:,} Stardust** as a thank-you for being "
             f"here before the **Frontier** update."
