@@ -57,7 +57,7 @@ class BlackjackView(discord.ui.View):
         )
 
         if show_entry_fee and not finished:
-            description += "\n🪙 Entry fee: **1 Arcade Coin**"
+            description += "\n🪙 Entry fee: **1 Arcade Token**"
 
         if status:
             description += f"\n\n{status}"
@@ -85,9 +85,9 @@ class BlackjackView(discord.ui.View):
         self.finished = True
         self.clear_items()
 
-        # The Arcade Coin entry token and initial Stardust wager were already
+        # The Arcade Token entry token and initial Stardust wager were already
         # removed when the hand opened. Normal outcomes only add the payout.
-        # A timeout additionally refunds the 1 Arcade Coin entry token.
+        # A timeout additionally refunds the 1 Arcade Token entry token.
         db_path = self.cog.get_db_path()
         async with aiosqlite.connect(db_path) as db:
             await db.execute("BEGIN IMMEDIATE")
@@ -142,16 +142,16 @@ class BlackjackView(discord.ui.View):
             "win": f"🎉 **You win!** Payout: **{payout:,} Stardust**",
             "push": f"🤝 **Push.** Your wager is returned: **{payout:,} Stardust**",
             "bust": "💥 **Bust!** The house takes the wager.",
-            "loss": "💀 **Dealer wins.** The house takes the wager.",
+            "loss": "💀 **Dealer wins.**",
             "timeout": (
                 f"⏰ **Table closed.** Your unfinished hand is refunded: **{payout:,} Stardust** "
-                "and your **1 Arcade Coin** entry token is returned."
+                "and your **1 Arcade Token** entry token is returned."
             ),
         }[outcome]
         embed = self.build_embed(finished=True, status=outcome_text)
         if outcome == "timeout":
             embed.set_footer(
-                text=f"Stardust: {new_balance:,} • Arcade Coins: {new_arcade_coins:,}"
+                text=f"Stardust: {new_balance:,} • Arcade Tokens: {new_arcade_coins:,}"
             )
         else:
             embed.set_footer(text=f"Stardust: {new_balance:,}")
@@ -204,7 +204,7 @@ class BlackjackView(discord.ui.View):
 
     async def double_callback(self, interaction):
         # Double Down requires matching the current Stardust wager, then forces
-        # exactly one more card. The Arcade Coin entry token is not charged again.
+        # exactly one more card. The Arcade Token entry token is not charged again.
         if self.doubled or self.finished:
             return
 
@@ -470,11 +470,11 @@ class DiceBetModal(discord.ui.Modal):
 
 class ArcadeCoinExchangeModal(discord.ui.Modal):
     def __init__(self, view):
-        super().__init__(title="🪙 Buy Arcade Coins")
+        super().__init__(title="🪙 Buy Arcade Tokens")
         self.view = view
         self.amount_input = discord.ui.TextInput(
-            label="Arcade Coins to Buy",
-            placeholder="1-100 coins (100 Stardust each)",
+            label="Arcade Tokens to Buy",
+            placeholder="1-1000 Arcade Tokens (100 Stardust each)",
             required=True,
             max_length=3,
         )
@@ -485,12 +485,12 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             coins = int(str(self.amount_input.value).replace(",", "").strip())
         except ValueError:
             return await interaction.response.send_message(
-                "❌ Enter a whole number of Arcade Coins.", ephemeral=True
+                "❌ Enter a whole number of Arcade Tokens.", ephemeral=True
             )
 
-        if coins < 1 or coins > 100:
+        if coins < 1 or coins > 1000:
             return await interaction.response.send_message(
-                "❌ You can exchange between **1 and 100 Arcade Coins** at a time.",
+                "❌ You can exchange between **1 and 1,000 Arcade Tokens** at a time.",
                 ephemeral=True,
             )
 
@@ -503,14 +503,14 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             if stardust is None:
                 await db.rollback()
                 return await interaction.response.send_message(
-                    "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                    "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                     ephemeral=True,
                 )
 
             if stardust < cost:
                 await db.rollback()
                 return await interaction.response.send_message(
-                    f"💸 **Not enough Stardust!** You need **{cost:,}** Stardust for **{coins:,} Arcade Coins**, "
+                    f"💸 **Not enough Stardust!** You need **{cost:,}** Stardust for **{coins:,} Arcade Tokens**, "
                     f"but only have **{stardust:,}**.",
                     ephemeral=True,
                 )
@@ -522,10 +522,10 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
                 row = await cursor.fetchone()
 
             current_coins = (row[0] or 0) if row else 0
-            if current_coins + coins > 100:
+            if current_coins + coins > 1000:
                 await db.rollback()
                 return await interaction.response.send_message(
-                    f"❌ You can hold at most **100 Arcade Tokens**. You currently have **{current_coins:,}**.",
+                    f"❌ You can hold at most **1,000 Arcade Tokens**. You currently have **{current_coins:,}**.",
                     ephemeral=True,
                 )
 
@@ -550,10 +550,10 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             await db.commit()
 
         embed = discord.Embed(
-            title=f"🪙 Arcade Coin Exchange — {interaction.user.display_name}",
+            title=f"🪙 Arcade Token Exchange — {interaction.user.display_name}",
             description=(
-                f"You exchanged **{cost:,} Stardust** for **{coins:,} Arcade Coins**.\n\n"
-                f"🪙 Arcade Coins: **{new_coins:,}**\n"
+                f"You exchanged **{cost:,} Stardust** for **{coins:,} Arcade Tokens**.\n\n"
+                f"🪙 Arcade Tokens: **{new_coins:,}**\n"
                 f"💰 Stardust remaining: **{new_stardust:,}**"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
@@ -579,15 +579,15 @@ class MinigameSelect(discord.ui.Select):
             ),
             discord.SelectOption(
                 label="Space Trivia", emoji="🚀", value="trivia",
-                description="Spend 1 Arcade Coin and answer for Stardust."
+                description="Spend 1 Arcade Token and answer for Stardust."
             ),
             discord.SelectOption(
                 label="Roulette", emoji="🎡", value="roulette",
                 description="Bet on colors, parity, or a single number."
             ),
             discord.SelectOption(
-                label="Arcade Coin Exchange", emoji="🪙", value="exchange",
-                description="Convert Stardust into Arcade Coins."
+                label="Arcade Token Exchange", emoji="🪙", value="exchange",
+                description="Convert Stardust into Arcade Tokens."
             ),
             discord.SelectOption(
                 label="My Stats", emoji="📊", value="stats",
@@ -644,9 +644,9 @@ class MinigamesView(discord.ui.View):
 
 
 class Minigames(commands.Cog):
-    """Casino-style station minigames using a separate Arcade Coin currency."""
+    """Casino-style station minigames using Arcade Tokens."""
 
-    ARCADE_COIN_COST = 400  # Stardust per Arcade Coin.
+    ARCADE_COIN_COST = 400  # Stardust per Arcade Token.
     MIN_BET = 1
     MAX_BET = 1000
 
@@ -794,7 +794,7 @@ class Minigames(commands.Cog):
         return (row[0] or 0) if row else None
 
     async def change_balance(self, user_id, bet, game_callback: Callable[[], dict[str, Any]]) -> tuple[dict[str, Any] | None, int | None]:
-        """Consume one Arcade Coin and resolve one Stardust wager atomically."""
+        """Consume one Arcade Token and resolve one Stardust wager atomically."""
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
@@ -956,7 +956,7 @@ class Minigames(commands.Cog):
                 f"⏰ Timeouts: **{total_timeouts:,}**\n"
                 f"💰 Stardust wagered: **{total_wagered:,}**\n"
                 f"📈 Net Stardust: **{total_net:+,}**\n"
-                f"🪙 Arcade Coins spent: **{total_tokens:,}**"
+                f"🪙 Arcade Tokens spent: **{total_tokens:,}**"
             )
 
         embed = discord.Embed(
@@ -978,7 +978,7 @@ class Minigames(commands.Cog):
                 inline=False,
             )
 
-        embed.set_footer(text="The house always remembers. 👁️")
+        embed.set_footer(text="Good luck out there! 👾")
         if isinstance(interaction, commands.Context):
             return await interaction.send(embed=embed)
         return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
@@ -1019,19 +1019,19 @@ class Minigames(commands.Cog):
         result, new_balance = await self.change_balance(interaction.user.id, bet, spin)
         if result is None:
             return await interaction.followup.send(
-                "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Coin to play!** Exchange Stardust for Arcade Coins from the minigame terminal.",
+                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
             stardust_available = int(new_balance or 0)
             return await interaction.followup.send(
                 f"💸 **Not enough Stardust!** You have `{stardust_available:,}`, but your bet is `{bet:,}`.\n"
-                f"🪙 Your Arcade Coin is not consumed.",
+                f"🪙 Your Arcade Token is not consumed.",
                 ephemeral=True,
             )
 
@@ -1054,11 +1054,11 @@ class Minigames(commands.Cog):
             outcome = "💨 No match. The house wins this spin."
 
         embed = discord.Embed(
-            title=f"🎰 Enceladus Station Slots — {interaction.user.display_name}",
-            description=f"**{display}**\n\n💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n{outcome}",
+            title=f"🎰 Slots — {interaction.user.display_name}",
+            description=f"**{display}**\n\n💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Token**\n{outcome}",
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Coin used")
+        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used")
         await interaction.followup.send(embed=embed)
 
     async def play_dice(self, interaction, bet, choice):
@@ -1091,19 +1091,19 @@ class Minigames(commands.Cog):
         result, new_balance = await self.change_balance(interaction.user.id, bet, roll)
         if result is None:
             return await interaction.followup.send(
-                "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Coin to play!** Exchange Stardust for Arcade Coins from the minigame terminal.",
+                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
             stardust_available = int(new_balance or 0)
             return await interaction.followup.send(
                 f"💸 **Not enough Stardust!** You have `{stardust_available:,}`, but your bet is `{bet:,}`.\n"
-                f"🪙 Your Arcade Coin is not consumed.",
+                f"🪙 Your Arcade Token is not consumed.",
                 ephemeral=True,
             )
 
@@ -1123,11 +1123,11 @@ class Minigames(commands.Cog):
             title=f"🎲 Enceladus Dice Table — {interaction.user.display_name}",
             description=(
                 f"🎲 **{result['die_one']} + {result['die_two']} = {result['total']}**\n\n"
-                f"💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n🎯 Choice: **{choice_names[choice]}**\n{outcome}"
+                f"💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Token**\n🎯 Choice: **{choice_names[choice]}**\n{outcome}"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Coin used")
+        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used")
         await interaction.followup.send(embed=embed)
 
     async def play_blackjack(self, interaction, bet):
@@ -1153,7 +1153,7 @@ class Minigames(commands.Cog):
             if not row:
                 await db.rollback()
                 return await interaction.followup.send(
-                    "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                    "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                     ephemeral=True
                 )
 
@@ -1163,7 +1163,7 @@ class Minigames(commands.Cog):
             if arcade_coins < 1:
                 await db.rollback()
                 return await interaction.followup.send(
-                    "🪙 **You need an Arcade Coin to play!** Exchange Stardust for Arcade Coins from the minigame terminal.",
+                    "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
                     ephemeral=True
                 )
 
@@ -1171,7 +1171,7 @@ class Minigames(commands.Cog):
                 await db.rollback()
                 return await interaction.followup.send(
                     f"💸 **Not enough Stardust!** You have `{stardust:,}`, but your bet is `{bet:,}`.\n"
-                    f"🪙 Your Arcade Coin is not consumed.",
+                    f"🪙 Your Arcade Token is not consumed.",
                     ephemeral=True
                 )
 
@@ -1247,19 +1247,19 @@ class Minigames(commands.Cog):
         result, new_balance = await self.change_balance(interaction.user.id, bet, spin)
         if result is None:
             return await interaction.followup.send(
-                "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Coin to play!** Exchange Stardust for Arcade Coins from the minigame terminal.",
+                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
             stardust_available = int(new_balance or 0)
             return await interaction.followup.send(
                 f"💸 **Not enough Stardust!** You have **{stardust_available:,}**, but your bet is **{bet:,}**.\n"
-                f"🪙 Your Arcade Coin is not consumed.",
+                f"🪙 Your Arcade Token is not consumed.",
                 ephemeral=True,
             )
 
@@ -1270,7 +1270,7 @@ class Minigames(commands.Cog):
             status = f"💀 **The house wins.** You lose **{bet:,} Stardust**."
 
         embed = discord.Embed(
-            title=f"🎡 Enceladus Roulette — {interaction.user.display_name}",
+            title=f"🎡 Roulette — {interaction.user.display_name}",
             description=(
                 f"**The wheel lands on:** {result['result']} — {result['color']}\n\n"
                 f"🎟️ Your bet: **{bet:,} Stardust** on **{choice}**\n"
@@ -1278,7 +1278,7 @@ class Minigames(commands.Cog):
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Coin used • European wheel (0-36)")
+        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used • European wheel (0-36)")
         await interaction.followup.send(embed=embed)
 
 
@@ -1317,12 +1317,12 @@ class Minigames(commands.Cog):
         token_balance = await self.consume_arcade_token(interaction.user.id)
         if token_balance is None:
             return await interaction.followup.send(
-                "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!",
+                "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if token_balance < 0:
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Coin to play!** Exchange Stardust for Arcade Coins from the minigame terminal.",
+                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
 
@@ -1334,10 +1334,10 @@ class Minigames(commands.Cog):
         reward = 100
         view = TriviaView(self, interaction, question, shuffled_options, shuffled_answer, reward)
         embed = discord.Embed(
-            title=f"🚀 Enceladus Space Trivia — {self.ctx.author.display_name}",
+            title=f"🚀 Space Trivia — {interaction.user.display_name}",
             description=(
                 f"**{question}**\n\nChoose the answer before the terminal times out.\n"
-                f"💰 Correct answer: **+{reward:,} Stardust**\n🪙 Entry fee: **1 Arcade Coin**\n🔀 Answer choices are shuffled each time."
+                f"💰 Correct answer: **+{reward:,} Stardust**\n🪙 Entry fee: **1 Arcade Token**\n🔀 Answer choices are shuffled each time."
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -1376,7 +1376,7 @@ class Minigames(commands.Cog):
 
         if arcade_coins is None:
             return await ctx.send(
-                "❌ You don't have an active station profile yet. Run `/profile` or `/mine` first!"
+                "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!"
             )
 
         embed = discord.Embed(
@@ -1384,17 +1384,17 @@ class Minigames(commands.Cog):
             description=(
                 "Welcome to the station's recreational deck.\n\n"
                 f"🪙 **Arcade Token Balance:** {arcade_coins:,}\n"
-                "Each game costs **1 Arcade Coin** to enter.\n"
+                "Each game costs **1 Arcade Token** to play.\n"
                 "Your actual wagers are paid in **Stardust** inside the games.\n"
-                "Use the exchange option to convert Stardust at **100 Stardust = 1 Arcade Coin**.\n\n"
+                "Use the exchange option to convert Stardust at **400 Stardust = 1 Arcade Token**.\n\n"
                 "Choose a game below. **The house has an edge.** "
-                "Don't bet what you can't afford to lose. 👁️\n\n"
+                "Don't bet what you can't afford to lose!\n\n"
                 "🎰 **Slots** — spend 1 token, then wager Stardust\n"
                 "🎲 **Dice** — spend 1 token, then wager Stardust\n"
                 "🃏 **Blackjack** — spend 1 token, then wager Stardust\n"
                 "🎡 **Roulette** — spend 1 token, then wager Stardust\n"
                 "🚀 **Space Trivia** — spend 1 token to answer for Stardust\n"
-                "🪙 **Arcade Coin Exchange** — buy entry tokens with Stardust\n"
+                "🪙 **Arcade Token Exchange** — buy Arcade Tokens with Stardust\n"
                 "📊 **My Stats** — view your minigame history"
             ),
             color=discord.Color.from_rgb(0, 229, 255),

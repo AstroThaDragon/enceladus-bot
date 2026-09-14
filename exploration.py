@@ -32,7 +32,7 @@ class Exploration(commands.Cog):
             ("lost a staring contest with a Suspicious Houseplant, it bonked you in the head", 6, 10, 12),
             # Moderate hazards are the usual danger of wreckage exploration.
             ("inhaled sharp hull-debris dust", 12, 20, 14),
-            ("were scraped by sharp alien metal (probably need a tetnis shot now)", 15, 25, 20),
+            ("were scraped by sharp alien metal (probably need a tetanus shot now)", 15, 25, 20),
             ("triggered an electrical spark while searching wreckage", 15, 25, 10),
             ("were chased through a corridor by an overenthusiastic security drone, ran into a wall head-first", 15, 25, 10),
             ("fell through a floor panel that looked stable... but wasn't", 12, 25, 15),

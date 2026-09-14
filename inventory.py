@@ -19,7 +19,7 @@ ITEM_REGISTRY = {
     "drone_power_cell": {"name": "Drone Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
     "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to 10/10 charges."},
     "pet_snack": {"name": "Cosmic Bio-Feed", "emoji": "🧬", "max_quantity": 50, "type": "Consumable", "desc": "Nutrient pack for your station pet."},
-    "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 100, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
+    "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": "🩹", "max_quantity": 50, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
     "medkit": {"name": "Field Trauma Medkit", "emoji": "🧰", "max_quantity": 25, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
@@ -183,7 +183,7 @@ class Inventory(commands.Cog):
             # into readable names such as Outer Rim Wanderer.
             display_name = item_id.removeprefix("title_").replace("_", " ").title()
 
-            if current and current not in display_name.lower():
+            if current and current not in display_name.lower() and current not in item_id.lower():
                 continue
 
             choices.append(
@@ -348,7 +348,7 @@ class Inventory(commands.Cog):
             max_quantity = item_info.get("max_quantity", 10)
             categories[cat].append(
                 f"{item_info['emoji']} **{item_info['name']}** "
-                f"({quantity or 1}/{max_quantity})\n"
+                f"({quantity or 0}/{max_quantity})\n"
                 f"└ *{item_info['desc']}*"
             )
 
@@ -454,7 +454,7 @@ class Inventory(commands.Cog):
 
             display_name = info["name"]
 
-            if current and current not in display_name.lower():
+            if current and current not in display_name.lower() and current not in item_id.lower():
                 continue
 
             choices.append(
