@@ -476,7 +476,7 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             label="Arcade Tokens to Buy",
             placeholder="1-1000 Arcade Tokens (100 Stardust each)",
             required=True,
-            max_length=3,
+            max_length=4,
         )
         self.add_item(self.amount_input)
 
@@ -510,10 +510,13 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             if stardust < cost:
                 await db.rollback()
                 return await interaction.response.send_message(
+                await interaction.response.send_message(
                     f"💸 **Not enough Stardust!** You need **{cost:,}** Stardust for **{coins:,} Arcade Tokens**, "
                     f"but only have **{stardust:,}**.",
                     ephemeral=True,
                 )
+                await self.view.reset_menu()
+                return
 
             async with db.execute(
                 "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'arcade_token'",
@@ -639,7 +642,15 @@ class MinigamesView(discord.ui.View):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
+        self.message = None
         self.add_item(MinigameSelect(self))
+
+    async def reset_menu(self):
+        if self.message:
+            new_view = MinigamesView(self.cog, self.user_id)
+            new_view.message = self.message
+            await self.message.edit(view=new_view)
+            self.stop()
 
 
 
@@ -1400,7 +1411,8 @@ class Minigames(commands.Cog):
             color=discord.Color.from_rgb(0, 229, 255),
         )
         embed.set_footer(text="Select a game to begin.")
-        await ctx.send(embed=embed, view=MinigamesView(self, ctx.author.id))
+        view = MinigamesView(self, ctx.author.id)
+        view.message = await ctx.send(embed=embed, view=view)
 
 
 async def setup(bot):
