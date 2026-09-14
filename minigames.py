@@ -646,7 +646,7 @@ class MinigamesView(discord.ui.View):
 class Minigames(commands.Cog):
     """Casino-style station minigames using Arcade Tokens."""
 
-    ARCADE_COIN_COST = 400  # Stardust per Arcade Token.
+    ARCADE_COIN_COST = 100  # Stardust per Arcade Token.
     MIN_BET = 1
     MAX_BET = 1000
 
@@ -1386,7 +1386,7 @@ class Minigames(commands.Cog):
                 f"🪙 **Arcade Token Balance:** {arcade_coins:,}\n"
                 "Each game costs **1 Arcade Token** to play.\n"
                 "Your actual wagers are paid in **Stardust** inside the games.\n"
-                "Use the exchange option to convert Stardust at **400 Stardust = 1 Arcade Token**.\n\n"
+                "Use the exchange option to convert Stardust at **100 Stardust = 1 Arcade Token**.\n\n"
                 "Choose a game below. **The house has an edge.** "
                 "Don't bet what you can't afford to lose!\n\n"
                 "🎰 **Slots** — spend 1 token, then wager Stardust\n"
