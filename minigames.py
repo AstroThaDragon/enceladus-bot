@@ -509,7 +509,6 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
 
             if stardust < cost:
                 await db.rollback()
-                return await interaction.response.send_message(
                 await interaction.response.send_message(
                     f"💸 **Not enough Stardust!** You need **{cost:,}** Stardust for **{coins:,} Arcade Tokens**, "
                     f"but only have **{stardust:,}**.",
@@ -562,7 +561,7 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             color=discord.Color.from_rgb(0, 229, 255),
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
+        await self.view.reset_menu()
 
 class MinigameSelect(discord.ui.Select):
     def __init__(self, view):
