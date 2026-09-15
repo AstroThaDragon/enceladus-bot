@@ -58,6 +58,8 @@ class Enceladus(commands.Bot):
         await self.load_extension("profile")
         await self.load_extension("pets")
         await self.load_extension("inventory")
+        await bot.load_extension("crafting")
+        await bot.load_extension("upgrades")
         await self.load_extension("admin")
         await self.load_extension("debug")
         print("🌌 All cogs loaded!")

@@ -368,7 +368,7 @@ class Economy(commands.Cog):
             "tape_deck": 45,
             "alien_artifact": 80,
             "space_boot": 25,
-            "cosmic_coin": 80,
+            "cosmic_coin": 120,
             "holo_poster": 35,
             "broken_laser": 20,
             "lost_logbook": 20,
@@ -384,15 +384,15 @@ class Economy(commands.Cog):
             "tinted_visor": 25,
             "purring_lint": 30,
             "pet_rock": 40,
-            "haunted_circuit": 90,
+            "haunted_circuit": 120,
             "space_taco": 35,
             "rusty_wrench": 25,
             "alien_fossil": 75,
             "big_red_button": 10,
             "antique_compass": 30,
-            "broken_clock": 20,
+            "broken_clock": 30,
             "perplexing_painting": 80,
-            "cosmic_banana": 5
+            "cosmic_banana": 20
         }
 
         # Add future daily offers here.  Each player sees the same three offers

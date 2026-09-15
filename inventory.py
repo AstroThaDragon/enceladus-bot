@@ -14,15 +14,16 @@ ITEM_REGISTRY = {
     # Currencies & Consumables
     "laser_charge_cell": {"name": "Laser Charge Cell", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 mining laser charges."},
     "laser_power_cell": {"name": "Laser Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 mining laser charges."},
-    "fuel_refill": {"name": "Laser Quantum Cell", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser back to 10/10 charges."},
+    "fuel_refill": {"name": "Laser Quantum Cell", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser to its current maximum charges."},
     "drone_battery": {"name": "Drone Battery Pack", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 scavenge charges."},
     "drone_power_cell": {"name": "Drone Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
-    "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to 10/10 charges."},
+    "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to its current maximum charges."},
     "pet_snack": {"name": "Cosmic Bio-Feed", "emoji": "🧬", "max_quantity": 50, "type": "Consumable", "desc": "Nutrient pack for your station pet."},
     "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": "🩹", "max_quantity": 50, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
     "medkit": {"name": "Field Trauma Medkit", "emoji": "🧰", "max_quantity": 25, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
+    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": "🩹", "max_quantity": 25, "type": "Consumable", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
     "full_revive": {"name": "Emergency Full Revival", "emoji": "⚕️", "max_quantity": 10, "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
     "revive_kit": {"name": "Emergency Revival Kit", "emoji": "💉", "max_quantity": 25, "type": "Consumable", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
     "revive": {"name": "Revival Kit", "emoji": "⚕️", "max_quantity": 25, "type": "Consumable", "desc": "A basic revival item"},
@@ -40,8 +41,26 @@ ITEM_REGISTRY = {
     "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. May be used in the future..."},
     "quantum_battery": {"name": "Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
-    # Minerals
-    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": "⛏️", "max_quantity": 50, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
+    # Materials & Minerals
+    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": "⛏️", "max_quantity": 99, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
+    "iron_ore": {"name": "Iron Ore", "emoji": "⛏️", "max_quantity": 99, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
+    "copper_ore": {"name": "Copper Ore", "emoji": "🟠", "max_quantity": 99, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
+    "aluminum_ore": {"name": "Aluminum Ore", "emoji": "⬜", "max_quantity": 99, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
+    "circuit_board": {"name": "Circuit Board", "emoji": "🟩", "max_quantity": 99, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
+    "glue": {"name": "Industrial Glue", "emoji": "🧴", "max_quantity": 99, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
+    "scrap_metal": {"name": "Scrap Metal", "emoji": "🔩", "max_quantity": 99, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
+    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": "🔧", "max_quantity": 99, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
+    "wiring": {"name": "Wiring", "emoji": "🧵", "max_quantity": 99, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
+    "reinforced_laser_parts": {"name": "Reinforced Laser Parts", "emoji": "🛠️", "max_quantity": 5, "type": "Upgrade Component", "desc": "Precision-built parts used to upgrade the mining laser."},
+    "drone_upgrade_kit": {"name": "Drone Upgrade Kit", "emoji": "🛸", "max_quantity": 5, "type": "Upgrade Component", "desc": "A carefully assembled kit used to upgrade the scavenging drone."},
+    "astral_power_core": {"name": "Astral Power Core", "emoji": "🌌", "max_quantity": 5, "type": "Upgrade Component", "desc": "A stabilized Astral Core assembly for advanced upgrades."},
+    "nanite_retrofit_kit": {"name": "Nanite Retrofit Kit", "emoji": "🧬", "max_quantity": 5, "type": "Upgrade Component", "desc": "A precision nanite package required to install higher-tier exploration upgrades."},
+
+    # Medical Supplies
+    "gauze": {"name": "Sterile Gauze", "emoji": "🧻", "max_quantity": 99, "type": "Medical Supply", "desc": "Clean bandage material recovered from abandoned medical stations."},
+    "medical_alcohol": {"name": "Medical Alcohol", "emoji": "🧴", "max_quantity": 99, "type": "Medical Supply", "desc": "Medical-grade alcohol useful for disinfecting wounds and equipment."},
+    "bandaids": {"name": "Bandaids", "emoji": "🩹", "max_quantity": 99, "type": "Medical Supply", "desc": "Basic adhesive bandages recovered from abandoned medical supplies."},
+    "antiseptic_ointment": {"name": "Antiseptic Ointment", "emoji": "🧪", "max_quantity": 99, "type": "Medical Supply", "desc": "Antiseptic ointment useful for treating minor wounds."},
 
     # Space Junk
     "space_pizza": {"name": "Dehydrated Space Pizza", "emoji": "🍕", "max_quantity": 99, "type": "Space Junk", "desc": "Slightly freezer-burned."},
@@ -75,7 +94,7 @@ ITEM_REGISTRY = {
     "big_red_button": {"name": "A Big Red Button", "emoji": "🔴", "max_quantity": 99, "type": "Space Junk", "desc": "Labeled 'do not press', but you pressed it anyway. It did nothing..."},
     "antique_compass": {"name": "Antique Compass", "emoji": "🧭", "max_quantity": 99, "type": "Space Junk", "desc": "Points to the nearest space anomaly, which is currently a black hole."},
     "broken_clock": {"name": "Broken Clock", "emoji": "⏰", "max_quantity": 99, "type": "Space Junk", "desc": "Stuck at 3:00AM. Witching hour... spooky."},
-    "perplexing_painting": {"name": "Perplexing Painting", "emoji": "🖌️", "max_quantity": 99, "type": "Space Junk", "desc": "The eyes seem to follow you, but it's a 2D image."},
+    "perplexing_painting": {"name": "Perplexing Painting", "emoji": "🖌️", "max_quantity": 99, "type": "Space Junk", "desc": "The eyes seem to follow you..."},
     "cosmic_banana": {"name": "Cosmic Banana", "emoji": "🍌", "max_quantity": 99, "type": "Space Junk", "desc": "Peels itself, but tastes like stardust."},
 
     # Background Vouchers
@@ -282,26 +301,13 @@ class Inventory(commands.Cog):
         user_id = ctx.author.id
 
         async with aiosqlite.connect(self.get_db_path()) as db:
-            # 1. Fetch standard items from the inventory table.
-            # Healing items and time crystals are tracked in the users table below,
-            # so exclude them here to prevent duplicate inventory entries from
-            # older deployments that may have stored them in the inventory table.
-            async with db.execute(
-                """
-                SELECT item_id, item_type, quantity
-                FROM inventory
-                WHERE user_id = ?
-                AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit')
-                """,
-                (user_id,)
-            ) as cursor:
+            async with db.execute("""
+                SELECT item_id, item_type, quantity FROM inventory
+                WHERE user_id = ? AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit')
+            """, (user_id,)) as cursor:
                 inv_rows = await cursor.fetchall()
-
-            # 2. Fetch healing items and time crystals from the users table
-            # (Failsafes added using PRAGMA to ensure columns exist before querying)
             async with db.execute("PRAGMA table_info(users)") as cursor:
                 columns = [row[1] async for row in cursor]
-            
             user_items = []
             if all(col in columns for col in ["time_crystals", "nanite_patchs", "medkits"]):
                 async with db.execute("SELECT time_crystals, nanite_patchs, medkits FROM users WHERE user_id = ?", (user_id,)) as cursor:
@@ -315,91 +321,50 @@ class Inventory(commands.Cog):
         if not inv_rows and not user_items:
             return await ctx.send("📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!")
 
-        embed = discord.Embed(
-            title=f"📦 {ctx.author.display_name}'s Storage Locker",
-            description="Here is a manifest of all salvaged artifacts, minerals, and vouchers in your inventory:",
-            color=discord.Color.from_rgb(0, 229, 255)
-        )
-
-        categories = {"Space Junk": [], "Mineral": [], "Consumable": [], "Voucher": [], "Currency": []}
-
-        # Format and append items tracked in the users table
+        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Consumable": [], "Healing": [], "Voucher": [], "Currency": []}
         for item_id, count in user_items:
-            item_info = ITEM_REGISTRY.get(item_id)
-            if not item_info:
-                continue
-
-            cat = item_info.get("type", "Consumable")
-            if cat not in categories:
-                categories[cat] = []
-            max_quantity = item_info.get("max_quantity", 10)
-            categories[cat].append(
-                f"{item_info['emoji']} **{item_info['name']}** "
-                f"({count}/{max_quantity})\n"
-                f"└ *{item_info['desc']}*"
-            )
-
-        # Format and append items tracked in the inventory table
+            info = ITEM_REGISTRY.get(item_id)
+            if info:
+                cat = info.get("type", "Consumable")
+                categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({count}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
         for item_id, item_type, quantity in inv_rows:
-            item_info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."})
-            cat = item_info.get("type", "Space Junk")
-            if cat not in categories:
-                categories[cat] = []
-            max_quantity = item_info.get("max_quantity", 10)
-            categories[cat].append(
-                f"{item_info['emoji']} **{item_info['name']}** "
-                f"({quantity or 0}/{max_quantity})\n"
-                f"└ *{item_info['desc']}*"
-            )
+            info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."})
+            cat = info.get("type", "Space Junk")
+            categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity or 0}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
 
-        for cat_name, items in categories.items():
-            if not items:
-                continue
-
-            chunks = []
-            current_chunk = ""
-
+        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Consumable":"Consumables","Healing":"Healing","Voucher":"Vouchers","Currency":"Currencies"}
+        pages=[]
+        for cat, items in categories.items():
+            if not items: continue
+            chunks=[]; current=""
             for item in items:
-                if len(current_chunk) + len(item) + 1 > 1024:
-                    if current_chunk:
-                        chunks.append(current_chunk)
-                    current_chunk = item
-                else:
-                    current_chunk = (
-                        f"{current_chunk}\n{item}"
-                        if current_chunk
-                        else item
-                    )
+                if current and len(current)+len(item)+1 > 6000:
+                    chunks.append(current); current=item
+                else: current=f"{current}\n{item}" if current else item
+            if current: chunks.append(current)
+            for i, chunk in enumerate(chunks):
+                display=names.get(cat,cat); suffix=f" ({i+1}/{len(chunks)})" if len(chunks)>1 else ""
+                e=discord.Embed(title=f"📦 {ctx.author.display_name}'s Storage Locker", description=f"**{display}**", color=discord.Color.from_rgb(0,229,255))
+                e.add_field(name=f"✨ {display}{suffix}", value=chunk, inline=False); pages.append(e)
 
-            if current_chunk:
-                chunks.append(current_chunk)
+        class InventoryView(discord.ui.View):
+            def __init__(self, owner_id, embeds):
+                super().__init__(timeout=300); self.owner_id=owner_id; self.embeds=embeds; self.current_page=0
+            def current_embed(self):
+                e=self.embeds[self.current_page]; e.set_footer(text=f"Page {self.current_page+1}/{len(self.embeds)} • Sell unwanted salvage with /shop sell"); return e
+            async def interaction_check(self, interaction):
+                if interaction.user.id != self.owner_id:
+                    await interaction.response.send_message("❌ This inventory menu belongs to someone else.", ephemeral=True); return False
+                return True
+            @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+            async def previous(self, interaction, button):
+                self.current_page=(self.current_page-1)%len(self.embeds); await interaction.response.edit_message(embed=self.current_embed(), view=self)
+            @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+            async def next(self, interaction, button):
+                self.current_page=(self.current_page+1)%len(self.embeds); await interaction.response.edit_message(embed=self.current_embed(), view=self)
 
-            category_names = {
-                "Space Junk": "Space Junk",
-                "Mineral": "Minerals",
-                "Consumable": "Consumables",
-                "Healing": "Healing",
-                "Voucher": "Vouchers",
-                "Currency": "Currencies",
-            }
-
-            for index, chunk in enumerate(chunks):
-                display_category = category_names.get(cat_name, cat_name)
-
-                field_name = (
-                    f"✨ {display_category}"
-                    if len(chunks) == 1
-                    else f"✨ {display_category} ({index + 1}/{len(chunks)})"
-                )
-
-                embed.add_field(
-                    name=field_name,
-                    value=chunk,
-                    inline=False
-                )
-
-        embed.set_footer(text="Tip: Sell your unwanted salvage at the trading post using /shop sell")
-        await ctx.send(embed=embed)
+        view=InventoryView(ctx.author.id,pages)
+        await ctx.send(embed=view.current_embed(), view=view)
 
     async def use_item_autocomplete(
         self,

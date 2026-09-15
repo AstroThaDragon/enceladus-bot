@@ -25,7 +25,10 @@ class Profile(commands.Cog):
             "stardust": "INTEGER DEFAULT 0",
             "bio": "TEXT DEFAULT NULL",
             "profile_card": "TEXT DEFAULT 'default_nebula'",
-            "equipped_title": "TEXT DEFAULT ''"
+            "equipped_title": "TEXT DEFAULT ''",
+            "daily_streak": "INTEGER DEFAULT 0",
+            "mining_upgrade": "INTEGER DEFAULT 0",
+            "scavenging_upgrade": "INTEGER DEFAULT 0"
         }
 
         for column, column_type in required_columns.items():
@@ -57,7 +60,7 @@ class Profile(commands.Cog):
 
             async with db.execute(
                 """
-                SELECT stardust, bio, profile_card, equipped_title
+                SELECT stardust, bio, profile_card, equipped_title, daily_streak, mining_upgrade, scavenging_upgrade
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -87,6 +90,9 @@ class Profile(commands.Cog):
                 "bg": "default_nebula",
                 "pet": "egg",
                 "title": "",
+                "daily_streak": 0,
+                "mining_upgrade": 0,
+                "scavenging_upgrade": 0,
             }
 
         stored_level = leveling_data[0] if leveling_data else 0
@@ -96,6 +102,9 @@ class Profile(commands.Cog):
         bio = economy_data[1] if economy_data else None
         profile_card = economy_data[2] if economy_data else None
         equipped_title = economy_data[3] if economy_data else ""
+        daily_streak = economy_data[4] if economy_data else 0
+        mining_upgrade = economy_data[5] if economy_data else 0
+        scavenging_upgrade = economy_data[6] if economy_data else 0
 
         # Calculate true level dynamically from accumulated XP.
         leveling_cog = self.bot.get_cog("Leveling")
@@ -118,7 +127,10 @@ class Profile(commands.Cog):
             "bio": bio or "Exploring the outer rims of Enceladus Station. 🚀",
             "title": equipped_title or "",
             "bg": profile_card or "default_nebula",
-            "pet": pet_data[0] if pet_data else "egg"
+            "pet": pet_data[0] if pet_data else "egg",
+            "daily_streak": max(0, daily_streak or 0),
+            "mining_upgrade": max(0, min(5, mining_upgrade or 0)),
+            "scavenging_upgrade": max(0, min(5, scavenging_upgrade or 0))
         }
 
     @commands.hybrid_command(name="profile", description="View your cosmic station profile.")
@@ -174,6 +186,15 @@ class Profile(commands.Cog):
         # Native Discord Stat Fields
         embed.add_field(name="⭐ Rank & XP", value=f"Level `{data['level']}` • `{data['xp']:,} XP`", inline=True)
         embed.add_field(name="✨ Stardust", value=f"`{data['stardust']:,}`", inline=True)
+        embed.add_field(name="🔥 Daily Streak", value=f"`{data['daily_streak']} days`", inline=True)
+        embed.add_field(
+            name="🛠️ Exploration Upgrades",
+            value=(
+                f"⛏️ Mining Laser — **Tier {data['mining_upgrade']}/5**\n"
+                f"🤖 Scavenging Drone — **Tier {data['scavenging_upgrade']}/5**"
+            ),
+            inline=False
+        )
         embed.add_field(name="🐉 Companion", value=f"`{data['pet'].capitalize()}`", inline=True)
         
         # Environment Window Image

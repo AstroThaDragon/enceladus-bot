@@ -12,6 +12,57 @@ from inventory import add_inventory_item
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
+MINING_MATERIALS = [
+    ("iron_ore", "Iron Ore", 0.22),
+    ("copper_ore", "Copper Ore", 0.12),
+    ("titanium_chunk", "Titanium Ore Chunk", 0.05),
+    ("aluminum_ore", "Aluminum Ore", 0.16),
+]
+SCAVENGE_MATERIALS = [
+    ("circuit_board", "Circuit Board", 0.12),
+    ("glue", "Industrial Glue", 0.18),
+    ("scrap_metal", "Scrap Metal", 0.29),
+    ("nuts_bolts", "Nuts & Bolts", 0.20),
+    ("wiring", "Wiring", 0.24),
+]
+SCAVENGE_MEDICAL_SUPPLIES = [
+    ("gauze", "Sterile Gauze", 0.20),
+    ("medical_alcohol", "Medical Alcohol", 0.17),
+    ("bandaids", "Bandaids", 0.15),
+    ("antiseptic_ointment", "Antiseptic Ointment", 0.12),
+]
+SCAVENGE_BONUS_MINERALS = [
+    ("iron_ore", "Iron Ore", 0.035),
+    ("copper_ore", "Copper Ore", 0.020),
+    ("aluminum_ore", "Aluminum Ore", 0.015),
+    ("titanium_chunk", "Titanium Ore Chunk", 0.008),
+]
+
+MATERIAL_OVERFLOW_VALUES = {
+    "iron_ore": 3,
+    "copper_ore": 5,
+    "aluminum_ore": 4,
+    "titanium_chunk": 15,
+    "scrap_metal": 3,
+    "nuts_bolts": 4,
+    "wiring": 5,
+    "glue": 6,
+    "circuit_board": 20,
+}
+
+LOOT_OVERFLOW_VALUES = {
+    "titanium_chunk": 75, "arcade_token": 50, "time_crystal": 350, "astral_core": 750,
+    "gauze": 5, "medical_alcohol": 5, "bandaids": 5, "antiseptic_ointment": 5,
+    "quantum_battery": 800, "revive_kit": 200, "laser_charge_cell": 50, "drone_battery": 50,
+    "space_pizza": 10, "floppy_disk": 10, "meteorite": 10, "rubber_duck": 10, "rusty_gear": 10,
+    "tape_deck": 10, "alien_artifact": 10, "space_boot": 10, "cosmic_coin": 10, "holo_poster": 10,
+    "broken_laser": 10, "lost_logbook": 10, "left_sock": 10, "warp_mug": 10, "space_pudding": 10,
+    "tangled_cables": 10, "screaming_crystal": 10, "moon_cheese": 10, "golden_spatula": 60,
+    "parking_ticket": 10, "floating_plant": 10, "tinted_visor": 10, "purring_lint": 10, "pet_rock": 10,
+    "haunted_circuit": 10, "space_taco": 10, "rusty_wrench": 10, "alien_fossil": 10, "big_red_button": 10,
+    "antique_compass": 10, "broken_clock": 10, "perplexing_painting": 10, "cosmic_banana": 10,
+}
+
 
 class Exploration(commands.Cog):
     def __init__(self, bot):
@@ -266,6 +317,7 @@ class Exploration(commands.Cog):
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
         app_commands.Choice(name="🩹 Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
+        app_commands.Choice(name="🩹 Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
         app_commands.Choice(name="🧰 Field Trauma Medkit (+100 HP)", value="medkit")
     ])
     async def heal(self, ctx: commands.Context, item: str):
@@ -282,7 +334,8 @@ class Exploration(commands.Cog):
 
         heal_data = {
             "nanite_patch": {"name": "Nanite Stim-Patch", "col": "nanite_patchs", "amount": 35},
-            "medkit": {"name": "Field Trauma Medkit", "col": "medkits", "amount": 100}
+            "medkit": {"name": "Field Trauma Medkit", "col": "medkits", "amount": 100},
+            "makeshift_medkit": {"name": "Makeshift Medkit", "inventory": True, "amount": 60},
         }
 
         selected = heal_data.get(item)
@@ -295,15 +348,8 @@ class Exploration(commands.Cog):
             await self.ensure_schema(db)
             await self.recover_if_new_day(db, user_id)
 
-            col_name = selected["col"]
-            async with db.execute("PRAGMA table_info(users)") as cursor:
-                cols = {row[1] async for row in cursor}
-
-            if col_name not in cols:
-                return await ctx.send(f"❌ You don't have any **{selected['name']}s** in your inventory!")
-
             async with db.execute(
-                f"SELECT hp, max_hp, {col_name}, knocked_out_until FROM users WHERE user_id = ?",
+                "SELECT hp, max_hp, knocked_out_until FROM users WHERE user_id = ?",
                 (user_id,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -311,35 +357,56 @@ class Exploration(commands.Cog):
             if not row:
                 return await ctx.send("❌ Profile not found!")
 
-            current_hp, max_hp, item_count, knocked_out_until = (
-                row[0] or 0,
-                row[1] or 100,
-                row[2] or 0,
-                row[3] or ""
-            )
+            current_hp, max_hp, knocked_out_until = row[0] or 0, row[1] or 100, row[2] or ""
 
             if current_hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
-
-            if item_count <= 0:
-                return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
 
             if current_hp >= max_hp:
                 return await ctx.send(
                     f"❤️ **Full Health!** You are already at max HP (**{max_hp}/{max_hp} HP**)."
                 )
 
+            if selected.get("inventory"):
+                async with db.execute(
+                    "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
+                    (user_id, item)
+                ) as cursor:
+                    item_row = await cursor.fetchone()
+                item_count = item_row[0] if item_row else 0
+                if item_count <= 0:
+                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
+                new_count = item_count - 1
+                await db.execute(
+                    "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                    (user_id, item)
+                )
+            else:
+                col_name = selected["col"]
+                async with db.execute("PRAGMA table_info(users)") as cursor:
+                    cols = {row[1] async for row in cursor}
+                if col_name not in cols:
+                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** in your inventory!")
+                async with db.execute(
+                    f"SELECT {col_name} FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    count_row = await cursor.fetchone()
+                item_count = count_row[0] if count_row else 0
+                if item_count <= 0:
+                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
+                new_count = item_count - 1
+                await db.execute(
+                    f"UPDATE users SET {col_name} = ? WHERE user_id = ?",
+                    (new_count, user_id)
+                )
+
             new_hp = min(max_hp, current_hp + selected["amount"])
             healed_by = new_hp - current_hp
-            new_count = item_count - 1
-
-            await db.execute(f"""
-                UPDATE users
-                SET hp = ?,
-                    {col_name} = ?
-                WHERE user_id = ?
-            """, (new_hp, new_count, user_id))
-
+            await db.execute(
+                "UPDATE users SET hp = ? WHERE user_id = ?",
+                (new_hp, user_id)
+            )
             await db.commit()
 
         await ctx.send(
@@ -506,6 +573,9 @@ class Exploration(commands.Cog):
                 )
 
             effects = json.loads(effects_raw)
+            upgrade_cog = self.bot.get_cog("Upgrades")
+            mining_upgrade = await upgrade_cog.get_effects(user_id, "mining") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
+            max_mining_charges = mining_upgrade["max_charges"]
 
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
@@ -522,10 +592,10 @@ class Exploration(commands.Cog):
             )
 
             if last_mined_date != current_date:
-                charges = 10
+                charges = max_mining_charges
                 await db.execute(
                     "UPDATE users SET mining_charges = ? WHERE user_id = ?",
-                    (10, user_id)
+                    (max_mining_charges, user_id)
                 )
                 await db.commit()
 
@@ -547,7 +617,7 @@ class Exploration(commands.Cog):
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
             new_charges = charges if effects.pop("fuel_stabilizer", False) else charges - 1
             
-            found_stardust = random.randint(35, 85)
+            found_stardust = int(random.randint(35, 85) * mining_upgrade["stardust_mult"])
 
             if effects.pop("prototype_drill_bit", False):
                 found_stardust = int(found_stardust * 1.5)
@@ -564,6 +634,30 @@ class Exploration(commands.Cog):
                 f"✨ **Stardust Collected:** `{found_stardust}`"
                 f"{loot_bonus_note}"
             )
+
+            # Mining can uncover multiple types of raw mineral in one run.
+            # Each successful find yields 1–5 units; Astral Core remains a separate
+            # legendary roll and is intentionally always awarded one at a time.
+            for material_id, material_name, chance in MINING_MATERIALS:
+                if random.random() < chance:
+                    amount_found = random.randint(1, 5)
+                    added_material, material_quantity, material_max = await add_inventory_item(
+                        db, user_id, material_id, "mineral", amount_found
+                    )
+                    overflow_amount = amount_found - added_material
+                    if added_material:
+                        loot_description += (
+                            f"\n⛏️ **Mineral Recovered:** {material_name} ×{added_material} "
+                            f"({material_quantity}/{material_max})"
+                        )
+                    if overflow_amount > 0:
+                        overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
+                        new_stardust += overflow_stardust
+                        loot_description += (
+                            f"\n📦 **Mineral Overflow:** {material_name} had **{overflow_amount}** extra "
+                            f"and was converted to **+{overflow_stardust} Stardust**."
+                        )
+
             rarity_badge = "common"
 
             if roll < 0.40:
@@ -583,7 +677,7 @@ class Exploration(commands.Cog):
                     if leveled_up:
                         loot_description += f"\n🎉 **Level Up!** Reached **Level {new_level}**!"
 
-            elif roll < 0.75:
+            elif roll < 0.75 + mining_upgrade["rare_bonus"]:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
                 added_amount, new_quantity, max_quantity = await add_inventory_item(
                     db,
@@ -599,7 +693,7 @@ class Exploration(commands.Cog):
                         f"`Titanium Ore Chunk`! ({new_quantity}/{max_quantity})"
                     )
                 else:
-                    overflow_stardust = 75
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("titanium_chunk", 75)
                     new_stardust += overflow_stardust
 
                     loot_description += (
@@ -626,7 +720,7 @@ class Exploration(commands.Cog):
                         f"**Arcade Token**! ({new_quantity}/{max_quantity})"
                     )
                 else:
-                    overflow_stardust = 50
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
                     new_stardust += overflow_stardust
 
                     loot_description += (
@@ -667,7 +761,7 @@ class Exploration(commands.Cog):
                         f"({current_crystals + 1}/{max_quantity})"
                     )
                 else:
-                    overflow_stardust = 350
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("time_crystal", 350)
                     new_stardust += overflow_stardust
 
                     loot_description += (
@@ -695,7 +789,7 @@ class Exploration(commands.Cog):
                         "\n*Its purpose is currently unknown...*"
                     )
                 else:
-                    overflow_stardust = 750
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("astral_core", 750)
                     new_stardust += overflow_stardust
 
                     loot_description += (
@@ -731,7 +825,13 @@ class Exploration(commands.Cog):
             ),
             color=colors.get(rarity_badge, discord.Color.blue())
         )
-        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
+        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: 30m")
+        embed.add_field(
+            name="🛠️ Mining Laser Upgrade",
+            value=(f"Tier **{mining_upgrade['level']}/5** • Max Charges: **{max_mining_charges}**\n"
+                   f"Stardust Bonus: **+{(mining_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{mining_upgrade['rare_bonus'] * 100:.1f}%**"),
+            inline=False
+        )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
@@ -790,6 +890,9 @@ class Exploration(commands.Cog):
                 knocked_out_until = row[5] or ""
                 effects_raw = row[6] or "{}"
             effects = json.loads(effects_raw)
+            upgrade_cog = self.bot.get_cog("Upgrades")
+            scavenging_upgrade = await upgrade_cog.get_effects(user_id, "scavenging") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
+            max_scavenge_charges = scavenging_upgrade["max_charges"]
 
             # Daily charge reset: charges refresh to 10 once per calendar day.
             current_date = self.game_date()
@@ -803,10 +906,10 @@ class Exploration(commands.Cog):
             )
 
             if last_scavenged_date != current_date:
-                charges = 10
+                charges = max_scavenge_charges
                 await db.execute(
                     "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
-                    (10, user_id)
+                    (max_scavenge_charges, user_id)
                 )
                 await db.commit()
 
@@ -900,7 +1003,7 @@ class Exploration(commands.Cog):
                 item_type = "space_junk"
                 loot_rarity_note = ""
             new_charges = charges - 1
-            found_stardust = random.randint(15, 35)
+            found_stardust = int(random.randint(15, 35) * scavenging_upgrade["stardust_mult"])
 
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
@@ -940,6 +1043,71 @@ class Exploration(commands.Cog):
                 item_type,
                 1
             )
+            bonus_findings = []
+
+            # Scavenging can recover multiple types of crafting material in one run.
+            # Each successful material find yields 1–5 units.
+            for material_id, material_name, chance in SCAVENGE_MATERIALS:
+                if random.random() < chance:
+                    amount_found = random.randint(1, 5)
+                    added_material, material_quantity, material_max = await add_inventory_item(
+                        db, user_id, material_id, "crafting_material", amount_found
+                    )
+                    overflow_amount = amount_found - added_material
+                    if added_material:
+                        bonus_findings.append(
+                            f"🧰 **Salvage Material:** {material_name} ×{added_material} "
+                            f"({material_quantity}/{material_max})"
+                        )
+                    if overflow_amount > 0:
+                        overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
+                        new_stardust += overflow_stardust
+                        bonus_findings.append(
+                            f"📦 **Material Overflow:** {material_name} had **{overflow_amount}** extra "
+                            f"and was converted to **+{overflow_stardust} Stardust**."
+                        )
+
+            # Scavengers can also recover individual medical supplies for makeshift kits.
+            for supply_id, supply_name, chance in SCAVENGE_MEDICAL_SUPPLIES:
+                if random.random() < chance:
+                    added_supply, supply_quantity, supply_max = await add_inventory_item(
+                        db, user_id, supply_id, "medical_supply", 1
+                    )
+                    if added_supply:
+                        bonus_findings.append(
+                            f"🩹 **Medical Supply:** {supply_name} ×{added_supply} "
+                            f"({supply_quantity}/{supply_max})"
+                        )
+                    else:
+                        overflow_stardust = LOOT_OVERFLOW_VALUES.get(supply_id, 5)
+                        new_stardust += overflow_stardust
+                        bonus_findings.append(
+                            f"📦 **Medical Supply Overflow:** {supply_name} was already at "
+                            f"**{supply_max}/{supply_max}** and was converted to **+{overflow_stardust} Stardust**."
+                        )
+
+            # Very rarely, a scavenger can uncover multiple minerals as bonus finds.
+            # These are independent rolls, so more than one type can appear.
+            if random.random() < 0.08:
+                for mineral_id, mineral_name, chance in SCAVENGE_BONUS_MINERALS:
+                    if random.random() < chance:
+                        amount_found = random.randint(1, 5)
+                        added_mineral, mineral_quantity, mineral_max = await add_inventory_item(
+                            db, user_id, mineral_id, "mineral", amount_found
+                        )
+                        overflow_amount = amount_found - added_mineral
+                        if added_mineral:
+                            bonus_findings.append(
+                                f"⛏️ **Bonus Mineral:** {mineral_name} ×{added_mineral} "
+                                f"({mineral_quantity}/{mineral_max})"
+                            )
+                        if overflow_amount > 0:
+                            overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(mineral_id, 0)
+                            new_stardust += overflow_stardust
+                            bonus_findings.append(
+                                f"📦 **Mineral Overflow:** {mineral_name} had **{overflow_amount}** extra "
+                                f"and was converted to **+{overflow_stardust} Stardust**."
+                            )
 
             if added_amount == 1:
                 loot_name_with_quantity = f"{item_name} ({new_quantity}/{max_quantity})"
@@ -948,53 +1116,10 @@ class Exploration(commands.Cog):
                 # SCAVENGE OVERFLOW VALUES
                 # Adjust these Stardust values individually as desired.
                 # ─────────────────────────────────────────────
-                overflow_values = {
-                    # Legendary / Rare
-                    "quantum_battery": 800,
-                    "revive_kit": 200,
-                    "laser_charge_cell": 50,
-                    "drone_battery": 50,
-
-                    # Space Junk
-                    "space_pizza": 10,
-                    "floppy_disk": 10,
-                    "meteorite": 10,
-                    "rubber_duck": 10,
-                    "rusty_gear": 10,
-                    "tape_deck": 10,
-                    "alien_artifact": 10,
-                    "space_boot": 10,
-                    "cosmic_coin": 10,
-                    "holo_poster": 10,
-                    "broken_laser": 10,
-                    "lost_logbook": 10,
-                    "left_sock": 10,
-                    "warp_mug": 10,
-                    "space_pudding": 10,
-                    "tangled_cables": 10,
-                    "screaming_crystal": 10,
-                    "moon_cheese": 10,
-                    "golden_spatula": 60,
-                    "parking_ticket": 10,
-                    "floating_plant": 10,
-                    "tinted_visor": 10,
-                    "purring_lint": 10,
-                    "pet_rock": 10,
-                    "haunted_circuit": 10,
-                    "space_taco": 10,
-                    "rusty_wrench": 10,
-                    "alien_fossil": 10,
-                    "big_red_button": 10,
-                    "antique_compass": 10,
-                    "broken_clock": 10,
-                    "perplexing_painting": 10,
-                    "cosmic_banana": 10,
-                }
-
                 # Use the item's individual overflow value.
                 # The fallback protects against a newly added loot item
                 # accidentally having no configured overflow value.
-                overflow_stardust = overflow_values.get(item_id, 10)
+                overflow_stardust = LOOT_OVERFLOW_VALUES.get(item_id, 10)
 
                 new_stardust += overflow_stardust
 
@@ -1004,6 +1129,11 @@ class Exploration(commands.Cog):
                     f"**{max_quantity}/{max_quantity}**!"
                     f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                 )
+
+            # Include any bonus material/mineral discoveries in the public result embed.
+            bonus_material_text = ""
+            if bonus_findings:
+                bonus_material_text = "\n" + "\n".join(bonus_findings)
 
             await db.execute("""
                 UPDATE users 
@@ -1023,12 +1153,19 @@ class Exploration(commands.Cog):
                 f"{quantum_bonus_note}\n"
                 f"🛸 **Salvaged Item:** `{loot_name_with_quantity}`"
                 f"{loot_rarity_note}"
+                f"{bonus_material_text}"
                 f"{hazard_note}\n\n"
                 f"{status_text}"
             ),
             color=discord.Color.dark_gold()
         )
-        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
+        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: 30m")
+        embed.add_field(
+            name="🛠️ Scavenging Drone Upgrade",
+            value=(f"Tier **{scavenging_upgrade['level']}/5** • Max Charges: **{max_scavenge_charges}**\n"
+                   f"Stardust Bonus: **+{(scavenging_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{scavenging_upgrade['rare_bonus'] * 100:.1f}%**"),
+            inline=False
+        )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
