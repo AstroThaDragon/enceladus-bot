@@ -2,7 +2,7 @@ import aiosqlite
 import discord
 from discord import app_commands
 from discord.ext import commands
-
+from inventory import ITEM_REGISTRY
 from database import ECONOMY_DB_NAME
 
 MATERIAL_NAMES = {
@@ -121,6 +121,85 @@ class Crafting(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="recipes", description="View all available crafting recipes. More to come!")
+    async def recipes(self, ctx: commands.Context):
+        await ctx.defer()
+
+        embed = discord.Embed(
+            title="🔧 Enceladus Crafting Recipes",
+            description=(
+                "Here are the recipes currently available at the station.\n"
+                "Gather the required materials, then use `/craft` to build them!\n"
+                "**Use `/item` and look for the item you're curious about to see what it is and does."
+            ),
+            color=discord.Color.blue()
+        )
+
+        # Group recipes by purpose.
+        recipe_groups = {
+            "🛠️ Mining Laser Components": [
+                "laser_parts_1",
+                "laser_parts_2",
+                "laser_parts_3",
+                "laser_parts_4",
+                "laser_parts_5",
+            ],
+            "🤖 Scavenging Drone Components": [
+                "drone_kit_1",
+                "drone_kit_2",
+                "drone_kit_3",
+                "drone_kit_4",
+                "drone_kit_5",
+            ],
+            "🧬 Special Components": [
+                "nanite_retrofit_kit",
+                "astral_power_core",
+            ],
+            "🩹 Medical": [
+                "makeshift_medkit",
+            ],
+        }
+
+        for category, recipe_ids in recipe_groups.items():
+            lines = []
+
+            for recipe_id in recipe_ids:
+                recipe = RECIPES.get(recipe_id)
+
+                if not recipe:
+                    continue
+
+                ingredients = []
+                for item_id, amount in recipe["ingredients"].items():
+                    item = ITEM_REGISTRY.get(item_id)
+
+                    if item:
+                        ingredients.append(
+                            f"{item.get('emoji', '📦')} "
+                            f"{item['name']} ×{amount}"
+                        )
+                    else:
+                        ingredients.append(
+                            f"📦 {item_id.replace('_', ' ').title()} ×{amount}"
+                        )
+
+                lines.append(
+                    f"{recipe['emoji']} **{recipe['name']}**\n"
+                    f"> {' • '.join(ingredients)}"
+                )
+
+            if lines:
+                embed.add_field(
+                    name=category,
+                    value="\n\n".join(lines),
+                    inline=False
+                )
+
+        embed.set_footer(
+            text="Use /craft to build a recipe • Materials are consumed when crafting!"
+        )
+
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Crafting(bot))
