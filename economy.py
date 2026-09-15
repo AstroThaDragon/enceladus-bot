@@ -654,20 +654,15 @@ class Economy(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.hybrid_group(
-        name="bank",
-        description="Manage your protected Stardust vault."
-    )
+    @commands.hybrid_command(name="bank", description="Access the bank to view your balance and vault Stardust.")
+    @app_commands.describe(amount="View your current Stardust balance and vaulted Stardust")
     async def bank(self, ctx: commands.Context):
         """Manage your protected Stardust vault."""
         # /bank is intentionally a command group. Use /balance to view balances.
         if ctx.invoked_subcommand is None:
-            await ctx.send("💫 Use `/balance` to view your Stardust balance.")
+            await ctx.send("💫 Use `/bank` to view your Stardust balance.")
 
-    @bank.command(
-        name="deposit",
-        description="Move Stardust into your protected vault."
-    )
+    @commands.hybrid_command(name="deposit", description="Deposit your Stardust into the bank vault for safe keeping.")
     @app_commands.describe(amount="How much Stardust to store in the vault")
     async def bank_deposit(self, ctx: commands.Context, amount: int):
         """Deposit available Stardust into the protected vault."""
@@ -719,10 +714,7 @@ class Economy(commands.Cog):
             f"Your vault now holds **{vault + amount:,} Stardust**."
         )
 
-    @bank.command(
-        name="withdraw",
-        description="Move Stardust from your vault back to your spendable balance."
-    )
+    @commands.hybrid_command(name="withdraw", description="Withdraw Stardust from your bank vault to spend.")
     @app_commands.describe(amount="How much Stardust to withdraw from the vault")
     async def bank_withdraw(self, ctx: commands.Context, amount: int):
         """Withdraw Stardust from the protected vault."""
@@ -832,14 +824,8 @@ class Economy(commands.Cog):
 
         return available_items[:25]
 
-    @commands.hybrid_command(
-        name="shop_buy",
-        description="Purchase an item from the station vendor catalog."
-    )
-    @app_commands.describe(
-        item_id="Choose an item to purchase.",
-        quantity="How many would you like to buy? (1-99)"
-    )
+    @commands.hybrid_command(name="shop_buy", description="Purchase an item from the station vendor catalog.")
+    @app_commands.describe(item_id="Choose an item to purchase.", quantity="How many would you like to buy? (1-99)")
     @app_commands.autocomplete(item_id=shop_buy_autocomplete)
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
         await ctx.defer()
@@ -1405,13 +1391,8 @@ class Economy(commands.Cog):
 
         return choices[:25]
 
-    @commands.hybrid_command(
-        name="shop_sell",
-        description="Sell salvaged space junk from your inventory for Stardust."
-    )
-    @app_commands.describe(
-        item="The junk item ID to sell, or 'all' to sell every piece of space junk."
-    )
+    @commands.hybrid_command(name="shop_sell", description="Sell salvaged space junk from your inventory for Stardust.")
+    @app_commands.describe(item="The junk item ID to sell, or 'all' to sell every piece of space junk.")
     async def sell(self, ctx: commands.Context, item: str):
         await ctx.defer()
 
@@ -1712,14 +1693,8 @@ class Economy(commands.Cog):
         return choices[:25]
 
     @commands.hybrid_command(name="item", description="Inspect an item from the station catalog.")
-    @app_commands.describe(
-        category="Choose an item category.",
-        item="Choose an item to inspect."
-    )
-    @app_commands.autocomplete(
-        category=item_category_autocomplete,
-        item=item_autocomplete
-    )
+    @app_commands.describe(category="Choose an item category.", item="Choose an item to inspect.")
+    @app_commands.autocomplete(category=item_category_autocomplete, item=item_autocomplete)
     async def item_lookup(self, ctx: commands.Context, category: str, item: str):
         item_id = item.lower()
         from inventory import ITEM_REGISTRY
@@ -1739,10 +1714,7 @@ class Economy(commands.Cog):
         embed.set_footer(text="Enceladus Station Catalog")
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(
-        name="claimlegacy",
-        description="Claim your one-time Stardust bonus for being in the server before the **Frontier** update!"
-    )
+    @commands.hybrid_command(name="claimlegacy", description="Claim your one-time Stardust bonus for being in the server before the **Frontier** update!")
     async def claim_legacy_bonus(self, ctx: commands.Context):
         await ctx.defer()
 

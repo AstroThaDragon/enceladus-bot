@@ -406,11 +406,10 @@ class Inventory(commands.Cog):
         interaction: discord.Interaction,
         current: str
     ):
-        """Show items the user owns that can currently be used."""
-        user_id = interaction.user.id
-        current = current.lower().strip()
+        """Show items that /use supports, with the user's owned quantity."""
+        current = (current or "").lower().strip()
 
-        # Items handled by /use. Dedicated healing items stay exclusively in /heal.
+        # Healing items stay exclusively in /heal. Revival items stay in /revive.
         usable_items = {
             "fuel_refill",
             "laser_charge_cell",
@@ -430,35 +429,40 @@ class Inventory(commands.Cog):
             "quantum_battery",
         }
 
-        async with aiosqlite.connect(self.get_db_path()) as db:
-            async with db.execute(
-                """
-                SELECT item_id, quantity
-                FROM inventory
-                WHERE user_id = ?
-                  AND quantity > 0
-                """,
-                (user_id,)
-            ) as cursor:
-                rows = await cursor.fetchall()
+        # Build a quantity lookup from the inventory table.  We intentionally
+        # do not require an owned row to exist before returning choices: this
+        # keeps the Discord picker populated even for users who currently have
+        # no /use-compatible item.  The command itself still verifies ownership.
+        quantities = {}
+        try:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                async with db.execute(
+                    """
+                    SELECT item_id, quantity
+                    FROM inventory
+                    WHERE user_id = ?
+                      AND quantity > 0
+                    """,
+                    (interaction.user.id,)
+                ) as cursor:
+                    quantities = {item_id: quantity for item_id, quantity in await cursor.fetchall()}
+        except Exception:
+            # Autocomplete must never fail the interaction because the database
+            # is temporarily unavailable.  We can still return the catalog.
+            quantities = {}
 
-
-        owned = list(rows)
         choices = []
-
-        for item_id, quantity in owned:
-            if item_id not in usable_items:
-                continue
-
+        for item_id in usable_items:
             info = ITEM_REGISTRY.get(item_id)
             if not info:
                 continue
 
             display_name = info["name"]
-
-            if current and current not in display_name.lower() and current not in item_id.lower():
+            search_text = f"{display_name} {item_id}".lower()
+            if current and current not in search_text:
                 continue
 
+            quantity = quantities.get(item_id, 0)
             choices.append(
                 app_commands.Choice(
                     name=f"{info['emoji']} {display_name} (x{quantity})",
@@ -471,9 +475,7 @@ class Inventory(commands.Cog):
 
     @commands.hybrid_command(name="use", description="Use a consumable from your inventory.")
     @app_commands.rename(item_id="item")
-    @app_commands.describe(
-        item_id="Choose an item from your inventory."
-    )
+    @app_commands.describe(item_id="Choose an item from your inventory.")
     @app_commands.autocomplete(item_id=use_item_autocomplete)
     async def use_item(self, ctx: commands.Context, item_id: str):
         await ctx.defer()
