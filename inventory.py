@@ -338,7 +338,7 @@ class Inventory(commands.Cog):
             if not items: continue
             chunks=[]; current=""
             for item in items:
-                if current and len(current)+len(item)+1 > 6000:
+                if current and len(current)+len(item)+1 > 1000:
                     chunks.append(current); current=item
                 else: current=f"{current}\n{item}" if current else item
             if current: chunks.append(current)
