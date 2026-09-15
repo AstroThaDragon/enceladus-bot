@@ -654,13 +654,38 @@ class Economy(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="bank", description="Access the bank to view your balance and vault Stardust.")
-    @app_commands.describe(amount="View your current Stardust balance and vaulted Stardust")
+    @commands.hybrid_command(name="bank", description="View your protected Stardust vault.")
     async def bank(self, ctx: commands.Context):
-        """Manage your protected Stardust vault."""
-        # /bank is intentionally a command group. Use /balance to view balances.
-        if ctx.invoked_subcommand is None:
-            await ctx.send("💫 Use `/bank` to view your Stardust balance.")
+        """View your protected Stardust vault."""
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                (user_id,)
+            )
+            await db.commit()
+
+            async with db.execute(
+                "SELECT COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        vault = row[0] if row else 0
+
+        embed = discord.Embed(
+            title=f"🔐 {ctx.author.display_name}'s Stardust Vault",
+            description=(
+                f"**Stored:** {vault:,} / {self.VAULT_CAPACITY:,} Stardust\n\n"
+                "Use `/deposit` to store Stardust or `/withdraw` to take it back out."
+            ),
+            color=discord.Color.from_rgb(0, 229, 255)
+        )
+        embed.set_footer(text="Enceladus Station Economy")
+        await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="deposit", description="Deposit your Stardust into the bank vault for safe keeping.")
     @app_commands.describe(amount="How much Stardust to store in the vault")
