@@ -6,7 +6,7 @@ import random
 from typing import Any
 import datetime
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 class ShopCategorySelect(discord.ui.Select):
@@ -591,6 +591,17 @@ class Economy(commands.Cog):
             "ALTER TABLE users ADD COLUMN vault_stardust INTEGER DEFAULT 0"
         )
 
+        # Daily Stardust reward tracking.
+        if "daily_streak" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN daily_streak INTEGER DEFAULT 0"
+            )
+
+        if "last_daily" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN last_daily TEXT DEFAULT ''"
+            )
+
         # Shop purchase-limit tracking.
         await db.execute(
             """
@@ -653,6 +664,131 @@ class Economy(commands.Cog):
         embed.set_footer(text="Enceladus Station Economy")
 
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="daily",
+        description="Claim your daily Stardust reward and build your streak up! Maxes at 7 days."
+    )
+    async def daily(self, ctx: commands.Context):
+        """Claim the daily Stardust reward and build a consecutive-day streak."""
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+        eastern = pytz.timezone("US/Eastern")
+        today = datetime.now(eastern).date()
+        today_str = today.isoformat()
+        yesterday_str = (today - timedelta(days=1)).isoformat()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+
+            await db.execute(
+                """
+                INSERT OR IGNORE INTO users
+                    (user_id, stardust, vault_stardust, daily_streak, last_daily)
+                VALUES (?, 0, 0, 0, '')
+                """,
+                (user_id,)
+            )
+            await db.commit()
+
+            # Lock the row before checking/updating the claim so two nearly
+            # simultaneous interactions cannot award the daily twice.
+            await db.execute("BEGIN IMMEDIATE")
+
+            async with db.execute(
+                """
+                SELECT COALESCE(stardust, 0), COALESCE(daily_streak, 0),
+                    COALESCE(last_daily, '')
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            stardust, streak, last_daily = row if row else (0, 0, "")
+
+            # Already claimed today.
+            if last_daily == today_str:
+                await db.rollback()
+
+                reward = min(400, 100 + max(0, streak - 1) * 50)
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 📅 **Daily already claimed!**\n"
+                    f"You claimed **{reward:,} Stardust** today.\n"
+                    f"🔥 Current streak: **{streak} day{'s' if streak != 1 else ''}**.\n"
+                    "Come back tomorrow to keep your streak going!"
+                )
+
+            # Determine whether the previous streak was broken.
+            streak_was_reset = bool(
+                last_daily and last_daily != yesterday_str
+            )
+
+            # Continue the streak if yesterday was claimed.
+            # The streak is intentionally NOT capped at 7 anymore.
+            if last_daily == yesterday_str:
+                new_streak = max(1, streak) + 1
+            else:
+                new_streak = 1
+
+            # Reward increases by 50 per day, but is currently capped at 400.
+            reward = min(400, 100 + (new_streak - 1) * 50)
+            new_stardust = stardust + reward
+
+            await db.execute(
+                """
+                UPDATE users
+                SET stardust = ?, daily_streak = ?, last_daily = ?
+                WHERE user_id = ?
+                """,
+                (new_stardust, new_streak, today_str, user_id)
+            )
+            await db.commit()
+
+        # Build the 1–7 day streak ladder.
+        # We can expand this later when the economy gets larger.
+        streak_rows = []
+        rewards = [100, 150, 200, 250, 300, 350, 400]
+
+        for day, day_reward in enumerate(rewards, start=1):
+            mark = "✅" if new_streak >= day else "❌"
+            label = f"{day} day" if day == 1 else f"{day} days"
+
+            streak_rows.append(
+                f"{label:<7} {mark} **{day_reward:,} Stardust**"
+            )
+
+        reset_note = ""
+        if streak_was_reset:
+            reset_note = (
+                "\n\n⚠️ **Your daily streak was reset** because you missed a day. "
+                "You're starting a new streak today!"
+            )
+
+        embed = discord.Embed(
+            title="📅 Daily Stardust",
+            description=(
+                "Claim your daily reward and build your streak!\n\n"
+                + "\n".join(streak_rows)
+                + f"\n\n🔥 **Current Streak:** "
+                f"{new_streak} day{'s' if new_streak != 1 else ''}"
+                + f"\n💫 **Today's Reward:** {reward:,} Stardust"
+                + f"\n💰 **Available Stardust:** {new_stardust:,}"
+                + reset_note
+            ),
+            color=discord.Color.from_rgb(0, 229, 255)
+        )
+
+        embed.set_footer(
+            text="Come back tomorrow to keep your streak going!"
+        )
+
+        await ctx.send(
+            content=ctx.author.mention,
+            embed=embed
+        )
 
     @commands.hybrid_command(name="bank", description="View your current Stardust balance and vaulted Stardust.")
     async def bank(self, ctx: commands.Context):

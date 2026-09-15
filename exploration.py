@@ -112,6 +112,26 @@ class Exploration(commands.Cog):
             await db.execute("ALTER TABLE users ADD COLUMN scavenge_alert_sent REAL DEFAULT 0")
         if "cooldown_alerts" not in existing_columns:
             await db.execute("ALTER TABLE users ADD COLUMN cooldown_alerts INTEGER DEFAULT 0")
+        if "daily_streak" not in existing_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN daily_streak INTEGER DEFAULT 0")
+        if "last_daily" not in existing_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN last_daily TEXT DEFAULT ''")
+
+    async def daily_unclaimed(self, user_id):
+        """Return True when the user has not claimed today's daily reward."""
+        today = self.game_date().isoformat()
+        try:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                await self.ensure_schema(db)
+                async with db.execute(
+                    "SELECT COALESCE(last_daily, '') FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+            return not row or row[0] != today
+        except Exception:
+            # A reminder should never break a successful exploration result.
+            return False
 
     @tasks.loop(seconds=60)
     async def cooldown_alert_checker(self):
@@ -414,9 +434,9 @@ class Exploration(commands.Cog):
             )
 
     async def maybe_suggest_cooldown_alerts(self, ctx):
-        """Occasionally suggest cooldown alerts to users who have them disabled."""
+        """Occasionally return a cooldown-alert suggestion for the result embed."""
         if random.random() > 0.10:
-            return
+            return None
 
         user_id = ctx.author.id
         db_path = self.get_db_path()
@@ -431,10 +451,12 @@ class Exploration(commands.Cog):
                 row = await cursor.fetchone()
 
         if row and not row[0]:
-            await ctx.send(
+            return (
                 "💡 **Want a little heads-up from time-to-time?** You can use `/cooldown_alerts` "
                 "to get pinged when your mining and/or scavenging cooldown finishes!"
             )
+
+        return None
 
 
 
@@ -710,9 +732,23 @@ class Exploration(commands.Cog):
             color=colors.get(rarity_badge, discord.Color.blue())
         )
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/10 • Cooldown: 30m")
-        
+
+        if random.random() < 0.25 and await self.daily_unclaimed(user_id):
+            embed.add_field(
+                name="📅 Daily Reminder",
+                value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+                inline=False
+            )
+
+        cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
+        if cooldown_reminder:
+            embed.add_field(
+                name="🔔 Cooldown Alerts",
+                value=cooldown_reminder,
+                inline=False
+            )
+
         await ctx.send(content=ctx.author.mention, embed=embed)
-        await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds!")
     async def scavenge(self, ctx: commands.Context):
@@ -994,8 +1030,22 @@ class Exploration(commands.Cog):
         )
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/10 • Cooldown: 30m")
 
+        if random.random() < 0.25 and await self.daily_unclaimed(user_id):
+            embed.add_field(
+                name="📅 Daily Reminder",
+                value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+                inline=False
+            )
+
+        cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
+        if cooldown_reminder:
+            embed.add_field(
+                name="🔔 Cooldown Alerts",
+                value=cooldown_reminder,
+                inline=False
+            )
+
         await ctx.send(content=ctx.author.mention, embed=embed)
-        await self.maybe_suggest_cooldown_alerts(ctx)
 
     @commands.hybrid_command(
         name="revive",
