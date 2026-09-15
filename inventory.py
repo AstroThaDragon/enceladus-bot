@@ -548,8 +548,17 @@ class Inventory(commands.Cog):
                 row = await cursor.fetchone()
 
             if not row or (row[0] or 0) <= 0:
+                item_info = ITEM_REGISTRY.get(item_id)
+
+                if item_info:
+                    item_name = item_info["name"]
+                    item_emoji = item_info.get("emoji", "📦")
+                    item_display = f"{item_emoji} **{item_name}**"
+                else:
+                    item_display = f"`{item_id}`"
+
                 return await ctx.send(
-                    f"❌ You do not have `{item_id}` in your inventory."
+                    f"❌ You do not have {item_display} in your inventory."
                 )
 
             async with db.execute(

@@ -654,37 +654,71 @@ class Economy(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="bank", description="View your protected Stardust vault.")
+    @commands.hybrid_command(name="bank", description="View your current Stardust balance and vaulted Stardust.")
     async def bank(self, ctx: commands.Context):
-        """View your protected Stardust vault."""
+        """Show available Stardust and protected vault balance."""
         user_id = ctx.author.id
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
             await self.ensure_schema(db)
+
             await db.execute(
-                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                """
+                INSERT OR IGNORE INTO users
+                    (user_id, stardust, vault_stardust)
+                VALUES (?, 0, 0)
+                """,
                 (user_id,)
             )
             await db.commit()
 
             async with db.execute(
-                "SELECT COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                """
+                SELECT
+                    COALESCE(stardust, 0),
+                    COALESCE(vault_stardust, 0)
+                FROM users
+                WHERE user_id = ?
+                """,
                 (user_id,)
             ) as cursor:
                 row = await cursor.fetchone()
 
-        vault = row[0] if row else 0
+        stardust = row[0] if row else 0
+        vault = row[1] if row else 0
+        total = stardust + vault
 
         embed = discord.Embed(
             title=f"🔐 {ctx.author.display_name}'s Stardust Vault",
             description=(
-                f"**Stored:** {vault:,} / {self.VAULT_CAPACITY:,} Stardust\n\n"
-                "Use `/deposit` to store Stardust or `/withdraw` to take it back out."
+                f"Your vault contains **{vault:,} Stardust**.\n\n"
+                "Stardust stored here is protected from normal spending.\n"
+                "Use `/deposit` to store more or `/withdraw` to take it back out."
             ),
             color=discord.Color.from_rgb(0, 229, 255)
         )
+
+        embed.add_field(
+            name="💫 Available to Spend",
+            value=f"{stardust:,} Stardust",
+            inline=True
+        )
+
+        embed.add_field(
+            name="🔐 Protected in Vault",
+            value=f"{vault:,} / {self.VAULT_CAPACITY:,} Stardust",
+            inline=True
+        )
+
+        embed.add_field(
+            name="📊 Total Owned",
+            value=f"{total:,} Stardust",
+            inline=False
+        )
+
         embed.set_footer(text="Enceladus Station Economy")
+
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="deposit", description="Deposit your Stardust into the bank vault for safe keeping.")
