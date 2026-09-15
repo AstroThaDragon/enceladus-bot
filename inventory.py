@@ -410,7 +410,7 @@ class Inventory(commands.Cog):
         user_id = interaction.user.id
         current = current.lower().strip()
 
-        # Items that /use currently supports.
+        # Items handled by /use. Dedicated healing items stay exclusively in /heal.
         usable_items = {
             "fuel_refill",
             "laser_charge_cell",
@@ -442,9 +442,11 @@ class Inventory(commands.Cog):
             ) as cursor:
                 rows = await cursor.fetchall()
 
+
+        owned = list(rows)
         choices = []
 
-        for item_id, quantity in rows:
+        for item_id, quantity in owned:
             if item_id not in usable_items:
                 continue
 
@@ -465,7 +467,6 @@ class Inventory(commands.Cog):
             )
 
         choices.sort(key=lambda choice: choice.name.lower())
-
         return choices[:25]
 
     @commands.hybrid_command(name="use", description="Use a consumable from your inventory.")
@@ -486,14 +487,21 @@ class Inventory(commands.Cog):
         if exploration_cog is not None:
             lock = exploration_cog._user_locks.setdefault(user_id, asyncio.Lock())
         else:
-            # Fallback for unusual startup/test situations where Exploration
-            # has not loaded yet.
             if not hasattr(self, "_user_locks"):
                 self._user_locks = {}
             lock = self._user_locks.setdefault(user_id, asyncio.Lock())
 
-        async with lock:
-            return await self._use_item_impl(ctx, item_id)
+        try:
+            async with lock:
+                return await self._use_item_impl(ctx, item_id)
+        except Exception:
+            # Keep /use from silently timing out if an unexpected item/database
+            # error occurs. The traceback still goes to the bot's error logger.
+            import logging
+            logging.getLogger(__name__).exception("Error while using item")
+            return await ctx.send(
+                "❌ Something went wrong while using that item. Please try again."
+            )
 
 
     async def _use_item_impl(self, ctx: commands.Context, item_id: str):

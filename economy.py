@@ -605,13 +605,13 @@ class Economy(commands.Cog):
         )
 
         
-    @commands.hybrid_group(
-        name="bank",
-        description="Manage your Stardust bank.",
-        invoke_without_command=True
+    @commands.hybrid_command(
+        name="balance",
+        aliases=["bal"],
+        description="View your spendable Stardust, vault balance, and total."
     )
-    async def bank(self, ctx: commands.Context):
-        """Show your available Stardust and stored vault balance."""
+    async def balance(self, ctx: commands.Context):
+        """Show your available Stardust, vault balance, and total."""
         user_id = ctx.author.id
         db_path = self.get_db_path()
 
@@ -634,7 +634,7 @@ class Economy(commands.Cog):
         total = stardust + vault
 
         embed = discord.Embed(
-            title=f"🏦 {ctx.author.display_name}'s Stardust Bank",
+            title=f"💰 {ctx.author.display_name}'s Stardust Balance",
             description=(
                 f"💫 **Available:** {stardust:,} Stardust\n"
                 f"🔐 **Vault:** {vault:,} Stardust\n\n"
@@ -645,8 +645,8 @@ class Economy(commands.Cog):
         embed.add_field(
             name="🔐 Vault",
             value=(
-                "Store Stardust here so it cannot be spent by shop purchases or other normal spending. "
-                "Use `/bank deposit` and `/bank withdraw` to move it."
+                "Stardust stored here is protected from normal spending. "
+                "Use `/bank deposit` to store Stardust and `/bank withdraw` to take it back out."
             ),
             inline=False
         )
@@ -654,46 +654,15 @@ class Economy(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @bank.command(
-        name="vault",
-        description="View your protected Stardust vault."
+    @commands.hybrid_group(
+        name="bank",
+        description="Manage your protected Stardust vault."
     )
-    async def bank_vault(self, ctx: commands.Context):
-        """Show the Stardust stored safely in the vault."""
-        user_id = ctx.author.id
-        db_path = self.get_db_path()
-
-        async with aiosqlite.connect(db_path) as db:
-            await self.ensure_schema(db)
-            await db.execute(
-                "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
-                (user_id,)
-            )
-            await db.commit()
-
-            async with db.execute(
-                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
-                (user_id,)
-            ) as cursor:
-                row = await cursor.fetchone()
-
-        stardust = row[0] if row else 0
-        vault = row[1] if row else 0
-
-        embed = discord.Embed(
-            title=f"🔐 {ctx.author.display_name}'s Stardust Vault",
-            description=(
-                f"Your vault contains **{vault:,} Stardust**.\n\n"
-                "Stardust stored here is protected from normal spending.\n"
-                "Use `/bank deposit` to store more or `/bank withdraw` to take it back out."
-            ),
-            color=discord.Color.from_rgb(120, 90, 220)
-        )
-        embed.add_field(name="💫 Available to Spend", value=f"{stardust:,} Stardust")
-        embed.add_field(name="🔐 Protected in Vault", value=f"{vault:,} Stardust")
-        embed.set_footer(text="Enceladus Station Economy")
-
-        await ctx.send(embed=embed)
+    async def bank(self, ctx: commands.Context):
+        """Manage your protected Stardust vault."""
+        # /bank is intentionally a command group. Use /balance to view balances.
+        if ctx.invoked_subcommand is None:
+            await ctx.send("💫 Use `/balance` to view your Stardust balance.")
 
     @bank.command(
         name="deposit",
