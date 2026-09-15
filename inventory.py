@@ -469,6 +469,7 @@ class Inventory(commands.Cog):
         return choices[:25]
 
     @commands.hybrid_command(name="use", description="Use a consumable from your inventory.")
+    @app_commands.rename(item_id="item")
     @app_commands.describe(
         item_id="Choose an item from your inventory."
     )

@@ -585,6 +585,11 @@ class Economy(commands.Cog):
             await db.execute(
                 "ALTER TABLE users ADD COLUMN last_chat_reward REAL DEFAULT 0"
             )
+            
+        if "vault_stardust" not in existing_columns:
+            await db.execute(
+            "ALTER TABLE users ADD COLUMN vault_stardust INTEGER DEFAULT 0"
+        )
 
         # Shop purchase-limit tracking.
         await db.execute(
@@ -602,7 +607,8 @@ class Economy(commands.Cog):
         
     @commands.hybrid_group(
         name="bank",
-        description="Manage your Stardust bank."
+        description="Manage your Stardust bank.",
+        invoke_without_command=True
     )
     async def bank(self, ctx: commands.Context):
         """Show your available Stardust and stored vault balance."""
