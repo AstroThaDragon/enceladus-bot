@@ -38,7 +38,7 @@ ITEM_REGISTRY = {
     "stardust_cache": {"name": "Contraband Stardust Cache", "emoji": "🎁", "max_quantity": 10, "type": "Consumable", "desc": "Opens for an unpredictable Stardust payoff."},
 
     # Legendary Loot
-    "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. May be used in the future..."},
+    "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. Required to craft higher-tier exploration upgrades."},
     "quantum_battery": {"name": "Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Materials & Minerals
@@ -345,7 +345,7 @@ class Inventory(commands.Cog):
             for i, chunk in enumerate(chunks):
                 display=names.get(cat,cat); suffix=f" ({i+1}/{len(chunks)})" if len(chunks)>1 else ""
                 e=discord.Embed(title=f"📦 {ctx.author.display_name}'s Storage Locker", description=f"**{display}**", color=discord.Color.from_rgb(0,229,255))
-                e.add_field(name=f"✨ {display}{suffix}", value=chunk, inline=False); pages.append(e)
+                e.add_field(name=f"✨ Items{suffix}", value=chunk, inline=False); pages.append(e)
 
         class InventoryView(discord.ui.View):
             def __init__(self, owner_id, embeds):

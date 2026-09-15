@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import aiosqlite
+import json
 import random
 from typing import Any
 import datetime
@@ -600,6 +601,14 @@ class Economy(commands.Cog):
         if "last_daily" not in existing_columns:
             await db.execute(
                 "ALTER TABLE users ADD COLUMN last_daily TEXT DEFAULT ''"
+            )
+
+        # Permanently unlocked profile backgrounds.
+        # Vouchers are consumed on redemption, so this list is the source of truth
+        # for whether a background has already been unlocked.
+        if "unlocked_backgrounds" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN unlocked_backgrounds TEXT DEFAULT '[\"default\"]'"
             )
 
         # Shop purchase-limit tracking.
@@ -1428,6 +1437,33 @@ class Economy(commands.Cog):
                 )
 
             if item["type"] == "background_voucher":
+                # A redeemed voucher permanently unlocks its background.
+                # Check that unlock list before charging Stardust so users can
+                # never buy another copy of a background they already own.
+                async with db.execute(
+                    "SELECT unlocked_backgrounds FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    unlock_row = await cursor.fetchone()
+
+                unlocked_backgrounds = ["default"]
+                if unlock_row and unlock_row[0]:
+                    try:
+                        parsed = json.loads(unlock_row[0])
+                        if isinstance(parsed, list):
+                            unlocked_backgrounds = parsed
+                    except (TypeError, json.JSONDecodeError):
+                        pass
+
+                if item_id in unlocked_backgrounds:
+                    await db.rollback()
+                    return await ctx.send(
+                        "⚠️ You already unlocked this background! "
+                        "You can select it with `/background` **after** redeeming with `/voucher`."
+                    )
+
+                # Also prevent buying a duplicate voucher while the original
+                # unredeemed voucher is still in the user's inventory.
                 async with db.execute(
                     "SELECT 1 FROM inventory "
                     "WHERE user_id = ? AND item_id = ?",
