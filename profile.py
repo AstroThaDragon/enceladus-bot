@@ -239,9 +239,9 @@ class Profile(commands.Cog):
                 f"Level `{data['pet']['level']}`"
             )
         else:
-            companion_text = "`None equipped`"
+            companion_text = "`None`"
 
-        embed.add_field(name="🐉 Companion", value=companion_text, inline=True)
+        embed.add_field(name="🐾 Companion", value=companion_text, inline=True)
         
         # Environment Window Image
         embed.set_image(url="attachment://viewport.png")
