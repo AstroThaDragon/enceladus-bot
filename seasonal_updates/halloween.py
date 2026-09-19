@@ -1,7 +1,7 @@
 """Halloween seasonal content for Enceladus.
 
 Edit the placeholder entries below to add the Halloween-themed Space Junk.
-The event is active from October 5 through November 5, Eastern Time.
+The event is active from October 1 through November 5, Eastern Time.
 """
 
 from datetime import datetime
@@ -10,7 +10,7 @@ from emojis import EMOJIS
 
 EVENT_NAME = "Halloween"
 EVENT_START_MONTH = 10
-EVENT_START_DAY = 5
+EVENT_START_DAY = 1
 EVENT_END_MONTH = 11
 EVENT_END_DAY = 5
 
