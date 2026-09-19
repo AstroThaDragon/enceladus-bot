@@ -79,7 +79,7 @@ HALLOWEEN_SPACE_JUNK = [
     ("hacked_phone", "Hacked Phone", "📱", "It doesn't want to hurt you. It just wants to make sure you never feel lonely again.", 100, 20),
     ("hair_trimmer", "Crazed Hair Trimmer", EMOJIS["hair_trimmer"], "Hello, new friend. My name is Fred. The words you hear are in my head.", 35, 8),
     ("mysterious_slab", "Mysterious Slab", EMOJIS["mysterious_slab"], "Return his slab, or suffer his curse.", 90, 10),
-    ("marker", "Unknown Alien Artifact",  "**Make us whole.**", 100, 15),
+    ("marker", "Unknown Alien Artifact", "👽", "**Make us whole.**", 100, 15),
     ("cupcake", "Cupcake with Eyes", "🧁", "Was a loving companion in the game. But was a violation in the movie. :(", 40, 12),
     ("old_wallpaper", "Old Wallpaper", EMOJIS["old_wallpaper"], "This shouldn't exist.", 65, 15),
     ("toy_remote", "Red Toy Remote", EMOJIS["toy_remote"], "Thank you for using our 'Limited-Time Imaginary Friend' remote! We hope you enjoy the next 2 days with your very own real, not-so-imaginary, friend!", 35, 10),

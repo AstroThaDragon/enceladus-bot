@@ -573,12 +573,13 @@ class Verification(commands.Cog):
         app_by_label = {v["label"]: k for k, v in APPLICATION_TYPES.items()}
         channel = self.bot.get_channel(VERIFICATION_CHANNEL_ID)
         if channel is None:
-            for guild in self.bot.guilds:
-                try:
-                    channel = await guild.fetch_channel(VERIFICATION_CHANNEL_ID)
-                    break
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    continue
+            try:
+                # Fetch directly by ID instead of depending on bot.guilds/cache
+                # during startup. This works even before guild caches are ready.
+                channel = await self.bot.fetch_channel(VERIFICATION_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                channel = None
+
         if channel is None:
             print("[VERIFICATION] Could not restore review views: verification channel unavailable.")
             return
@@ -812,4 +813,16 @@ class Verification(commands.Cog):
 async def setup(bot):
     cog = Verification(bot)
     await bot.add_cog(cog)
-    await cog.restore_review_views()
+
+    async def restore_after_ready():
+        try:
+            await bot.wait_until_ready()
+            await cog.restore_review_views()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"[VERIFICATION] Review-view restoration failed: {e}")
+
+    # setup_hook runs before the bot is fully ready, so restoration must wait
+    # until Discord has finished establishing the guild/channel state.
+    asyncio.create_task(restore_after_ready())
