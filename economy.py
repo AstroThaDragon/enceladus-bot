@@ -1,3 +1,4 @@
+from emojis import EMOJIS
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -9,6 +10,84 @@ import datetime
 import time
 from datetime import datetime, timedelta
 import pytz
+from seasonal_updates.halloween import is_active as halloween_is_active
+from seasonal_updates.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
+
+
+# Space Junk salvage pools. Each junk item always yields exactly one base
+# material at Level 0. Higher Salvage Rig levels add a chance for one extra
+# material from the same pool. Weights within each pool are normalized by
+# random.choices, so they do not need to add to exactly 1.
+SALVAGE_POOLS = {
+    "electronics": [("wiring", 50), ("circuit_board", 30), ("copper_ore", 20)],
+    "mechanical": [("scrap_metal", 45), ("nuts_bolts", 35), ("iron_ore", 20)],
+    "structural": [("scrap_metal", 45), ("iron_ore", 35), ("aluminum_ore", 20)],
+    "mineral": [("iron_ore", 50), ("copper_ore", 30), ("aluminum_ore", 18), ("titanium_chunk", 2)],
+    "miscellaneous": [("scrap_metal", 50), ("glue", 30), ("nuts_bolts", 20)],
+    "valuable": [("circuit_board", 35), ("wiring", 30), ("copper_ore", 25), ("aluminum_ore", 10)],
+}
+
+SALVAGE_CATEGORIES = {
+    # Electronics / powered equipment
+    "floppy_disk": "electronics",
+    "tape_deck": "electronics",
+    "alien_artifact": "electronics",
+    "tangled_cables": "electronics",
+    "broken_laser": "electronics",
+    "haunted_circuit": "electronics",
+    "big_red_button": "electronics",
+    "broken_clock": "electronics",
+
+    # Mechanical hardware / tools
+    "rusty_gear": "mechanical",
+    "space_boot": "mechanical",
+    "tinted_visor": "mechanical",
+    "rusty_wrench": "mechanical",
+    "warp_mug": "mechanical",
+
+    # Structural / mineral-heavy wreckage
+    "meteorite": "mineral",
+    "pet_rock": "mineral",
+    "alien_fossil": "mineral",
+
+    # Valuable / specialized oddities
+    "cosmic_coin": "valuable",
+    "screaming_crystal": "valuable",
+    "golden_spatula": "valuable",
+    "antique_compass": "valuable",
+    "perplexing_painting": "valuable",
+
+    # Everything else is mostly generic salvageable material.
+    "space_pizza": "miscellaneous",
+    "rubber_duck": "miscellaneous",
+    "holo_poster": "miscellaneous",
+    "lost_logbook": "miscellaneous",
+    "left_sock": "miscellaneous",
+    "space_pudding": "miscellaneous",
+    "moon_cheese": "miscellaneous",
+    "parking_ticket": "miscellaneous",
+    "floating_plant": "miscellaneous",
+    "purring_lint": "miscellaneous",
+    "space_taco": "miscellaneous",
+    "cosmic_banana": "miscellaneous",
+}
+
+SALVAGE_MATERIAL_NAMES = {
+    "iron_ore": (EMOJIS.get("iron_ore", "⛏️"), "Iron Ore"),
+    "copper_ore": (EMOJIS.get("copper_ore", "🟠"), "Copper Ore"),
+    "titanium_chunk": (EMOJIS.get("titanium_chunk", "⛏️"), "Titanium Ore Chunk"),
+    "aluminum_ore": (EMOJIS.get("aluminum_ore", "⬜"), "Aluminum Ore"),
+    "circuit_board": (EMOJIS.get("circuit_board", "🟩"), "Circuit Board"),
+    "glue": (EMOJIS.get("glue", "🧴"), "Industrial Glue"),
+    "scrap_metal": (EMOJIS.get("scrap_metal", "🔩"), "Scrap Metal"),
+    "nuts_bolts": (EMOJIS.get("nuts_bolts", "🔧"), "Nuts & Bolts"),
+    "wiring": (EMOJIS.get("wiring", "🧵"), "Wiring"),
+}
+
+SALVAGE_OVERFLOW_VALUES = {
+    "iron_ore": 3, "copper_ore": 5, "titanium_chunk": 15, "aluminum_ore": 4,
+    "circuit_board": 20, "glue": 6, "scrap_metal": 3, "nuts_bolts": 4, "wiring": 5,
+}
 
 class ShopCategorySelect(discord.ui.Select):
     def __init__(self, shop_view):
@@ -251,75 +330,75 @@ class Economy(commands.Cog):
         # Define shop catalog
         self.SHOP_ITEMS = {
             "nanite_patch": {
-                "name": "🩹 Nanite Stim-Patch",
+                "name": f"{EMOJIS.get('nanite_patch', '🩹')} Nanite Stim-Patch",
                 "cost": 400,
                 "type": "heal",
                 "heal_amount": 35,
                 "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."
             },
             "medkit": {
-                "name": "🧰 Field Trauma Medkit",
+                "name": f"{EMOJIS.get('medkit', '🧰')} Field Trauma Medkit",
                 "cost": 750,
                 "type": "heal",
                 "heal_amount": 100,
                 "desc": "Standard planetary survival trauma kit. Restores +100 HP."
             },
             "revive": {
-                "name": "⚕️ Revival Kit",
+                "name": f"{EMOJIS.get('revive', '⚕️')} Revival Kit",
                 "cost": 350,
                 "type": "revive",
                 "desc": "Immediately revives an unconscious explorer at 35% HP."
             },
             "full_revive": {
-                "name": "⚕️ Emergency Full Revival",
+                "name": f"{EMOJIS.get('full_revive', '⚕️')} Emergency Full Revival",
                 "cost": 800,
                 "type": "revive",
                 "desc": "Immediately revives an unconscious explorer at full HP."
             },
             "laser_charge_cell": {
-                "name": "🔋 Laser Charge Cell",
+                "name": f"{EMOJIS.get('laser_charge_cell', '🔋')} Laser Charge Cell",
                 "cost": 400,
                 "type": "consumable",
                 "desc": "Restores 2 mining laser charges."
             },
             "laser_power_cell": {
-                "name": "⚡ Laser Power Cell",
+                "name": f"{EMOJIS.get('laser_power_cell', '⚡')} Laser Power Cell",
                 "cost": 750,
                 "type": "consumable",
                 "desc": "Restores 5 mining laser charges."
             },
             "fuel_refill": {
-                "name": "⚛️ Laser Quantum Cell",
+                "name": f"{EMOJIS.get('fuel_refill', '⚛️')} Laser Quantum Cell",
                 "cost": 1200,
                 "type": "consumable",
                 "desc": "Instantly refills your mining laser to 10/10 charges."
             },
             "drone_battery": {
-                "name": "🔋 Drone Battery Pack",
+                "name": f"{EMOJIS.get('drone_battery', '🔋')} Drone Battery Pack",
                 "cost": 400,
                 "type": "consumable",
                 "desc": "Restores 2 scavenge charges."
             },
             "drone_power_cell": {
-                "name": "⚡ Drone Power Cell",
+                "name": f"{EMOJIS.get('drone_power_cell', '⚡')} Drone Power Cell",
                 "cost": 750,
                 "type": "consumable",
                 "desc": "Restores 5 scavenge charges."
             },
             "drone_quantum_battery": {
-                "name": "⚛️ Drone Quantum Battery",
+                "name": f"{EMOJIS.get('drone_quantum_battery', '⚛️')} Drone Quantum Battery",
                 "cost": 1200,
                 "type": "consumable",
                 "desc": "Instantly refills your scavenging drone to 10/10 charges."
             },
             "pet_snack": {
-                "name": "🧬 Cosmic Bio-Feed (Pet Snack)",
+                "name": f"{EMOJIS.get('pet_snack', '🍪')} Pet Treat",
                 "cost": 200,
                 "type": "consumable",
-                "desc": "Nutrient pack used to feed your station pet companion."
+                "desc": "A tasty treat for your station pet. Gives your active pet +25 Pet XP."
             },
             "time_crystal": {
-                "name": "💎 Dilated Time Crystal",
+                "name": f"{EMOJIS.get('time_crystal', '💎')} Dilated Time Crystal",
                 "cost": 3500,
                 "type": "special",
                 "desc": "Bends time backwards to restore a fortune streak missed yesterday (Max 2 uses/month)."
@@ -343,19 +422,19 @@ class Economy(commands.Cog):
                 "desc": "Unlocks the 'Solaris Ring' background photo for your /profile card."
             },
             "fuel_stabilizer": {
-                "name": "🛢️ Fuel Stabilizer", "cost": 800, "type": "consumable",
+                "name": f"{EMOJIS.get('fuel_stabilizer', '🛢️')} Fuel Stabilizer", "cost": 800, "type": "consumable",
                 "desc": "Makes your next mining run cost no fuel charge."
             },
             "hazard_shield": {
-                "name": "🛡️ Hazard Shield", "cost": 1000, "type": "consumable",
+                "name": f"{EMOJIS.get('hazard_shield', '🛡️')} Hazard Shield", "cost": 1000, "type": "consumable",
                 "desc": "Blocks the next scavenging hazard."
             },
             "lucky_scanner": {
-                "name": "📡 Deep-Space Scanner", "cost": 700, "type": "consumable",
+                "name": f"{EMOJIS.get('lucky_scanner', '📡')} Deep-Space Scanner", "cost": 700, "type": "consumable",
                 "desc": "Improves rare-find odds on your next scavenging run."
             },
             "prototype_drill_bit": {
-                "name": "⚙️ Prototype Drill Bit", "cost": 1000, "type": "consumable",
+                "name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "type": "consumable",
                 "desc": "Boosts Stardust from your next mining run."
             },
         }
@@ -399,16 +478,23 @@ class Economy(commands.Cog):
         # Add future daily offers here.  Each player sees the same three offers
         # for the whole Eastern-time day.
         self.ROTATING_ITEMS = {
-            "fuel_stabilizer": {"name": "🛢️ Fuel Stabilizer", "cost": 800, "desc": "Makes your next mining run cost no fuel charge."},
-            "station_rations": {"name": "🥫 Station Rations", "cost": 150, "desc": "Restores a modest 15 HP."},
-            "hazard_shield": {"name": "🛡️ Hazard Shield", "cost": 1000, "desc": "Blocks the next scavenging hazard."},
-            "lucky_scanner": {"name": "📡 Deep-Space Scanner", "cost": 700, "desc": "Improves rare-find odds on your next scavenging run."},
-            "ore_magnet": {"name": "🧲 Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
-            "prototype_drill_bit": {"name": "⚙️ Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
-            "cosmic_insurance": {"name": "📋 Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
-            "fate_anchor": {"name": "⚓ Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
-            "stardust_cache": {"name": "🎁 Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
-            "revive_kit": {"name": "💉 Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
+            "fuel_stabilizer": {"name": f"{EMOJIS.get('fuel_stabilizer', '🛢️')} Fuel Stabilizer", "cost": 800, "desc": "Makes your next mining run cost no fuel charge."},
+            "station_rations": {"name": f"{EMOJIS.get('station_rations', '🥫')} Station Rations", "cost": 150, "desc": "Restores a modest 15 HP."},
+            "hazard_shield": {"name": f"{EMOJIS.get('hazard_shield', '🛡️')} Hazard Shield", "cost": 1000, "desc": "Blocks the next scavenging hazard."},
+            "lucky_scanner": {"name": f"{EMOJIS.get('lucky_scanner', '📡')} Deep-Space Scanner", "cost": 700, "desc": "Improves rare-find odds on your next scavenging run."},
+            "ore_magnet": {"name": f"{EMOJIS.get('ore_magnet', '🧲')} Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
+            "prototype_drill_bit": {"name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
+            "cosmic_insurance": {"name": f"{EMOJIS.get('cosmic_insurance', '📋')} Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
+            "fate_anchor": {"name": f"{EMOJIS.get('fate_anchor', '⚓')} Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
+            "stardust_cache": {"name": f"{EMOJIS.get('stardust_cache', '🎁')} Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
+            "revive_kit": {"name": f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
+            "stop_sign": {"name": "🛑 Stop Sign", "cost": 250, "type": "defense_weapon", "desc": "Lethal Company-inspired station debris. 8% chance to prevent a scavenging hazard."},
+            "stick": {"name": "🪵 Stick", "cost": 150, "type": "defense_weapon", "desc": "Undertale-inspired weapon. 4% chance to prevent a scavenging hazard."},
+            "wooden_sword": {"name": "🗡️ Wooden Sword", "cost": 300, "type": "defense_weapon", "desc": "Minecraft-inspired starter weapon. 10% chance to prevent a scavenging hazard."},
+            "wooden_shield": {"name": "🛡️ Wooden Shield", "cost": 400, "type": "defense_weapon", "desc": "Minecraft-inspired starter shield. 7% chance to prevent a scavenging hazard."},
+            "wooden_spoon": {"name": "🥄 Wooden Spoon", "cost": 175, "type": "defense_weapon", "desc": "A mighty station kitchen utensil. 2% chance to prevent a scavenging hazard."},
+            "heavy_wrench": {"name": "🔧 Suspiciously Heavy Wrench", "cost": 325, "type": "defense_weapon", "desc": "A maintenance tool that doubles as a weapon. 12% chance to prevent a scavenging hazard."},
+            "plasma_cutter": {"name": "🔫 Plasma Cutter", "cost": 2500, "type": "defense_weapon", "halloween_only": True, "desc": "Halloween-only Dead Space-inspired weapon. 25% chance to prevent a scavenging hazard."},
             "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
             "title_starborn": {"name": "🏷️ Title: Starborn", "cost": 750, "type": "title", "desc": "A prestigious title for those touched by the stars."},
             "title_voidfarer": {"name": "🏷️ Title: Voidfarer", "cost": 750, "type": "title", "desc": "For those brave enough to chart the endless void."},
@@ -442,6 +528,13 @@ class Economy(commands.Cog):
             "fate_anchor": (3, "daily"),
             "stardust_cache": (3, "daily"),
             "revive_kit": (3, "daily"),
+            "stop_sign": (1, "lifetime"),
+            "stick": (1, "lifetime"),
+            "wooden_sword": (1, "lifetime"),
+            "wooden_shield": (1, "lifetime"),
+            "wooden_spoon": (1, "lifetime"),
+            "heavy_wrench": (1, "lifetime"),
+            "plasma_cutter": (1, "lifetime"),
 
             # Rotating titles are permanent unlocks.
             "title_outer_rim_wanderer": (1, "lifetime"),
@@ -466,6 +559,8 @@ class Economy(commands.Cog):
                 eligible_items.append(item_id)
 
         for item_id, item in self.ROTATING_ITEMS.items():
+            if item.get("halloween_only") and not halloween_is_active():
+                continue
             if item.get("type") not in excluded_types and item_id not in eligible_items:
                 eligible_items.append(item_id)
 
@@ -603,6 +698,11 @@ class Economy(commands.Cog):
                 "ALTER TABLE users ADD COLUMN last_daily TEXT DEFAULT ''"
             )
 
+        if "salvage_upgrade" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN salvage_upgrade INTEGER DEFAULT 0"
+            )
+
         # Permanently unlocked profile backgrounds.
         # Vouchers are consumed on redemption, so this list is the source of truth
         # for whether a background has already been unlocked.
@@ -676,7 +776,7 @@ class Economy(commands.Cog):
 
     @commands.hybrid_command(
         name="daily",
-        description="Claim your daily Stardust reward and build your streak up! Maxes at 7 days."
+        description="Claim your daily Stardust reward and build your streak! Rewards max out at 400 Stardust."
     )
     async def daily(self, ctx: commands.Context):
         """Claim the daily Stardust reward and build a consecutive-day streak."""
@@ -707,7 +807,7 @@ class Economy(commands.Cog):
             async with db.execute(
                 """
                 SELECT COALESCE(stardust, 0), COALESCE(daily_streak, 0),
-                    COALESCE(last_daily, '')
+                    COALESCE(last_daily, ''), COALESCE(hp, 100)
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -715,7 +815,7 @@ class Economy(commands.Cog):
             ) as cursor:
                 row = await cursor.fetchone()
 
-            stardust, streak, last_daily = row if row else (0, 0, "")
+            stardust, streak, last_daily, hp = row if row else (0, 0, "", 100)
 
             # Already claimed today.
             if last_daily == today_str:
@@ -746,13 +846,18 @@ class Economy(commands.Cog):
             reward = min(400, 100 + (new_streak - 1) * 50)
             new_stardust = stardust + reward
 
+            # Daily also restores +50 HP, regardless of current HP, capped at 100.
+            # If the user was knocked out (0 HP), clearing knocked_out_until revives them.
+            new_hp = min(100, hp + 50)
+
             await db.execute(
                 """
                 UPDATE users
-                SET stardust = ?, daily_streak = ?, last_daily = ?
+                SET stardust = ?, daily_streak = ?, last_daily = ?,
+                    hp = ?, knocked_out_until = ''
                 WHERE user_id = ?
                 """,
-                (new_stardust, new_streak, today_str, user_id)
+                (new_stardust, new_streak, today_str, new_hp, user_id)
             )
             await db.commit()
 
@@ -1563,6 +1668,230 @@ class Economy(commands.Cog):
 
         await ctx.send("❌ An error occurred processing your transaction.")
 
+    def get_junk_sell_reward(self, item_id):
+        """Return Stardust + Halloween Candy rewards for a junk item."""
+        halloween_reward = get_halloween_sell_reward(item_id)
+        if halloween_reward is not None:
+            return halloween_reward
+        return (self.JUNK_PRICES.get(item_id, 25), 0)
+
+    async def salvage_item_autocomplete(self, interaction: discord.Interaction, current: str):
+        """Show Space Junk the user currently owns and can salvage."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+        from inventory import ITEM_REGISTRY
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ? AND item_type = 'space_junk' AND quantity > 0
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+        if not current or "salvage all" in current:
+            choices.append(app_commands.Choice(name="♻️ Salvage All Space Junk", value="all"))
+
+        for item_id, quantity in rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+            if current and current not in info["name"].lower():
+                continue
+            choices.append(
+                app_commands.Choice(
+                    name=f"{info['emoji']} {info['name']} (x{quantity})",
+                    value=item_id
+                )
+            )
+
+        choices.sort(key=lambda choice: choice.name.lower())
+        return choices[:25]
+
+    def salvage_pool_for(self, item_id):
+        """Return the material pool used when a Space Junk item is salvaged."""
+        category = SALVAGE_CATEGORIES.get(item_id, "miscellaneous")
+        return SALVAGE_POOLS[category]
+
+    def roll_salvage_material(self, item_id):
+        """Roll one guaranteed base material for a junk item."""
+        pool = self.salvage_pool_for(item_id)
+        return random.choices(
+            [material_id for material_id, _weight in pool],
+            weights=[weight for _material_id, weight in pool],
+            k=1,
+        )[0]
+
+    async def add_salvage_material(self, db, user_id, material_id, amount):
+        """Add salvage materials and convert inventory overflow into Stardust."""
+        from inventory import add_inventory_item
+
+        added, _quantity, _max_quantity = await add_inventory_item(
+            db, user_id, material_id, "crafting_material", amount
+        )
+        overflow = amount - added
+        overflow_stardust = overflow * SALVAGE_OVERFLOW_VALUES.get(material_id, 0)
+        return added, overflow, overflow_stardust
+
+    @commands.hybrid_command(name="salvage", description="Scrap Space Junk for crafting materials.")
+    @app_commands.describe(item="Choose Space Junk to salvage, or salvage all of it.")
+    @app_commands.autocomplete(item=salvage_item_autocomplete)
+    async def salvage(self, ctx: commands.Context, item: str):
+        await ctx.defer()
+
+        user_id = ctx.author.id
+        target_item = item.lower().strip()
+        db_path = self.get_db_path()
+
+        # Get the user's current Salvage Rig bonus chance.
+        upgrade_cog = self.bot.get_cog("Upgrades")
+        salvage_upgrade = (
+            await upgrade_cog.get_effects(user_id, "salvage")
+            if upgrade_cog
+            else {"level": 0, "bonus_chance": 0.0}
+        )
+        bonus_chance = salvage_upgrade.get("bonus_chance", 0.0)
+
+        from inventory import ITEM_REGISTRY
+
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute("BEGIN IMMEDIATE")
+
+            if target_item == "all":
+                async with db.execute(
+                    """
+                    SELECT item_id, quantity
+                    FROM inventory
+                    WHERE user_id = ? AND item_type = 'space_junk' AND quantity > 0
+                    """,
+                    (user_id,)
+                ) as cursor:
+                    junk_rows = await cursor.fetchall()
+
+                if not junk_rows:
+                    await db.rollback()
+                    return await ctx.send(f"{ctx.author.mention} 🎒 You don't have any Space Junk to salvage!")
+
+                totals = {}
+                item_count = 0
+                bonus_count = 0
+
+                for junk_id, quantity in junk_rows:
+                    item_count += quantity
+                    for _ in range(quantity):
+                        material_id = self.roll_salvage_material(junk_id)
+                        totals[material_id] = totals.get(material_id, 0) + 1
+                        if bonus_chance > 0 and random.random() < bonus_chance:
+                            bonus_material = self.roll_salvage_material(junk_id)
+                            totals[bonus_material] = totals.get(bonus_material, 0) + 1
+                            bonus_count += 1
+
+                await db.execute(
+                    "DELETE FROM inventory WHERE user_id = ? AND item_type = 'space_junk'",
+                    (user_id,)
+                )
+
+            else:
+                async with db.execute(
+                    """
+                    SELECT quantity FROM inventory
+                    WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'
+                    """,
+                    (user_id, target_item)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                if not row or (row[0] or 0) <= 0:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"{ctx.author.mention} ❌ You don't have **{ITEM_REGISTRY.get(target_item, {}).get('name', target_item)}** in your Space Junk inventory."
+                    )
+
+                item_count = 1
+                bonus_count = 0
+                totals = {self.roll_salvage_material(target_item): 1}
+                if bonus_chance > 0 and random.random() < bonus_chance:
+                    bonus_material = self.roll_salvage_material(target_item)
+                    totals[bonus_material] = totals.get(bonus_material, 0) + 1
+                    bonus_count = 1
+
+                quantity = row[0]
+                if quantity > 1:
+                    await db.execute(
+                        "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                        (user_id, target_item)
+                    )
+                else:
+                    await db.execute(
+                        "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND item_type = 'space_junk'",
+                        (user_id, target_item)
+                    )
+
+            added_totals = {}
+            overflow_stardust = 0
+            for material_id, amount in totals.items():
+                added, overflow, overflow_value = await self.add_salvage_material(
+                    db, user_id, material_id, amount
+                )
+                if added:
+                    added_totals[material_id] = added
+                if overflow:
+                    overflow_stardust += overflow_value
+
+            if overflow_stardust:
+                await db.execute(
+                    "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
+                    (overflow_stardust, user_id)
+                )
+
+            await db.commit()
+
+        junk_name = "Space Junk" if target_item == "all" else ITEM_REGISTRY.get(target_item, {}).get("name", target_item)
+        material_lines = []
+        for material_id, amount in added_totals.items():
+            icon, name = SALVAGE_MATERIAL_NAMES[material_id]
+            material_lines.append(f"{icon} **{name} ×{amount}**")
+
+        if not material_lines:
+            material_lines.append("📦 Your material storage was full, so the salvage was converted to Stardust.")
+
+        bonus_text = (
+            f"\n✨ **Bonus materials:** +{bonus_count}"
+            if bonus_count
+            else ""
+        )
+        overflow_text = (
+            f"\n📦 **Material Overflow:** +{overflow_stardust:,} Stardust"
+            if overflow_stardust
+            else ""
+        )
+        remaining_text = ""
+        if target_item != "all":
+            # We consumed one unit, so report the remaining amount from the pre-salvage quantity.
+            remaining_text = f"\n📦 **Remaining:** {max(0, quantity - 1)}x"
+
+        embed = discord.Embed(
+            title="♻️ Salvage Complete!",
+            description=(
+                f"{ctx.author.mention}\n\n"
+                f"You salvaged **{item_count}x {junk_name}**.\n\n"
+                "🔧 **Materials Recovered:**\n"
+                + "\n".join(material_lines)
+                + bonus_text
+                + overflow_text
+                + remaining_text
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.set_footer(
+            text=f"Salvage Rig Level {salvage_upgrade.get('level', 0)}/5 • Base salvage is guaranteed"
+        )
+        await ctx.send(embed=embed)
+
     async def shop_sell_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -1599,7 +1928,7 @@ class Economy(commands.Cog):
             )
 
         for item_id, quantity in rows:
-            if item_id not in self.JUNK_PRICES:
+            if item_id not in self.JUNK_PRICES and get_halloween_sell_reward(item_id) is None and item_id not in ITEM_REGISTRY:
                 continue
 
             info = ITEM_REGISTRY.get(item_id)
@@ -1632,6 +1961,9 @@ class Economy(commands.Cog):
         db_path = self.get_db_path()
 
         async with aiosqlite.connect(db_path) as db:
+            # Lock the database before reading inventory so concurrent sell
+            # requests cannot both cash out the same space junk.
+            await db.execute("BEGIN IMMEDIATE")
 
             # Option A: Sell ALL space junk
             if target_item == "all":
@@ -1652,10 +1984,12 @@ class Economy(commands.Cog):
                         "🎒 **Inventory Empty!** You don't have any space junk to sell."
                     )
 
-                total_payout = sum(
-                    self.JUNK_PRICES.get(item_id, 25) * quantity
-                    for item_id, quantity in junk_rows
-                )
+                total_payout = 0
+                total_candy = 0
+                for item_id, quantity in junk_rows:
+                    payout, candy = self.get_junk_sell_reward(item_id)
+                    total_payout += payout * quantity
+                    total_candy += candy * quantity
 
                 item_count = sum(quantity for _, quantity in junk_rows)
 
@@ -1677,11 +2011,34 @@ class Economy(commands.Cog):
                     (total_payout, user_id)
                 )
 
+                candy_added = 0
+                candy_overflow = 0
+                if total_candy > 0:
+                    from inventory import add_inventory_item
+                    candy_added, _, _ = await add_inventory_item(
+                        db, user_id, "halloween_candy", "consumable", total_candy
+                    )
+                    candy_overflow = total_candy - candy_added
+                    if candy_overflow > 0:
+                        # Keep excess candy from disappearing when the 99-stack is full.
+                        overflow_payout = candy_overflow * 5
+                        total_payout += overflow_payout
+                        await db.execute(
+                            "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                            (overflow_payout, user_id),
+                        )
+
                 await db.commit()
 
+                candy_text = f" and 🍬 **{candy_added} Halloween Candy**" if candy_added else ""
+                overflow_text = (
+                    f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
+                    if candy_overflow else ""
+                )
                 return await ctx.send(
                     f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
-                    f"for a total of ✨ **{total_payout:,} Stardust**!"
+                    f"for a total of ✨ **{total_payout:,} Stardust**{candy_text}!"
+                    f"{overflow_text}"
                 )
 
             # Option B: Sell ONE unit of a specific junk item
@@ -1703,7 +2060,7 @@ class Economy(commands.Cog):
                 )
 
             quantity = row[0] or 0
-            payout = self.JUNK_PRICES.get(target_item, 25)
+            payout, candy_reward = self.get_junk_sell_reward(target_item)
 
             if quantity > 1:
                 await db.execute(
@@ -1736,14 +2093,36 @@ class Economy(commands.Cog):
                 (payout, user_id)
             )
 
+            candy_added = 0
+            candy_overflow = 0
+            if candy_reward > 0:
+                from inventory import add_inventory_item
+                candy_added, _, _ = await add_inventory_item(
+                    db, user_id, "halloween_candy", "consumable", candy_reward
+                )
+                candy_overflow = candy_reward - candy_added
+                if candy_overflow > 0:
+                    overflow_payout = candy_overflow * 5
+                    payout += overflow_payout
+                    await db.execute(
+                        "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                        (overflow_payout, user_id),
+                    )
+
             await db.commit()
 
             remaining = quantity - 1
+            candy_text = f" and 🍬 **{candy_added} Halloween Candy**" if candy_added else ""
+            overflow_text = (
+                f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
+                if candy_overflow else ""
+            )
 
             await ctx.send(
                 f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **1x `{target_item}`** "
-                f"for ✨ **{payout:,} Stardust**!\n"
+                f"for ✨ **{payout:,} Stardust**{candy_text}!\n"
                 f"📦 **Remaining:** `{remaining}x`"
+                f"{overflow_text}"
             )
 
     async def item_category_autocomplete(

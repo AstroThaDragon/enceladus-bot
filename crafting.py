@@ -2,47 +2,59 @@ import aiosqlite
 import discord
 from discord import app_commands
 from discord.ext import commands
-from inventory import ITEM_REGISTRY
+
+from emojis import EMOJIS
 from database import ECONOMY_DB_NAME
 
 MATERIAL_NAMES = {
-    "iron_ore": ("⛏️", "Iron Ore"),
-    "copper_ore": ("🟠", "Copper Ore"),
-    "titanium_chunk": ("⛏️", "Titanium Ore Chunk"),
-    "aluminum_ore": ("⬜", "Aluminum Ore"),
-    "scrap_metal": ("🔩", "Scrap Metal"),
-    "nuts_bolts": ("🔧", "Nuts & Bolts"),
-    "wiring": ("🧵", "Wiring"),
-    "circuit_board": ("🟩", "Circuit Board"),
-    "glue": ("🧴", "Industrial Glue"),
+    "iron_ore": (EMOJIS.get("iron_ore", "⛏️"), "Iron Ore"),
+    "copper_ore": (EMOJIS.get("copper_ore", "🟠"), "Copper Ore"),
+    "titanium_chunk": (EMOJIS.get("titanium_chunk", "⛏️"), "Titanium Ore Chunk"),
+    "aluminum_ore": (EMOJIS.get("aluminum_ore", "⬜"), "Aluminum Ore"),
+    "scrap_metal": (EMOJIS.get("scrap_metal", "🔩"), "Scrap Metal"),
+    "nuts_bolts": (EMOJIS.get("nuts_bolts", "🔧"), "Nuts & Bolts"),
+    "wiring": (EMOJIS.get("wiring", "🧵"), "Wiring"),
+    "circuit_board": (EMOJIS.get("circuit_board", "🟩"), "Circuit Board"),
+    "glue": (EMOJIS.get("glue", "🧴"), "Industrial Glue"),
     "gauze": ("🧻", "Sterile Gauze"),
     "medical_alcohol": ("🧴", "Medical Alcohol"),
     "bandaids": ("🩹", "Bandaids"),
     "antiseptic_ointment": ("🧪", "Antiseptic Ointment"),
+    "halloween_candy": ("🍬", "Halloween Candy"),
+    "halloween_plastic": ("🧴", "Halloween Themed Plastic"),
     "astral_core": ("🌌", "Astral Core"),
-    "nanite_retrofit_kit": ("🧬", "Nanite Retrofit Kit"),
+    "nanite_retrofit_kit": (EMOJIS.get("nanite_retrofit", "🧬"), "Nanite Retrofit Kit"),
+    "salvage_rig_kit": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit"),
 }
 
 RECIPES = {
-    "laser_parts_1": {"name": "Reinforced Laser Parts", "emoji": "🛠️", "result": "reinforced_laser_parts", "ingredients": {"iron_ore": 5, "copper_ore": 3, "scrap_metal": 3, "wiring": 3}},
-    "laser_parts_2": {"name": "Reinforced Laser Parts II", "emoji": "🛠️", "result": "reinforced_laser_parts", "ingredients": {"iron_ore": 10, "copper_ore": 6, "titanium_chunk": 3, "aluminum_ore": 3, "circuit_board": 3, "wiring": 5}},
-    "laser_parts_3": {"name": "Reinforced Laser Parts III", "emoji": "🛠️", "result": "reinforced_laser_parts", "ingredients": {"iron_ore": 15, "copper_ore": 9, "titanium_chunk": 5, "aluminum_ore": 5, "circuit_board": 6, "wiring": 8}},
-    "laser_parts_4": {"name": "Reinforced Laser Parts IV", "emoji": "🛠️", "result": "reinforced_laser_parts", "ingredients": {"iron_ore": 20, "copper_ore": 12, "titanium_chunk": 8, "aluminum_ore": 8, "circuit_board": 10, "wiring": 12, "nuts_bolts": 7}},
-    "laser_parts_5": {"name": "Reinforced Laser Parts V", "emoji": "🛠️", "result": "reinforced_laser_parts", "ingredients": {"iron_ore": 30, "copper_ore": 18, "titanium_chunk": 12, "aluminum_ore": 12, "circuit_board": 15, "wiring": 18, "astral_core": 1}},
+    "laser_parts_1": {"name": "Reinforced Laser Parts", "emoji": EMOJIS.get("reinforced_laser_parts", "🛠️"), "result": "reinforced_laser_parts_1", "ingredients": {"iron_ore": 5, "copper_ore": 3, "scrap_metal": 3, "wiring": 3}},
+    "laser_parts_2": {"name": "Reinforced Laser Parts II", "emoji": EMOJIS.get("reinforced_laser_parts", "🛠️"), "result": "reinforced_laser_parts_2", "ingredients": {"iron_ore": 10, "copper_ore": 6, "titanium_chunk": 3, "aluminum_ore": 3, "circuit_board": 3, "wiring": 5}},
+    "laser_parts_3": {"name": "Reinforced Laser Parts III", "emoji": EMOJIS.get("reinforced_laser_parts", "🛠️"), "result": "reinforced_laser_parts_3", "ingredients": {"iron_ore": 15, "copper_ore": 9, "titanium_chunk": 5, "aluminum_ore": 5, "circuit_board": 6, "wiring": 8}},
+    "laser_parts_4": {"name": "Reinforced Laser Parts IV", "emoji": EMOJIS.get("reinforced_laser_parts", "🛠️"), "result": "reinforced_laser_parts_4", "ingredients": {"iron_ore": 20, "copper_ore": 12, "titanium_chunk": 8, "aluminum_ore": 8, "circuit_board": 10, "wiring": 12, "nuts_bolts": 7}},
+    "laser_parts_5": {"name": "Reinforced Laser Parts V", "emoji": EMOJIS.get("reinforced_laser_parts", "🛠️"), "result": "reinforced_laser_parts_5", "ingredients": {"iron_ore": 30, "copper_ore": 18, "titanium_chunk": 12, "aluminum_ore": 12, "circuit_board": 15, "wiring": 18, "astral_core": 1}},
 
     
-    "drone_kit_1": {"name": "Drone Upgrade Kit", "emoji": "🛸", "result": "drone_upgrade_kit", "ingredients": {"scrap_metal": 5, "nuts_bolts": 5, "wiring": 3, "glue": 2}},
-    "drone_kit_2": {"name": "Drone Upgrade Kit II", "emoji": "🛸", "result": "drone_upgrade_kit", "ingredients": {"scrap_metal": 10, "nuts_bolts": 8, "wiring": 6, "aluminum_ore": 3, "circuit_board": 3, "glue": 4}},
-    "drone_kit_3": {"name": "Drone Upgrade Kit III", "emoji": "🛸", "result": "drone_upgrade_kit", "ingredients": {"scrap_metal": 15, "nuts_bolts": 12, "wiring": 9, "aluminum_ore": 5, "circuit_board": 6, "copper_ore": 4, "glue": 6}},
-    "drone_kit_4": {"name": "Drone Upgrade Kit IV", "emoji": "🛸", "result": "drone_upgrade_kit", "ingredients": {"scrap_metal": 20, "nuts_bolts": 18, "wiring": 12, "aluminum_ore": 8, "circuit_board": 10, "titanium_chunk": 6, "glue": 9}},
-    "drone_kit_5": {"name": "Drone Upgrade Kit V", "emoji": "🛸", "result": "drone_upgrade_kit", "ingredients": {"scrap_metal": 30, "nuts_bolts": 25, "wiring": 18, "aluminum_ore": 12, "circuit_board": 15, "titanium_chunk": 10, "glue": 14, "astral_core": 1}},
+    "drone_kit_1": {"name": "Drone Upgrade Kit", "emoji": EMOJIS.get("drone_upgrade_kit", "🛸"), "result": "drone_upgrade_kit_1", "ingredients": {"scrap_metal": 5, "nuts_bolts": 5, "wiring": 3, "glue": 2}},
+    "drone_kit_2": {"name": "Drone Upgrade Kit II", "emoji": EMOJIS.get("drone_upgrade_kit", "🛸"), "result": "drone_upgrade_kit_2", "ingredients": {"scrap_metal": 10, "nuts_bolts": 8, "wiring": 6, "aluminum_ore": 3, "circuit_board": 3, "glue": 4}},
+    "drone_kit_3": {"name": "Drone Upgrade Kit III", "emoji": EMOJIS.get("drone_upgrade_kit", "🛸"), "result": "drone_upgrade_kit_3", "ingredients": {"scrap_metal": 15, "nuts_bolts": 12, "wiring": 9, "aluminum_ore": 5, "circuit_board": 6, "copper_ore": 4, "glue": 6}},
+    "drone_kit_4": {"name": "Drone Upgrade Kit IV", "emoji": EMOJIS.get("drone_upgrade_kit", "🛸"), "result": "drone_upgrade_kit_4", "ingredients": {"scrap_metal": 20, "nuts_bolts": 18, "wiring": 12, "aluminum_ore": 8, "circuit_board": 10, "titanium_chunk": 6, "glue": 9}},
+    "drone_kit_5": {"name": "Drone Upgrade Kit V", "emoji": EMOJIS.get("drone_upgrade_kit", "🛸"), "result": "drone_upgrade_kit_5", "ingredients": {"scrap_metal": 30, "nuts_bolts": 25, "wiring": 18, "aluminum_ore": 12, "circuit_board": 15, "titanium_chunk": 10, "glue": 14, "astral_core": 1}},
 
 
-    "nanite_retrofit_kit": {"name": "Nanite Retrofit Kit", "emoji": "🧬", "result": "nanite_retrofit_kit", "ingredients": {"scrap_metal": 15, "wiring": 10, "circuit_board": 6, "glue": 4, "titanium_chunk": 3}},
-    "astral_power_core": {"name": "Astral Power Core", "emoji": "🌌", "result": "astral_power_core", "ingredients": {"astral_core": 1, "titanium_chunk": 5, "copper_ore": 4, "circuit_board": 5, "wiring": 6}},
+    "nanite_retrofit_kit": {"name": "Nanite Retrofit Kit", "emoji": EMOJIS.get("nanite_retrofit", "🧬"), "result": "nanite_retrofit_kit", "ingredients": {"scrap_metal": 15, "wiring": 10, "circuit_board": 6, "glue": 4, "titanium_chunk": 3}},
+    "astral_power_core": {"name": "Astral Power Core", "emoji": EMOJIS.get("astral_power_core", "🌌"), "result": "astral_power_core", "ingredients": {"astral_core": 1, "titanium_chunk": 5, "copper_ore": 4, "circuit_board": 5, "wiring": 6}},
 
     
-    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": "🩹", "result": "makeshift_medkit", "ingredients": {"bandaids": 3, "gauze": 2, "medical_alcohol": 1, "antiseptic_ointment": 1}},
+    "salvage_rig_kit_1": {"name": "Salvage Rig Kit", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "result": "salvage_rig_kit_1", "ingredients": {"scrap_metal": 5, "nuts_bolts": 3, "wiring": 2}},
+    "salvage_rig_kit_2": {"name": "Salvage Rig Kit II", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "result": "salvage_rig_kit_2", "ingredients": {"scrap_metal": 10, "nuts_bolts": 6, "wiring": 4, "iron_ore": 3}},
+    "salvage_rig_kit_3": {"name": "Salvage Rig Kit III", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "result": "salvage_rig_kit_3", "ingredients": {"scrap_metal": 15, "nuts_bolts": 9, "wiring": 6, "circuit_board": 4, "aluminum_ore": 3}},
+    "salvage_rig_kit_4": {"name": "Salvage Rig Kit IV", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "result": "salvage_rig_kit_4", "ingredients": {"scrap_metal": 22, "nuts_bolts": 13, "wiring": 9, "circuit_board": 8, "aluminum_ore": 6, "copper_ore": 4}},
+    "salvage_rig_kit_5": {"name": "Salvage Rig Kit V", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "result": "salvage_rig_kit_5", "ingredients": {"scrap_metal": 30, "nuts_bolts": 18, "wiring": 14, "circuit_board": 12, "aluminum_ore": 10, "titanium_chunk": 5, "astral_core": 1}},
+
+    
+    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": EMOJIS.get("makeshift_medkit", "🩹"), "result": "makeshift_medkit", "ingredients": {"bandaids": 3, "gauze": 2, "medical_alcohol": 1, "antiseptic_ointment": 1}},
+    "trick_or_treat_bag": {"name": "Trick-or-Treat Bag", "emoji": EMOJIS.get("trick_or_treat_bag", "🎃"), "result": "trick_or_treat_bag", "ingredients": {"halloween_candy": 25, "halloween_plastic": 10}},
 }
 
 CHOICES = [app_commands.Choice(name=f"{r['emoji']} {r['name']}", value=k) for k, r in RECIPES.items()]
@@ -77,7 +89,7 @@ class Crafting(commands.Cog):
             have = owned.get(item_id, 0)
             mark = "✅" if have >= amount else "❌"
             lines.append(f"{mark} {icon} {name} ×{amount}  *(you have {have})*")
-        destination = "Use `/heal` to restore HP." if recipe["result"] == "makeshift_medkit" else "These crafted parts are used by `/upgrade`."
+        destination = "Use `/heal` to restore HP." if recipe["result"] in {"makeshift_medkit", "trick_or_treat_bag"} else "These crafted parts are used by `/upgrade`."
         lines += ["", f"🔨 **Produces:** {recipe['emoji']} {recipe['name']} ×1", "", destination]
         return discord.Embed(title="🔨 Crafting", description="\n".join(lines), color=discord.Color.from_rgb(0, 229, 255))
 
@@ -115,91 +127,12 @@ class Crafting(commands.Cog):
             title="🔨 Crafting Complete!",
             description=(
                 f"{ctx.author.mention}\n\nYou crafted **{data['emoji']} {data['name']} ×1**!\n\n"
-                + ("Use `/heal` to patch yourself up when needed." if data["result"] == "makeshift_medkit" else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade.")
+                + ("Use `/heal` when you want to chow down on your Halloween treats!" if data["result"] == "trick_or_treat_bag" else "Use `/heal` to patch yourself up when needed." if data["result"] == "makeshift_medkit" else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade.")
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="recipes", description="View all available crafting recipes. More to come!")
-    async def recipes(self, ctx: commands.Context):
-        await ctx.defer()
-
-        embed = discord.Embed(
-            title="🔧 Enceladus Crafting Recipes",
-            description=(
-                "Here are the recipes currently available at the station.\n"
-                "Gather the required materials, then use `/craft` to build them!\n"
-                "**Use `/item` and look for the item you're curious about to see what it is and does."
-            ),
-            color=discord.Color.blue()
-        )
-
-        # Group recipes by purpose.
-        recipe_groups = {
-            "🛠️ Mining Laser Components": [
-                "laser_parts_1",
-                "laser_parts_2",
-                "laser_parts_3",
-                "laser_parts_4",
-                "laser_parts_5",
-            ],
-            "🤖 Scavenging Drone Components": [
-                "drone_kit_1",
-                "drone_kit_2",
-                "drone_kit_3",
-                "drone_kit_4",
-                "drone_kit_5",
-            ],
-            "🧬 Special Components": [
-                "nanite_retrofit_kit",
-                "astral_power_core",
-            ],
-            "🩹 Medical": [
-                "makeshift_medkit",
-            ],
-        }
-
-        for category, recipe_ids in recipe_groups.items():
-            lines = []
-
-            for recipe_id in recipe_ids:
-                recipe = RECIPES.get(recipe_id)
-
-                if not recipe:
-                    continue
-
-                ingredients = []
-                for item_id, amount in recipe["ingredients"].items():
-                    item = ITEM_REGISTRY.get(item_id)
-
-                    if item:
-                        ingredients.append(
-                            f"{item.get('emoji', '📦')} "
-                            f"{item['name']} ×{amount}"
-                        )
-                    else:
-                        ingredients.append(
-                            f"📦 {item_id.replace('_', ' ').title()} ×{amount}"
-                        )
-
-                lines.append(
-                    f"{recipe['emoji']} **{recipe['name']}**\n"
-                    f"> {' • '.join(ingredients)}"
-                )
-
-            if lines:
-                embed.add_field(
-                    name=category,
-                    value="\n\n".join(lines),
-                    inline=False
-                )
-
-        embed.set_footer(
-            text="Use /craft to build a recipe • Materials are consumed when crafting!"
-        )
-
-        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Crafting(bot))

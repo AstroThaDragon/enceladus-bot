@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -27,12 +28,12 @@ class Fun(commands.Cog):
                 )
             """)
             
-            # Migrating existing tables that might be missing the column
-            try:
-                await db.execute("ALTER TABLE users ADD COLUMN last_fortune_date TEXT;")
-            except:
-                # Column already exists
-                pass
+            # Migrate older tables only when the column is actually missing.
+            async with db.execute("PRAGMA table_info(users)") as cursor:
+                columns = {row[1] async for row in cursor}
+
+            if "last_fortune_date" not in columns:
+                await db.execute("ALTER TABLE users ADD COLUMN last_fortune_date TEXT")
                 
             await db.commit()
 
@@ -260,23 +261,29 @@ class Fun(commands.Cog):
     @commands.hybrid_command(name="spacefact", description="Pull real-time data on a random celestial body!")
     async def spacefact(self, ctx):
         url = "https://api.le-systeme-solaire.net/rest/bodies/"
-        api_key = "99499df9-ede1-466d-8fcd-a7ee85201ffd"
+        api_key = os.getenv("SOLAR_SYSTEM_API_KEY", "").strip()
         
-        headers = {
-            "Authorization": f"Bearer {api_key}"
-        }
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         await ctx.defer()
 
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
                         
                         # Filter: Only keep objects that have gravity data or a discoverer 
                         # to avoid showing "empty" scan results.
-                        bodies = [b for b in data['bodies'] if b.get('gravity') or b.get('discoveredBy')]
+                        bodies = [
+                            b for b in data.get("bodies", [])
+                            if b.get("gravity") or b.get("discoveredBy")
+                        ]
+                        if not bodies:
+                            return await ctx.send("📡 The Solar System Database returned no usable celestial bodies right now.")
                         body = random.choice(bodies)
                         
                         name = body.get('englishName', 'Unknown Entity')
@@ -631,9 +638,9 @@ class Fun(commands.Cog):
         await interaction.response.defer()
 
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign={sign.value}&day=today"
-                
                 async with session.get(url) as response:
                     if response.status == 200:
                         raw_data = await response.json()

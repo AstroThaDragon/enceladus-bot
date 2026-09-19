@@ -1,4 +1,5 @@
 import random
+import asyncio
 import aiosqlite
 import discord
 from discord.ext import commands
@@ -278,6 +279,9 @@ FAIL_MESSAGES = [
 class Sword(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Pulls can race globally: only one successful/failed attempt may update
+        # the daily-attempt state and current-wielder state at a time.
+        self.pull_lock = asyncio.Lock()
         self.bot.loop.create_task(self.setup_database())
 
     async def setup_database(self):
@@ -326,6 +330,8 @@ class Sword(commands.Cog):
         today_et = self.get_today_et()
 
         async with aiosqlite.connect(SWORD_DB_PATH) as db:
+            await db.execute("BEGIN IMMEDIATE")
+
             async with db.execute(
                 "SELECT attempts, last_pull_date FROM sword_stats WHERE user_id = ?",
                 (user_id,)
@@ -333,6 +339,7 @@ class Sword(commands.Cog):
                 row = await cursor.fetchone()
 
             if row and row[1] == today_et:
+                await db.rollback()
                 return None, None, None, True
 
             await db.execute(
@@ -418,74 +425,109 @@ class Sword(commands.Cog):
         description="Attempt to pull the cosmic blade from the stone!"
     )
     async def pullsword(self, ctx):
-        user = ctx.author
-        guild = ctx.guild
+        # This lock is intentionally global, not per-user.  The sword has one
+        # shared wielder, so two different users must not resolve simultaneously.
+        async with self.pull_lock:
+            user = ctx.author
+            guild = ctx.guild
 
-        user_attempts, total_attempts, previous_wielder_id, already_pulled = await self.add_attempt(user.id)
+            user_attempts, total_attempts, previous_wielder_id, already_pulled = await self.add_attempt(user.id)
 
-        if already_pulled:
-            reset_timestamp = self.get_next_midnight_reset()
+            if already_pulled:
+                reset_timestamp = self.get_next_midnight_reset()
 
-            return await ctx.send(
-                f"⏳ You've already attempted to pull the cosmic blade today!\n"
-                f"⚔️ You may attempt another pull <t:{reset_timestamp}:R>."
-            )
-
-        sword_role = guild.get_role(SWORD_ROLE_ID)
-
-        success = random.random() < SUCCESS_CHANCE
-        owner_ping = f"<@&{OWNER_ROLE_ID}>"
-
-        if not success:
-            fail_text = random.choice(FAIL_MESSAGES)
-
-            return await ctx.send(
-                f"⚔️ {user.mention} attempts to pull the sword!\n\n"
-                f"**{fail_text}**\n\n"
-                f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\n\n"
-                f"-# ***Your Attempts:*** {user_attempts}"
-            )
-
-        previous_wielder = None
-
-        if previous_wielder_id:
-            previous_wielder = guild.get_member(previous_wielder_id)
-
-        if sword_role:
-            if previous_wielder and sword_role in previous_wielder.roles:
-                await previous_wielder.remove_roles(
-                    sword_role,
-                    reason="The cosmic sword chose a new wielder."
+                return await ctx.send(
+                    f"⏳ You've already attempted to pull the cosmic blade today!\\n"
+                    f"⚔️ You may attempt another pull <t:{reset_timestamp}:R>."
                 )
 
-            await user.add_roles(
-                sword_role,
-                reason="Pulled the cosmic sword from the stone."
+            sword_role = guild.get_role(SWORD_ROLE_ID)
+
+            success = random.random() < SUCCESS_CHANCE
+            owner_ping = f"<@&{OWNER_ROLE_ID}>"
+
+            if not success:
+                fail_text = random.choice(FAIL_MESSAGES)
+
+                return await ctx.send(
+                    f"⚔️ {user.mention} attempts to pull the sword!\\n\\n"
+                    f"**{fail_text}**\\n\\n"
+                    f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\\n\\n"
+                    f"-# ***Your Attempts:*** {user_attempts}"
+                )
+
+            previous_wielder = None
+            if previous_wielder_id:
+                previous_wielder = guild.get_member(previous_wielder_id)
+
+            added_new_role = False
+            removed_old_role = False
+
+            try:
+                if sword_role:
+                    # Give the new wielder the role before removing it from the old
+                    # wielder, so a role/API failure does not leave nobody holding it.
+                    if sword_role not in user.roles:
+                        await user.add_roles(
+                            sword_role,
+                            reason="Pulled the cosmic sword from the stone."
+                        )
+                        added_new_role = True
+
+                    if previous_wielder and previous_wielder.id != user.id and sword_role in previous_wielder.roles:
+                        await previous_wielder.remove_roles(
+                            sword_role,
+                            reason="The cosmic sword chose a new wielder."
+                        )
+                        removed_old_role = True
+
+                await self.set_wielder(user.id)
+
+            except Exception:
+                # Best-effort rollback keeps the Discord role state aligned with
+                # the database if the claim or role transition fails.
+                if sword_role:
+                    if removed_old_role and previous_wielder and sword_role not in previous_wielder.roles:
+                        try:
+                            await previous_wielder.add_roles(
+                                sword_role,
+                                reason="Rolling back failed cosmic sword transfer."
+                            )
+                        except discord.HTTPException:
+                            pass
+
+                    if added_new_role and sword_role in user.roles:
+                        try:
+                            await user.remove_roles(
+                                sword_role,
+                                reason="Rolling back failed cosmic sword transfer."
+                            )
+                        except discord.HTTPException:
+                            pass
+
+                raise
+
+            message = (
+                f"{owner_ping}\\n"
+                f"🌌⚔️ **THE COSMIC BLADE HAS BEEN PULLED FROM THE STONE!** ⚔️🌌\\n\\n"
+                f"{user.mention} has become the new wielder of the blade!\\n"
             )
 
-        await self.set_wielder(user.id)
+            if previous_wielder and previous_wielder.id != user.id:
+                message += (
+                    f"\\nThe blade's blessing leaves {previous_wielder.mention}..."
+                )
 
-        message = (
-            f"{owner_ping}\n"
-            f"🌌⚔️ **THE COSMIC BLADE HAS BEEN PULLED FROM THE STONE!** ⚔️🌌\n\n"
-            f"{user.mention} has become the new wielder of the blade!\n"
-        )
-
-        if previous_wielder:
             message += (
-                f"\nThe blade's blessing leaves {previous_wielder.mention}..."
+                f"\\n\\n ⚔️ **{user.display_name}'s Attempts:** {user_attempts}"
             )
 
-        message += (
-            f"\n\n ⚔️ **{user.display_name}'s Attempts:** {user_attempts}"
-        )
+            await ctx.send(message)
 
-        await ctx.send(message)
+            announce_channel = guild.get_channel(SWORD_ANNOUNCE_CHANNEL_ID)
 
-        announce_channel = guild.get_channel(SWORD_ANNOUNCE_CHANNEL_ID)
-
-        if announce_channel and announce_channel.id != ctx.channel.id:
-            await announce_channel.send(message)
+            if announce_channel and announce_channel.id != ctx.channel.id:
+                await announce_channel.send(message)
 
     @commands.hybrid_command(
         name="swordstats",

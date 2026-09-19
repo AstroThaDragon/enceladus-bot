@@ -1,6 +1,3 @@
-# © 2026 The Cosmic Lair & AstroThaDragon. All Rights Reserved. 
-# Unauthorized use of this code is prohibited.
-
 import discord
 from discord.ext import commands, tasks
 import os
@@ -58,8 +55,11 @@ class Enceladus(commands.Bot):
         await self.load_extension("profile")
         await self.load_extension("pets")
         await self.load_extension("inventory")
-        await bot.load_extension("crafting")
-        await bot.load_extension("upgrades")
+        await self.load_extension("crafting")
+        await self.load_extension("upgrades")
+        await self.load_extension("collectibles")
+        await self.load_extension("achievements")
+        await self.load_extension("defense")
         await self.load_extension("admin")
         await self.load_extension("debug")
         print("🌌 All cogs loaded!")
@@ -94,6 +94,8 @@ FUN_DB_PATH = "/app/data/fun.db"
 # Anti-double message protection
 recent_joins = set()
 recent_leaves = set()
+# Serialize vault promotion checks so simultaneous star reactions cannot promote the same message twice.
+_vault_lock = asyncio.Lock()
 
 # --- DATABASE INITIALIZATION ---
 async def init_bump_db():
@@ -224,8 +226,8 @@ async def check_bump_timer():
         await asyncio.sleep(60)
 
 # --- STARGAZING ALERTS SETUP ---
-edt = timezone(timedelta(hours=-4))
-scheduled_time = time(hour=12, minute=0, tzinfo=edt)
+eastern = pytz.timezone("US/Eastern")
+scheduled_time = time(hour=12, minute=0, tzinfo=eastern)
 
 @tasks.loop(time=scheduled_time)
 async def stargazing_alert():
@@ -428,10 +430,15 @@ async def on_member_join(member):
         embed.set_thumbnail(url=DRAGON_IMAGE_URL)
         embed.set_footer(text=f"You are our {ordinal_count} member! Congrats!")
         
-        await channel.send(content=content_text, embed=embed)
+        try:
+            await channel.send(content=content_text, embed=embed)
+        except (discord.Forbidden, discord.HTTPException) as e:
+            print(f"[JOIN LOG ERROR]: {e}")
 
-    await asyncio.sleep(10)
-    recent_joins.discard(member.id)
+    try:
+        await asyncio.sleep(10)
+    finally:
+        recent_joins.discard(member.id)
 
 @bot.event
 async def on_member_remove(member):
@@ -455,10 +462,15 @@ async def on_member_remove(member):
         embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"We now have {count} members.")
         
-        await channel.send(content=content_text, embed=embed)
+        try:
+            await channel.send(content=content_text, embed=embed)
+        except (discord.Forbidden, discord.HTTPException) as e:
+            print(f"[LEAVE LOG ERROR]: {e}")
 
-    await asyncio.sleep(10)
-    recent_leaves.discard(member.id)
+    try:
+        await asyncio.sleep(10)
+    finally:
+        recent_leaves.discard(member.id)
 
 @bot.event
 async def on_member_update(before, after):
@@ -492,45 +504,87 @@ EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    if str(payload.emoji) == "⭐": 
-        channel = bot.get_channel(payload.channel_id)
-        
-        if channel.is_nsfw() or channel.id in EXCLUDED_CHANNELS or channel.category_id in EXCLUDED_CATEGORIES:
+    if str(payload.emoji) != "⭐":
+        return
+
+    channel = bot.get_channel(payload.channel_id)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(payload.channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+            print(f"[VAULT ERROR]: Could not access channel {payload.channel_id}: {e}")
             return
 
+    if not hasattr(channel, "is_nsfw"):
+        return
+
+    if channel.is_nsfw() or channel.id in EXCLUDED_CHANNELS or channel.category_id in EXCLUDED_CATEGORIES:
+        return
+
+    try:
         message = await channel.fetch_message(payload.message_id)
-        
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+        print(f"[VAULT ERROR]: Could not fetch message {payload.message_id}: {e}")
+        return
+
+    async with _vault_lock:
         async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute("SELECT message_id FROM vaulted_messages WHERE message_id = ?", (message.id,)) as cursor:
+            async with db.execute(
+                "SELECT message_id FROM vaulted_messages WHERE message_id = ?",
+                (message.id,)
+            ) as cursor:
                 if await cursor.fetchone():
-                    return 
+                    return
 
             reaction = discord.utils.get(message.reactions, emoji="⭐")
-            
-            if reaction:
+            if reaction is None:
+                return
+
+            try:
                 users = [user async for user in reaction.users()]
-                valid_star_count = len([u for u in users if u.id != message.author.id])
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[VAULT ERROR]: Could not inspect star reactions for {message.id}: {e}")
+                return
 
-                if valid_star_count >= VAULT_THRESHOLD:
-                    vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
-                    
-                    embed = discord.Embed(
-                        description=message.content,
-                        color=discord.Color.gold(),
-                        timestamp=message.created_at
-                    )
-                    embed.set_author(name=message.author.display_name, icon_url=message.author.avatar.url)
-                    embed.add_field(name="Original", value=f"[Jump to Message]({message.jump_url})")
-                    
-                    if message.attachments:
-                        embed.set_image(url=message.attachments[0].url)
-                        
-                    embed.set_footer(text=f"ID: {message.id} • The Vault")
-                    
-                    await vault_channel.send(embed=embed)
+            valid_star_count = len([u for u in users if u.id != message.author.id])
+            if valid_star_count < VAULT_THRESHOLD:
+                return
 
-                    await db.execute("INSERT INTO vaulted_messages (message_id) VALUES (?)", (message.id,))
-                    await db.commit()
+            vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
+            if vault_channel is None:
+                try:
+                    vault_channel = await bot.fetch_channel(VAULT_CHANNEL_ID)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                    print(f"[VAULT ERROR]: Could not access vault channel {VAULT_CHANNEL_ID}: {e}")
+                    return
+
+            embed = discord.Embed(
+                description=message.content,
+                color=discord.Color.gold(),
+                timestamp=message.created_at
+            )
+            embed.set_author(
+                name=message.author.display_name,
+                icon_url=message.author.display_avatar.url
+            )
+            embed.add_field(name="Original", value=f"[Jump to Message]({message.jump_url})")
+
+            if message.attachments:
+                embed.set_image(url=message.attachments[0].url)
+
+            embed.set_footer(text=f"ID: {message.id} • The Vault")
+
+            try:
+                await vault_channel.send(embed=embed)
+                await db.execute(
+                    "INSERT INTO vaulted_messages (message_id) VALUES (?)",
+                    (message.id,)
+                )
+                await db.commit()
+            except (discord.Forbidden, discord.HTTPException, aiosqlite.Error) as e:
+                await db.rollback()
+                print(f"[VAULT ERROR]: Failed to archive message {message.id}: {e}")
+
 
 # --- COSMIC COMMANDS ---
 
@@ -540,7 +594,7 @@ async def nasa(interaction: discord.Interaction):
     url = f"https://api.nasa.gov/planetary/apod?api_key={api_key}"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
+        async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 data = await response.json()
                 title = data.get('title', 'Space Discovery')
@@ -560,8 +614,9 @@ async def nasa(interaction: discord.Interaction):
                 )
                 
                 if media_type == 'video':
-                    embed.description += f"\n\n**Watch the video here:**\n{img_url}"
-                else:
+                    if img_url:
+                        embed.description += f"\n\n**Watch the video here:**\n{img_url}"
+                elif img_url:
                     embed.set_image(url=img_url)
                 
                 embed.set_footer(text="Provided by NASA APOD API")
@@ -572,13 +627,29 @@ async def bing(interaction: discord.Interaction):
     url = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
+        async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 data = await response.json()
-                img_path = data['images'][0]['url']
+                images = data.get('images') or []
+                if not images:
+                    await interaction.response.send_message(
+                        "❌ Bing didn't return a wallpaper right now. Please try again later.",
+                        ephemeral=True
+                    )
+                    return
+
+                image = images[0]
+                img_path = image.get('url')
+                if not img_path:
+                    await interaction.response.send_message(
+                        "❌ Bing returned an incomplete wallpaper result.",
+                        ephemeral=True
+                    )
+                    return
+
                 img_url = f"https://www.bing.com{img_path}"
-                copyright_info = data['images'][0]['copyright']
-                copyright_link = data['images'][0]['copyrightlink']
+                copyright_info = image.get('copyright', 'Bing Wallpaper')
+                copyright_link = image.get('copyrightlink', 'https://www.bing.com/')
 
                 embed = discord.Embed(
                     title="🌍 Today's Bing Wallpaper", 
@@ -593,7 +664,7 @@ async def moon(interaction: discord.Interaction):
     url = "https://wttr.in/?format=%m" 
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
+        async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 phase_emoji = await response.text()
                 await interaction.response.send_message(f"The current moon phase is: **{phase_emoji}**")
@@ -605,7 +676,7 @@ async def weather(interaction: discord.Interaction, city: str):
     url = f"https://wttr.in/{city}?format=3"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
+        async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 weather_report = await response.text()
                 await interaction.response.send_message(f"**Current Weather:**\n{weather_report}")
@@ -636,8 +707,9 @@ async def iss(interaction: discord.Interaction):
                     embed.add_field(name="Longitude", value=f"{lon:.4f}", inline=True)
                     embed.add_field(name="Velocity", value=f"{velocity:.2f} km/h", inline=False)
                     await interaction.followup.send(embed=embed)
-        except:
-            await interaction.followup.send("Offline!")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as e:
+            print(f"[ISS ERROR]: {type(e).__name__}: {e}")
+            await interaction.followup.send("❌ The ISS service is unavailable right now. Please try again later.")
 
 def get_next_midnight_reset():
     et = pytz.timezone("US/Eastern")

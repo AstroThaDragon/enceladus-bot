@@ -3,9 +3,30 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from emojis import EMOJIS
 from database import ECONOMY_DB_NAME
 
 MAX_LEVEL = 5
+
+# Components crafted before tiered component IDs were introduced. These remain
+# valid as wildcard fallbacks so existing players do not lose already-crafted parts.
+LEGACY_COMPONENTS = {
+    "reinforced_laser_parts_1": "reinforced_laser_parts",
+    "reinforced_laser_parts_2": "reinforced_laser_parts",
+    "reinforced_laser_parts_3": "reinforced_laser_parts",
+    "reinforced_laser_parts_4": "reinforced_laser_parts",
+    "reinforced_laser_parts_5": "reinforced_laser_parts",
+    "drone_upgrade_kit_1": "drone_upgrade_kit",
+    "drone_upgrade_kit_2": "drone_upgrade_kit",
+    "drone_upgrade_kit_3": "drone_upgrade_kit",
+    "drone_upgrade_kit_4": "drone_upgrade_kit",
+    "drone_upgrade_kit_5": "drone_upgrade_kit",
+    "salvage_rig_kit_1": "salvage_rig_kit",
+    "salvage_rig_kit_2": "salvage_rig_kit",
+    "salvage_rig_kit_3": "salvage_rig_kit",
+    "salvage_rig_kit_4": "salvage_rig_kit",
+    "salvage_rig_kit_5": "salvage_rig_kit",
+}
 
 UPGRADE_DATA = {
     "mining": {
@@ -13,11 +34,11 @@ UPGRADE_DATA = {
         "emoji": "🔫",
         "column": "mining_upgrade",
         "levels": {
-            1: {"cost": 2500, "component": "reinforced_laser_parts", "charges": 11, "stardust": 0.03, "rare": 0.005},
-            2: {"cost": 7500, "component": "reinforced_laser_parts", "charges": 12, "stardust": 0.05, "rare": 0.010},
-            3: {"cost": 20000, "component": "reinforced_laser_parts", "charges": 13, "stardust": 0.07, "rare": 0.015},
-            4: {"cost": 50000, "component": "reinforced_laser_parts", "charges": 14, "stardust": 0.09, "rare": 0.020},
-            5: {"cost": 125000, "component": "reinforced_laser_parts", "charges": 15, "stardust": 0.12, "rare": 0.025},
+            1: {"cost": 2500, "component": "reinforced_laser_parts_1", "charges": 11, "stardust": 0.03, "rare": 0.005},
+            2: {"cost": 7500, "component": "reinforced_laser_parts_2", "charges": 12, "stardust": 0.05, "rare": 0.010},
+            3: {"cost": 20000, "component": "reinforced_laser_parts_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
+            4: {"cost": 50000, "component": "reinforced_laser_parts_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
+            5: {"cost": 125000, "component": "reinforced_laser_parts_5", "charges": 15, "stardust": 0.12, "rare": 0.025},
         },
     },
     "scavenging": {
@@ -25,11 +46,23 @@ UPGRADE_DATA = {
         "emoji": "🤖",
         "column": "scavenging_upgrade",
         "levels": {
-            1: {"cost": 2500, "component": "drone_upgrade_kit", "charges": 11, "stardust": 0.03, "rare": 0.005},
-            2: {"cost": 7500, "component": "drone_upgrade_kit", "charges": 12, "stardust": 0.05, "rare": 0.010},
-            3: {"cost": 20000, "component": "drone_upgrade_kit", "charges": 13, "stardust": 0.07, "rare": 0.015},
-            4: {"cost": 50000, "component": "drone_upgrade_kit", "charges": 14, "stardust": 0.09, "rare": 0.020},
-            5: {"cost": 125000, "component": "drone_upgrade_kit", "charges": 15, "stardust": 0.12, "rare": 0.025},
+            1: {"cost": 2500, "component": "drone_upgrade_kit_1", "charges": 11, "stardust": 0.03, "rare": 0.005},
+            2: {"cost": 7500, "component": "drone_upgrade_kit_2", "charges": 12, "stardust": 0.05, "rare": 0.010},
+            3: {"cost": 20000, "component": "drone_upgrade_kit_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
+            4: {"cost": 50000, "component": "drone_upgrade_kit_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
+            5: {"cost": 125000, "component": "drone_upgrade_kit_5", "charges": 15, "stardust": 0.12, "rare": 0.025},
+        },
+    },
+    "salvage": {
+        "name": "Salvage Rig",
+        "emoji": "♻️",
+        "column": "salvage_upgrade",
+        "levels": {
+            1: {"cost": 2500, "component": "salvage_rig_kit_1", "bonus_chance": 0.10},
+            2: {"cost": 7500, "component": "salvage_rig_kit_2", "bonus_chance": 0.20},
+            3: {"cost": 20000, "component": "salvage_rig_kit_3", "bonus_chance": 0.35},
+            4: {"cost": 50000, "component": "salvage_rig_kit_4", "bonus_chance": 0.50},
+            5: {"cost": 125000, "component": "salvage_rig_kit_5", "bonus_chance": 0.65},
         },
     },
 }
@@ -51,22 +84,45 @@ UPGRADE_MATERIALS = {
         4: {"scrap_metal": 5, "nuts_bolts": 3, "wiring": 2, "circuit_board": 2, "glue": 1},
         5: {"scrap_metal": 7, "nuts_bolts": 4, "wiring": 3, "circuit_board": 3, "glue": 2, "titanium_chunk": 2},
     },
+    "salvage": {
+        1: {"scrap_metal": 2, "nuts_bolts": 1},
+        2: {"scrap_metal": 3, "nuts_bolts": 2, "wiring": 1},
+        3: {"scrap_metal": 4, "nuts_bolts": 2, "wiring": 2, "circuit_board": 1},
+        4: {"scrap_metal": 5, "nuts_bolts": 3, "wiring": 2, "circuit_board": 2, "glue": 1},
+        5: {"scrap_metal": 7, "nuts_bolts": 4, "wiring": 3, "circuit_board": 3, "glue": 2, "titanium_chunk": 1},
+    },
 }
 
 MATERIAL_NAMES = {
-    "iron_ore": ("⛏️", "Iron Ore"),
-    "copper_ore": ("🟠", "Copper Ore"),
-    "titanium_chunk": ("⛏️", "Titanium Ore Chunk"),
-    "aluminum_ore": ("⬜", "Aluminum Ore"),
-    "scrap_metal": ("🔩", "Scrap Metal"),
-    "nuts_bolts": ("🔧", "Nuts & Bolts"),
-    "wiring": ("🧵", "Wiring"),
-    "circuit_board": ("🟩", "Circuit Board"),
-    "glue": ("🧴", "Industrial Glue"),
+    "iron_ore": (EMOJIS.get("iron_ore", "⛏️"), "Iron Ore"),
+    "copper_ore": (EMOJIS.get("copper_ore", "🟠"), "Copper Ore"),
+    "titanium_chunk": (EMOJIS.get("titanium_chunk", "⛏️"), "Titanium Ore Chunk"),
+    "aluminum_ore": (EMOJIS.get("aluminum_ore", "⬜"), "Aluminum Ore"),
+    "scrap_metal": (EMOJIS.get("scrap_metal", "🔩"), "Scrap Metal"),
+    "nuts_bolts": (EMOJIS.get("nuts_bolts", "🔧"), "Nuts & Bolts"),
+    "wiring": (EMOJIS.get("wiring", "🧵"), "Wiring"),
+    "circuit_board": (EMOJIS.get("circuit_board", "🟩"), "Circuit Board"),
+    "glue": (EMOJIS.get("glue", "🧴"), "Industrial Glue"),
     "astral_core": ("🌌", "Astral Core"),
-    "reinforced_laser_parts": ("🛠️", "Reinforced Laser Parts"),
-    "drone_upgrade_kit": ("🤖", "Drone Upgrade Kit"),
-    "astral_power_core": ("🌌", "Astral Power Core"),
+    "reinforced_laser_parts": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts (Legacy)"),
+    "reinforced_laser_parts_1": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts"),
+    "reinforced_laser_parts_2": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts II"),
+    "reinforced_laser_parts_3": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts III"),
+    "reinforced_laser_parts_4": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts IV"),
+    "reinforced_laser_parts_5": (EMOJIS.get("reinforced_laser_parts", "🛠️"), "Reinforced Laser Parts V"),
+    "drone_upgrade_kit": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit (Legacy)"),
+    "drone_upgrade_kit_1": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit"),
+    "drone_upgrade_kit_2": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit II"),
+    "drone_upgrade_kit_3": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit III"),
+    "drone_upgrade_kit_4": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit IV"),
+    "drone_upgrade_kit_5": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit V"),
+    "astral_power_core": (EMOJIS.get("astral_power_core", "🌌"), "Astral Power Core"),
+    "salvage_rig_kit": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit (Legacy)"),
+    "salvage_rig_kit_1": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit"),
+    "salvage_rig_kit_2": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit II"),
+    "salvage_rig_kit_3": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit III"),
+    "salvage_rig_kit_4": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit IV"),
+    "salvage_rig_kit_5": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit V"),
 }
 
 
@@ -83,6 +139,8 @@ class Upgrades(commands.Cog):
             await db.execute("ALTER TABLE users ADD COLUMN mining_upgrade INTEGER DEFAULT 0")
         if "scavenging_upgrade" not in columns:
             await db.execute("ALTER TABLE users ADD COLUMN scavenging_upgrade INTEGER DEFAULT 0")
+        if "salvage_upgrade" not in columns:
+            await db.execute("ALTER TABLE users ADD COLUMN salvage_upgrade INTEGER DEFAULT 0")
         await db.commit()
 
     async def get_levels(self, user_id):
@@ -94,14 +152,16 @@ class Upgrades(commands.Cog):
             )
             await db.commit()
             async with db.execute(
-                "SELECT COALESCE(stardust, 0), COALESCE(mining_upgrade, 0), COALESCE(scavenging_upgrade, 0) FROM users WHERE user_id = ?",
+                "SELECT COALESCE(stardust, 0), COALESCE(mining_upgrade, 0), COALESCE(scavenging_upgrade, 0), COALESCE(salvage_upgrade, 0) FROM users WHERE user_id = ?",
                 (user_id,),
             ) as cursor:
-                return await cursor.fetchone() or (0, 0, 0)
+                return await cursor.fetchone() or (0, 0, 0, 0)
 
     async def get_effects(self, user_id, system):
         """Return the current upgrade effects for Exploration."""
-        key = "mining_upgrade" if system == "mining" else "scavenging_upgrade"
+        key = {"mining": "mining_upgrade", "scavenging": "scavenging_upgrade", "salvage": "salvage_upgrade"}.get(system)
+        if not key:
+            return {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0, "bonus_chance": 0.0}
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
             async with db.execute(
@@ -111,13 +171,22 @@ class Upgrades(commands.Cog):
                 row = await cursor.fetchone()
         level = min(MAX_LEVEL, max(0, row[0] if row else 0))
         if level == 0:
-            return {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
+            return {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0, "bonus_chance": 0.0}
         data = UPGRADE_DATA[system]["levels"][level]
+        if system == "salvage":
+            return {
+                "level": level,
+                "max_charges": 10,
+                "stardust_mult": 1.0,
+                "rare_bonus": 0.0,
+                "bonus_chance": data["bonus_chance"],
+            }
         return {
             "level": level,
             "max_charges": data["charges"],
             "stardust_mult": 1.0 + data["stardust"],
-            "rare_bonus": data["rare"],
+            "rare_bonus": data.get("rare", 0.0),
+            "bonus_chance": data.get("bonus_chance", 0.0),
         }
 
     def material_text(self, materials):
@@ -127,44 +196,61 @@ class Upgrades(commands.Cog):
         )
 
     async def build_embed(self, user_id):
-        stardust, mining_level, scavenging_level = await self.get_levels(user_id)
+        stardust, mining_level, scavenging_level, salvage_level = await self.get_levels(user_id)
         embed = discord.Embed(
             title="⚙️ Exploration Upgrades",
-            description="Permanent upgrades for your mining laser and scavenging drone.\n\nEach system has **5 levels**, and every upgrade requires both **Stardust and materials**.",
+            description="Permanent upgrades for your mining laser, scavenging drone, and salvage rig.\n\nEach system has **5 levels**, and every upgrade requires both **Stardust and materials**.",
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        for system, level in (("mining", mining_level), ("scavenging", scavenging_level)):
+        for system, level in (("mining", mining_level), ("scavenging", scavenging_level), ("salvage", salvage_level)):
             info = UPGRADE_DATA[system]
             if level >= MAX_LEVEL:
                 data = info["levels"][MAX_LEVEL]
-                value = (
-                    f"**Level:** 5/5 ✨ MAX\n"
-                    f"🔋 Max Charges: **{data['charges']}**\n"
-                    f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                    f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**"
-                )
+                if system == "salvage":
+                    value = (
+                        f"**Level:** 5/5 ✨ MAX\n"
+                        f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**"
+                    )
+                else:
+                    value = (
+                        f"**Level:** 5/5 ✨ MAX\n"
+                        f"🔋 Max Charges: **{data['charges']}**\n"
+                        f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
+                        f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**"
+                    )
             else:
                 next_level = level + 1
                 data = info["levels"][next_level]
                 mats = UPGRADE_MATERIALS[system][next_level]
                 component = data["component"]
                 comp_icon, comp_name = MATERIAL_NAMES[component]
-                value = (
-                    f"**Level:** {level}/5\n"
-                    f"Next: **Level {next_level}**\n"
-                    f"🔋 Max Charges: **{data['charges']}**\n"
-                    f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                    f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
-                    f"💰 **{data['cost']:,} Stardust**\n"
-                    f"{comp_icon} **{comp_name} ×1**\n"
-                    f"{self.material_text(mats)}"
-                    + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
-                )
+                if system == "salvage":
+                    value = (
+                        f"**Level:** {level}/5\n"
+                        f"Next: **Level {next_level}**\n"
+                        f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**\n\n"
+                        f"💰 **{data['cost']:,} Stardust**\n"
+                        f"{comp_icon} **{comp_name} ×1**\n"
+                        f"{self.material_text(mats)}"
+                        + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
+                    )
+                else:
+                    value = (
+                        f"**Level:** {level}/5\n"
+                        f"Next: **Level {next_level}**\n"
+                        f"🔋 Max Charges: **{data['charges']}**\n"
+                        f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
+                        f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
+                        f"💰 **{data['cost']:,} Stardust**\n"
+                        f"{comp_icon} **{comp_name} ×1**\n"
+                        f"{self.material_text(mats)}"
+                        + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
+                    )
             embed.add_field(name=f"{info['emoji']} {info['name']}", value=value, inline=False)
         embed.set_footer(text=f"Available Stardust: {stardust:,} • Craft upgrade parts with /craft")
         return embed
 
-    @commands.hybrid_command(name="upgrades", description="View your permanent mining and scavenging upgrades.")
+    @commands.hybrid_command(name="upgrades", description="View your permanent exploration upgrades.")
     async def upgrades(self, ctx):
         await ctx.defer()
         await ctx.send(content=ctx.author.mention, embed=await self.build_embed(ctx.author.id))
@@ -174,6 +260,7 @@ class Upgrades(commands.Cog):
     @app_commands.choices(upgrade=[
         app_commands.Choice(name="🔫 Mining Laser", value="mining"),
         app_commands.Choice(name="🤖 Scavenging Drone", value="scavenging"),
+        app_commands.Choice(name="♻️ Salvage Rig", value="salvage"),
     ])
     async def upgrade(self, ctx, upgrade: str):
         await ctx.defer()
@@ -214,6 +301,7 @@ class Upgrades(commands.Cog):
                 return await ctx.send(f"{ctx.author.mention} ❌ You need **{data['cost']:,} Stardust** for Level {next_level}. You have **{stardust:,}**.")
 
             missing = []
+            consumptions = []
             for item_id, amount in required.items():
                 async with db.execute(
                     "SELECT COALESCE(quantity, 0) FROM inventory WHERE user_id = ? AND item_id = ?",
@@ -221,9 +309,28 @@ class Upgrades(commands.Cog):
                 ) as cursor:
                     row = await cursor.fetchone()
                 owned = row[0] if row else 0
-                if owned < amount:
-                    icon, name = MATERIAL_NAMES[item_id]
-                    missing.append(f"{icon} {name} ×{amount - owned}")
+
+                # A legacy unsuffixed component can substitute for the new tiered
+                # component, preserving existing players' previously crafted parts.
+                if owned >= amount:
+                    consumptions.append((item_id, amount))
+                    continue
+
+                legacy_id = LEGACY_COMPONENTS.get(item_id)
+                if legacy_id:
+                    async with db.execute(
+                        "SELECT COALESCE(quantity, 0) FROM inventory WHERE user_id = ? AND item_id = ?",
+                        (user_id, legacy_id),
+                    ) as cursor:
+                        legacy_row = await cursor.fetchone()
+                    legacy_owned = legacy_row[0] if legacy_row else 0
+                    if legacy_owned >= amount:
+                        consumptions.append((legacy_id, amount))
+                        continue
+
+                icon, name = MATERIAL_NAMES[item_id]
+                fallback_note = " (legacy component can substitute)" if legacy_id else ""
+                missing.append(f"{icon} {name} ×{amount - owned}{fallback_note}")
 
             if missing:
                 await db.rollback()
@@ -233,7 +340,7 @@ class Upgrades(commands.Cog):
                     + "\n\nUse `/craft` to make the required upgrade component."
                 )
 
-            for item_id, amount in required.items():
+            for item_id, amount in consumptions:
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
                     (amount, user_id, item_id),
@@ -249,10 +356,15 @@ class Upgrades(commands.Cog):
             description=(
                 f"{ctx.author.mention}\n\n"
                 f"{info['emoji']} **{info['name']}** is now **Level {next_level}/5**!\n\n"
-                f"🔋 Max Charges: **{data['charges']}**\n"
-                f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
-                f"💰 Spent: **{data['cost']:,} Stardust**\n"
+                + (
+                    f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**\n\n"
+                    if upgrade == "salvage"
+                    else
+                    f"🔋 Max Charges: **{data['charges']}**\n"
+                    f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
+                    f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
+                )
+                + f"💰 Spent: **{data['cost']:,} Stardust**\n"
                 "🧰 Required materials were consumed."
             ),
             color=discord.Color.from_rgb(0, 229, 255),

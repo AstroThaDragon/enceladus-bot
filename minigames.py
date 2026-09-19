@@ -102,7 +102,7 @@ class BlackjackView(discord.ui.View):
                 return
 
             async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'arcade_token'",
+                "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
                 (self.user_id,)
             ) as cursor:
                 token_row = await cursor.fetchone()
@@ -110,22 +110,12 @@ class BlackjackView(discord.ui.View):
             balance = row[0] or 0
             arcade_coins = (token_row[0] or 0) if token_row else 0
             new_balance = balance + payout
-            new_arcade_coins = arcade_coins + (1 if outcome == "timeout" else 0)
+            new_arcade_coins = min(1000, arcade_coins + (1 if outcome == "timeout" else 0))
 
             await db.execute(
-                "UPDATE users SET stardust = ? WHERE user_id = ?",
-                (new_balance, self.user_id)
+                "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
+                (new_balance, new_arcade_coins, self.user_id)
             )
-            if token_row:
-                await db.execute(
-                    "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = 'arcade_token'",
-                    (new_arcade_coins, self.user_id)
-                )
-            elif new_arcade_coins > 0:
-                await db.execute(
-                    "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, 'arcade_token', 'Currency', ?)",
-                    (self.user_id, new_arcade_coins)
-                )
             await self.cog.record_stats(
                 db,
                 self.user_id,
@@ -518,7 +508,7 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
                 return
 
             async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'arcade_token'",
+                "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
                 (interaction.user.id,),
             ) as cursor:
                 row = await cursor.fetchone()
@@ -534,20 +524,9 @@ class ArcadeCoinExchangeModal(discord.ui.Modal):
             new_stardust = stardust - cost
             new_coins = current_coins + coins
 
-            if row:
-                await db.execute(
-                    "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = 'arcade_token'",
-                    (new_coins, interaction.user.id),
-                )
-            else:
-                await db.execute(
-                    "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, 'arcade_token', 'Currency', ?)",
-                    (interaction.user.id, new_coins),
-                )
-
             await db.execute(
-                "UPDATE users SET stardust = ? WHERE user_id = ?",
-                (new_stardust, interaction.user.id),
+                "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
+                (new_stardust, new_coins, interaction.user.id),
             )
             await db.commit()
 
@@ -641,7 +620,7 @@ class MinigamesView(discord.ui.View):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
-        self.message = None
+        self.message: discord.Message | None = None
         self.add_item(MinigameSelect(self))
 
     async def reset_menu(self):
@@ -773,6 +752,35 @@ class Minigames(commands.Cog):
                 )
                 """
             )
+
+            # One-time migration: legacy Arcade Tokens were stored as inventory rows.
+            # Preserve those balances in the new users.arcade_coins column, then remove
+            # the legacy rows so there is only one source of truth. If a balance already
+            # exists in users.arcade_coins, it came from an earlier migration and must not
+            # be added again.
+            async with db.execute(
+                """
+                SELECT i.user_id, i.quantity, COALESCE(u.arcade_coins, 0)
+                FROM inventory AS i
+                INNER JOIN users AS u ON u.user_id = i.user_id
+                WHERE i.item_id = 'arcade_token'
+                """
+            ) as cursor:
+                legacy_tokens = await cursor.fetchall()
+
+            for legacy_user_id, quantity, current_coins in legacy_tokens:
+                if (current_coins or 0) <= 0:
+                    migrated_coins = min(1000, max(0, quantity or 0))
+                    await db.execute(
+                        "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
+                        (migrated_coins, legacy_user_id),
+                    )
+
+            if legacy_tokens:
+                await db.execute(
+                    "DELETE FROM inventory WHERE item_id = 'arcade_token'"
+                )
+
             await db.commit()
 
     def get_db_path(self):
@@ -780,20 +788,14 @@ class Minigames(commands.Cog):
         return ECONOMY_DB_NAME
 
     async def get_balance(self, db, user_id) -> int | None:
-        """Return the user's Arcade Token balance from inventory."""
+        """Return the user's Arcade Token balance from users.arcade_coins."""
         async with db.execute(
-            """
-            SELECT u.user_id, COALESCE(i.quantity, 0)
-            FROM users AS u
-            LEFT JOIN inventory AS i
-              ON i.user_id = u.user_id AND i.item_id = 'arcade_token'
-            WHERE u.user_id = ?
-            """,
+            "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
             (user_id,)
         ) as cursor:
             row = await cursor.fetchone()
 
-        return (row[1] or 0) if row else None
+        return (row[0] or 0) if row else None
 
     async def get_stardust(self, db, user_id):
         async with db.execute(
@@ -816,7 +818,7 @@ class Minigames(commands.Cog):
                 row = await cursor.fetchone()
 
             async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'arcade_token'",
+                "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
                 (user_id,)
             ) as cursor:
                 token_row = await cursor.fetchone()
@@ -842,12 +844,8 @@ class Minigames(commands.Cog):
             new_arcade_coins = arcade_coins - 1
 
             await db.execute(
-                "UPDATE users SET stardust = ? WHERE user_id = ?",
-                (new_stardust, user_id)
-            )
-            await db.execute(
-                "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = 'arcade_token'",
-                (new_arcade_coins, user_id)
+                "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
+                (new_stardust, new_arcade_coins, user_id)
             )
 
             game = result.get("game")
@@ -991,7 +989,7 @@ class Minigames(commands.Cog):
         embed.set_footer(text="Good luck out there! 👾")
         if isinstance(interaction, commands.Context):
             return await interaction.send(embed=embed)
-        return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+        return await interaction.followup.send(embed=embed)
 
     @commands.hybrid_command(
         name="minigame_stats",
@@ -1155,7 +1153,7 @@ class Minigames(commands.Cog):
                 row = await cursor.fetchone()
 
             async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = 'arcade_token'",
+                "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
                 (interaction.user.id,)
             ) as cursor:
                 token_row = await cursor.fetchone()
@@ -1188,12 +1186,8 @@ class Minigames(commands.Cog):
             new_stardust = stardust - bet
             new_arcade_coins = arcade_coins - 1
             await db.execute(
-                "UPDATE users SET stardust = ? WHERE user_id = ?",
-                (new_stardust, interaction.user.id),
-            )
-            await db.execute(
-                "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = 'arcade_token'",
-                (new_arcade_coins, interaction.user.id),
+                "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
+                (new_stardust, new_arcade_coins, interaction.user.id),
             )
             await db.commit()
 
@@ -1293,7 +1287,7 @@ class Minigames(commands.Cog):
 
 
     async def consume_arcade_token(self, user_id) -> int | None:
-        """Consume exactly one Arcade Token from the inventory table."""
+        """Consume exactly one Arcade Token from users.arcade_coins."""
         db_path = self.get_db_path()
         async with aiosqlite.connect(db_path) as db:
             await db.execute("BEGIN IMMEDIATE")
@@ -1317,7 +1311,7 @@ class Minigames(commands.Cog):
 
             new_balance = balance - 1
             await db.execute(
-                "UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_id = 'arcade_token'",
+                "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
                 (new_balance, user_id)
             )
             await db.commit()
@@ -1354,7 +1348,7 @@ class Minigames(commands.Cog):
         for index, option in enumerate(shuffled_options):
             embed.add_field(name=f"{chr(65 + index)}.", value=option, inline=False)
 
-        for index, option in enumerate(options):
+        for index, option in enumerate(shuffled_options):
             button = discord.ui.Button(
                 label=chr(65 + index),
                 style=discord.ButtonStyle.secondary,

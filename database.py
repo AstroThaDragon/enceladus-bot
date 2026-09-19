@@ -43,7 +43,8 @@ async def init_economy_db():
                 bio TEXT DEFAULT 'Exploring the outer rims of Enceladus Station. 🚀',
                 profile_card TEXT DEFAULT 'default_nebula',
                 equipped_title TEXT DEFAULT '',
-                cooldown_alerts INTEGER DEFAULT 0
+                cooldown_alerts INTEGER DEFAULT 0,
+                salvage_upgrade INTEGER DEFAULT 0
             )
         """)
 
@@ -62,10 +63,50 @@ async def init_economy_db():
                 pet_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 pet_stage TEXT DEFAULT 'egg',
+                pet_type TEXT DEFAULT '',
                 nickname TEXT,
                 level INTEGER DEFAULT 1,
-                xp INTEGER DEFAULT 0
+                xp INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 0
             )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS pet_incubators (
+                incubator_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                egg_id TEXT NOT NULL,
+                started_at REAL NOT NULL,
+                ready_at REAL NOT NULL,
+                notified INTEGER DEFAULT 0
+            )
+        """)
+
+        # Migrate older pet tables without deleting existing companions.
+        async with db.execute("PRAGMA table_info(pets)") as cursor:
+            pet_columns = {row[1] async for row in cursor}
+
+        if "pet_type" not in pet_columns:
+            await db.execute("ALTER TABLE pets ADD COLUMN pet_type TEXT DEFAULT ''")
+        if "is_active" not in pet_columns:
+            await db.execute("ALTER TABLE pets ADD COLUMN is_active INTEGER DEFAULT 0")
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS pet_incubators (
+                incubator_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                egg_id TEXT NOT NULL,
+                started_at REAL NOT NULL,
+                ready_at REAL NOT NULL,
+                notified INTEGER DEFAULT 0
+            )
+        """)
+
+        await db.execute("""
+            UPDATE pets
+            SET pet_type = pet_stage
+            WHERE COALESCE(pet_type, '') = ''
+              AND COALESCE(pet_stage, '') != 'egg'
         """)
 
         await db.commit()
@@ -123,7 +164,8 @@ async def init_db(db_path: str = DB_NAME):
             "medkits": "INTEGER DEFAULT 0",
             "bio": "TEXT DEFAULT 'Exploring the outer rims of Enceladus Station. 🚀'",
             "profile_card": "TEXT DEFAULT 'default_nebula'",
-            "cooldown_alerts": "INTEGER DEFAULT 0"
+            "cooldown_alerts": "INTEGER DEFAULT 0",
+            "salvage_upgrade": "INTEGER DEFAULT 0"
         }
 
         for col, col_def in columns_to_add.items():

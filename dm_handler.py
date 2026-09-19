@@ -48,6 +48,12 @@ class DMHandler(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def safe_send(self, user, content):
+        try:
+            await user.send(content)
+        except discord.Forbidden:
+            pass
+
     def is_rate_limited(self, user_id):
         now = time.time()
 
@@ -85,16 +91,19 @@ class DMHandler(commands.Cog):
             active_sessions[user.id] = now
 
         if self.is_rate_limited(user.id):
-            try:
-                await user.send(
-                    "⚠️ Please slow down a little. Your messages are still important, but I need a moment to process them!"
-                )
-            except discord.Forbidden:
-                pass
+            await self.safe_send(
+                user,
+                "⚠️ Please slow down a little. Your messages are still important, but I need a moment to process them!",
+            )
 
             return
 
         log_channel = self.bot.get_channel(DM_LOG_CHANNEL_ID)
+        if log_channel is None:
+            try:
+                log_channel = await self.bot.fetch_channel(DM_LOG_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                log_channel = None
 
         should_forward = (
             session_active
@@ -135,42 +144,51 @@ class DMHandler(commands.Cog):
                 embed.title = "🚨 Urgent DM to Enceladus"
                 embed.color = discord.Color.red()
 
-            await log_channel.send(embed=embed)
+            try:
+                await log_channel.send(embed=embed)
+            except (discord.Forbidden, discord.HTTPException):
+                # Logging failure must not break the user's support flow.
+                pass
 
         if session_active:
-            await user.send(
-                "🌌 Added to your active support session. Your message has been forwarded to staff."
+            await self.safe_send(
+                user,
+                "🌌 Added to your active support session. Your message has been forwarded to staff.",
             )
 
         elif any(word in lowered for word in ["appeal", "appeals", "ban", "banned", "unban"]):
             active_sessions[user.id] = time.time()
-            await user.send(
+            await self.safe_send(
+                user,
                 "🌌 If this is about a ban or verification appeal, please reply here with:\n\n"
                 "• Your Discord username\n"
                 "• Why you were removed or banned\n"
                 "• Any relevant screenshots/details\n"
                 "• Whether this was related to verification, account age, or timeout strikes\n\n"
-                "Your messages here will be forwarded to staff for the next 15 minutes."
+                "Your messages here will be forwarded to staff for the next 15 minutes.",
             )
 
         elif any(word in lowered for word in HELP_KEYWORDS):
             active_sessions[user.id] = time.time()
-            await user.send(
+            await self.safe_send(
+                user,
                 "🌌 Thanks for reaching out. Your message has been forwarded to staff.\n\n"
-                "If this is about verification, appeals, reports, or server support, please include as much detail as you can. Your messages here will be forwarded to staff for the next 15 minutes."
+                "If this is about verification, appeals, reports, or server support, please include as much detail as you can. Your messages here will be forwarded to staff for the next 15 minutes.",
             )
 
         elif any(word in lowered for word in URGENT_KEYWORDS):
             active_sessions[user.id] = time.time()
-            await user.send(
+            await self.safe_send(
+                user,
                 "🚨 Your message looks urgent, so it has been forwarded to staff right away.\n\n"
-                "Please stay safe and include any extra details that may help. Your messages here will be forwarded to staff for the next 15 minutes."
+                "Please stay safe and include any extra details that may help. Your messages here will be forwarded to staff for the next 15 minutes.",
             )
             
         else:
-            await user.send(
+            await self.safe_send(
+                user,
                 "🌌 Hello! Message received!\n\n"
-                "If you need help, reports, appeals, bans, or verification support, please say that clearly so I can forward it to staff."
+                "If you need help, reports, appeals, bans, or verification support, please say that clearly so I can forward it to staff.",
             )
 
 async def setup(bot):

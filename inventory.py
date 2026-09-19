@@ -8,59 +8,91 @@ import json
 from datetime import datetime
 import pytz
 import random
+from emojis import EMOJIS
+from seasonal_updates.halloween import HALLOWEEN_SPACE_JUNK, HALLOWEEN_ITEMS
 
 # Master Item Registry used across inventory, shop, and exploration
 ITEM_REGISTRY = {
     # Currencies & Consumables
-    "laser_charge_cell": {"name": "Laser Charge Cell", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 mining laser charges."},
-    "laser_power_cell": {"name": "Laser Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 mining laser charges."},
-    "fuel_refill": {"name": "Laser Quantum Cell", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser to its current maximum charges."},
-    "drone_battery": {"name": "Drone Battery Pack", "emoji": "🔋", "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 scavenge charges."},
-    "drone_power_cell": {"name": "Drone Power Cell", "emoji": "⚡", "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
-    "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to its current maximum charges."},
-    "pet_snack": {"name": "Cosmic Bio-Feed", "emoji": "🧬", "max_quantity": 50, "type": "Consumable", "desc": "Nutrient pack for your station pet."},
-    "arcade_token": {"name": "Arcade Token", "emoji": "🪙", "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
-    "time_crystal": {"name": "Dilated Time Crystal", "emoji": "💎", "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
-    "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": "🩹", "max_quantity": 50, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
-    "medkit": {"name": "Field Trauma Medkit", "emoji": "🧰", "max_quantity": 25, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
-    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": "🩹", "max_quantity": 25, "type": "Consumable", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
-    "full_revive": {"name": "Emergency Full Revival", "emoji": "⚕️", "max_quantity": 10, "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
-    "revive_kit": {"name": "Emergency Revival Kit", "emoji": "💉", "max_quantity": 25, "type": "Consumable", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
-    "revive": {"name": "Revival Kit", "emoji": "⚕️", "max_quantity": 25, "type": "Consumable", "desc": "A basic revival item"},
-    "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": "🛢️", "max_quantity": 5, "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
-    "station_rations": {"name": "Station Rations", "emoji": "🥫", "max_quantity": 99, "type": "Consumable", "desc": "Restores 15 HP."},
-    "hazard_shield": {"name": "Hazard Shield", "emoji": "🛡️", "max_quantity": 5, "type": "Consumable", "desc": "Blocks the next scavenging hazard."},
-    "lucky_scanner": {"name": "Deep-Space Scanner", "emoji": "📡", "max_quantity": 5, "type": "Consumable", "desc": "Improves rare-find odds on the next scavenging run."},
-    "ore_magnet": {"name": "Ore Magnet", "emoji": "🧲", "max_quantity": 5, "type": "Consumable", "desc": "Guarantees a titanium ore find on the next mining run."},
-    "prototype_drill_bit": {"name": "Prototype Drill Bit", "emoji": "⚙️", "max_quantity": 5, "type": "Consumable", "desc": "Boosts Stardust from the next mining run."},
-    "cosmic_insurance": {"name": "Cosmic Insurance", "emoji": "📋", "max_quantity": 5, "type": "Consumable", "desc": "Prevents a knockout from the next scavenging hazard."},
-    "fate_anchor": {"name": "Fate Anchor", "emoji": "⚓", "max_quantity": 5, "type": "Consumable", "desc": "Protects one missed fortune streak day."},
-    "stardust_cache": {"name": "Contraband Stardust Cache", "emoji": "🎁", "max_quantity": 10, "type": "Consumable", "desc": "Opens for an unpredictable Stardust payoff."},
+    "laser_charge_cell": {"name": "Laser Charge Cell", "emoji": EMOJIS.get("laser_charge_cell", "🔋"), "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 mining laser charges."},
+    "laser_power_cell": {"name": "Laser Power Cell", "emoji": EMOJIS.get("laser_power_cell", "⚡"), "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 mining laser charges."},
+    "fuel_refill": {"name": "Laser Quantum Cell", "emoji": EMOJIS.get("fuel_refill", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Instantly refills your starship mining laser to its current maximum charges."},
+    "drone_battery": {"name": "Drone Battery Pack", "emoji": EMOJIS.get("drone_battery", "🔋"), "max_quantity": 10, "type": "Consumable", "desc": "Restores 2 scavenge charges."},
+    "drone_power_cell": {"name": "Drone Power Cell", "emoji": EMOJIS.get("drone_power_cell", "⚡"), "max_quantity": 10, "type": "Consumable", "desc": "Restores 5 scavenge charges."},
+    "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": EMOJIS.get("drone_quantum_battery", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Fully restores your scavenging drone to its current maximum charges."},
+    "pet_snack": {"name": "Pet Treat", "emoji": EMOJIS.get("pet_snack", "🍪"), "max_quantity": 99, "type": "Pet Treat", "desc": "A tasty treat that gives your active pet a chunk of Pet XP."},
+    "normal_egg": {"name": "Pet Egg", "emoji": "🥚", "max_quantity": 10, "type": "Pet Egg", "desc": "A mysterious egg containing a normal station pet. Incubate for 12 hours."},
+    "arcade_token": {"name": "Arcade Token", "emoji": EMOJIS["arcade_token"], "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
+    "time_crystal": {"name": "Dilated Time Crystal", "emoji": EMOJIS.get("time_crystal", "💎"), "max_quantity": 4, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
+    "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": EMOJIS.get("nanite_patch", "🩹"), "max_quantity": 50, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
+    "medkit": {"name": "Field Trauma Medkit", "emoji": EMOJIS.get("medkit", "🧰"), "max_quantity": 25, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
+    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": EMOJIS.get("makeshift_medkit", "🩹"), "max_quantity": 25, "type": "Consumable", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
+    "full_revive": {"name": "Emergency Full Revival", "emoji": EMOJIS.get("full_revive", "⚕️"), "max_quantity": 10, "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
+    "revive_kit": {"name": "Emergency Revival Kit", "emoji": EMOJIS.get("revive_kit", "💉"), "max_quantity": 25, "type": "Consumable", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
+    "revive": {"name": "Revival Kit", "emoji": EMOJIS.get("revive", "⚕️"), "max_quantity": 25, "type": "Consumable", "desc": "A basic revival item"},
+    "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": EMOJIS.get("fuel_stabilizer", "🛢️"), "max_quantity": 5, "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
+    "station_rations": {"name": "Station Rations", "emoji": EMOJIS.get("station_rations", "🥫"), "max_quantity": 99, "type": "Consumable", "desc": "Restores 15 HP."},
+    "hazard_shield": {"name": "Hazard Shield", "emoji": EMOJIS.get("hazard_shield", "🛡️"), "max_quantity": 5, "type": "Consumable", "desc": "Blocks the next scavenging hazard."},
+    "lucky_scanner": {"name": "Deep-Space Scanner", "emoji": EMOJIS.get("lucky_scanner", "📡"), "max_quantity": 5, "type": "Consumable", "desc": "Improves rare-find odds on the next scavenging run."},
+    "ore_magnet": {"name": "Ore Magnet", "emoji": EMOJIS.get("ore_magnet", "🧲"), "max_quantity": 5, "type": "Consumable", "desc": "Guarantees a titanium ore find on the next mining run."},
+    "prototype_drill_bit": {"name": "Prototype Drill Bit", "emoji": EMOJIS.get("prototype_drill_bit", "⚙️"), "max_quantity": 5, "type": "Consumable", "desc": "Boosts Stardust from the next mining run."},
+    "cosmic_insurance": {"name": "Cosmic Insurance", "emoji": EMOJIS.get("cosmic_insurance", "📋"), "max_quantity": 5, "type": "Consumable", "desc": "Prevents a knockout from the next scavenging hazard."},
+    "fate_anchor": {"name": "Fate Anchor", "emoji": EMOJIS.get("fate_anchor", "⚓"), "max_quantity": 5, "type": "Consumable", "desc": "Protects one missed fortune streak day."},
+    "stardust_cache": {"name": "Contraband Stardust Cache", "emoji": EMOJIS.get("stardust_cache", "🎁"), "max_quantity": 10, "type": "Consumable", "desc": "Opens for an unpredictable Stardust payoff."},
 
     # Legendary Loot
     "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. Required to craft higher-tier exploration upgrades."},
-    "quantum_battery": {"name": "Quantum Battery", "emoji": "⚛️", "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
+    "quantum_battery": {"name": "Quantum Battery", "emoji": EMOJIS.get("quantum_battery", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Materials & Minerals
-    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": "⛏️", "max_quantity": 99, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
-    "iron_ore": {"name": "Iron Ore", "emoji": "⛏️", "max_quantity": 99, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
-    "copper_ore": {"name": "Copper Ore", "emoji": "🟠", "max_quantity": 99, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
-    "aluminum_ore": {"name": "Aluminum Ore", "emoji": "⬜", "max_quantity": 99, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
-    "circuit_board": {"name": "Circuit Board", "emoji": "🟩", "max_quantity": 99, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
-    "glue": {"name": "Industrial Glue", "emoji": "🧴", "max_quantity": 99, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
-    "scrap_metal": {"name": "Scrap Metal", "emoji": "🔩", "max_quantity": 99, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
-    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": "🔧", "max_quantity": 99, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
-    "wiring": {"name": "Wiring", "emoji": "🧵", "max_quantity": 99, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
-    "reinforced_laser_parts": {"name": "Reinforced Laser Parts", "emoji": "🛠️", "max_quantity": 5, "type": "Upgrade Component", "desc": "Precision-built parts used to upgrade the mining laser."},
-    "drone_upgrade_kit": {"name": "Drone Upgrade Kit", "emoji": "🛸", "max_quantity": 5, "type": "Upgrade Component", "desc": "A carefully assembled kit used to upgrade the scavenging drone."},
-    "astral_power_core": {"name": "Astral Power Core", "emoji": "🌌", "max_quantity": 5, "type": "Upgrade Component", "desc": "A stabilized Astral Core assembly for advanced upgrades."},
-    "nanite_retrofit_kit": {"name": "Nanite Retrofit Kit", "emoji": "🧬", "max_quantity": 5, "type": "Upgrade Component", "desc": "A precision nanite package required to install higher-tier exploration upgrades."},
+    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": EMOJIS["titanium_chunk"], "max_quantity": 99, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
+    "iron_ore": {"name": "Iron Ore", "emoji": EMOJIS["iron_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
+    "copper_ore": {"name": "Copper Ore", "emoji": EMOJIS["copper_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
+    "aluminum_ore": {"name": "Aluminum Ore", "emoji": EMOJIS["aluminum_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
+    "circuit_board": {"name": "Circuit Board", "emoji": EMOJIS["circuit_board"], "max_quantity": 99, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
+    "glue": {"name": "Industrial Glue", "emoji": EMOJIS["glue"], "max_quantity": 99, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
+    "scrap_metal": {"name": "Scrap Metal", "emoji": EMOJIS["scrap_metal"], "max_quantity": 99, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
+    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": EMOJIS["nuts_bolts"], "max_quantity": 99, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
+    "wiring": {"name": "Wiring", "emoji": EMOJIS["wiring"], "max_quantity": 99, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
+
+    # Defensive Weapons
+    "stop_sign": {"name": "Stop Sign", "emoji": "🛑", "max_quantity": 1, "type": "Defense Weapon", "desc": "A surprisingly sturdy traffic sign. Provides a small chance to prevent a scavenging hazard."},
+    "stick": {"name": "Stick", "emoji": "🪵", "max_quantity": 1, "type": "Defense Weapon", "desc": "It's a stick. Somehow, it helps."},
+    "wooden_sword": {"name": "Wooden Sword", "emoji": "🗡️", "max_quantity": 1, "type": "Defense Weapon", "desc": "A humble wooden sword with a small defensive chance."},
+    "wooden_shield": {"name": "Wooden Shield", "emoji": "🛡️", "max_quantity": 1, "type": "Defense Weapon", "desc": "A basic wooden shield that can prevent incoming hazards."},
+    "wooden_spoon": {"name": "Wooden Spoon", "emoji": "🥄", "max_quantity": 1, "type": "Defense Weapon", "desc": "A perfectly ordinary spoon. Surely this will protect you."},
+    "heavy_wrench": {"name": "Suspiciously Heavy Wrench", "emoji": "🔧", "max_quantity": 1, "type": "Defense Weapon", "desc": "Technically a maintenance tool. Technically."},
+    "plasma_cutter": {"name": "Plasma Cutter", "emoji": "🔫", "max_quantity": 1, "type": "Defense Weapon", "desc": "A precision plasma weapon recovered during the Halloween event. Provides a strong chance to prevent scavenging hazards."},
+
+    # Upgrade Kits
+    # The unsuffixed component IDs are retained as legacy compatibility items.
+    # New crafting uses tier-specific IDs so each upgrade level gets the correct part.
+    "reinforced_laser_parts": {"name": "Reinforced Laser Parts (Legacy)", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Legacy reinforced laser parts. These can still be used as a fallback for upgrades created before tiered parts were introduced."},
+    "reinforced_laser_parts_1": {"name": "Reinforced Laser Parts", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier I precision-built parts used for the first mining laser upgrade."},
+    "reinforced_laser_parts_2": {"name": "Reinforced Laser Parts II", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier II precision-built parts used for the second mining laser upgrade."},
+    "reinforced_laser_parts_3": {"name": "Reinforced Laser Parts III", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier III precision-built parts used for the third mining laser upgrade."},
+    "reinforced_laser_parts_4": {"name": "Reinforced Laser Parts IV", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier IV precision-built parts used for the fourth mining laser upgrade."},
+    "reinforced_laser_parts_5": {"name": "Reinforced Laser Parts V", "emoji": EMOJIS["reinforced_laser_parts"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier V precision-built parts used for the fifth mining laser upgrade."},
+    "drone_upgrade_kit": {"name": "Drone Upgrade Kit (Legacy)", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Legacy drone upgrade kits. These can still be used as a fallback for upgrades created before tiered kits were introduced."},
+    "drone_upgrade_kit_1": {"name": "Drone Upgrade Kit", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier I kit used for the first scavenging drone upgrade."},
+    "drone_upgrade_kit_2": {"name": "Drone Upgrade Kit II", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier II kit used for the second scavenging drone upgrade."},
+    "drone_upgrade_kit_3": {"name": "Drone Upgrade Kit III", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier III kit used for the third scavenging drone upgrade."},
+    "drone_upgrade_kit_4": {"name": "Drone Upgrade Kit IV", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier IV kit used for the fourth scavenging drone upgrade."},
+    "drone_upgrade_kit_5": {"name": "Drone Upgrade Kit V", "emoji": EMOJIS["drone_upgrade_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier V kit used for the fifth scavenging drone upgrade."},
+    "astral_power_core": {"name": "Astral Power Core", "emoji": EMOJIS["astral_power_core"], "max_quantity": 5, "type": "Upgrade Component", "desc": "A stabilized Astral Core assembly for advanced upgrades."},
+    "nanite_retrofit_kit": {"name": "Nanite Retrofit Kit", "emoji": EMOJIS["nanite_retrofit_kit"], "max_quantity": 5, "type": "Upgrade Component", "desc": "A precision nanite package required to install higher-tier exploration upgrades."},
+    "salvage_rig_kit": {"name": "Salvage Rig Kit (Legacy)", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Legacy salvage rig kits. These can still be used as a fallback for upgrades created before tiered kits were introduced."},
+    "salvage_rig_kit_1": {"name": "Salvage Rig Kit", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier I kit used for the first salvage rig upgrade."},
+    "salvage_rig_kit_2": {"name": "Salvage Rig Kit II", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier II kit used for the second salvage rig upgrade."},
+    "salvage_rig_kit_3": {"name": "Salvage Rig Kit III", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier III kit used for the third salvage rig upgrade."},
+    "salvage_rig_kit_4": {"name": "Salvage Rig Kit IV", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier IV kit used for the fourth salvage rig upgrade."},
+    "salvage_rig_kit_5": {"name": "Salvage Rig Kit V", "emoji": EMOJIS.get("salvage_rig_kit", "♻️"), "max_quantity": 5, "type": "Upgrade Component", "desc": "Tier V kit used for the fifth salvage rig upgrade."},
 
     # Medical Supplies
-    "gauze": {"name": "Sterile Gauze", "emoji": "🧻", "max_quantity": 99, "type": "Medical Supply", "desc": "Clean bandage material recovered from abandoned medical stations."},
-    "medical_alcohol": {"name": "Medical Alcohol", "emoji": "🧴", "max_quantity": 99, "type": "Medical Supply", "desc": "Medical-grade alcohol useful for disinfecting wounds and equipment."},
-    "bandaids": {"name": "Bandaids", "emoji": "🩹", "max_quantity": 99, "type": "Medical Supply", "desc": "Basic adhesive bandages recovered from abandoned medical supplies."},
-    "antiseptic_ointment": {"name": "Antiseptic Ointment", "emoji": "🧪", "max_quantity": 99, "type": "Medical Supply", "desc": "Antiseptic ointment useful for treating minor wounds."},
+    "gauze": {"name": "Sterile Gauze", "emoji": EMOJIS["gauze"], "max_quantity": 99, "type": "Medical Supply", "desc": "Clean bandage material recovered from abandoned medical stations."},
+    "medical_alcohol": {"name": "Medical Alcohol", "emoji": EMOJIS["alcohol"], "max_quantity": 99, "type": "Medical Supply", "desc": "Medical-grade alcohol useful for disinfecting wounds and equipment."},
+    "bandaids": {"name": "Bandaids", "emoji": EMOJIS["bandaid"], "max_quantity": 99, "type": "Medical Supply", "desc": "Basic adhesive bandages recovered from abandoned medical supplies."},
+    "antiseptic_ointment": {"name": "Antiseptic Ointment", "emoji": EMOJIS["ointment"], "max_quantity": 99, "type": "Medical Supply", "desc": "Antiseptic ointment useful for treating minor wounds."},
 
     # Space Junk
     "space_pizza": {"name": "Dehydrated Space Pizza", "emoji": "🍕", "max_quantity": 99, "type": "Space Junk", "desc": "Slightly freezer-burned."},
@@ -105,8 +137,27 @@ ITEM_REGISTRY = {
     # Profile Titles
     "title_outer_rim_wanderer": {"name": "Outer Rim Wanderer", "emoji": "🏷️", "max_quantity": 1, "type": "Title","desc": "A title for explorers who venture beyond the station."},
     "title_starborn": {"name": "Starborn", "emoji": "✨", "max_quantity": 1, "type": "Title", "desc": "A prestigious title for those touched by the stars."},
-    "title_voidfarer": {"name": "Voidfarer", "emoji": "🌌", "max_quantity": 1, "type": "Title", "desc": "A title for those brave enough to chart the endless void."}
+    "title_voidfarer": {"name": "Voidfarer", "emoji": "🌌", "max_quantity": 1, "type": "Title", "desc": "A title for those brave enough to chart the endless void."},
+    "title_horror_enthusiast": {"name": "Horror Enthusiast", "emoji": "👻", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting every Halloween Space Junk collectible."},
+    "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."}
 }
+
+# Seasonal Space Junk is registered here so it automatically appears in /inventory
+# while its event module remains the place where the seasonal definitions live.
+for _item_id, _name, _emoji, _desc, _stardust, _candy in HALLOWEEN_SPACE_JUNK:
+    ITEM_REGISTRY[_item_id] = {
+        "name": _name,
+        "emoji": _emoji,
+        "max_quantity": 99,
+        "type": "Space Junk",
+        "desc": _desc,
+    }
+
+del _item_id, _name, _emoji, _desc
+
+# Seasonal Halloween crafting/healing items are registered separately from
+# Space Junk so they can be used normally without becoming collectibles.
+ITEM_REGISTRY.update(HALLOWEEN_ITEMS)
 
 async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
     """
@@ -166,6 +217,32 @@ class Inventory(commands.Cog):
         if "active_effects" not in columns:
             await db.execute("ALTER TABLE users ADD COLUMN active_effects TEXT DEFAULT '{}'")
             await db.commit()
+
+    async def get_charge_caps(self, user_id):
+        """Return the user's current mining/scavenging charge capacities.
+
+        Exploration upgrades can raise the default 10-charge capacity, so
+        consumable charge restores must use the same upgrade source as
+        /mine and /scavenge instead of hard-coding 10.
+        """
+        default_caps = {"mining": 10, "scavenging": 10}
+        upgrade_cog = self.bot.get_cog("Upgrades")
+
+        if upgrade_cog is None:
+            return default_caps
+
+        try:
+            mining_effects = await upgrade_cog.get_effects(user_id, "mining")
+            scavenging_effects = await upgrade_cog.get_effects(user_id, "scavenging")
+
+            return {
+                "mining": max(1, int(mining_effects.get("max_charges", 10))),
+                "scavenging": max(1, int(scavenging_effects.get("max_charges", 10))),
+            }
+        except Exception:
+            # /use should remain functional even if the upgrade cog is
+            # temporarily unavailable or an older profile has malformed data.
+            return default_caps
 
     async def title_autocomplete(self, interaction: discord.Interaction, current: str):
         """Show the user's owned profile titles in the Discord autocomplete menu."""
@@ -303,7 +380,7 @@ class Inventory(commands.Cog):
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute("""
                 SELECT item_id, item_type, quantity FROM inventory
-                WHERE user_id = ? AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit')
+                WHERE user_id = ? AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit', 'arcade_token')
             """, (user_id,)) as cursor:
                 inv_rows = await cursor.fetchall()
             async with db.execute("PRAGMA table_info(users)") as cursor:
@@ -317,11 +394,16 @@ class Inventory(commands.Cog):
                         if tc > 0: user_items.append(("time_crystal", tc))
                         if nanites > 0: user_items.append(("nanite_patch", nanites))
                         if medkits > 0: user_items.append(("medkit", medkits))
+            if "arcade_coins" in columns:
+                async with db.execute("SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                    row = await cursor.fetchone()
+                    if row and row[0] > 0:
+                        user_items.append(("arcade_token", min(row[0], 1000)))
 
         if not inv_rows and not user_items:
             return await ctx.send("📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!")
 
-        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Consumable": [], "Healing": [], "Voucher": [], "Currency": []}
+        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Voucher": [], "Currency": []}
         for item_id, count in user_items:
             info = ITEM_REGISTRY.get(item_id)
             if info:
@@ -332,7 +414,7 @@ class Inventory(commands.Cog):
             cat = info.get("type", "Space Junk")
             categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity or 0}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
 
-        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Consumable":"Consumables","Healing":"Healing","Voucher":"Vouchers","Currency":"Currencies"}
+        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Voucher":"Vouchers","Currency":"Currencies"}
         pages=[]
         for cat, items in categories.items():
             if not items: continue
@@ -546,95 +628,99 @@ class Inventory(commands.Cog):
             effects = json.loads(effects_raw or "{}")
             message = ""
 
+            charge_caps = await self.get_charge_caps(user_id)
+            max_mining_charges = charge_caps["mining"]
+            max_scavenge_charges = charge_caps["scavenging"]
+
             if item_id == "laser_charge_cell":
-                if (mining or 0) >= 10:
+                if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
-                mining = min(10, (mining or 0) + 2)
+                mining = min(max_mining_charges, (mining or 0) + 2)
 
                 await db.execute(
                     "UPDATE users SET mining_charges = ? WHERE user_id = ?",
                     (mining, user_id)
                 )
 
-                message = f"🔋 Mining laser charges restored to **{mining}/10**."
+                message = f"🔋 Mining laser charges restored to **{mining}/{max_mining_charges}**."
 
             elif item_id == "laser_power_cell":
-                if (mining or 0) >= 10:
+                if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
-                mining = min(10, (mining or 0) + 5)
+                mining = min(max_mining_charges, (mining or 0) + 5)
 
                 await db.execute(
                     "UPDATE users SET mining_charges = ? WHERE user_id = ?",
                     (mining, user_id)
                 )
 
-                message = f"⚡ Mining laser charges restored to **{mining}/10**."
+                message = f"⚡ Mining laser charges restored to **{mining}/{max_mining_charges}**."
 
             elif item_id == "fuel_refill":
-                if (mining or 0) >= 10:
+                if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        "⚠️ Your mining laser charges are already full (`10/10`)!"
+                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
-                mining = 10
+                mining = max_mining_charges
 
                 await db.execute(
                     "UPDATE users SET mining_charges = ? WHERE user_id = ?",
                     (mining, user_id)
                 )
 
-                message = "🌌 Mining laser fully recharged to **10/10**."
+                message = f"🌌 Mining laser fully recharged to **{max_mining_charges}/{max_mining_charges}**."
 
             elif item_id == "drone_battery":
-                if (scavenging or 0) >= 10:
+                if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
-                scavenging = min(10, (scavenging or 0) + 2)
+                scavenging = min(max_scavenge_charges, (scavenging or 0) + 2)
 
                 await db.execute(
                     "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
                     (scavenging, user_id)
                 )
 
-                message = f"🔋 Scavenge drone charges restored to **{scavenging}/10**."
+                message = f"🔋 Scavenge drone charges restored to **{scavenging}/{max_scavenge_charges}**."
 
             elif item_id == "drone_power_cell":
-                if (scavenging or 0) >= 10:
+                if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
-                scavenging = min(10, (scavenging or 0) + 5)
+                scavenging = min(max_scavenge_charges, (scavenging or 0) + 5)
 
                 await db.execute(
                     "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
                     (scavenging, user_id)
                 )
 
-                message = f"⚡ Scavenge drone charges restored to **{scavenging}/10**."
+                message = f"⚡ Scavenge drone charges restored to **{scavenging}/{max_scavenge_charges}**."
 
             elif item_id == "drone_quantum_battery":
-                if (scavenging or 0) >= 10:
+                if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        "⚠️ Your scavenge drone charges are already full (`10/10`)!"
+                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
-                scavenging = 10
+                scavenging = max_scavenge_charges
 
                 await db.execute(
                     "UPDATE users SET scavenge_charges = ? WHERE user_id = ?",
                     (scavenging, user_id)
                 )
 
-                message = "🌌 Scavenge drone fully recharged to **10/10**."
+                message = f"🌌 Scavenge drone fully recharged to **{max_scavenge_charges}/{max_scavenge_charges}**."
 
             elif item_id == "station_rations":
                 if (hp or 0) <= 0:
@@ -680,8 +766,8 @@ class Inventory(commands.Cog):
 
                 current_mining = mining or 0
                 current_scavenge = scavenging or 0
-                new_mining = min(10, current_mining + 5)
-                new_scavenge = min(10, current_scavenge + 5)
+                new_mining = min(max_mining_charges, current_mining + 5)
+                new_scavenge = min(max_scavenge_charges, current_scavenge + 5)
                 mining_added = new_mining - current_mining
                 scavenge_added = new_scavenge - current_scavenge
 
@@ -694,8 +780,8 @@ class Inventory(commands.Cog):
 
                 message = (
                     "⚛️ **Quantum Battery Activated!**\n"
-                    f"🔫 Mining laser: **+{mining_added}** charges → **{new_mining}/10**\n"
-                    f"🤖 Scavenging drone: **+{scavenge_added}** charges → **{new_scavenge}/10**\n"
+                    f"🔫 Mining laser: **+{mining_added}** charges → **{new_mining}/{max_mining_charges}**\n"
+                    f"🤖 Scavenging drone: **+{scavenge_added}** charges → **{new_scavenge}/{max_scavenge_charges}**\n"
                     "✨ Your next mining or scavenging run will produce **3x Stardust**!"
                 )
 
@@ -779,8 +865,11 @@ class Inventory(commands.Cog):
 
         hp, max_hp, mining, scavenging, last_mined, last_scavenged, knocked_out_until, effects_raw = row
 
-        # Apply the daily 10/10 charge reset for display purposes too.
+        # Use the same upgrade-derived capacities as /mine and /scavenge.
         # /mine and /scavenge perform the actual database reset when used.
+        charge_caps = await self.get_charge_caps(user_id)
+        max_mining_charges = charge_caps["mining"]
+        max_scavenge_charges = charge_caps["scavenging"]
         eastern = pytz.timezone("US/Eastern")
         current_date = datetime.now(eastern).date()
 
@@ -797,10 +886,10 @@ class Inventory(commands.Cog):
         )
 
         if last_mined_date != current_date:
-            mining = 10
+            mining = max_mining_charges
 
         if last_scavenged_date != current_date:
-            scavenging = 10
+            scavenging = max_scavenge_charges
 
         def cooldown(last_used):
             remaining = max(0, int(30 * 60 - (now - (last_used or 0))))
@@ -825,8 +914,8 @@ class Inventory(commands.Cog):
             value=f"`{hp_value}/{max_hp_value}` HP\n{health_status}",
             inline=True
         )
-        embed.add_field(name="⛏️ Mining", value=f"`{mining or 0}/10` charges\n{cooldown(last_mined)}", inline=True)
-        embed.add_field(name="🛠️ Scavenging", value=f"`{scavenging or 0}/10` charges\n{cooldown(last_scavenged)}", inline=True)
+        embed.add_field(name="⛏️ Mining", value=f"`{mining or 0}/{max_mining_charges}` charges\n{cooldown(last_mined)}", inline=True)
+        embed.add_field(name="🛠️ Scavenging", value=f"`{scavenging or 0}/{max_scavenge_charges}` charges\n{cooldown(last_scavenged)}", inline=True)
         if (hp or 0) <= 0:
             recovery_date = knocked_out_until or "revived"
 

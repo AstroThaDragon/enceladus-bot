@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, date
 import pytz
 
 eastern = pytz.timezone("US/Eastern")
@@ -20,7 +20,9 @@ class BirthdayCog(commands.Cog):
     @app_commands.command(name="set_birthday", description="Set your birthday (Month/Day)!")
     @app_commands.describe(month="Month (1-12)", day="Day (1-31)")
     async def set_birthday(self, interaction: discord.Interaction, month: int, day: int):
-        if not (1 <= month <= 12) or not (1 <= day <= 31):
+        try:
+            date(2000, month, day)
+        except ValueError:
             return await interaction.response.send_message(
                 "Please provide a valid Month and Day!",
                 ephemeral=True
@@ -143,8 +145,6 @@ class BirthdayCog(commands.Cog):
         if self.last_birthday_run == today:
             return
 
-        self.last_birthday_run = today
-
         current_month = now.month
         current_day = now.day
 
@@ -212,10 +212,15 @@ class BirthdayCog(commands.Cog):
                     text="May your day be filled with magical stardust and joy!"
                 )
 
-                await channel.send(
-                    content=f"Happy birthday, {', '.join(birthday_members)}! 🎉🎂✨",
-                    embed=shoutout_embed
-                )
+                try:
+                    await channel.send(
+                        content=f"Happy birthday, {', '.join(birthday_members)}! 🎉🎂✨",
+                        embed=shoutout_embed
+                    )
+                except Exception as e:
+                    print(f"[BIRTHDAY ANNOUNCEMENT ERROR]: {e}")
+
+        self.last_birthday_run = today
 
     @check_birthdays.before_loop
     async def before_check_birthdays(self):

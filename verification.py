@@ -4,6 +4,9 @@ from discord.ui import View, Select, Button, Modal, TextInput
 import os
 import json
 import time
+import asyncio
+import re
+import threading
 
 COOLDOWN_FILE = "verification_cooldowns.json"
 
@@ -47,37 +50,44 @@ APPLICATION_TYPES = {
     }
 }
 
+COOLDOWN_LOCK = threading.Lock()
+
 def get_cooldown(user_id):
-    if not os.path.exists(COOLDOWN_FILE):
-        return 0, None
-    try:
-        with open(COOLDOWN_FILE, "r") as f:
-            data = json.load(f)
+    with COOLDOWN_LOCK:
+        if not os.path.exists(COOLDOWN_FILE):
+            return 0, None
+        try:
+            with open(COOLDOWN_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return 0, None
         user_data = data.get(str(user_id))
         if not user_data:
             return 0, None
-        
-        # Returns (expiration_timestamp, reason)
         return user_data.get("expires_at", 0), user_data.get("reason", "a previous application")
-    except:
-        return 0, None
 
 def set_cooldown(user_id, hours, reason):
-    data = {}
-    if os.path.exists(COOLDOWN_FILE):
-        try:
-            with open(COOLDOWN_FILE, "r") as f:
-                data = json.load(f)
-        except:
-            data = {}
-
-    data[str(user_id)] = {
-        "expires_at": time.time() + (hours * 3600),
-        "reason": reason
-    }
-
-    with open(COOLDOWN_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with COOLDOWN_LOCK:
+        data = {}
+        if os.path.exists(COOLDOWN_FILE):
+            try:
+                with open(COOLDOWN_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                try:
+                    os.replace(COOLDOWN_FILE, f"{COOLDOWN_FILE}.corrupt")
+                except OSError:
+                    pass
+        data[str(user_id)] = {
+            "expires_at": time.time() + (hours * 3600),
+            "reason": reason
+        }
+        temp_file = f"{COOLDOWN_FILE}.tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, COOLDOWN_FILE)
 
 class ReasonModal(Modal):
     def __init__(self, cog, member, application_key, approved):
@@ -88,6 +98,7 @@ class ReasonModal(Modal):
         self.cog = cog
         self.member = member
         self.application_key = application_key
+
         self.approved = approved
 
         self.reason = TextInput(
@@ -135,12 +146,24 @@ class CancelConfirmView(View):
         )
 
 class VerificationReviewView(View):
-    def __init__(self, cog, member, application_key):
+    def __init__(self, cog, member, application_key, custom_ids=None):
         super().__init__(timeout=None)
 
         self.cog = cog
         self.member = member
         self.application_key = application_key
+
+        custom_ids = custom_ids or {}
+        button_ids = {
+            "Accept": custom_ids.get("accept", f"verification_accept:{member.id}:{application_key}"),
+            "Accept w/ Reason": custom_ids.get("accept_reason", f"verification_accept_reason:{member.id}:{application_key}"),
+            "Deny": custom_ids.get("deny", f"verification_deny:{member.id}:{application_key}"),
+            "Deny w/ Reason": custom_ids.get("deny_reason", f"verification_deny_reason:{member.id}:{application_key}"),
+            "Cancel Application": custom_ids.get("cancel", f"verification_cancel:{member.id}:{application_key}"),
+        }
+        for child in self.children:
+            if getattr(child, "label", None) in button_ids:
+                child.custom_id = button_ids[child.label]
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.data and interaction.data.get("custom_id"):
@@ -270,6 +293,11 @@ class VerificationReviewView(View):
             )
 
     async def cancel_application(self, interaction):
+        lock = self.cog.get_application_lock(interaction.guild.id, self.member.id)
+        async with lock:
+            return await self._cancel_application_locked(interaction)
+
+    async def _cancel_application_locked(self, interaction):
         guild = interaction.guild
         thread = interaction.channel
         is_applicant = interaction.user.id == self.member.id
@@ -339,6 +367,39 @@ class VerificationDropdown(Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        lock = self.cog.get_application_lock(interaction.guild.id, interaction.user.id)
+        if lock.locked():
+            return await interaction.response.send_message(
+                "⚠️ You already have a verification request being created. Please wait a moment.",
+                ephemeral=True
+            )
+        async with lock:
+            try:
+                return await self._callback_locked(interaction)
+            except Exception as e:
+                print(f"[VERIFICATION CREATE ERROR] {e}")
+                pending_role = interaction.guild.get_role(PENDING_VERIFICATION_ROLE_ID)
+                if pending_role and pending_role in interaction.user.roles:
+                    try:
+                        await interaction.user.remove_roles(
+                            pending_role,
+                            reason="Verification application creation failed"
+                        )
+                    except discord.HTTPException:
+                        pass
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        "❌ I couldn't create your verification request. No application was finalized; please try again in a moment.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.response.send_message(
+                        "❌ I couldn't create your verification request. No application was created; please try again in a moment.",
+                        ephemeral=True
+                    )
+
+    async def _callback_locked(self, interaction: discord.Interaction):
+
         guild = interaction.guild
         member = interaction.user
 
@@ -373,13 +434,33 @@ class VerificationDropdown(Select):
 
         pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
 
-        if pending_role:
-            await member.add_roles(pending_role)
+        if pending_role is None:
+            return await interaction.response.send_message(
+                "⚠️ The verification system is missing its Pending Verification role. Please contact staff.",
+                ephemeral=True
+            )
+
+        if pending_role in member.roles:
+            return await interaction.response.send_message(
+                "⚠️ You already have an active verification request. Please use your existing verification thread.",
+                ephemeral=True
+            )
+
+        await member.add_roles(pending_role, reason="Started verification application")
 
         application_key = self.values[0]
         application_name = APPLICATION_TYPES[application_key]["label"]
 
         verification_channel = guild.get_channel(VERIFICATION_CHANNEL_ID)
+        if verification_channel is None:
+            try:
+                verification_channel = await guild.fetch_channel(VERIFICATION_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                await member.remove_roles(pending_role, reason="Verification channel unavailable")
+                return await interaction.followup.send(
+                    "⚠️ The verification channel could not be found or accessed. Please contact staff.",
+                    ephemeral=True
+                )
 
         request_message = await verification_channel.send(
             f"<@&{VERIFICATION_TEAM_ROLE_ID}> <@{OWNER_ID}> <@&{ADMIN_ROLE_ID}>\n"
@@ -445,14 +526,12 @@ class VerificationDropdown(Select):
 
         await thread.send("\n".join(questions))
 
-        await thread.send(
+        review_view = VerificationReviewView(self.cog, member, application_key)
+        review_message = await thread.send(
             "Staff review controls:",
-            view=VerificationReviewView(
-                self.cog,
-                member,
-                application_key
-            )
+            view=review_view
         )
+        self.cog.register_review_view(review_view, review_message.id)
 
 class VerificationPanelView(View):
     def __init__(self, cog):
@@ -465,10 +544,89 @@ class VerificationPanelView(View):
 class Verification(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._application_locks = {}
+        self._review_view_keys = set()
 
         self.bot.add_view(
             VerificationPanelView(self)
         )
+
+    def get_application_lock(self, guild_id, user_id):
+        key = (guild_id, user_id)
+        if key not in self._application_locks:
+            self._application_locks[key] = asyncio.Lock()
+        return self._application_locks[key]
+
+    def register_review_view(self, view, message_id):
+        if message_id not in self._review_view_keys:
+            self.bot.add_view(view, message_id=message_id)
+            self._review_view_keys.add(message_id)
+
+    async def restore_review_views(self):
+        labels = {
+            "Accept": "accept",
+            "Accept w/ Reason": "accept_reason",
+            "Deny": "deny",
+            "Deny w/ Reason": "deny_reason",
+            "Cancel Application": "cancel",
+        }
+        app_by_label = {v["label"]: k for k, v in APPLICATION_TYPES.items()}
+        channel = self.bot.get_channel(VERIFICATION_CHANNEL_ID)
+        if channel is None:
+            for guild in self.bot.guilds:
+                try:
+                    channel = await guild.fetch_channel(VERIFICATION_CHANNEL_ID)
+                    break
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    continue
+        if channel is None:
+            print("[VERIFICATION] Could not restore review views: verification channel unavailable.")
+            return
+
+        for thread in getattr(channel, "threads", []):
+            try:
+                starter = await channel.fetch_message(thread.id)
+                user_match = re.search(r"\*\*User:\*\*\s*<@!?(\d+)>", starter.content or "")
+                app_match = re.search(r"\*\*Application:\*\*\s*(.+)", starter.content or "")
+                if not user_match or not app_match:
+                    continue
+                application_key = app_by_label.get(app_match.group(1).strip())
+                if application_key is None:
+                    continue
+                user_id = int(user_match.group(1))
+                member = thread.guild.get_member(user_id)
+                if member is None:
+                    try:
+                        member = await thread.guild.fetch_member(user_id)
+                    except (discord.NotFound, discord.HTTPException):
+                        continue
+
+                review_message = None
+                async for message in thread.history(limit=25, oldest_first=False):
+                    if message.content == "Staff review controls:" and message.components:
+                        review_message = message
+                        break
+                if review_message is None:
+                    continue
+
+                custom_ids = {}
+                for row in review_message.components:
+                    for component in row.children:
+                        label = getattr(component, "label", None)
+                        key = labels.get(label) if isinstance(label, str) else None
+                        component_custom_id = getattr(component, "custom_id", None)
+                        if key and isinstance(component_custom_id, str):
+                            custom_ids[key] = component_custom_id
+                if len(custom_ids) != 5:
+                    continue
+
+                view = VerificationReviewView(self, member, application_key, custom_ids)
+                self.register_review_view(view, review_message.id)
+                print(f"[VERIFICATION] Restored review controls for {member} in thread {thread.id}.")
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                print(f"[VERIFICATION] Could not restore thread {thread.id}: {e}")
+            except Exception as e:
+                print(f"[VERIFICATION] Unexpected restore error for thread {thread.id}: {e}")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -511,20 +669,28 @@ class Verification(commands.Cog):
 
         return file_name
 
-    async def finish_verification(
-        self,
-        interaction,
-        member,
-        application_key,
-        approved,
-        reason
-    ):
+    async def finish_verification(self, interaction, member, application_key, approved, reason):
+        lock = self.get_application_lock(interaction.guild.id, member.id)
+        async with lock:
+            if getattr(interaction.channel, "locked", False) or getattr(interaction.channel, "archived", False):
+                return await interaction.followup.send(
+                    "ℹ️ This verification request has already been processed.",
+                    ephemeral=True
+                )
+            return await self._finish_verification_locked(
+                interaction, member, application_key, approved, reason
+            )
+
+    async def _finish_verification_locked(self, interaction, member, application_key, approved, reason):
 
         guild = interaction.guild
 
-        log_channel = guild.get_channel(
-            VERIFICATION_LOG_CHANNEL_ID
-        )
+        log_channel = guild.get_channel(VERIFICATION_LOG_CHANNEL_ID)
+        if log_channel is None:
+            try:
+                log_channel = await guild.fetch_channel(VERIFICATION_LOG_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                log_channel = None
 
         thread = interaction.channel
 
@@ -534,15 +700,38 @@ class Verification(commands.Cog):
             ]["roles"]
 
             roles = []
+            missing_roles = []
 
             for role_id in roles_to_add:
                 role = guild.get_role(role_id)
-
-                if role:
+                if role is None or (guild.me and guild.me.top_role <= role):
+                    missing_roles.append(role_id)
+                else:
                     roles.append(role)
 
-            if roles:
-                await member.add_roles(*roles)
+            if missing_roles:
+                return await interaction.followup.send(
+                    "❌ This application cannot be approved because one or more required verification roles are missing or below Enceladus' role hierarchy. Please contact the server owner.",
+                    ephemeral=True
+                )
+
+            added_roles = []
+            try:
+                for role in roles:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason=f"Approved {application_key} verification")
+                        added_roles.append(role)
+            except discord.HTTPException as e:
+                for role in reversed(added_roles):
+                    try:
+                        await member.remove_roles(role, reason="Rollback failed verification approval")
+                    except discord.HTTPException:
+                        pass
+                print(f"[VERIFICATION ROLE ERROR] {e}")
+                return await interaction.followup.send(
+                    "❌ I couldn't safely assign all required verification roles. No approval was finalized; please try again or contact staff.",
+                    ephemeral=True
+                )
 
             message = (
                 f"✅ You have been approved for **{APPLICATION_TYPES[application_key]['label']}**."
@@ -559,9 +748,10 @@ class Verification(commands.Cog):
             await interaction.followup.send(
                 f"✅ {member.mention} approved.")
 
-            await log_channel.send(
-                f"✅ {member.mention} approved for **{APPLICATION_TYPES[application_key]['label']}**"
-            )
+            if log_channel:
+                await log_channel.send(
+                    f"✅ {member.mention} approved for **{APPLICATION_TYPES[application_key]['label']}**"
+                )
 
         else:
             message = (
@@ -580,9 +770,10 @@ class Verification(commands.Cog):
                 f"❌ {member.mention} denied."
             )
 
-            await log_channel.send(
-                f"❌ {member.mention} denied for **{APPLICATION_TYPES[application_key]['label']}**"
-            )
+            if log_channel:
+                await log_channel.send(
+                    f"❌ {member.mention} denied for **{APPLICATION_TYPES[application_key]['label']}**"
+                )
 
             # Apply 48-hour denial cooldown inside the else block
             set_cooldown(member.id, 48, reason="denial")
@@ -596,15 +787,22 @@ class Verification(commands.Cog):
         except discord.NotFound:
             pass
 
-        transcript_file = await self.create_thread_transcript(thread)
-
-        if log_channel:
-            await log_channel.send(
-                content=f"📜 Transcript for {thread.name}:",
-                file=discord.File(transcript_file)
-            )
-
-        os.remove(transcript_file)
+        transcript_file = None
+        try:
+            transcript_file = await self.create_thread_transcript(thread)
+            if log_channel:
+                await log_channel.send(
+                    content=f"📜 Transcript for {thread.name}:",
+                    file=discord.File(transcript_file)
+                )
+        except discord.HTTPException as e:
+            print(f"[VERIFICATION TRANSCRIPT ERROR] {e}")
+        finally:
+            if transcript_file:
+                try:
+                    os.remove(transcript_file)
+                except OSError:
+                    pass
 
         await thread.edit(
             archived=True,
@@ -612,4 +810,6 @@ class Verification(commands.Cog):
         )
 
 async def setup(bot):
-    await bot.add_cog(Verification(bot))
+    cog = Verification(bot)
+    await bot.add_cog(cog)
+    await cog.restore_review_views()

@@ -8,14 +8,32 @@ import random
 import json
 from datetime import datetime, timedelta
 import pytz
-from inventory import add_inventory_item
+from emojis import EMOJIS
+from inventory import add_inventory_item, ITEM_REGISTRY
+from seasonal_updates.halloween import (
+    BONUS_ROLL_CHANCE as HALLOWEEN_BONUS_ROLL_CHANCE,
+    CANDY_CHANCE as HALLOWEEN_CANDY_CHANCE,
+    PLASTIC_CHANCE as HALLOWEEN_PLASTIC_CHANCE,
+    TRICK_OR_TREAT_BAG_CHANCE as HALLOWEEN_BAG_CHANCE,
+    PLASTIC_MIN as HALLOWEEN_PLASTIC_MIN,
+    PLASTIC_MAX as HALLOWEEN_PLASTIC_MAX,
+    get_space_junk as get_halloween_space_junk,
+    HALLOWEEN_DAMAGE_MESSAGES,
+    HALLOWEEN_KNOCKOUT_LINES,
+    is_active as halloween_is_active,
+    HALLOWEEN_PET_EGG_CHANCE,
+    HALLOWEEN_PET_CANDY_CHANCE,
+)
+from collectibles import record_collectible
+from pets import add_pet_xp, get_active_pet_effects, NORMAL_EGG_CHANCE, PET_XP_PER_EXPLORATION
+from defense import roll_hazard_defense
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
 MINING_MATERIALS = [
     ("iron_ore", "Iron Ore", 0.22),
     ("copper_ore", "Copper Ore", 0.12),
-    ("titanium_chunk", "Titanium Ore Chunk", 0.05),
+    ("titanium_chunk", "Titanium Ore Chunk", 0.04),
     ("aluminum_ore", "Aluminum Ore", 0.16),
 ]
 SCAVENGE_MATERIALS = [
@@ -35,7 +53,7 @@ SCAVENGE_BONUS_MINERALS = [
     ("iron_ore", "Iron Ore", 0.035),
     ("copper_ore", "Copper Ore", 0.020),
     ("aluminum_ore", "Aluminum Ore", 0.015),
-    ("titanium_chunk", "Titanium Ore Chunk", 0.008),
+    ("titanium_chunk", "Titanium Ore Chunk", 0.007),
 ]
 
 MATERIAL_OVERFLOW_VALUES = {
@@ -189,6 +207,11 @@ class Exploration(commands.Cog):
         """Check for completed mining/scavenging cooldowns and notify opted-in users."""
         try:
             channel = self.bot.get_channel(COOLDOWN_ALERT_CHANNEL_ID)
+            if channel is None:
+                try:
+                    channel = await self.bot.fetch_channel(COOLDOWN_ALERT_CHANNEL_ID)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    return
 
             if channel is None:
                 return
@@ -224,11 +247,18 @@ class Exploration(commands.Cog):
                     mining_alert_sent,
                     scavenge_alert_sent
                 ) in users:
+                    # The actual exploration cooldown can be shortened by the
+                    # user's active pet, so alerts must use the same effective
+                    # cooldown as /mine and /scavenge.
+                    pet_effects = await get_active_pet_effects(db, user_id)
+                    effective_cooldown = self.COOLDOWN_SECONDS * (
+                        1 - pet_effects.get("cooldown_reduction", 0.0)
+                    )
 
                     # Mining cooldown
                     if (
                         last_mined
-                        and current_time - last_mined >= self.COOLDOWN_SECONDS
+                        and current_time - last_mined >= effective_cooldown
                         and mining_alert_sent != last_mined
                     ):
                         try:
@@ -252,7 +282,7 @@ class Exploration(commands.Cog):
                     # Scavenging cooldown
                     if (
                         last_scavenged
-                        and current_time - last_scavenged >= self.COOLDOWN_SECONDS
+                        and current_time - last_scavenged >= effective_cooldown
                         and scavenge_alert_sent != last_scavenged
                     ):
                         try:
@@ -316,9 +346,11 @@ class Exploration(commands.Cog):
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
-        app_commands.Choice(name="🩹 Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
-        app_commands.Choice(name="🩹 Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
-        app_commands.Choice(name="🧰 Field Trauma Medkit (+100 HP)", value="medkit")
+        app_commands.Choice(name=f"{EMOJIS.get('nanite_patch', '🩹')} Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
+        app_commands.Choice(name=f"{EMOJIS.get('makeshift_medkit', '🩹')} Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
+        app_commands.Choice(name=f"{EMOJIS.get('medkit', '🧰')} Field Trauma Medkit (+100 HP)", value="medkit"),
+        app_commands.Choice(name="🍬 Halloween Candy (+5 HP)", value="halloween_candy"),
+        app_commands.Choice(name="🎃 Trick-or-Treat Bag (+25 HP)", value="trick_or_treat_bag")
     ])
     async def heal(self, ctx: commands.Context, item: str):
         await ctx.defer()
@@ -336,6 +368,8 @@ class Exploration(commands.Cog):
             "nanite_patch": {"name": "Nanite Stim-Patch", "col": "nanite_patchs", "amount": 35},
             "medkit": {"name": "Field Trauma Medkit", "col": "medkits", "amount": 100},
             "makeshift_medkit": {"name": "Makeshift Medkit", "inventory": True, "amount": 60},
+            "halloween_candy": {"name": "Halloween Candy", "inventory": True, "amount": 5},
+            "trick_or_treat_bag": {"name": "Trick-or-Treat Bag", "inventory": True, "amount": 25},
         }
 
         selected = heal_data.get(item)
@@ -407,10 +441,25 @@ class Exploration(commands.Cog):
                 "UPDATE users SET hp = ? WHERE user_id = ?",
                 (new_hp, user_id)
             )
+            # Track Halloween candy consumption for achievements.
+            if item in ("halloween_candy", "trick_or_treat_bag"):
+                achievements_cog = self.bot.get_cog("Achievements")
+
+                if achievements_cog:
+                    # A Trick-or-Treat Bag represents the 25 candy pieces
+                    # used to craft it, so opening one counts as 25 candy eaten.
+                    candy_amount = 25 if item == "trick_or_treat_bag" else 1
+
+                    await achievements_cog.add_candy_progress(
+                        user_id,
+                        candy_amount,
+                        db=db,
+                    )
             await db.commit()
 
+        action = "Chowed down on the candy! 🍬" if item == "halloween_candy" else ("You opened the bag and chowed down on candy! 🍬" if item == "trick_or_treat_bag" else f"Used {selected['name']}!")
         await ctx.send(
-            f"{ctx.author.mention} 💉 **Used {selected['name']}!**\n"
+            f"{ctx.author.mention} {'🎃' if item in ('halloween_candy', 'trick_or_treat_bag') else '💉'} **{action}**\n"
             f"Restored **+{healed_by} HP**! Current Health: ❤️ **{new_hp}/{max_hp} HP** "
             f"*(Items Remaining: {new_count})*"
         )
@@ -573,6 +622,7 @@ class Exploration(commands.Cog):
                 )
 
             effects = json.loads(effects_raw)
+            pet_effects = await get_active_pet_effects(db, user_id)
             upgrade_cog = self.bot.get_cog("Upgrades")
             mining_upgrade = await upgrade_cog.get_effects(user_id, "mining") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
             max_mining_charges = mining_upgrade["max_charges"]
@@ -601,8 +651,12 @@ class Exploration(commands.Cog):
 
             elapsed = current_time - last_mined
 
-            if elapsed < self.COOLDOWN_SECONDS:
-                remaining = int(self.COOLDOWN_SECONDS - elapsed)
+            effective_cooldown = self.COOLDOWN_SECONDS * (
+                1 - pet_effects["cooldown_reduction"]
+            )
+
+            if elapsed < effective_cooldown:
+                remaining = int(effective_cooldown - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
                 return await ctx.send(f"{ctx.author.mention} ⚠️ **Mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**.")
@@ -615,16 +669,26 @@ class Exploration(commands.Cog):
 
             # --- TIERED LOOT ROLL ---
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
-            new_charges = charges if effects.pop("fuel_stabilizer", False) else charges - 1
+            if effects.pop("fuel_stabilizer", False):
+                new_charges = charges
+            elif pet_effects["charge_save"] and random.random() < pet_effects["charge_save"]:
+                new_charges = charges
+            else:
+                new_charges = charges - 1
             
-            found_stardust = int(random.randint(35, 85) * mining_upgrade["stardust_mult"])
+            pet_effects = await get_active_pet_effects(db, user_id)
+            found_stardust = int(
+                random.randint(50, 150)
+                * mining_upgrade["stardust_mult"]
+                * (1 + pet_effects["stardust_bonus"])
+            )
 
             if effects.pop("prototype_drill_bit", False):
                 found_stardust = int(found_stardust * 1.5)
 
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
-                loot_bonus_note = "\n⚛️ **Quantum Battery:** Stardust tripled!"
+                loot_bonus_note = "\n\n⚛️ **Quantum Battery:** Stardust tripled!"
             else:
                 loot_bonus_note = ""
 
@@ -638,25 +702,125 @@ class Exploration(commands.Cog):
             # Mining can uncover multiple types of raw mineral in one run.
             # Each successful find yields 1–5 units; Astral Core remains a separate
             # legendary roll and is intentionally always awarded one at a time.
+            mining_material_findings = []
+            mining_overflow_findings = []
             for material_id, material_name, chance in MINING_MATERIALS:
                 if random.random() < chance:
                     amount_found = random.randint(1, 5)
+                    if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
+                        amount_found += 1
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "mineral", amount_found
                     )
                     overflow_amount = amount_found - added_material
                     if added_material:
-                        loot_description += (
-                            f"\n⛏️ **Mineral Recovered:** {material_name} ×{added_material} "
-                            f"({material_quantity}/{material_max})"
+                        mining_material_findings.append(
+                            f"{material_name} ×{added_material}"
                         )
                     if overflow_amount > 0:
                         overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
                         new_stardust += overflow_stardust
-                        loot_description += (
-                            f"\n📦 **Mineral Overflow:** {material_name} had **{overflow_amount}** extra "
-                            f"and was converted to **+{overflow_stardust} Stardust**."
+                        mining_overflow_findings.append(
+                            f"{material_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
                         )
+
+            if mining_material_findings:
+                loot_description += (
+                    "\n\n⛏️ **Minerals Recovered:** "
+                    + " • ".join(mining_material_findings)
+                )
+            if mining_overflow_findings:
+                loot_description += (
+                    "\n\n📦 **Mineral Overflow:** "
+                    + " • ".join(mining_overflow_findings)
+                )
+
+            # Halloween bonus resources are independent rolls during the active event.
+            halloween_junk = get_halloween_space_junk()
+            seasonal_findings = []
+            if halloween_junk and random.random() < HALLOWEEN_CANDY_CHANCE:
+                candy_found = 1
+                candy_doubled = False
+
+                # Samhain's Trick-or-Treating passive can double the base candy haul.
+                if (
+                    pet_effects["candy_bonus"]
+                    and random.random() < pet_effects["candy_bonus"]
+                ):
+                    candy_found *= 2
+                    candy_doubled = True
+
+                if (
+                    pet_effects["halloween_bonus"]
+                    and random.random() < pet_effects["halloween_bonus"]
+                ):
+                    candy_found += 1
+
+                added_candy, candy_quantity, candy_max = await add_inventory_item(
+                    db, user_id, "halloween_candy", "consumable", candy_found
+                )
+                overflow_candy = candy_found - added_candy
+                if added_candy:
+                    candy_note = f"{EMOJIS.get('halloween_candy', '🍬')} Halloween Candy ×{added_candy}"
+                    if candy_doubled:
+                        candy_note += " (Samhain bonus!)"
+                    seasonal_findings.append(candy_note)
+                if overflow_candy > 0:
+                    candy_overflow_stardust = overflow_candy * 2
+                    new_stardust += candy_overflow_stardust
+                    seasonal_findings.append(
+                        f"📦 Candy Overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
+                    )
+
+            # Special pet candy is seasonal too, but is separate from ordinary Halloween Candy.
+            if halloween_junk and random.random() < HALLOWEEN_PET_CANDY_CHANCE:
+                pet_candy_found = random.randint(1, 2)
+
+                if (
+                    pet_effects["halloween_bonus"]
+                    and random.random() < pet_effects["halloween_bonus"]
+                ):
+                    pet_candy_found += 1
+                added_pet_candy, pet_candy_quantity, pet_candy_max = await add_inventory_item(
+                    db, user_id, "halloween_pet_candy", "pet_treat", pet_candy_found
+                )
+                if added_pet_candy:
+                    seasonal_findings.append(
+                        f"🍬 Halloween Pet Candy ×{added_pet_candy}"
+                    )
+                overflow_pet_candy = pet_candy_found - added_pet_candy
+                if overflow_pet_candy:
+                    # Halloween Pet Candy is a pet treat, so any overflow is
+                    # converted 1:1 into ordinary Pet Treats instead of being lost.
+                    added_normal_treat, _, normal_treat_max = await add_inventory_item(
+                        db, user_id, "pet_snack", "pet_treat", overflow_pet_candy
+                    )
+                    if added_normal_treat:
+                        seasonal_findings.append(
+                            f"📦 Halloween Pet Candy Overflow ×{overflow_pet_candy} "
+                            f"→ 🍪 Pet Treat ×{added_normal_treat}"
+                        )
+                    remaining_overflow = overflow_pet_candy - added_normal_treat
+                    if remaining_overflow:
+                        seasonal_findings.append(
+                            f"📦 Pet Treat Inventory Full: {remaining_overflow} overflow "
+                            f"could not be stored (cap {normal_treat_max})"
+                        )
+
+            if halloween_junk and random.random() < HALLOWEEN_PLASTIC_CHANCE:
+                plastic_found = random.randint(HALLOWEEN_PLASTIC_MIN, HALLOWEEN_PLASTIC_MAX)
+                added_plastic, plastic_quantity, plastic_max = await add_inventory_item(
+                    db, user_id, "halloween_plastic", "crafting_material", plastic_found
+                )
+                if added_plastic:
+                    seasonal_findings.append(f"🧴 Halloween Plastic ×{added_plastic}")
+                overflow_plastic = plastic_found - added_plastic
+                if overflow_plastic:
+                    new_stardust += overflow_plastic * 2
+                    seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
+
+            if seasonal_findings:
+                loot_description += "\n\n🎃 **Halloween Finds:** " + " • ".join(seasonal_findings)
 
             rarity_badge = "common"
 
@@ -667,7 +831,7 @@ class Exploration(commands.Cog):
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
                 found_xp = random.randint(75, 200)
-                loot_description += f"\n📊 **XP Data Shard:** `+{found_xp} XP`"
+                loot_description += f"\n\n📊 **XP Data Shard:** `+{found_xp} XP`"
                 rarity_badge = "uncommon"
 
                 # Award XP globally through leveling.py
@@ -675,7 +839,7 @@ class Exploration(commands.Cog):
                 if leveling_cog:
                     leveled_up, new_level = await leveling_cog.add_xp(ctx.author, found_xp)
                     if leveled_up:
-                        loot_description += f"\n🎉 **Level Up!** Reached **Level {new_level}**!"
+                        loot_description += f"\n\n🎉 **Level Up!** Reached **Level {new_level}**!"
 
             elif roll < 0.75 + mining_upgrade["rare_bonus"]:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
@@ -689,7 +853,7 @@ class Exploration(commands.Cog):
 
                 if added_amount == 1:
                     loot_description += (
-                        f"\n⛏️ **Rare Ore Extracted:** Refined a "
+                        f"\n\n⛏️ **Rare Ore Extracted:** Refined a "
                         f"`Titanium Ore Chunk`! ({new_quantity}/{max_quantity})"
                     )
                 else:
@@ -697,36 +861,42 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n📦 **Inventory Full:** Your Titanium Ore Chunk stack "
+                        f"\n\n📦 **Inventory Full:** Your Titanium Ore Chunk stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                     )
 
                 rarity_badge = "rare"
 
-            elif roll < 0.88:
+            elif roll < 0.90 + mining_upgrade["rare_bonus"]:
                 # Tier 4: Rare/Epic (Arcade Token for future minigames)
-                added_amount, new_quantity, max_quantity = await add_inventory_item(
-                    db,
-                    user_id,
-                    "arcade_token",
-                    "currency",
-                    1
-                )
+                async with db.execute(
+                    "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    token_row = await cursor.fetchone()
 
-                if added_amount == 1:
+                token_balance = (token_row[0] or 0) if token_row else 0
+                token_max = 1000
+
+                if token_balance < token_max:
+                    new_token_balance = token_balance + 1
+                    await db.execute(
+                        "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
+                        (new_token_balance, user_id)
+                    )
                     loot_description += (
-                        f"\n🪙 **Holodeck Find:** Discovered a shiny "
-                        f"**Arcade Token**! ({new_quantity}/{max_quantity})"
+                        f"\n\n🪙 **Holodeck Find:** Discovered a shiny "
+                        f"**Arcade Token**! ({new_token_balance}/{token_max})"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n📦 **Inventory Full:** Your Arcade Token stack "
-                        f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n📦 **Inventory Full:** Your Arcade Token balance "
+                        f"is already at **{token_max}/{token_max}**!"
+                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                     )
 
                 rarity_badge = "rare"
@@ -756,7 +926,7 @@ class Exploration(commands.Cog):
                     )
 
                     loot_description += (
-                        f"\n💎 **Rare Discovery:** Acquired a stable "
+                        f"\n\n💎 **Rare Discovery:** Acquired a stable "
                         f"**Dilated Time Crystal**! "
                         f"({current_crystals + 1}/{max_quantity})"
                     )
@@ -765,9 +935,9 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n📦 **Inventory Full:** Your Dilated Time Crystal "
+                        f"\n\n📦 **Inventory Full:** Your Dilated Time Crystal "
                         f"stack is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                     )
 
                 rarity_badge = "epic"
@@ -793,13 +963,15 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n📦 **Inventory Full:** Your Astral Core stack "
+                        f"\n\n📦 **Inventory Full:** Your Astral Core stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                         "\n*The mysterious core was too much for your inventory to contain.*"
                     )
 
                 rarity_badge = "legendary"
+
+            await add_pet_xp(db, user_id, PET_XP_PER_EXPLORATION)
 
             await db.execute("""
                 UPDATE users 
@@ -825,7 +997,10 @@ class Exploration(commands.Cog):
             ),
             color=colors.get(rarity_badge, discord.Color.blue())
         )
-        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: 30m")
+        cooldown_total_seconds = max(0, int(round(effective_cooldown)))
+        cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
+        cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
+        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: {cooldown_text}")
         embed.add_field(
             name="🛠️ Mining Laser Upgrade",
             value=(f"Tier **{mining_upgrade['level']}/5** • Max Charges: **{max_mining_charges}**\n"
@@ -890,9 +1065,13 @@ class Exploration(commands.Cog):
                 knocked_out_until = row[5] or ""
                 effects_raw = row[6] or "{}"
             effects = json.loads(effects_raw)
+            pet_effects = await get_active_pet_effects(db, user_id)
             upgrade_cog = self.bot.get_cog("Upgrades")
             scavenging_upgrade = await upgrade_cog.get_effects(user_id, "scavenging") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
+            salvage_upgrade = await upgrade_cog.get_effects(user_id, "salvage") if upgrade_cog else {"level": 0, "bonus_chance": 0.0}
             max_scavenge_charges = scavenging_upgrade["max_charges"]
+            scavenging_rare_bonus = scavenging_upgrade.get("rare_bonus", 0.0)
+            salvage_bonus_chance = max(0.0, salvage_upgrade.get("bonus_chance", 0.0))
 
             # Daily charge reset: charges refresh to 10 once per calendar day.
             current_date = self.game_date()
@@ -915,12 +1094,16 @@ class Exploration(commands.Cog):
 
             elapsed = current_time - last_scavenged
 
+            effective_cooldown = self.COOLDOWN_SECONDS * (
+                1 - pet_effects["cooldown_reduction"]
+            )
+
             # Health Knockout Check
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
 
-            if elapsed < self.COOLDOWN_SECONDS:
-                remaining = int(self.COOLDOWN_SECONDS - elapsed)
+            if elapsed < effective_cooldown:
+                remaining = int(effective_cooldown - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
                 return await ctx.send(f"{ctx.author.mention} ⚠️ **Scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
@@ -973,37 +1156,87 @@ class Exploration(commands.Cog):
 
             if loot_roll >= (0.96 if lucky_scanner_active else 0.98):
                 item_id = "quantum_battery"
-                item_name = "⚛️ Quantum Battery (legendary)"
+                item_name = f"{EMOJIS.get('quantum_battery', '⚛️')} Quantum Battery (legendary)"
                 item_type = "consumable"
                 loot_rarity_note = (
                     "\n🌟 **Legendary Find:** Recovered a "
                     "**Quantum Battery**!"
                 )
 
-            elif loot_roll < (0.10 if lucky_scanner_active else 0.02):
+            elif loot_roll < (0.10 if lucky_scanner_active else 0.02) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "revive_kit"
-                item_name = "💉 Emergency Revival Kit (rare)"
+                item_name = f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit (rare)"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
-            elif loot_roll < (0.20 if lucky_scanner_active else 0.05):
+            elif loot_roll < (0.20 if lucky_scanner_active else 0.05) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "laser_charge_cell"
-                item_name = "🔋 Laser Charge Cell (rare)"
+                item_name = f"{EMOJIS.get('laser_charge_cell', '🔋')} Laser Charge Cell (rare)"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
-            elif loot_roll < (0.32 if lucky_scanner_active else 0.08):
+            elif loot_roll < (0.32 if lucky_scanner_active else 0.08) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "drone_battery"
-                item_name = "🔋 Drone Battery Pack (rare)"
+                item_name = f"{EMOJIS.get('drone_battery', '🔋')} Drone Battery Pack (rare)"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
             else:
-                item_id, item_name = random.choice(list(junk_items.items()))
+                # During Halloween, the normal Space Junk slot is fully replaced
+                # by the seasonal Halloween Space Junk pool. Outside the event,
+                # scavenging uses the normal Space Junk pool as usual.
+                halloween_junk = get_halloween_space_junk()
+                if halloween_junk:
+                    item_id, item_name, item_emoji, item_desc, _stardust_value, _candy_value = random.choice(halloween_junk)
+                    item_name = f"{item_emoji} {item_name}"
+                else:
+                    item_id, item_name = random.choice(list(junk_items.items()))
                 item_type = "space_junk"
                 loot_rarity_note = ""
-            new_charges = charges - 1
-            found_stardust = int(random.randint(15, 35) * scavenging_upgrade["stardust_mult"])
+
+            # Arcade Tokens are an independent bonus roll during scavenging.
+            # This keeps the normal scavenging loot table intact instead of
+            # replacing another find when a token appears.
+            scavenging_token_found = False
+            token_overflow_stardust = 0
+            if random.random() < 0.25:
+                async with db.execute(
+                    "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    token_row = await cursor.fetchone()
+
+                token_balance = (token_row[0] or 0) if token_row else 0
+                token_max = 1000
+                scavenging_token_found = True
+                if token_balance < token_max:
+                    token_quantity = token_balance + 1
+                    await db.execute(
+                        "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
+                        (token_quantity, user_id)
+                    )
+                    loot_rarity_note += (
+                        f"\n🪙 **Bonus Find:** Discovered an **Arcade Token**! "
+                        f"({token_quantity}/{token_max})"
+                    )
+                else:
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
+                    token_overflow_stardust = overflow_stardust
+                    loot_rarity_note += (
+                        f"\n📦 **Arcade Token Overflow:** Your token balance is already "
+                        f"at **{token_max}/{token_max}**!"
+                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                    )
+
+            if pet_effects["charge_save"] and random.random() < pet_effects["charge_save"]:
+                new_charges = charges
+            else:
+                new_charges = charges - 1
+            found_stardust = int(
+                random.randint(45, 120)
+                * scavenging_upgrade["stardust_mult"]
+                * (1 + pet_effects["stardust_bonus"])
+            )
 
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
@@ -1011,7 +1244,7 @@ class Exploration(commands.Cog):
             else:
                 quantum_bonus_note = ""
 
-            new_stardust = stardust + found_stardust
+            new_stardust = stardust + found_stardust + token_overflow_stardust
 
             # 30% Environmental Hazard Chance during Scavenging.
             damage_taken = 0
@@ -1023,18 +1256,33 @@ class Exploration(commands.Cog):
                     weights=[entry[3] for entry in self.SCAVENGE_HAZARDS],
                     k=1,
                 )[0]
-                damage_taken = random.randint(min_damage, max_damage)
-                hazard_note = f"\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
+                defended, defense_weapon_id, _atomic_breath_chance, _defense_chance = await roll_hazard_defense(db, user_id)
+                if defended:
+                    if defense_weapon_id:
+                        from defense import DEFENSE_MESSAGES
+                        defense_text = DEFENSE_MESSAGES.get(defense_weapon_id, "Your defensive weapon stopped the hazard!")
+                    else:
+                        defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
+                    hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
+                elif halloween_is_active() and HALLOWEEN_DAMAGE_MESSAGES:
+                    halloween_message, halloween_min_damage, halloween_max_damage = random.choice(HALLOWEEN_DAMAGE_MESSAGES)
+                    hazard = halloween_message
+                    damage_taken = max(1, int(random.randint(halloween_min_damage, halloween_max_damage) * (1 - pet_effects["hazard_reduction"])))
+                    hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
+                else:
+                    damage_taken = max(1, int(random.randint(min_damage, max_damage) * (1 - pet_effects["hazard_reduction"])))
+                    hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
 
             new_hp = max(0, hp - damage_taken)
             if new_hp <= 0 and effects.pop("cosmic_insurance", False):
                 new_hp = 1
-                hazard_note += "\n📋 **Cosmic Insurance:** Your coverage kept you at **1 HP**."
+                hazard_note += "\n\n📋 **Cosmic Insurance:** Your coverage kept you at **1 HP**."
 
             knocked_out_until = ""
             if new_hp <= 0:
                 knocked_out_until = (self.game_date() + timedelta(days=1)).isoformat()
-                hazard_note += f"\n💀 **Knockout Report:** {random.choice(self.KNOCKOUT_LINES)}"
+                knockout_lines = HALLOWEEN_KNOCKOUT_LINES if halloween_is_active() and HALLOWEEN_KNOCKOUT_LINES else self.KNOCKOUT_LINES
+                hazard_note += f"\n\n💀 **Knockout Report:** {random.choice(knockout_lines)}"
 
             added_amount, new_quantity, max_quantity = await add_inventory_item(
                 db,
@@ -1043,70 +1291,178 @@ class Exploration(commands.Cog):
                 item_type,
                 1
             )
-            bonus_findings = []
+            salvage_material_findings = []
+            medical_supply_findings = []
+            bonus_mineral_findings = []
+            seasonal_findings = []
+            pet_findings = []
+            bonus_overflow_findings = []
+
+            # During an active seasonal event, Space Junk can be found as an
+            # independent bonus alongside the normal scavenging loot.
+            halloween_junk = get_halloween_space_junk()
+            if halloween_junk and random.random() < HALLOWEEN_BONUS_ROLL_CHANCE:
+                seasonal_item_id, seasonal_name, seasonal_emoji, _seasonal_desc, _seasonal_stardust, _seasonal_candy = random.choice(halloween_junk)
+                added_seasonal, seasonal_quantity, seasonal_max = await add_inventory_item(
+                    db, user_id, seasonal_item_id, "space_junk", 1
+                )
+                if added_seasonal:
+                    seasonal_findings.append(
+                        f"{seasonal_emoji} {seasonal_name} ×{added_seasonal}"
+                    )
+                    await record_collectible(db, self.bot, user_id, seasonal_item_id, "Halloween")
+                else:
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get(seasonal_item_id, 10)
+                    new_stardust += overflow_stardust
+                    seasonal_findings.append(
+                        f"{seasonal_emoji} {seasonal_name} → +{overflow_stardust} Stardust (inventory full)"
+                    )
+
+            # Pet eggs are independent bonus rolls and never replace normal loot.
+            # Halloween eggs stop dropping automatically when the event ends.
+            egg_id = None
+            if halloween_junk and random.random() < HALLOWEEN_PET_EGG_CHANCE:
+                egg_id = "halloween_egg"
+            elif random.random() < NORMAL_EGG_CHANCE:
+                egg_id = "normal_egg"
+
+            if egg_id:
+                egg_info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
+                added_egg, egg_quantity, egg_max = await add_inventory_item(
+                    db, user_id, egg_id, "pet_egg", 1
+                )
+                if added_egg:
+                    pet_findings.append(
+                        f"{egg_info['emoji']} {egg_info['name']} ×{added_egg} — use `/incubator start {egg_id}`"
+                    )
+                else:
+                    pet_findings.append(
+                        f"{egg_info['emoji']} {egg_info['name']} → Inventory Full"
+                    )
+
+            # Halloween resources are independent bonus rolls and never replace normal loot.
+            candy_doubled = False
+            if halloween_junk and random.random() < HALLOWEEN_CANDY_CHANCE:
+                candy_found = 1
+
+                # Sam's Trick-or-Treating passive can double the base candy haul.
+                if pet_effects["candy_bonus"] and random.random() < pet_effects["candy_bonus"]:
+                    candy_found *= 2
+                    candy_doubled = True
+
+
+                if (
+                    pet_effects["halloween_bonus"]
+                    and random.random() < pet_effects["halloween_bonus"]
+                ):
+                    candy_found += 1
+
+                added_candy, candy_quantity, candy_max = await add_inventory_item(
+                    db, user_id, "halloween_candy", "consumable", candy_found
+                )
+                overflow_candy = candy_found - added_candy
+                if added_candy:
+                    candy_note = f"{EMOJIS.get('halloween_candy', '🍬')} Halloween Candy ×{added_candy}"
+                    if candy_doubled:
+                        candy_note += " (Samhain bonus!)"
+                    seasonal_findings.append(candy_note)
+                if overflow_candy > 0:
+                    candy_overflow_stardust = overflow_candy * 2
+                    new_stardust += candy_overflow_stardust
+                    seasonal_findings.append(
+                        f"📦 Candy Overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
+                    )
+
+            if halloween_junk and random.random() < HALLOWEEN_PLASTIC_CHANCE:
+                plastic_found = random.randint(HALLOWEEN_PLASTIC_MIN, HALLOWEEN_PLASTIC_MAX)
+                added_plastic, plastic_quantity, plastic_max = await add_inventory_item(
+                    db, user_id, "halloween_plastic", "crafting_material", plastic_found
+                )
+                if added_plastic:
+                    seasonal_findings.append(f"🧴 Halloween Plastic ×{added_plastic}")
+                overflow_plastic = plastic_found - added_plastic
+                if overflow_plastic:
+                    new_stardust += overflow_plastic * 2
+                    seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
+
+            # A Trick-or-Treat Bag is an especially rare direct seasonal find.
+            if halloween_junk and random.random() < HALLOWEEN_BAG_CHANCE:
+                added_bag, bag_quantity, bag_max = await add_inventory_item(
+                    db, user_id, "trick_or_treat_bag", "consumable", 1
+                )
+                if added_bag:
+                    seasonal_findings.append(f"🎃 Trick-or-Treat Bag ×{added_bag}")
+                else:
+                    seasonal_findings.append("🎃 Trick-or-Treat Bag → Inventory Full")
 
             # Scavenging can recover multiple types of crafting material in one run.
             # Each successful material find yields 1–5 units.
+            #
+            # Salvage Rig bonus is a relative chance multiplier:
+            # +10% turns a 20% base chance into 22%, while +65% turns it
+            # into 33%. This keeps higher tiers meaningful without making
+            # common materials nearly guaranteed.
             for material_id, material_name, chance in SCAVENGE_MATERIALS:
-                if random.random() < chance:
+                effective_material_chance = min(1.0, chance * (1 + salvage_bonus_chance))
+                if random.random() < effective_material_chance:
                     amount_found = random.randint(1, 5)
+                    if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
+                        amount_found += 1
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "crafting_material", amount_found
                     )
                     overflow_amount = amount_found - added_material
                     if added_material:
-                        bonus_findings.append(
-                            f"🧰 **Salvage Material:** {material_name} ×{added_material} "
-                            f"({material_quantity}/{material_max})"
+                        salvage_material_findings.append(
+                            f"{material_name} ×{added_material}"
                         )
                     if overflow_amount > 0:
                         overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
                         new_stardust += overflow_stardust
-                        bonus_findings.append(
-                            f"📦 **Material Overflow:** {material_name} had **{overflow_amount}** extra "
-                            f"and was converted to **+{overflow_stardust} Stardust**."
+                        bonus_overflow_findings.append(
+                            f"{material_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
                         )
 
             # Scavengers can also recover individual medical supplies for makeshift kits.
             for supply_id, supply_name, chance in SCAVENGE_MEDICAL_SUPPLIES:
-                if random.random() < chance:
+                effective_supply_chance = min(1.0, chance * (1 + salvage_bonus_chance))
+                if random.random() < effective_supply_chance:
                     added_supply, supply_quantity, supply_max = await add_inventory_item(
                         db, user_id, supply_id, "medical_supply", 1
                     )
                     if added_supply:
-                        bonus_findings.append(
-                            f"🩹 **Medical Supply:** {supply_name} ×{added_supply} "
-                            f"({supply_quantity}/{supply_max})"
+                        medical_supply_findings.append(
+                            f"{supply_name} ×{added_supply}"
                         )
                     else:
                         overflow_stardust = LOOT_OVERFLOW_VALUES.get(supply_id, 5)
                         new_stardust += overflow_stardust
-                        bonus_findings.append(
-                            f"📦 **Medical Supply Overflow:** {supply_name} was already at "
-                            f"**{supply_max}/{supply_max}** and was converted to **+{overflow_stardust} Stardust**."
+                        bonus_overflow_findings.append(
+                            f"{supply_name} → +{overflow_stardust} Stardust"
                         )
 
             # Very rarely, a scavenger can uncover multiple minerals as bonus finds.
             # These are independent rolls, so more than one type can appear.
             if random.random() < 0.08:
                 for mineral_id, mineral_name, chance in SCAVENGE_BONUS_MINERALS:
-                    if random.random() < chance:
+                    effective_mineral_chance = min(1.0, chance * (1 + salvage_bonus_chance))
+                    if random.random() < effective_mineral_chance:
                         amount_found = random.randint(1, 5)
+                        if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
+                            amount_found += 1
                         added_mineral, mineral_quantity, mineral_max = await add_inventory_item(
                             db, user_id, mineral_id, "mineral", amount_found
                         )
                         overflow_amount = amount_found - added_mineral
                         if added_mineral:
-                            bonus_findings.append(
-                                f"⛏️ **Bonus Mineral:** {mineral_name} ×{added_mineral} "
-                                f"({mineral_quantity}/{mineral_max})"
+                            bonus_mineral_findings.append(
+                                f"{mineral_name} ×{added_mineral}"
                             )
                         if overflow_amount > 0:
                             overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(mineral_id, 0)
                             new_stardust += overflow_stardust
-                            bonus_findings.append(
-                                f"📦 **Mineral Overflow:** {mineral_name} had **{overflow_amount}** extra "
-                                f"and was converted to **+{overflow_stardust} Stardust**."
+                            bonus_overflow_findings.append(
+                                f"{mineral_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
                             )
 
             if added_amount == 1:
@@ -1130,10 +1486,37 @@ class Exploration(commands.Cog):
                     f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
                 )
 
-            # Include any bonus material/mineral discoveries in the public result embed.
-            bonus_material_text = ""
-            if bonus_findings:
-                bonus_material_text = "\n" + "\n".join(bonus_findings)
+            # Group bonus discoveries into readable single-line sections rather than
+            # repeating "Salvage Material:" / "Medical Supply:" for every item.
+            bonus_sections = []
+            if salvage_material_findings:
+                bonus_sections.append(
+                    "🧰 **Salvage Materials:** " + " • ".join(salvage_material_findings)
+                )
+            if medical_supply_findings:
+                bonus_sections.append(
+                    "🩹 **Medical Supplies:** " + " • ".join(medical_supply_findings)
+                )
+            if bonus_mineral_findings:
+                bonus_sections.append(
+                    "⛏️ **Bonus Minerals:** " + " • ".join(bonus_mineral_findings)
+                )
+            if seasonal_findings:
+                bonus_sections.append(
+                    "🎃 **Halloween Find:** " + " • ".join(seasonal_findings)
+                )
+            if pet_findings:
+                bonus_sections.append(
+                    "🐾 **Pet Find:** " + " • ".join(pet_findings)
+                )
+            if bonus_overflow_findings:
+                bonus_sections.append(
+                    "📦 **Overflow:** " + " • ".join(bonus_overflow_findings)
+                )
+
+            bonus_material_text = "\n\n" + "\n\n".join(bonus_sections) if bonus_sections else ""
+
+            await add_pet_xp(db, user_id, PET_XP_PER_EXPLORATION)
 
             await db.execute("""
                 UPDATE users 
@@ -1150,7 +1533,7 @@ class Exploration(commands.Cog):
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
                 f"✨ **Found Stardust:** `{found_stardust}`"
-                f"{quantum_bonus_note}\n"
+                f"{quantum_bonus_note}\n\n"
                 f"🛸 **Salvaged Item:** `{loot_name_with_quantity}`"
                 f"{loot_rarity_note}"
                 f"{bonus_material_text}"
@@ -1159,11 +1542,23 @@ class Exploration(commands.Cog):
             ),
             color=discord.Color.dark_gold()
         )
-        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: 30m")
+        cooldown_total_seconds = max(0, int(round(effective_cooldown)))
+        cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
+        cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
+        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
         embed.add_field(
             name="🛠️ Scavenging Drone Upgrade",
             value=(f"Tier **{scavenging_upgrade['level']}/5** • Max Charges: **{max_scavenge_charges}**\n"
                    f"Stardust Bonus: **+{(scavenging_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{scavenging_upgrade['rare_bonus'] * 100:.1f}%**"),
+            inline=False
+        )
+        embed.add_field(
+            name="♻️ Salvage Rig Upgrade",
+            value=(
+                f"Tier **{salvage_upgrade['level']}/5** • Relative loot chance: **+{salvage_bonus_chance * 100:.0f}%**\n"
+                "Applies to salvage materials, medical supplies, and bonus minerals.\n"
+                "*The 8% bonus-mineral discovery gate is unchanged.*"
+            ),
             inline=False
         )
 
@@ -1251,7 +1646,7 @@ class Exploration(commands.Cog):
 
                 revive_button = discord.ui.Button(
                     label="Revival Kit",
-                    emoji="⚕️",
+                    emoji=EMOJIS.get("revive", "⚕️"),
                     style=discord.ButtonStyle.secondary,
                     disabled=available.get("revive", 0) <= 0
                 )
@@ -1260,7 +1655,7 @@ class Exploration(commands.Cog):
 
                 kit_button = discord.ui.Button(
                     label="Emergency Revival Kit",
-                    emoji="💉",
+                    emoji=EMOJIS.get("revive_kit", "💉"),
                     style=discord.ButtonStyle.primary,
                     disabled=available.get("revive_kit", 0) <= 0
                 )
@@ -1269,7 +1664,7 @@ class Exploration(commands.Cog):
 
                 full_button = discord.ui.Button(
                     label="Emergency Full Revival",
-                    emoji="🚑",
+                    emoji=EMOJIS.get("full_revive", "🚑"),
                     style=discord.ButtonStyle.success,
                     disabled=available.get("full_revive", 0) <= 0
                 )
@@ -1339,11 +1734,11 @@ class Exploration(commands.Cog):
                         item_row = await cursor.fetchone()
 
                     if not item_row or (item_row[0] or 0) <= 0:
-                        item_name = (
-                            "Emergency Revival Kit"
-                            if item_id == "revive_kit"
-                            else "Emergency Full Revival"
-                        )
+                        item_name = {
+                            "revive": "Revival Kit",
+                            "revive_kit": "Emergency Revival Kit",
+                            "full_revive": "Emergency Full Revival",
+                        }.get(item_id, item_id)
 
                         return await interaction.followup.send(
                             f"❌ You don't have an **{item_name}**!",
@@ -1391,11 +1786,11 @@ class Exploration(commands.Cog):
 
                     await db.commit()
 
-                item_name = (
-                    "Emergency Revival Kit"
-                    if item_id == "revive_kit"
-                    else "Emergency Full Revival"
-                )
+                item_name = {
+                    "revive": "Revival Kit",
+                    "revive_kit": "Emergency Revival Kit",
+                    "full_revive": "Emergency Full Revival",
+                }.get(item_id, item_id)
 
                 if heal_percent >= 1.0:
                     message = (
@@ -1436,7 +1831,7 @@ class Exploration(commands.Cog):
         full_count = available.get("full_revive", 0)
 
         embed.add_field(
-            name="⚕️ Revival Kit",
+            name=f"{EMOJIS.get('revive', '⚕️')} Revival Kit",
             value=(
                 "Restores **35% HP**\n"
                 f"Owned: **{revive_count}**"
@@ -1445,7 +1840,7 @@ class Exploration(commands.Cog):
         )
 
         embed.add_field(
-            name="💉 Emergency Revival Kit",
+            name=f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit",
             value=(
                 "Restores **50% HP**\n"
                 f"Owned: **{kit_count}**"
@@ -1454,7 +1849,7 @@ class Exploration(commands.Cog):
         )
 
         embed.add_field(
-            name="🚑 Emergency Full Revival",
+            name=f"{EMOJIS.get('full_revive', '🚑')} Emergency Full Revival",
             value=(
                 "Restores **100% HP**\n"
                 f"Owned: **{full_count}**"

@@ -1,3 +1,6 @@
+import asyncio
+from collections import defaultdict
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -55,6 +58,13 @@ LEVEL_UNLOCK_ROLES = [
     1296961266627121223  # Level 100
 ]
 
+# Serialize role changes per user so rapid interactions cannot race each other.
+_ROLE_LOCKS = defaultdict(asyncio.Lock)
+
+
+def _get_role_lock(user_id: int):
+    return _ROLE_LOCKS[user_id]
+
 class ColorSelect(discord.ui.Select):
     def __init__(self, placeholder, options, custom_id):
         # custom_id is CRITICAL for persistent views
@@ -62,38 +72,85 @@ class ColorSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        
-        # 1. Check which color roles the user currently has
-        member_roles = [
-            role for role in interaction.user.roles
-            if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
-        ]
-        
-        # 2. Handle Removal
-        if self.values[0] == "remove":
-            if member_roles:
-                await interaction.user.remove_roles(*member_roles)
-                return await interaction.followup.send("All cosmic colors have been stripped.", ephemeral=True)
-            return await interaction.followup.send("You don't have a color role to remove!", ephemeral=True)
 
-        # 3. Handle Assignment
-        selected_role_id = int(self.values[0])
-        new_role = interaction.guild.get_role(selected_role_id)
+        async with _get_role_lock(interaction.user.id):
+            member_roles = [
+                role for role in interaction.user.roles
+                if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+            ]
 
-        if new_role:
-            # Check hierarchy safety
-            if interaction.guild.me.top_role <= new_role:
-                return await interaction.followup.send("I can't assign this role! Move my 'Enceladus' role higher in settings.", ephemeral=True)
-            
-            await interaction.user.remove_roles(*member_roles)
-            await interaction.user.add_roles(new_role)
-            await interaction.followup.send(f"Your color is now **{new_role.name}**!", ephemeral=True)
+            if self.values[0] == "remove":
+                if not member_roles:
+                    return await interaction.followup.send(
+                        "You don't have a color role to remove!",
+                        ephemeral=True
+                    )
+
+                try:
+                    await interaction.user.remove_roles(*member_roles)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    print(f"[ROLE ERROR] Failed to remove color roles from {interaction.user}: {e}")
+                    return await interaction.followup.send(
+                        "❌ I couldn't remove your color role(s). Please try again.",
+                        ephemeral=True
+                    )
+
+                return await interaction.followup.send(
+                    "All cosmic colors have been stripped.",
+                    ephemeral=True
+                )
+
+            selected_role_id = int(self.values[0])
+            new_role = interaction.guild.get_role(selected_role_id)
+
+            if new_role is None:
+                return await interaction.followup.send(
+                    "❌ That color role no longer exists. Please let the server staff know.",
+                    ephemeral=True
+                )
+
+            if interaction.guild.me is None or interaction.guild.me.top_role <= new_role:
+                return await interaction.followup.send(
+                    "I can't assign this role! Move my 'Enceladus' role higher in settings.",
+                    ephemeral=True
+                )
+
+            try:
+                # Add first so a failed add never strips the user's current color.
+                await interaction.user.add_roles(new_role)
+                old_roles = [role for role in member_roles if role.id != new_role.id]
+
+                if old_roles:
+                    try:
+                        await interaction.user.remove_roles(*old_roles)
+                    except (discord.Forbidden, discord.HTTPException) as remove_error:
+                        try:
+                            await interaction.user.remove_roles(new_role)
+                        except (discord.Forbidden, discord.HTTPException) as rollback_error:
+                            print(f"[ROLE ERROR] Failed to roll back new color role for {interaction.user}: {rollback_error}")
+                        print(f"[ROLE ERROR] Failed to remove old color roles from {interaction.user}: {remove_error}")
+                        return await interaction.followup.send(
+                            "❌ I couldn't finish changing your color. "
+                            "Your previous color should remain active; please try again.",
+                            ephemeral=True
+                        )
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[ROLE ERROR] Failed to assign color role to {interaction.user}: {e}")
+                return await interaction.followup.send(
+                    "❌ I couldn't assign that color role. Please try again.",
+                    ephemeral=True
+                )
+
+            await interaction.followup.send(
+                f"Your color is now **{new_role.name}**!",
+                ephemeral=True
+            )
+
 
 class PersistentColorView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) 
+        super().__init__(timeout=None)
 
-        # --- PAGE 1 ---
         p1_options = [
             discord.SelectOption(label="Bright Red", value="941482022445125712"),
             discord.SelectOption(label="Dark Red", value="941483503277719632"),
@@ -123,7 +180,6 @@ class PersistentColorView(discord.ui.View):
         ]
         self.add_item(ColorSelect("Cosmic Palette: Page 1", p1_options, custom_id="color_select_p1"))
 
-        # --- PAGE 2 ---
         p2_options = [
             discord.SelectOption(label="Royal Blue", value="941486762407116821"),
             discord.SelectOption(label="Navy Blue", value="941486878425768046"),
@@ -138,6 +194,7 @@ class PersistentColorView(discord.ui.View):
             discord.SelectOption(label="❌ Remove Color", value="remove", description="Reset to default")
         ]
         self.add_item(ColorSelect("Cosmic Palette: Page 2", p2_options, custom_id="color_select_p2"))
+
 
 class GradientColorSelect(discord.ui.Select):
     def __init__(self):
@@ -164,7 +221,6 @@ class GradientColorSelect(discord.ui.Select):
             discord.SelectOption(label="Voidwalker", value="1512320224530141184", emoji="🕳️"),
             discord.SelectOption(label="❌ Remove Color", value="remove", description="Reset to default"),
         ]
-
         super().__init__(
             placeholder="Level 10+ Gradient Colors",
             min_values=1,
@@ -176,41 +232,81 @@ class GradientColorSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        member_roles = [
-            role for role in interaction.user.roles
-            if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
-        ]
+        async with _get_role_lock(interaction.user.id):
+            member_roles = [
+                role for role in interaction.user.roles
+                if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+            ]
 
-        if self.values[0] == "remove":
-            if member_roles:
-                await interaction.user.remove_roles(*member_roles)
-                return await interaction.followup.send("All cosmic colors have been stripped.", ephemeral=True)
+            if self.values[0] == "remove":
+                if not member_roles:
+                    return await interaction.followup.send(
+                        "You don't have a color role to remove!",
+                        ephemeral=True
+                    )
+                try:
+                    await interaction.user.remove_roles(*member_roles)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    print(f"[ROLE ERROR] Failed to remove gradient/color roles from {interaction.user}: {e}")
+                    return await interaction.followup.send(
+                        "❌ I couldn't remove your color role(s). Please try again.",
+                        ephemeral=True
+                    )
+                return await interaction.followup.send(
+                    "All cosmic colors have been stripped.",
+                    ephemeral=True
+                )
 
-            return await interaction.followup.send("You don't have a color role to remove!", ephemeral=True)
+            if not any(role.id in LEVEL_UNLOCK_ROLES for role in interaction.user.roles):
+                return await interaction.followup.send(
+                    "🌈 You must be **Level 10 or higher** to use gradient color roles!",
+                    ephemeral=True
+                )
 
-        if not any(role.id in LEVEL_UNLOCK_ROLES for role in interaction.user.roles):
-            return await interaction.followup.send(
-                "🌈 You must be **Level 10 or higher** to use gradient color roles!",
-                ephemeral=True
-            )
+            selected_role_id = int(self.values[0])
+            new_role = interaction.guild.get_role(selected_role_id)
 
-        selected_role_id = int(self.values[0])
-        new_role = interaction.guild.get_role(selected_role_id)
+            if new_role is None:
+                return await interaction.followup.send(
+                    "❌ That gradient color role no longer exists. Please let the server staff know.",
+                    ephemeral=True
+                )
 
-        if new_role:
-            if interaction.guild.me.top_role <= new_role:
+            if interaction.guild.me is None or interaction.guild.me.top_role <= new_role:
                 return await interaction.followup.send(
                     "I can't assign this role! Move my 'Enceladus' role higher in settings.",
                     ephemeral=True
                 )
 
-            await interaction.user.remove_roles(*member_roles)
-            await interaction.user.add_roles(new_role)
+            try:
+                await interaction.user.add_roles(new_role)
+                old_roles = [role for role in member_roles if role.id != new_role.id]
+                if old_roles:
+                    try:
+                        await interaction.user.remove_roles(*old_roles)
+                    except (discord.Forbidden, discord.HTTPException) as remove_error:
+                        try:
+                            await interaction.user.remove_roles(new_role)
+                        except (discord.Forbidden, discord.HTTPException) as rollback_error:
+                            print(f"[ROLE ERROR] Failed to roll back new gradient role for {interaction.user}: {rollback_error}")
+                        print(f"[ROLE ERROR] Failed to remove old color roles from {interaction.user}: {remove_error}")
+                        return await interaction.followup.send(
+                            "❌ I couldn't finish changing your gradient color. "
+                            "Your previous color should remain active; please try again.",
+                            ephemeral=True
+                        )
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[ROLE ERROR] Failed to assign gradient role to {interaction.user}: {e}")
+                return await interaction.followup.send(
+                    "❌ I couldn't assign that gradient color role. Please try again.",
+                    ephemeral=True
+                )
 
             await interaction.followup.send(
                 f"Your gradient color is now **{new_role.name}**!",
                 ephemeral=True
             )
+
 
 class GradientColorView(discord.ui.View):
     def __init__(self):
@@ -219,29 +315,41 @@ class GradientColorView(discord.ui.View):
 
 # --- SHARED TOGGLE LOGIC ---
 async def toggle_role(interaction: discord.Interaction, role_id: int):
-    role = interaction.guild.get_role(role_id)
-    if not role:
-        return await interaction.response.send_message("Role not found! Check the code IDs.", ephemeral=True)
-    
-    # NEW: Check hierarchy safety before trying to assign the role
-    if interaction.guild.me.top_role <= role:
-        return await interaction.response.send_message(
-            f"I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in settings.", 
-            ephemeral=True
-        )
-    
-    # Try/Except block to catch any other random API errors
-    try:
-        if role in interaction.user.roles:
-            await interaction.user.remove_roles(role)
-            await interaction.response.send_message(f"Removed **{role.name}** role.", ephemeral=True)
-        else:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message(f"Added **{role.name}** role!", ephemeral=True)
-    except Exception as e:
-        if not interaction.response.is_done():
-            await interaction.response.send_message("An error occurred while managing that role.", ephemeral=True)
-        print(f"Role Error: {e}")
+    async with _get_role_lock(interaction.user.id):
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            return await interaction.response.send_message(
+                "Role not found! Check the code IDs.",
+                ephemeral=True
+            )
+
+        if interaction.guild.me is None or interaction.guild.me.top_role <= role:
+            return await interaction.response.send_message(
+                f"I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in settings.",
+                ephemeral=True
+            )
+
+        try:
+            if role in interaction.user.roles:
+                await interaction.user.remove_roles(role)
+                await interaction.response.send_message(
+                    f"Removed **{role.name}** role.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.user.add_roles(role)
+                await interaction.response.send_message(
+                    f"Added **{role.name}** role!",
+                    ephemeral=True
+                )
+        except (discord.Forbidden, discord.HTTPException) as e:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ I couldn't manage that role. Please try again.",
+                    ephemeral=True
+                )
+            print(f"[ROLE ERROR] Failed to manage role {role_id} for {interaction.user}: {e}")
+
 
 # --- REUSABLE COMPONENTS ---
 class RoleButton(discord.ui.Button):
@@ -252,20 +360,36 @@ class RoleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await toggle_role(interaction, self.role_id)
 
+
 class RoleSelect(discord.ui.Select):
     def __init__(self, placeholder, options, custom_id):
         super().__init__(placeholder=placeholder, min_values=1, max_values=1, options=options, custom_id=custom_id)
 
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "remove":
-            # Specialized removal for the Color dropdowns
-            member_roles = [
-                r for r in interaction.user.roles
-                if r.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
-            ]
-            await interaction.user.remove_roles(*member_roles)
-            return await interaction.response.send_message("All cosmic colors cleared!", ephemeral=True)
-        
+            async with _get_role_lock(interaction.user.id):
+                member_roles = [
+                    role for role in interaction.user.roles
+                    if role.id in (ALL_COLOR_ROLES + GRADIENT_COLOR_ROLES)
+                ]
+                if not member_roles:
+                    return await interaction.response.send_message(
+                        "You don't have a color role to remove!",
+                        ephemeral=True
+                    )
+                try:
+                    await interaction.user.remove_roles(*member_roles)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    print(f"[ROLE ERROR] Failed to remove color roles from {interaction.user}: {e}")
+                    return await interaction.response.send_message(
+                        "❌ I couldn't remove your color role(s). Please try again.",
+                        ephemeral=True
+                    )
+                return await interaction.response.send_message(
+                    "All cosmic colors cleared!",
+                    ephemeral=True
+                )
+
         await toggle_role(interaction, int(self.values[0]))
 
 # --- THE VIEWS (One for each screenshot category) ---
@@ -433,12 +557,14 @@ class RoleCog(commands.Cog):
         MESSAGE_ID = 1503674763497705543
 
         channel = interaction.guild.get_channel(CHANNEL_ID)
-
         if channel is None:
-            return await interaction.response.send_message(
-            "Could not find the channel!",
-            ephemeral=True
-        )
+            try:
+                channel = await interaction.guild.fetch_channel(CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return await interaction.response.send_message(
+                    "Could not find or access the channel!",
+                    ephemeral=True
+                )
 
         try:
             message = await channel.fetch_message(MESSAGE_ID)
@@ -469,12 +595,14 @@ class RoleCog(commands.Cog):
         MESSAGE_ID = 1530787956405829873
 
         channel = interaction.guild.get_channel(CHANNEL_ID)
-
         if channel is None:
-            return await interaction.response.send_message(
-            "Could not find the channel!",
-            ephemeral=True
-        )
+            try:
+                channel = await interaction.guild.fetch_channel(CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return await interaction.response.send_message(
+                    "Could not find or access the channel!",
+                    ephemeral=True
+                )
 
         try:
             message = await channel.fetch_message(MESSAGE_ID)

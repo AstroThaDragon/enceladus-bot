@@ -72,9 +72,9 @@ class Profile(commands.Cog):
 
             async with db.execute(
                 """
-                SELECT pet_stage
+                SELECT pet_type, pet_stage, nickname, level, xp
                 FROM pets
-                WHERE user_id = ?
+                WHERE user_id = ? AND is_active = 1
                 ORDER BY pet_id DESC
                 LIMIT 1
                 """,
@@ -90,7 +90,7 @@ class Profile(commands.Cog):
                 "stardust": 0,
                 "bio": "Exploring the outer rims of Enceladus Station. 🚀",
                 "bg": "default_nebula",
-                "pet": "egg",
+                "pet": None,
                 "title": "",
                 "daily_streak": 0,
                 "mining_upgrade": 0,
@@ -119,6 +119,26 @@ class Profile(commands.Cog):
         if "default" not in unlocked_backgrounds:
             unlocked_backgrounds.insert(0, "default")
 
+        active_pet = None
+        if pet_data:
+            pet_type, pet_stage, nickname, pet_level, pet_xp = pet_data
+            pet_id = pet_type or pet_stage
+            try:
+                from pets import get_pet_definition
+                pet_definition = get_pet_definition(pet_id)
+            except Exception:
+                pet_definition = None
+
+            if pet_definition:
+                active_pet = {
+                    "id": pet_id,
+                    "name": pet_definition["name"],
+                    "emoji": pet_definition["emoji"],
+                    "nickname": nickname or "",
+                    "level": pet_level or 1,
+                    "xp": pet_xp or 0,
+                }
+
         # Calculate true level dynamically from accumulated XP.
         leveling_cog = self.bot.get_cog("Leveling")
         calculated_level = stored_level or 0
@@ -140,7 +160,7 @@ class Profile(commands.Cog):
             "bio": bio or "Exploring the outer rims of Enceladus Station. 🚀",
             "title": equipped_title or "",
             "bg": profile_card or "default_nebula",
-            "pet": pet_data[0] if pet_data else "egg",
+            "pet": active_pet,
             "daily_streak": max(0, daily_streak or 0),
             "mining_upgrade": max(0, min(5, mining_upgrade or 0)),
             "scavenging_upgrade": max(0, min(5, scavenging_upgrade or 0)),
@@ -173,11 +193,14 @@ class Profile(commands.Cog):
             viewport.rectangle((0, 0), width=viewport_w, height=viewport_h, fill="#1E2333")
 
         # Load & Paste Active Companion/Pet Sprite into the environment
-        try:
-            pet_image = Editor(f"assets/pets/{data['pet']}.png").resize((120, 120))
-            viewport.paste(pet_image, (440, 150))
-        except FileNotFoundError:
-            pass
+        if data.get("pet"):
+            try:
+                pet_image = Editor(
+                    f"assets/pets/{data['pet']['id']}.png"
+                ).resize((120, 120))
+                viewport.paste(pet_image, (440, 150))
+            except FileNotFoundError:
+                pass
 
         # Save canvas to file attachment
         file = discord.File(fp=viewport.image_bytes, filename="viewport.png")
@@ -209,7 +232,16 @@ class Profile(commands.Cog):
             ),
             inline=False
         )
-        embed.add_field(name="🐉 Companion", value=f"`{data['pet'].capitalize()}`", inline=True)
+        if data.get("pet"):
+            pet_name = data["pet"]["nickname"] or data["pet"]["name"]
+            companion_text = (
+                f"{data['pet']['emoji']} **{pet_name}**\n"
+                f"Level `{data['pet']['level']}`"
+            )
+        else:
+            companion_text = "`None equipped`"
+
+        embed.add_field(name="🐉 Companion", value=companion_text, inline=True)
         
         # Environment Window Image
         embed.set_image(url="attachment://viewport.png")
@@ -328,6 +360,10 @@ class Profile(commands.Cog):
             "neon_grid": "Cyberpunk Neon Grid",
             "deep_void": "Deep Void Galaxy",
             "solaris_ring": "Solaris Ring System",
+            "halloween_haunted": "Haunted Halloween",
+            "halloween_candy_collector": "Candy Collector",
+            "halloween_haunting_friend": "Haunting Friend",
+            "halloween_trick_or_treat": "Trick-or-Treat",
         }
 
         from database import ECONOMY_DB_NAME
@@ -366,6 +402,10 @@ class Profile(commands.Cog):
                 "neon_grid": "🌆",
                 "deep_void": "🌌",
                 "solaris_ring": "💫",
+                "halloween_haunted": "🎃",
+                "halloween_candy_collector": "🍬",
+                "halloween_haunting_friend": "🐣",
+                "halloween_trick_or_treat": "🎃",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -393,7 +433,11 @@ class Profile(commands.Cog):
             "default": "Default Nebula",
             "neon_grid": "Cyberpunk Neon Grid City",
             "deep_void": "Deep Void",
-            "solaris_ring": "Solaris Ring"
+            "solaris_ring": "Solaris Ring",
+            "halloween_haunted": "Haunted Halloween",
+            "halloween_candy_collector": "Candy Collector",
+            "halloween_haunting_friend": "Haunting Friend",
+            "halloween_trick_or_treat": "Trick-or-Treat"
         }
 
         if background not in valid_backgrounds:

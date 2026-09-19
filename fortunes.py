@@ -191,6 +191,15 @@ class Fortunes(commands.Cog):
 
         self.bot.loop.create_task(self.setup_database())
         self.bot.loop.create_task(self.update_full_moon_status())
+
+        # Fallback locks used when the Exploration cog is not loaded yet.
+        # When it is loaded, _get_user_lock() shares its per-user locks.
+        self._user_locks = {}
+
+        # Prevent the reset query from running every minute. If the bot
+        # restarts after 6 AM, the reset safely catches up.
+        self._last_streak_reset_day = None
+
         self.fortune_reset_announcement.start() # type: ignore
 
     def cog_unload(self):
@@ -386,95 +395,161 @@ class Fortunes(commands.Cog):
 
         return rarity, selected_fortune
 
+    def _get_user_lock(self, user_id: int) -> asyncio.Lock:
+        """Return the shared per-user lock used by fortune-related actions."""
+        exploration_cog = self.bot.get_cog("Exploration")
+
+        if exploration_cog is not None:
+            locks = getattr(exploration_cog, "_user_locks", None)
+            if isinstance(locks, dict):
+                lock = locks.get(user_id)
+                if lock is None:
+                    lock = asyncio.Lock()
+                    locks[user_id] = lock
+                return lock
+
+        lock = self._user_locks.get(user_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._user_locks[user_id] = lock
+        return lock
+
+    async def _process_streak_reset(self, now_et):
+        """Safely catch up the daily streak reset."""
+        current_date_et = self.get_fortune_day(now_et)
+        yesterday_et = (
+            datetime.date.fromisoformat(current_date_et)
+            - datetime.timedelta(days=1)
+        ).isoformat()
+
+        lost_streak_messages = []
+
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                """
+                SELECT user_id
+                FROM users
+                WHERE fortune_streak > 0
+                """
+            ) as cursor:
+                user_ids = [row[0] async for row in cursor]
+
+        # Re-read each user while holding the same lock used by /fortune and
+        # /usecrystal. This prevents a reset from racing a claim/restoration.
+        for user_id in user_ids:
+            async with self._get_user_lock(user_id):
+                async with aiosqlite.connect(self.db_path) as db:
+                    async with db.execute(
+                        """
+                        SELECT fortune_streak, last_fortune_streak_date, active_effects
+                        FROM users
+                        WHERE user_id = ?
+                        """,
+                        (user_id,),
+                    ) as cursor:
+                        row = await cursor.fetchone()
+
+                    if not row:
+                        continue
+
+                    streak, last_date, active_effects_json = row
+                    if not streak:
+                        continue
+
+                    # Claims for either yesterday or today are valid.
+                    # This prevents the 6 AM task from breaking a streak
+                    # after the user already claimed today's fortune.
+                    if last_date in (yesterday_et, current_date_et):
+                        continue
+
+                    active_effects = (
+                        json.loads(active_effects_json or "{}")
+                        if active_effects_json
+                        else {}
+                    )
+
+                    # Preserve the existing Fate Anchor behavior.
+                    if active_effects.pop("fate_anchor", False):
+                        await db.execute(
+                            """
+                            UPDATE users
+                            SET last_broken_streak = 0,
+                                last_fortune_streak_date = ?,
+                                active_effects = ?
+                            WHERE user_id = ?
+                            """,
+                            (
+                                yesterday_et,
+                                json.dumps(active_effects),
+                                user_id,
+                            ),
+                        )
+                    else:
+                        if streak >= 3:
+                            lost_streak_messages.append(
+                                f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
+                            )
+
+                        await db.execute(
+                            """
+                            UPDATE users
+                            SET last_broken_streak = fortune_streak,
+                                fortune_streak = 0
+                            WHERE user_id = ?
+                            """,
+                            (user_id,),
+                        )
+
+                    await db.commit()
+
+        return lost_streak_messages
+
     @tasks.loop(minutes=1)
     async def fortune_reset_announcement(self):
         et_timezone = pytz.timezone("US/Eastern")
         now_et = datetime.datetime.now(et_timezone)
+        current_date_et = self.get_fortune_day(now_et)
 
-        lost_streak_messages = []
+        # Run once per fortune day after 6 AM. If the bot missed 6:00 or
+        # restarted later, the first loop after startup catches up.
+        if now_et.hour >= 6 and self._last_streak_reset_day != current_date_et:
+            lost_streak_messages = await self._process_streak_reset(now_et)
+            self._last_streak_reset_day = current_date_et
+        else:
+            lost_streak_messages = []
 
-        if now_et.hour == 6 and now_et.minute == 0:
-            await self.update_full_moon_status()
+        # Keep the public announcement at the normal 6:00 AM time.
+        if now_et.hour != 6 or now_et.minute != 0:
+            return
 
-            channel = self.bot.get_channel(FORTUNE_RESET_CHANNEL_ID)
+        await self.update_full_moon_status()
 
-            role_mention = f"<@&{FORTUNE_PING_ROLE_ID}>"
+        channel = self.bot.get_channel(FORTUNE_RESET_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(FORTUNE_RESET_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                print(f"Could not fetch fortune reset channel: {e}")
+                channel = None
 
-            yesterday_et = (
-                now_et.date() - datetime.timedelta(days=1)
-            ).isoformat()
+        if channel is None:
+            return
 
-            async with aiosqlite.connect(self.db_path) as db:
+        role_mention = f"<@&{FORTUNE_PING_ROLE_ID}>"
 
-                async with db.execute(
-                    """
-                    SELECT user_id, fortune_streak, last_fortune_streak_date
-                    FROM users
-                    WHERE fortune_streak > 0
-                    """
-                ) as cursor:
+        message = (
+            f"{role_mention}\n"
+            "🌙✨ **The cosmic fortune cookies have reset!**\n"
+            "Use `/fortune` to open today's cookie!"
+        )
 
-                    users = await cursor.fetchall()
+        if lost_streak_messages:
+            message += "\n\n" + "\n".join(lost_streak_messages[:10])
 
-                for user_id, streak, last_date in users:
-
-                    # If they missed yesterday, streak dies
-                    if last_date != yesterday_et:
-                        # Fate Anchor protects the streak from being broken at reset.
-                        async with db.execute(
-                            "SELECT active_effects FROM users WHERE user_id = ?",
-                            (user_id,)
-                        ) as effects_cursor:
-                            effects_row = await effects_cursor.fetchone()
-
-                        active_effects = json.loads(effects_row[0] or "{}") if effects_row else {}
-
-                        if active_effects.pop("fate_anchor", False):
-                            await db.execute(
-                                """
-                                UPDATE users
-                                SET last_broken_streak = 0,
-                                    last_fortune_streak_date = ?,
-                                    active_effects = ?
-                                WHERE user_id = ?
-                                """,
-                                (
-                                    yesterday_et,
-                                    json.dumps(active_effects),
-                                    user_id
-                                )
-                            )
-                        else:
-                            if streak >= 3:  # Only mention if they lose a streak of 3 or more for spam reasons
-                                lost_streak_messages.append(
-                                    f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
-                                )
-
-                            await db.execute(
-                                """
-                                UPDATE users
-                                SET last_broken_streak = fortune_streak,
-                                    fortune_streak = 0
-                                WHERE user_id = ?
-                                """,
-                                (user_id,)
-                            )
-
-                await db.commit()
-
-                message = (
-                    f"{role_mention}\n"
-                    "🌙✨ **The cosmic fortune cookies have reset!**\n"
-                    "Use `/fortune` to open today's cookie!"
-                )
-
-                if lost_streak_messages:
-                    message += (
-                        "\n\n"
-                        + "\n".join(lost_streak_messages[:10])
-                    )
-
-                await channel.send(message)
+        try:
+            await channel.send(message)
+        except discord.HTTPException as e:
+            print(f"Failed to send fortune reset announcement: {e}")
 
     async def setup_database(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -646,20 +721,7 @@ class Fortunes(commands.Cog):
     async def fortune(self, ctx):
         user_id = ctx.author.id
 
-        # Reuse Exploration's per-user lock so /fortune cannot race
-        # against other economy/exploration operations for the same user.
-        exploration_cog = self.bot.get_cog("Exploration")
-
-        if exploration_cog is not None:
-            lock = exploration_cog._user_locks.setdefault(user_id, asyncio.Lock())
-        else:
-            # Fallback for unusual startup/test situations where Exploration
-            # has not loaded yet.
-            if not hasattr(self, "_user_locks"):
-                self._user_locks = {}
-            lock = self._user_locks.setdefault(user_id, asyncio.Lock())
-
-        async with lock:
+        async with self._get_user_lock(user_id):
             return await self._fortune_impl(ctx)
 
     async def _fortune_impl(self, ctx):
@@ -783,6 +845,11 @@ class Fortunes(commands.Cog):
 
     @commands.hybrid_command(name="usecrystal", description="Use a Dilated Time Crystal to restore a fortune streak missed yesterday (Max 2/month).")
     async def use_crystal(self, ctx: commands.Context):
+        user_id = ctx.author.id
+        async with self._get_user_lock(user_id):
+            return await self._use_crystal_impl(ctx)
+
+    async def _use_crystal_impl(self, ctx: commands.Context):
         await ctx.defer()
         user_id = ctx.author.id
 
@@ -898,32 +965,33 @@ class Fortunes(commands.Cog):
         if streak < 0:
             return await ctx.send("⚠️ Streak cannot be negative.")
 
-        et_timezone = pytz.timezone("US/Eastern")
-        now_et = datetime.datetime.now(et_timezone)
-        current_date_et = self.get_fortune_day(now_et)
+        async with self._get_user_lock(member.id):
+            et_timezone = pytz.timezone("US/Eastern")
+            now_et = datetime.datetime.now(et_timezone)
+            current_date_et = self.get_fortune_day(now_et)
 
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                """
-                INSERT INTO users (
-                    user_id,
-                    fortune_streak,
-                    last_fortune_streak_date
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute(
+                    """
+                    INSERT INTO users (
+                        user_id,
+                        fortune_streak,
+                        last_fortune_streak_date
+                    )
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id)
+                    DO UPDATE SET
+                        fortune_streak = excluded.fortune_streak,
+                        last_fortune_streak_date = excluded.last_fortune_streak_date
+                    """,
+                    (
+                        member.id,
+                        streak,
+                        current_date_et
+                    )
                 )
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id)
-                DO UPDATE SET
-                    fortune_streak = excluded.fortune_streak,
-                    last_fortune_streak_date = excluded.last_fortune_streak_date
-                """,
-                (
-                    member.id,
-                    streak,
-                    current_date_et
-                )
-            )
 
-            await db.commit()
+                await db.commit()
 
         await ctx.send(
             f"✅ Restored {member.mention}'s fortune streak to **{streak} day{'s' if streak != 1 else ''}**."

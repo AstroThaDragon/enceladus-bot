@@ -1,12 +1,14 @@
 import discord
 import aiosqlite
+import os
 import datetime
 import pytz
 from discord import app_commands
 from discord.ext import commands
 from leveling import FontView
-from moderation import VerifyView
+from moderation import VerifyView, VERIFICATION_DB_PATH
 from verification import VerificationPanelView
+from database import DB_NAME, ECONOMY_DB_NAME
 
 
 class SetXPModal(discord.ui.Modal):
@@ -24,9 +26,9 @@ class SetXPModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             amount = int(self.amount.value)
-            if amount < 0:
+            if amount <= 0:
                 return await interaction.response.send_message(
-                    "⚠️ XP cannot be negative.",
+                    "⚠️ XP must be greater than zero.",
                     ephemeral=True
                 )
         except ValueError:
@@ -47,18 +49,23 @@ class SetXPModal(discord.ui.Modal):
             temp_level += 1
 
         async with aiosqlite.connect(leveling_cog.db_path) as db:
-            await db.execute(
-                """
-                INSERT INTO users (user_id, xp, level)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id)
-                DO UPDATE SET
-                    xp = excluded.xp,
-                    level = excluded.level
-                """,
-                (self.member.id, amount, temp_level)
-            )
-            await db.commit()
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                await db.execute(
+                    """
+                    INSERT INTO users (user_id, xp, level)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id)
+                    DO UPDATE SET
+                        xp = excluded.xp,
+                        level = excluded.level
+                    """,
+                    (self.member.id, amount, temp_level)
+                )
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
 
         await leveling_cog._update_member_roles(self.member, temp_level)
 
@@ -125,18 +132,23 @@ class SetLevelModal(discord.ui.Modal):
         new_xp = leveling_cog.get_xp_for_level(level)
 
         async with aiosqlite.connect(leveling_cog.db_path) as db:
-            await db.execute(
-                """
-                INSERT INTO users (user_id, xp, level)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id)
-                DO UPDATE SET
-                    xp = excluded.xp,
-                    level = excluded.level
-                """,
-                (self.member.id, new_xp, level)
-            )
-            await db.commit()
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                await db.execute(
+                    """
+                    INSERT INTO users (user_id, xp, level)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id)
+                    DO UPDATE SET
+                        xp = excluded.xp,
+                        level = excluded.level
+                    """,
+                    (self.member.id, new_xp, level)
+                )
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
 
         await leveling_cog._update_member_roles(self.member, level)
 
@@ -273,7 +285,7 @@ class FortuneStreakModal(discord.ui.Modal):
         now_et = datetime.datetime.now(et_timezone)
         current_date_et = now_et.strftime("%Y-%m-%d")
 
-        async with aiosqlite.connect("/app/data/levels.db") as db:
+        async with aiosqlite.connect(DB_NAME) as db:
             await db.execute(
                 """
                 INSERT INTO users (
@@ -437,16 +449,21 @@ class ResetConfirmationView(discord.ui.View):
 
         if self.reset_type == "xp":
             async with aiosqlite.connect(leveling_cog.db_path) as db:
-                await db.execute(
-                    """
-                    UPDATE users
-                    SET xp = 0,
-                        level = 0
-                    WHERE user_id = ?
-                    """,
-                    (self.member.id,)
-                )
-                await db.commit()
+                await db.execute("BEGIN IMMEDIATE")
+                try:
+                    await db.execute(
+                        """
+                        UPDATE users
+                        SET xp = 0,
+                            level = 0
+                        WHERE user_id = ?
+                        """,
+                        (self.member.id,)
+                    )
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
 
             await leveling_cog._update_member_roles(
                 self.member,
@@ -463,42 +480,98 @@ class ResetConfirmationView(discord.ui.View):
 
         else:
             from database import ECONOMY_DB_NAME
+            from dragonrider import FLIGHT_DB_PATH
+            from sword import SWORD_DB_PATH
 
+            user_id = self.member.id
+
+            async def delete_user_rows(db, schema, table):
+                """Delete a user's rows only when the optional table exists."""
+                async with db.execute(
+                    f"SELECT 1 FROM {schema}.sqlite_master WHERE type = 'table' AND name = ?",
+                    (table,)
+                ) as cursor:
+                    exists = await cursor.fetchone()
+                if exists:
+                    await db.execute(
+                        f"DELETE FROM {schema}.{table} WHERE user_id = ?",
+                        (user_id,)
+                    )
+
+            # Keep player-owned data in one SQLite transaction where possible.
+            # Attached databases participate in the same transaction/commit.
             async with aiosqlite.connect(leveling_cog.db_path) as db:
-                await db.execute(
-                    "ATTACH DATABASE ? AS economy",
-                    (ECONOMY_DB_NAME,)
-                )
+                attachments = []
 
-                await db.execute(
-                    "DELETE FROM economy.inventory WHERE user_id = ?",
-                    (self.member.id,)
-                )
+                for alias, path in (
+                    ("economy", ECONOMY_DB_NAME),
+                    ("sword", SWORD_DB_PATH),
+                    ("flight", FLIGHT_DB_PATH),
+                    ("verification", VERIFICATION_DB_PATH),
+                ):
+                    if path and os.path.exists(path):
+                        await db.execute("ATTACH DATABASE ? AS " + alias, (path,))
+                        attachments.append(alias)
 
-                await db.execute(
-                    "DELETE FROM economy.pets WHERE user_id = ?",
-                    (self.member.id,)
-                )
+                try:
+                    await db.execute("BEGIN IMMEDIATE")
 
-                await db.execute(
-                    "DELETE FROM economy.users WHERE user_id = ?",
-                    (self.member.id,)
-                )
+                    # Main leveling/profile record.
+                    await delete_user_rows(db, "main", "users")
 
-                await db.execute(
-                    "DELETE FROM main.users WHERE user_id = ?",
-                    (self.member.id,)
-                )
+                    # Economy/progression records.
+                    if "economy" in attachments:
+                        for table in (
+                            "inventory",
+                            "pets",
+                            "pet_incubators",
+                            "collectibles",
+                            "achievements",
+                            "achievement_progress",
+                            "shop_purchase_limits",
+                            "minigame_stats",
+                            "users",
+                        ):
+                            await delete_user_rows(db, "economy", table)
 
-                await db.commit()
-                await db.execute("DETACH DATABASE economy")
+                    if "sword" in attachments:
+                        await delete_user_rows(db, "sword", "sword_stats")
+                        # Prevent the global sword state from pointing at a
+                        # user whose sword record was just deleted.
+                        await db.execute(
+                            """
+                            UPDATE sword.sword_global
+                            SET current_wielder_id = NULL
+                            WHERE current_wielder_id = ?
+                            """,
+                            (user_id,),
+                        )
+
+                    if "flight" in attachments:
+                        await delete_user_rows(db, "flight", "dragonflight")
+
+                    if "verification" in attachments:
+                        await delete_user_rows(db, "verification", "verification_strikes")
+                        await delete_user_rows(db, "verification", "pending_verifications")
+
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
+                finally:
+                    for alias in reversed(attachments):
+                        try:
+                            await db.execute("DETACH DATABASE " + alias)
+                        except Exception:
+                            pass
 
             await interaction.edit_original_response(
                 content=(
                     f"☢️ **{self.member.name}**'s Enceladus account "
                     f"has been completely wiped.\n"
-                    f"XP, Level, economy, profile data, inventory, "
-                    f"and pets were deleted."
+                    f"All player-owned XP, economy, profile, inventory, pets, "
+                    f"achievements, collectibles, purchase limits, minigame, "
+                    f"sword, and Dragon Rider data were deleted."
                 ),
                 view=None
             )
@@ -629,7 +702,7 @@ class Admin(commands.Cog):
         command: app_commands.Choice[str]
     ):
         if command.value == "resetbump":
-            async with aiosqlite.connect("/app/data/levels.db") as db:
+            async with aiosqlite.connect(DB_NAME) as db:
                 await db.execute("DELETE FROM bump_timer WHERE id = 1")
                 await db.commit()
 
@@ -681,59 +754,69 @@ class Admin(commands.Cog):
                     ephemeral=True
                 )
 
+            if interaction.guild is None:
+                return await interaction.followup.send(
+                    "❌ This command can only be used inside a server.",
+                    ephemeral=True
+                )
+
             synced_count = 0
 
             async with aiosqlite.connect(leveling_cog.db_path) as db:
-                for member in interaction.guild.members:
-                    if member.bot:
-                        continue
-
-                    starting_level = 0
-
-                    for level, role_id in sorted(
-                        leveling_cog.level_roles.items(),
-                        reverse=True
-                    ):
-                        if role_id != 0 and member.get_role(role_id):
-                            starting_level = level
-                            break
-
-                    async with db.execute(
-                        "SELECT level FROM users WHERE user_id = ?",
-                        (member.id,)
-                    ) as cursor:
-                        result = await cursor.fetchone()
-
-                    current_db_level = result[0] if result else -1
-
-                    if starting_level > current_db_level:
-                        xp = leveling_cog.get_xp_for_level(starting_level)
-
-                        await db.execute(
-                            """
-                            INSERT INTO users (
-                                user_id,
-                                xp,
-                                level,
-                                bar_color,
-                                bg_url
+                await db.execute("BEGIN IMMEDIATE")
+                try:
+                    for member in interaction.guild.members:
+                        if member.bot:
+                            continue
+    
+                        starting_level = 0
+    
+                        for level, role_id in sorted(
+                            leveling_cog.level_roles.items(),
+                            reverse=True
+                        ):
+                            if role_id != 0 and member.get_role(role_id):
+                                starting_level = level
+                                break
+    
+                        async with db.execute(
+                            "SELECT level FROM users WHERE user_id = ?",
+                            (member.id,)
+                        ) as cursor:
+                            result = await cursor.fetchone()
+    
+                        current_db_level = result[0] if result else -1
+    
+                        if starting_level > current_db_level:
+                            xp = leveling_cog.get_xp_for_level(starting_level)
+    
+                            await db.execute(
+                                """
+                                INSERT INTO users (
+                                    user_id,
+                                    xp,
+                                    level,
+                                    bar_color,
+                                    bg_url
+                                )
+                                VALUES (?, ?, ?, '#8a2be2', 'default')
+                                ON CONFLICT(user_id)
+                                DO UPDATE SET
+                                    xp = excluded.xp,
+                                    level = excluded.level
+                                """,
+                                (
+                                    member.id,
+                                    xp,
+                                    starting_level
+                                )
                             )
-                            VALUES (?, ?, ?, '#8a2be2', 'default')
-                            ON CONFLICT(user_id)
-                            DO UPDATE SET
-                                xp = excluded.xp,
-                                level = excluded.level
-                            """,
-                            (
-                                member.id,
-                                xp,
-                                starting_level
-                            )
-                        )
-
-                        synced_count += 1
-
-                await db.commit()
+    
+                            synced_count += 1
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
 
             await interaction.followup.send(
                 f"✅ Sync complete! Calibrated {synced_count} members.",
@@ -751,49 +834,118 @@ class Admin(commands.Cog):
                     ephemeral=True
                 )
 
-            from database import ECONOMY_DB_NAME
+            from dragonrider import FLIGHT_DB_PATH
+            from moderation import VERIFICATION_DB_PATH
+            from sword import SWORD_DB_PATH
 
-            async with aiosqlite.connect(leveling_cog.db_path) as db:
-                await db.execute(
-                    "ATTACH DATABASE ? AS economy",
-                    (ECONOMY_DB_NAME,)
+            if interaction.guild is None:
+                return await interaction.followup.send(
+                    "❌ This command can only be used inside a server.",
+                    ephemeral=True
                 )
 
-                async with db.execute(
-                    "SELECT user_id FROM main.users"
-                ) as cursor:
-                    rows = await cursor.fetchall()
+            async with aiosqlite.connect(leveling_cog.db_path) as db:
+                attachments = []
 
-                deleted_count = 0
+                for alias, path in (
+                    ("economy", ECONOMY_DB_NAME),
+                    ("sword", SWORD_DB_PATH),
+                    ("flight", FLIGHT_DB_PATH),
+                    ("verification", VERIFICATION_DB_PATH),
+                ):
+                    if path and os.path.exists(path):
+                        await db.execute("ATTACH DATABASE ? AS " + alias, (path,))
+                        attachments.append(alias)
 
-                for row in rows:
-                    user_id = row[0]
+                try:
+                    await db.execute("BEGIN IMMEDIATE")
 
-                    if interaction.guild.get_member(user_id) is None:
-                        await db.execute(
-                            "DELETE FROM economy.inventory WHERE user_id = ?",
-                            (user_id,)
-                        )
+                    async with db.execute(
+                        "SELECT user_id FROM main.users"
+                    ) as cursor:
+                        rows = await cursor.fetchall()
 
-                        await db.execute(
-                            "DELETE FROM economy.pets WHERE user_id = ?",
-                            (user_id,)
-                        )
+                    deleted_count = 0
 
-                        await db.execute(
-                            "DELETE FROM economy.users WHERE user_id = ?",
-                            (user_id,)
-                        )
+                    for row in rows:
+                        user_id = row[0]
 
-                        await db.execute(
-                            "DELETE FROM main.users WHERE user_id = ?",
-                            (user_id,)
-                        )
+                        member = interaction.guild.get_member(user_id)
+                        if member is None:
+                            try:
+                                member = await interaction.guild.fetch_member(user_id)
+                            except discord.NotFound:
+                                member = None
+                            except (discord.Forbidden, discord.HTTPException):
+                                # If Discord cannot confirm membership, do not
+                                # destructively purge this user's data.
+                                continue
 
-                        deleted_count += 1
+                        if member is None:
+                            await db.execute(
+                                "DELETE FROM main.users WHERE user_id = ?",
+                                (user_id,)
+                            )
 
-                await db.commit()
-                await db.execute("DETACH DATABASE economy")
+                            if "economy" in attachments:
+                                for table in (
+                                    "inventory",
+                                    "pets",
+                                    "pet_incubators",
+                                    "collectibles",
+                                    "achievements",
+                                    "achievement_progress",
+                                    "shop_purchase_limits",
+                                    "minigame_stats",
+                                    "users",
+                                ):
+                                    await db.execute(
+                                        f"DELETE FROM economy.{table} WHERE user_id = ?",
+                                        (user_id,)
+                                    )
+
+                            if "sword" in attachments:
+                                await db.execute(
+                                    "DELETE FROM sword.sword_stats WHERE user_id = ?",
+                                    (user_id,)
+                                )
+                                await db.execute(
+                                    """
+                                    UPDATE sword.sword_global
+                                    SET current_wielder_id = NULL
+                                    WHERE current_wielder_id = ?
+                                    """,
+                                    (user_id,)
+                                )
+
+                            if "flight" in attachments:
+                                await db.execute(
+                                    "DELETE FROM flight.dragonflight WHERE user_id = ?",
+                                    (user_id,)
+                                )
+
+                            if "verification" in attachments:
+                                for table in (
+                                    "verification_strikes",
+                                    "pending_verifications",
+                                ):
+                                    await db.execute(
+                                        f"DELETE FROM verification.{table} WHERE user_id = ?",
+                                        (user_id,)
+                                    )
+
+                            deleted_count += 1
+
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
+                finally:
+                    for alias in reversed(attachments):
+                        try:
+                            await db.execute("DETACH DATABASE " + alias)
+                        except Exception:
+                            pass
 
             await interaction.followup.send(
                 f"✅ Cleaned up {deleted_count} former members from the database!",

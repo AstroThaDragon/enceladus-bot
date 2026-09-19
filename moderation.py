@@ -13,6 +13,16 @@ SPOILER_REQUIRED_CHANNELS = {
 
 MIN_ACCOUNT_AGE_DAYS = 30
 
+# Automatically ban known repeat-name accounts on join.
+# Numbers, underscores, spaces, punctuation, and other symbols are ignored.
+NAME_BAN_PATTERNS = {
+    "edeneva",
+}
+
+
+def normalize_name_for_ban(name):
+    return "".join(char.lower() for char in name if char.isalnum())
+
 VERIFY_CHANNEL_ID = 1296962529989361685
 VERIFY_LOG_CHANNEL_ID = 1352834838478061608
 
@@ -51,9 +61,34 @@ class VerifyView(View):
     )
     async def verify_button(self, interaction, button):
         member = interaction.user
-        code = generate_code()
 
-        pending_codes[member.id] = code
+        # Keep the verification code persistent so a bot restart does not
+        # invalidate an otherwise active verification. Reuse an existing
+        # code when the button is clicked multiple times.
+        async with self.cog.verification_lock:
+            async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                async with db.execute(
+                    "SELECT code FROM pending_verifications WHERE user_id = ?",
+                    (member.id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                code = row[0] if row and row[0] else generate_code()
+
+                if row:
+                    await db.execute(
+                        "UPDATE pending_verifications SET code = ? WHERE user_id = ?",
+                        (code, member.id)
+                    )
+                else:
+                    await db.execute(
+                        "INSERT INTO pending_verifications (user_id, code) VALUES (?, ?)",
+                        (member.id, code)
+                    )
+
+                await db.commit()
+
+            pending_codes[member.id] = code
 
         try:
             await member.send(
@@ -88,11 +123,17 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.add_view(VerifyView(self))
+        self.verification_lock = asyncio.Lock()
 
-        self.bot.loop.create_task(
-            self.setup_verification_db()
-        )
-        self.check_pending_verifications.start()
+    async def cog_load(self):
+        # Discord.py awaits cog_load before the cog is considered loaded, so
+        # the database is guaranteed to exist before the verification loop or
+        # member events can use it.
+        await self.setup_verification_db()
+        self.check_pending_verifications.start()  # pyright: ignore[reportAttributeAccessIssue]
+
+    def cog_unload(self):
+        self.check_pending_verifications.cancel()  # pyright: ignore[reportAttributeAccessIssue]
 
     async def setup_verification_db(self):
         async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
@@ -109,11 +150,33 @@ class Moderation(commands.Cog):
                 """
                 CREATE TABLE IF NOT EXISTS pending_verifications (
                     user_id INTEGER PRIMARY KEY,
-                    join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    code TEXT
                 )
                 """
             )
+
+            # Migrate existing databases created before persistent verification
+            # codes were added. SQLite raises OperationalError when the column
+            # already exists, which is safe to ignore here.
+            try:
+                await db.execute(
+                    "ALTER TABLE pending_verifications ADD COLUMN code TEXT"
+                )
+            except aiosqlite.OperationalError:
+                pass
+
             await db.commit()
+
+    async def get_channel_safe(self, channel_id):
+        channel = self.bot.get_channel(channel_id)
+        if channel:
+            return channel
+
+        try:
+            return await self.bot.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
 
     async def add_verification_strike(self, user_id):
         async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
@@ -139,7 +202,7 @@ class Moderation(commands.Cog):
 
     @commands.command()
     async def qr(self, ctx, *, reason):
-        staff_channel = self.bot.get_channel(1352834838478061608)
+        staff_channel = await self.get_channel_safe(1352834838478061608)
 
         if not staff_channel:
             return await ctx.send("⚠️ Staff report channel not found.")
@@ -173,6 +236,54 @@ class Moderation(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member):
 
+        # Catch known repeat-name accounts immediately on join.
+        # This intentionally checks both the Discord username and display name
+        # so added numbers/symbols do not bypass the filter.
+        normalized_names = {
+            normalize_name_for_ban(member.name),
+            normalize_name_for_ban(member.display_name),
+        }
+
+        matched_pattern = next(
+            (
+                pattern
+                for pattern in NAME_BAN_PATTERNS
+                if normalize_name_for_ban(pattern) in normalized_names
+            ),
+            None,
+        )
+
+        if matched_pattern:
+            try:
+                await member.send(
+                    f"⚠️ You were banned from **{member.guild.name}** because your username/display name matched a blocked account pattern."
+                )
+            except discord.Forbidden:
+                pass
+
+            try:
+                await member.ban(
+                    reason=f"Automatic ban: matched blocked name pattern '{matched_pattern}'."
+                )
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[NAME BAN ERROR] Could not ban {member} ({member.id}): {e}")
+                return
+
+            log_channel = await self.get_channel_safe(MOD_LOG_CHANNEL_ID)
+            if log_channel:
+                embed = discord.Embed(
+                    title="🚫 Automatic Name-Pattern Ban",
+                    color=discord.Color.red(),
+                    timestamp=discord.utils.utcnow(),
+                )
+                embed.add_field(name="User", value=f"{member} ({member.id})", inline=False)
+                embed.add_field(name="Username", value=member.name, inline=True)
+                embed.add_field(name="Display Name", value=member.display_name, inline=True)
+                embed.add_field(name="Matched Pattern", value=f"`{matched_pattern}`", inline=False)
+                await log_channel.send(embed=embed)
+
+            return
+
         account_age = discord.utils.utcnow() - member.created_at
 
         if account_age.days < MIN_ACCOUNT_AGE_DAYS:
@@ -186,19 +297,24 @@ class Moderation(commands.Cog):
             except discord.Forbidden:
                 pass
 
-            await member.kick(
-                reason=f"Account younger than {MIN_ACCOUNT_AGE_DAYS} days."
-            )
+            try:
+                await member.kick(
+                    reason=f"Account younger than {MIN_ACCOUNT_AGE_DAYS} days."
+                )
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[ACCOUNT AGE KICK ERROR] Could not kick {member} ({member.id}): {e}")
 
             return
 
-        # Save the new member to the database to start their 30-minute timer
-        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
-            await db.execute(
-                "INSERT OR IGNORE INTO pending_verifications (user_id) VALUES (?)",
-                (member.id,)
-            )
-            await db.commit()
+        # Save the new member to the database to start their 30-minute timer.
+        # Do not overwrite an existing code if the join event is delivered twice.
+        async with self.verification_lock:
+            async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                await db.execute(
+                    "INSERT OR IGNORE INTO pending_verifications (user_id) VALUES (?)",
+                    (member.id,)
+                )
+                await db.commit()
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -220,7 +336,20 @@ class Moderation(commands.Cog):
     @commands.command()
     async def verifycode(self, ctx, *, code: str):
         member = ctx.author
+
+        # Recover the code from SQLite if the bot restarted since it was sent.
         correct_code = pending_codes.get(member.id)
+        if not correct_code:
+            async with self.verification_lock:
+                async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                    async with db.execute(
+                        "SELECT code FROM pending_verifications WHERE user_id = ?",
+                        (member.id,)
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                correct_code = row[0] if row and row[0] else None
+                if correct_code:
+                    pending_codes[member.id] = correct_code
 
         if not correct_code:
             return await ctx.send(
@@ -247,21 +376,41 @@ class Moderation(commands.Cog):
 
         guild = ctx.guild
 
-        verified_role = guild.get_role(VERIFIED_ROLE_ID)
-        unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
-
-        if verified_role:
-            await member.add_roles(verified_role)
-
-        if unverified_role and unverified_role in member.roles:
-            await member.remove_roles(unverified_role)
-            
-            # STOP THE TIMER
+        async with self.verification_lock:
+            # Re-check the stored code while holding the lock so the timeout
+            # checker cannot process the same pending verification at the same time.
             async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
-                await db.execute("DELETE FROM pending_verifications WHERE user_id = ?", (member.id,))
+                async with db.execute(
+                    "SELECT code FROM pending_verifications WHERE user_id = ?",
+                    (member.id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+            stored_code = row[0] if row and row[0] else correct_code
+            if stored_code != correct_code:
+                return await ctx.send(
+                    "❌ Your verification code is no longer active. Click the **Verify** button to generate a new one!",
+                    delete_after=10
+                )
+
+            verified_role = guild.get_role(VERIFIED_ROLE_ID)
+            unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
+
+            if verified_role:
+                await member.add_roles(verified_role)
+
+            if unverified_role and unverified_role in member.roles:
+                await member.remove_roles(unverified_role)
+
+            # STOP THE TIMER regardless of whether the unverified role was present.
+            async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                await db.execute(
+                    "DELETE FROM pending_verifications WHERE user_id = ?",
+                    (member.id,)
+                )
                 await db.commit()
 
-        pending_codes.pop(member.id, None)
+            pending_codes.pop(member.id, None)
 
         try:
             await ctx.message.delete()
@@ -273,7 +422,7 @@ class Moderation(commands.Cog):
             delete_after=10
         )
 
-        log_channel = guild.get_channel(VERIFY_LOG_CHANNEL_ID)
+        log_channel = await self.get_channel_safe(VERIFY_LOG_CHANNEL_ID)
 
         if log_channel:
             await log_channel.send(
@@ -399,7 +548,7 @@ class Moderation(commands.Cog):
         if before.channel == after.channel:
             return
 
-        log_channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
+        log_channel = await self.get_channel_safe(MOD_LOG_CHANNEL_ID)
 
         if not log_channel:
             return
@@ -443,7 +592,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_thread_create(self, thread):
-        log_channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
+        log_channel = await self.get_channel_safe(MOD_LOG_CHANNEL_ID)
 
         if not log_channel:
             return
@@ -476,7 +625,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
-        log_channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
+        log_channel = await self.get_channel_safe(MOD_LOG_CHANNEL_ID)
 
         if not log_channel:
             return
@@ -509,7 +658,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_thread_update(self, before, after):
-        log_channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
+        log_channel = await self.get_channel_safe(MOD_LOG_CHANNEL_ID)
 
         if not log_channel:
             return
@@ -575,48 +724,92 @@ class Moderation(commands.Cog):
 
     @tasks.loop(minutes=2)
     async def check_pending_verifications(self):
-        async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
-            async with db.execute("SELECT user_id, join_time FROM pending_verifications") as cursor:
-                rows = await cursor.fetchall()
-            
-            for row in rows:
-                user_id, join_time_str = row
-                join_time = datetime.strptime(join_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                
-                if (datetime.now(timezone.utc) - join_time) > timedelta(minutes=30):
-                    member_found = False
-                    
-                    for guild in self.bot.guilds:
-                        member = guild.get_member(user_id)
-                        if member:
-                            member_found = True
-                            unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
-                            
-                            if unverified_role and unverified_role in member.roles:
-                                strikes = await self.add_verification_strike(member.id)
-                                
-                                if strikes >= 3:
-                                    action_text = "🚫 You have reached the maximum number of verification strikes and have been banned from the server.\n\nIf you believe this was a mistake, you may appeal by contacting @Enceladus#0496, or the server owner at 'astrothadragon.'"
-                                else:
-                                    action_text = "You may rejoin and try again, but repeated missed verifications will lead to a ban."
+        async with self.verification_lock:
+            async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                async with db.execute(
+                    "SELECT user_id, join_time FROM pending_verifications"
+                ) as cursor:
+                    rows = await cursor.fetchall()
 
-                                try:
-                                    await member.send(
-                                        f"⚠️ You were removed from **{guild.name}** because you did not verify within 30 minutes.\n\n"
-                                        f"Verification strike: **{strikes}/3**\n\n"
-                                        f"{action_text}"
-                                    )
-                                except discord.Forbidden:
-                                    pass
+            for user_id, join_time_str in rows:
+                try:
+                    join_time = datetime.strptime(
+                        join_time_str, "%Y-%m-%d %H:%M:%S"
+                    ).replace(tzinfo=timezone.utc)
+                except (TypeError, ValueError):
+                    print(
+                        f"[VERIFICATION DB ERROR] Invalid join time for user {user_id}: "
+                        f"{join_time_str!r}"
+                    )
+                    continue
 
-                                if strikes >= 3:
-                                    await member.ban(reason="Reached 3/3 verification timeout strikes.")
-                                else:
-                                    await member.kick(reason=f"Did not verify within 30 minutes. Verification strike {strikes}/3.")
+                if (datetime.now(timezone.utc) - join_time) <= timedelta(minutes=30):
+                    continue
 
-                    await db.execute("DELETE FROM pending_verifications WHERE user_id = ?", (user_id,))
-            
-            await db.commit()
+                for guild in self.bot.guilds:
+                    member = guild.get_member(user_id)
+                    if not member:
+                        continue
+
+                    unverified_role = guild.get_role(UNVERIFIED_ROLE_ID)
+                    if not unverified_role or unverified_role not in member.roles:
+                        continue
+
+                    strikes = await self.add_verification_strike(member.id)
+
+                    if strikes >= 3:
+                        action_text = (
+                            "🚫 You have reached the maximum number of verification strikes "
+                            "and have been banned from the server.\n\n"
+                            "If you believe this was a mistake, you may appeal by contacting "
+                            "@Enceladus#0496, or the server owner at 'astrothadragon.'"
+                        )
+                    else:
+                        action_text = (
+                            "You may rejoin and try again, but repeated missed verifications "
+                            "will lead to a ban."
+                        )
+
+                    try:
+                        await member.send(
+                            f"⚠️ You were removed from **{guild.name}** because you did not verify within 30 minutes.\n\n"
+                            f"Verification strike: **{strikes}/3**\n\n"
+                            f"{action_text}"
+                        )
+                    except discord.Forbidden:
+                        pass
+
+                    try:
+                        if strikes >= 3:
+                            await member.ban(
+                                reason="Reached 3/3 verification timeout strikes."
+                            )
+                        else:
+                            await member.kick(
+                                reason=(
+                                    f"Did not verify within 30 minutes. "
+                                    f"Verification strike {strikes}/3."
+                                )
+                            )
+                    except (discord.Forbidden, discord.HTTPException) as e:
+                        print(
+                            f"[VERIFICATION TIMEOUT ERROR] Could not remove {member} "
+                            f"({member.id}): {e}"
+                        )
+                        # Keep the pending record so a transient Discord failure can
+                        # be retried on the next checker run.
+                        continue
+
+                    # Only clear the pending record after the removal succeeded.
+                    async with aiosqlite.connect(VERIFICATION_DB_PATH) as db:
+                        await db.execute(
+                            "DELETE FROM pending_verifications WHERE user_id = ?",
+                            (user_id,)
+                        )
+                        await db.commit()
+
+                    pending_codes.pop(user_id, None)
+                    break
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))

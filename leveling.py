@@ -521,10 +521,10 @@ class Leveling(commands.Cog):
                 
             await db.commit()
 
-        self.cleanup_departed_users.start()
+        self.cleanup_departed_users.start()  # type: ignore[reportAttributeAccessIssue]
 
     def cog_unload(self):
-        self.cleanup_departed_users.cancel()
+        self.cleanup_departed_users.cancel()  # type: ignore[reportAttributeAccessIssue]
 
     def get_xp_for_level(self, level):
         if level <= 0: return 0
@@ -562,12 +562,18 @@ class Leveling(commands.Cog):
                 await member.remove_roles(*[r for r in roles_to_remove if r])
 
     async def add_xp(self, member: discord.Member, amount: int):
-        if member.bot:
+        if member.bot or amount <= 0:
             return False, 0
 
         user_id = member.id
+        leveled_up = False
+        new_level = 0
 
         async with aiosqlite.connect(self.db_path) as db:
+            # Serialize the read -> calculate -> write sequence so concurrent
+            # XP awards cannot overwrite one another.
+            await db.execute("BEGIN IMMEDIATE")
+
             async with db.execute(
                 "SELECT xp, level FROM users WHERE user_id = ?",
                 (user_id,)
@@ -575,48 +581,38 @@ class Leveling(commands.Cog):
                 result = await cursor.fetchone()
 
             if result is None:
-                xp, level = amount, 0
-
-                new_level = level
-                while xp >= self.get_xp_for_level(new_level + 1):
+                new_xp = amount
+                new_level = 0
+                while new_xp >= self.get_xp_for_level(new_level + 1):
                     new_level += 1
 
                 await db.execute(
                     "INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)",
-                    (user_id, xp, new_level)
+                    (user_id, new_xp, new_level)
                 )
+                leveled_up = new_level > 0
+            else:
+                xp, level = result
+                new_xp = xp + amount
+                new_level = level
 
-                if new_level > 0:
-                    await self._update_member_roles(member, new_level)
+                while new_xp >= self.get_xp_for_level(new_level + 1):
+                    new_level += 1
 
-                await db.commit()
-                return new_level > 0, new_level
+                leveled_up = new_level > level
 
-            xp, level = result
-            new_xp = xp + amount
-
-            temp_level = level
-
-            while new_xp >= self.get_xp_for_level(temp_level + 1):
-                temp_level += 1
-
-            leveled_up = temp_level > level
-
-            if leveled_up:
-                await self._update_member_roles(member, temp_level)
                 await db.execute(
                     "UPDATE users SET xp = ?, level = ? WHERE user_id = ?",
-                    (new_xp, temp_level, user_id)
-                )
-            else:
-                await db.execute(
-                    "UPDATE users SET xp = ? WHERE user_id = ?",
-                    (new_xp, user_id)
+                    (new_xp, new_level, user_id)
                 )
 
             await db.commit()
 
-            return leveled_up, temp_level
+        # Update Discord roles only after the database state is safely committed.
+        if leveled_up:
+            await self._update_member_roles(member, new_level)
+
+        return leveled_up, new_level
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -709,10 +705,17 @@ class Leveling(commands.Cog):
 
         user_id = message.author.id
         current_time = time.time()
-        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60: return 
+        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60: return
         self.cooldowns[user_id] = current_time
 
+        leveled_up = False
+        new_level = 0
+
         async with aiosqlite.connect(self.db_path) as db:
+            # Serialize the read -> calculate -> write sequence so concurrent
+            # message XP awards cannot overwrite one another.
+            await db.execute("BEGIN IMMEDIATE")
+
             async with db.execute("SELECT xp, level FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 result = await cursor.fetchone()
 
@@ -721,28 +724,35 @@ class Leveling(commands.Cog):
                 for level, role_id in sorted(self.level_roles.items(), reverse=True):
                     if role_id != 0 and message.author.get_role(role_id):
                         starting_level = level
-                        break 
-                xp, level = self.get_xp_for_level(starting_level), starting_level
-                await db.execute("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", (user_id, xp, level))
+                        break
+                xp = self.get_xp_for_level(starting_level)
+                level = starting_level
+                await db.execute(
+                    "INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)",
+                    (user_id, xp, level)
+                )
             else:
                 xp, level = result
 
             base_xp = random.randint(20, 50)
             if message.author.get_role(self.BOOSTER_ROLE_ID):
-                base_xp = int(base_xp * 1.15) 
-            
-            new_xp = xp + base_xp
-            temp_level = level
-            while new_xp >= self.get_xp_for_level(temp_level + 1):
-                temp_level += 1
-            new_level = temp_level
+                base_xp = int(base_xp * 1.15)
 
-            if new_level > level:
-                await self._update_member_roles(message.author, new_level)
-                await db.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", (new_xp, new_level, user_id))
-            else:
-                await db.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
+            new_xp = xp + base_xp
+            new_level = level
+            while new_xp >= self.get_xp_for_level(new_level + 1):
+                new_level += 1
+            leveled_up = new_level > level
+
+            await db.execute(
+                "UPDATE users SET xp = ?, level = ? WHERE user_id = ?",
+                (new_xp, new_level, user_id)
+            )
             await db.commit()
+
+        # Update Discord roles only after the database state is safely committed.
+        if leveled_up:
+            await self._update_member_roles(message.author, new_level)
 
     @commands.hybrid_command(name="rank", description="Check your or another member's level!")
     async def rank(self, ctx, member: discord.Member = None):
@@ -1070,6 +1080,9 @@ class Leveling(commands.Cog):
     @app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        if amount < 0:
+            return await interaction.response.send_message("❌ XP cannot be negative.", ephemeral=True)
+
         temp_level = 0
         while amount >= self.get_xp_for_level(temp_level + 1):
             temp_level += 1
@@ -1089,6 +1102,9 @@ class Leveling(commands.Cog):
     @app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
+        if level < 0:
+            return await interaction.response.send_message("❌ Level cannot be negative.", ephemeral=True)
+
         new_xp = self.get_xp_for_level(level)
         
         async with aiosqlite.connect(self.db_path) as db:
@@ -1106,6 +1122,9 @@ class Leveling(commands.Cog):
     @app_commands.command(name="addxp", description="Add XP to a user's current total (Admin only)")
     @commands.has_permissions(administrator=True)
     async def addxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        if amount <= 0:
+            return await interaction.response.send_message("❌ XP to add must be greater than 0.", ephemeral=True)
+
         await self.add_xp(member, amount)
         
         async with aiosqlite.connect(self.db_path) as db:

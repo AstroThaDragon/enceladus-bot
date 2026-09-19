@@ -343,6 +343,7 @@ SUCCESS_MESSAGES = [
 class DragonFlight(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._test_lock = __import__('asyncio').Lock()
         self.bot.loop.create_task(self.setup_database())
 
     async def setup_database(self):
@@ -396,72 +397,76 @@ class DragonFlight(commands.Cog):
 
         today_et = self.get_today_et()
 
-        async with aiosqlite.connect(FLIGHT_DB_PATH) as db:
-            async with db.execute(
-                """
-                SELECT attempts, last_attempt_date, licensed
-                FROM dragonflight
-                WHERE user_id = ?
-                """,
-                (user.id,)
-            ) as cursor:
-                row = await cursor.fetchone()
+        async with self._test_lock:
+            async with aiosqlite.connect(FLIGHT_DB_PATH) as db:
+                await db.execute("BEGIN IMMEDIATE")
 
-            if row:
-                attempts, last_attempt_date, licensed = row
-
-                if licensed:
-                    return await ctx.send(
-                        "🐉 You already possess a Dragonrider License! Don't try to make the instructor feel even more pain, bro."
-                    )
-
-                if last_attempt_date == today_et:
-                    reset_timestamp = self.get_next_midnight_reset()
-
-                    return await ctx.send(
-                        f"⏳ You've already attempted your Dragon Rider Test today!\n"
-                        f"🐉 You may attempt another test <t:{reset_timestamp}:R>."
-                )
-                
-            await db.execute(
-                """
-                INSERT INTO dragonflight (
-                    user_id,
-                    attempts,
-                    last_attempt_date,
-                    licensed
-                )
-                VALUES (?, 1, ?, 0)
-
-                ON CONFLICT(user_id)
-                DO UPDATE SET
-                    attempts = attempts + 1,
-                    last_attempt_date = excluded.last_attempt_date
-                """,
-                (user.id, today_et)
-            )
-
-            async with db.execute(
-                "SELECT attempts FROM dragonflight WHERE user_id = ?",
-                (user.id,)
-            ) as cursor:
-                updated_row = await cursor.fetchone()
-
-            attempts = updated_row[0] if updated_row else 1
-
-            success = random.random() < SUCCESS_CHANCE
-
-            if success:
-                await db.execute(
+                async with db.execute(
                     """
-                    UPDATE dragonflight
-                    SET licensed = 1
+                    SELECT attempts, last_attempt_date, licensed
+                    FROM dragonflight
                     WHERE user_id = ?
                     """,
                     (user.id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                if row:
+                    attempts, last_attempt_date, licensed = row
+
+                    if licensed:
+                        await db.rollback()
+                        return await ctx.send(
+                            "🐉 You already possess a Dragonrider License! Don't try to make the instructor feel even more pain, bro."
+                        )
+
+                    if last_attempt_date == today_et:
+                        await db.rollback()
+                        reset_timestamp = self.get_next_midnight_reset()
+
+                        return await ctx.send(
+                            f"⏳ You've already attempted your Dragon Rider Test today!\n"
+                            f"🐉 You may attempt another test <t:{reset_timestamp}:R>."
+                        )
+
+                await db.execute(
+                    """
+                    INSERT INTO dragonflight (
+                        user_id,
+                        attempts,
+                        last_attempt_date,
+                        licensed
+                    )
+                    VALUES (?, 1, ?, 0)
+
+                    ON CONFLICT(user_id)
+                    DO UPDATE SET
+                        attempts = attempts + 1,
+                        last_attempt_date = excluded.last_attempt_date
+                    """,
+                    (user.id, today_et)
                 )
 
-            await db.commit()
+                async with db.execute(
+                    "SELECT attempts FROM dragonflight WHERE user_id = ?",
+                    (user.id,)
+                ) as cursor:
+                    updated_row = await cursor.fetchone()
+
+                attempts = updated_row[0] if updated_row else 1
+                success = random.random() < SUCCESS_CHANCE
+
+                if success:
+                    await db.execute(
+                        """
+                        UPDATE dragonflight
+                        SET licensed = 1
+                        WHERE user_id = ?
+                        """,
+                        (user.id,)
+                    )
+
+                await db.commit()
 
         if not success:
             return await ctx.send(
@@ -479,8 +484,30 @@ class DragonFlight(commands.Cog):
                     license_role,
                     reason="Passed Dragon Flight Test."
                 )
-            except:
-                pass
+            except (discord.Forbidden, discord.HTTPException):
+                async with aiosqlite.connect(FLIGHT_DB_PATH) as db:
+                    await db.execute(
+                        "UPDATE dragonflight SET licensed = 0 WHERE user_id = ?",
+                        (user.id,)
+                    )
+                    await db.commit()
+
+                return await ctx.send(
+                    "🐉 You passed the Dragonrider Test, but I couldn't assign your license role. "
+                    "Your license has not been recorded yet."
+                )
+        else:
+            async with aiosqlite.connect(FLIGHT_DB_PATH) as db:
+                await db.execute(
+                    "UPDATE dragonflight SET licensed = 0 WHERE user_id = ?",
+                    (user.id,)
+                )
+                await db.commit()
+
+            return await ctx.send(
+                "🐉 You passed the Dragonrider Test, but the Dragonrider License role "
+                "is missing from this server. Your license has not been recorded."
+            )
 
         await ctx.send(
             f"{random.choice(SUCCESS_MESSAGES)}\n\n"
