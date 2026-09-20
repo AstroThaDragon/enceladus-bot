@@ -82,6 +82,11 @@ LOOT_OVERFLOW_VALUES = {
 }
 
 
+SCAVENGE_STARDUST_CACHE_CHANCE = 0.20
+SCAVENGE_STARDUST_CACHE_MIN = 750
+SCAVENGE_STARDUST_CACHE_MAX = 3500
+
+
 class Exploration(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -695,7 +700,7 @@ class Exploration(commands.Cog):
             new_stardust = stardust + found_stardust
             
             loot_description = (
-                f"✨ **Stardust Collected:** `{found_stardust}`"
+                f"✨ **Stardust Collected:** **{found_stardust:,}**"
                 f"{loot_bonus_note}"
             )
 
@@ -831,7 +836,7 @@ class Exploration(commands.Cog):
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
                 found_xp = random.randint(75, 200)
-                loot_description += f"\n\n📊 **XP Data Shard:** `+{found_xp} XP`"
+                loot_description += f"\n\n📊 **XP Data Shard:** **+{found_xp} XP**"
                 rarity_badge = "uncommon"
 
                 # Award XP globally through leveling.py
@@ -854,7 +859,7 @@ class Exploration(commands.Cog):
                 if added_amount == 1:
                     loot_description += (
                         f"\n\n⛏️ **Rare Ore Extracted:** Refined a "
-                        f"`Titanium Ore Chunk`! ({new_quantity}/{max_quantity})"
+                        f"**Titanium Ore Chunk**! ({new_quantity}/{max_quantity})"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("titanium_chunk", 75)
@@ -863,7 +868,7 @@ class Exploration(commands.Cog):
                     loot_description += (
                         f"\n\n📦 **Inventory Full:** Your Titanium Ore Chunk stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -896,7 +901,7 @@ class Exploration(commands.Cog):
                     loot_description += (
                         f"\n\n📦 **Inventory Full:** Your Arcade Token balance "
                         f"is already at **{token_max}/{token_max}**!"
-                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -937,7 +942,7 @@ class Exploration(commands.Cog):
                     loot_description += (
                         f"\n\n📦 **Inventory Full:** Your Dilated Time Crystal "
                         f"stack is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "epic"
@@ -965,7 +970,7 @@ class Exploration(commands.Cog):
                     loot_description += (
                         f"\n\n📦 **Inventory Full:** Your Astral Core stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                         "\n*The mysterious core was too much for your inventory to contain.*"
                     )
 
@@ -1225,7 +1230,7 @@ class Exploration(commands.Cog):
                     loot_rarity_note += (
                         f"\n📦 **Arcade Token Overflow:** Your token balance is already "
                         f"at **{token_max}/{token_max}**!"
-                        f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                        f"\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
             if pet_effects["charge_save"] and random.random() < pet_effects["charge_save"]:
@@ -1244,7 +1249,13 @@ class Exploration(commands.Cog):
             else:
                 quantum_bonus_note = ""
 
-            new_stardust = stardust + found_stardust + token_overflow_stardust
+            cache_payout = 0
+            cache_note = ""
+            if random.random() < SCAVENGE_STARDUST_CACHE_CHANCE:
+                cache_payout = random.randint(SCAVENGE_STARDUST_CACHE_MIN, SCAVENGE_STARDUST_CACHE_MAX)
+                cache_note = f"\n\n🎁 **Stardust Cache Found!** **+{cache_payout:,} Stardust**"
+
+            new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
 
             # 30% Environmental Hazard Chance during Scavenging.
             damage_taken = 0
@@ -1319,14 +1330,16 @@ class Exploration(commands.Cog):
                     )
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
-            # Halloween eggs stop dropping automatically when the event ends.
-            egg_id = None
+            # Halloween and normal eggs each get their own roll, so both can be
+            # found during the same scavenging run. Halloween eggs stop dropping
+            # automatically when the event ends.
+            egg_rolls = []
             if halloween_junk and random.random() < HALLOWEEN_PET_EGG_CHANCE:
-                egg_id = "halloween_egg"
-            elif random.random() < NORMAL_EGG_CHANCE:
-                egg_id = "normal_egg"
+                egg_rolls.append("halloween_egg")
+            if random.random() < NORMAL_EGG_CHANCE:
+                egg_rolls.append("normal_egg")
 
-            if egg_id:
+            for egg_id in egg_rolls:
                 egg_info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
                 added_egg, egg_quantity, egg_max = await add_inventory_item(
                     db, user_id, egg_id, "pet_egg", 1
@@ -1483,7 +1496,7 @@ class Exploration(commands.Cog):
                     f"{item_name}\n"
                     f"📦 **Inventory Full:** Stack is already "
                     f"**{max_quantity}/{max_quantity}**!"
-                    f"\n✨ **Converted to:** `+{overflow_stardust} Stardust`"
+                    f"\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                 )
 
             # Group bonus discoveries into readable single-line sections rather than
@@ -1526,15 +1539,16 @@ class Exploration(commands.Cog):
 
             await db.commit()
 
-        status_text = f"❤️ **Health:** `{new_hp}/{max_hp} HP`" if new_hp > 0 else f"💀 **Knocked Out!** Use `/revive`, buy `/shop buy full_revive`, or recover at 50% HP on **{knocked_out_until}**."
+        status_text = f"❤️ **Health:** **{new_hp}/{max_hp} HP**" if new_hp > 0 else f"💀 **Knocked Out!** Use `/revive`, buy `/shop buy full_revive`, or recover at 50% HP on **{knocked_out_until}**."
 
         embed = discord.Embed(
             title=f"🛰️ Derelict Salvage Log — {ctx.author.display_name}",
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
-                f"✨ **Found Stardust:** `{found_stardust}`"
-                f"{quantum_bonus_note}\n\n"
-                f"🛸 **Salvaged Item:** `{loot_name_with_quantity}`"
+                f"✨ **Found Stardust:** **{found_stardust:,}**"
+                f"{quantum_bonus_note}"
+                f"{cache_note}\n\n"
+                f"🛸 **Salvaged Item:** **{loot_name_with_quantity}**"
                 f"{loot_rarity_note}"
                 f"{bonus_material_text}"
                 f"{hazard_note}\n\n"

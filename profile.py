@@ -6,6 +6,23 @@ import os
 import json
 from easy_pil import Canvas, Editor, Font, load_image_async
 
+# Artwork credits for profile backgrounds.
+# Replace each placeholder with the artist's preferred credit name.
+# Leave the value as None when no artwork credit is needed.
+BACKGROUND_ARTISTS = {
+    "default": "NASA Hubble Space Telescope",
+    "default_nebula": "NASA Hubble Space Telescope",
+    "neon_grid": "pikisuperstar on Magnific",
+    "deep_void": "Marek Pavlík on Unsplash",
+    "solaris_ring": "NASA / Solar Dynamics Observatory (SDO)",
+    "halloween_haunted": "@john_silliman on Unsplash",
+    "halloween_candy_collector": "Yaroslav Danylchenko0",
+    "halloween_haunting_friend": "@helloimnik on Unsplash",
+    "halloween_trick_or_treat": "Daisy Anderson on Pexels",
+    "background_glowing_gem": "SynoMatesXD on Reddit",
+    "background_malo": "@upsetfroglet on Tumblr",
+}
+
 class Profile(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -221,9 +238,9 @@ class Profile(commands.Cog):
         embed.set_thumbnail(url=target.display_avatar.url)
         
         # Native Discord Stat Fields
-        embed.add_field(name="⭐ Rank & XP", value=f"Level `{data['level']}` • `{data['xp']:,} XP`", inline=True)
-        embed.add_field(name="✨ Stardust", value=f"`{data['stardust']:,}`", inline=True)
-        embed.add_field(name="🔥 Daily Streak", value=f"`{data['daily_streak']} days`", inline=True)
+        embed.add_field(name="⭐ Rank & XP", value=f"Level **{data['level']}** • **{data['xp']:,} XP**", inline=True)
+        embed.add_field(name="✨ Stardust", value=f"**{data['stardust']:,}**", inline=True)
+        embed.add_field(name="🔥 Daily Streak", value=f"**{data['daily_streak']} days**", inline=True)
         embed.add_field(
             name="🛠️ Exploration Upgrades",
             value=(
@@ -236,15 +253,24 @@ class Profile(commands.Cog):
             pet_name = data["pet"]["nickname"] or data["pet"]["name"]
             companion_text = (
                 f"{data['pet']['emoji']} **{pet_name}**\n"
-                f"Level `{data['pet']['level']}`"
+                f"Level **{data['pet']['level']}**"
             )
         else:
-            companion_text = "`None`"
+            companion_text = "**None**"
 
         embed.add_field(name="🐾 Companion", value=companion_text, inline=True)
         
         # Environment Window Image
         embed.set_image(url="attachment://viewport.png")
+
+        # Add an artwork credit only when the active background has one.
+        # The profile data stores the actual background ID, so this also works
+        # automatically for newly added backgrounds once they are listed above.
+        active_background_id = data.get("bg") or "default"
+        artist = BACKGROUND_ARTISTS.get(active_background_id)
+
+        if artist:
+            embed.set_footer(text=f"Artwork credit — {artist}")
 
         await ctx.send(file=file, embed=embed)
 
@@ -364,7 +390,11 @@ class Profile(commands.Cog):
             "halloween_candy_collector": "Candy Collector",
             "halloween_haunting_friend": "Haunting Friend",
             "halloween_trick_or_treat": "Trick-or-Treat",
+            "background_glowing_gem": "Glowing Gem",
+            "background_malo": "MalO",
         }
+
+
 
         from database import ECONOMY_DB_NAME
 
@@ -406,6 +436,8 @@ class Profile(commands.Cog):
                 "halloween_candy_collector": "🍬",
                 "halloween_haunting_friend": "🐣",
                 "halloween_trick_or_treat": "🎃",
+                "background_glowing_gem": "💎",
+                "background_malo": "📱",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -437,7 +469,9 @@ class Profile(commands.Cog):
             "halloween_haunted": "Haunted Halloween",
             "halloween_candy_collector": "Candy Collector",
             "halloween_haunting_friend": "Haunting Friend",
-            "halloween_trick_or_treat": "Trick-or-Treat"
+            "halloween_trick_or_treat": "Trick-or-Treat",
+            "background_glowing_gem": "Glowing Gem",
+            "background_malo": "MalO"
         }
 
         if background not in valid_backgrounds:

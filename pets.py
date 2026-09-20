@@ -1,6 +1,7 @@
 import asyncio
 import random
 import time
+from typing import cast
 
 import aiosqlite
 import discord
@@ -210,8 +211,8 @@ PET_TREAT_XP = 25
 HALLOWEEN_PET_CANDY_XP = 100
 
 # Egg drops are independent bonus rolls during scavenging.
-NORMAL_EGG_CHANCE = 0.015
-HALLOWEEN_EGG_CHANCE = 0.025
+NORMAL_EGG_CHANCE = 0.15
+HALLOWEEN_EGG_CHANCE = 1 / 35
 
 INCUBATION_SECONDS = 12 * 60 * 60
 INCUBATOR_NOTIFICATION_CHANNEL_ID = 1548034265508356166
@@ -389,6 +390,363 @@ async def add_pet_xp(db, user_id: int, amount: int):
     }
 
 
+
+class FeedTreatSelect(discord.ui.Select):
+    def __init__(self, cog, user_id, pet_id, owned, parent_message, ctx):
+        options = []
+        for item_id, label, emoji in (
+            ("pet_snack", "Pet Treat", "🍖"),
+            ("halloween_pet_candy", "Halloween Pet Candy", "🎃"),
+        ):
+            quantity = owned.get(item_id, 0)
+            if quantity <= 0:
+                continue
+            options.append(discord.SelectOption(
+                label=f"{label} ×{quantity}",
+                value=item_id,
+                emoji=emoji,
+                description="Feed this treat to the selected pet.",
+            ))
+        super().__init__(placeholder="Choose a treat...", min_values=1, max_values=1, options=options)
+        self.cog = cog
+        self.user_id = user_id
+        self.pet_id = pet_id
+        self.parent_message = parent_message
+        self.ctx = ctx
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ This treat menu isn't for you.", ephemeral=True)
+        result, error = await self.cog._feed_specific_pet(self.user_id, self.pet_id, self.values[0])
+        if error:
+            return await interaction.response.send_message(error, ephemeral=True)
+        pet = result["pet"]
+        level_line = ""
+        if result["leveled_up"]:
+            level_line = (
+                f"\n🎉 **Level Up!** Your pet reached **Level {result['new_level']}**!"
+                f"\n✨ Passive is now **Level {result['passive_level']}/{PET_PASSIVE_MAX_LEVEL}**."
+            )
+        await interaction.response.send_message(
+            f"{pet['emoji']} **{pet['nickname'] or pet['name']}** enjoyed the "
+            f"**{result['treat']['name']}**!\n✨ **+{result['xp_amount']} Pet XP**{level_line}",
+            ephemeral=True,
+        )
+        await self.cog._refresh_pet_view(self.parent_message, self.user_id, self.pet_id, ctx=self.ctx)
+
+
+class FeedTreatView(discord.ui.View):
+    def __init__(self, cog, user_id, pet_id, owned, parent_message, ctx):
+        super().__init__(timeout=60)
+        self.parent_message = parent_message
+        self.add_item(FeedTreatSelect(cog, user_id, pet_id, owned, parent_message, ctx))
+
+
+class ReleaseConfirmationView(discord.ui.View):
+    def __init__(self, cog, user_id, pet, parent_message, ctx):
+        super().__init__(timeout=30)
+        self.cog = cog
+        self.user_id = user_id
+        self.pet_id = pet["pet_id"]
+        self.pet = pet
+        self.parent_message = parent_message
+        self.ctx = ctx
+
+    @discord.ui.button(label="Yes, Release Pet", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ This confirmation isn't for you.", ephemeral=True)
+        released = await self.cog._release_pet(self.user_id, self.pet_id)
+        if not released:
+            self.stop()
+            return await interaction.response.edit_message(content="❌ That pet could not be released because it no longer exists.", view=None)
+        if released.get("protected"):
+            self.stop()
+            return await interaction.response.edit_message(
+                content="🔒 **This pet is favorited and protected!** Unfavorite it first if you really want to release it.",
+                view=None,
+            )
+        self.stop()
+        await interaction.response.edit_message(
+            content=(
+                f"🔴 Released **{released['emoji']} {released['nickname'] or released['name']}** "
+                f"(Level {released['level']}).\n\nThis pet has been permanently removed from your collection."
+            ),
+            view=None,
+        )
+        await self.cog._refresh_pet_view(self.parent_message, self.user_id, self.pet_id, allow_missing=True, ctx=self.ctx)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ This confirmation isn't for you.", ephemeral=True)
+        self.stop()
+        await interaction.response.edit_message(content="Release cancelled. 👍", view=None)
+
+
+
+class RenamePetModal(discord.ui.Modal):
+    def __init__(self, cog, user_id, pet_id, parent_message, ctx):
+        super().__init__(title="Rename Pet", timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.pet_id = pet_id
+        self.parent_message = parent_message
+        self.ctx = ctx
+
+        self.name_input = discord.ui.TextInput(
+            label="Pet Name",
+            placeholder="Enter a new name (30 characters max)",
+            max_length=30,
+            required=False,
+        )
+        self.add_item(self.name_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "❌ This rename menu isn't for you.", ephemeral=True
+            )
+
+        new_name = str(self.name_input.value).strip()
+        if len(new_name) > 30:
+            return await interaction.response.send_message(
+                "❌ Pet names can be at most **30 characters** long.",
+                ephemeral=True,
+            )
+
+        renamed = await self.cog._rename_pet(self.user_id, self.pet_id, new_name)
+        if not renamed:
+            return await interaction.response.send_message(
+                "❌ That pet no longer exists in your collection.",
+                ephemeral=True,
+            )
+
+        display_name = renamed["nickname"] or renamed["name"]
+        if renamed["nickname"]:
+            message = (
+                f"✏️ Pet renamed to **{display_name}**!\n"
+                f"-# Original: {renamed['name']}"
+            )
+        else:
+            message = f"✏️ **{renamed['name']}** is back to its original name."
+
+        await interaction.response.send_message(message, ephemeral=True)
+        await self.cog._refresh_pet_view(
+            self.parent_message,
+            self.user_id,
+            self.pet_id,
+            ctx=self.ctx,
+        )
+
+
+class PetManagementView(discord.ui.View):
+    def __init__(self, cog, user_id, ctx, pets, index=0):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.user_id = user_id
+        self.ctx = ctx
+        self.pets = pets
+        self.index = index
+        self._sync_buttons()
+
+    def _sync_buttons(self):
+        previous = cast(discord.ui.Button, self.previous)
+        next_button = cast(discord.ui.Button, self.next)
+        equip = cast(discord.ui.Button, self.equip)
+        favorite = cast(discord.ui.Button, self.favorite)
+
+        previous.disabled = len(self.pets) <= 1
+        next_button.disabled = len(self.pets) <= 1
+        pet = self.pets[self.index]
+        equip.label = "Unequip Pet" if pet["is_active"] else "Equip Pet"
+        equip.style = discord.ButtonStyle.secondary
+        favorite.label = "🔓 Unfavorite" if pet["is_favorite"] else "🔒 Favorite"
+        favorite.style = discord.ButtonStyle.primary
+
+    async def _ensure_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This pet menu isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    async def _refresh(self, interaction=None, message=None):
+        self.pets = await self.cog._get_owned_pets(self.user_id)
+        if not self.pets:
+            self.stop()
+            embed = discord.Embed(
+                title=f"🐾 {self.ctx.author.display_name}'s Pet Collection",
+                description="Your collection is empty!",
+                color=discord.Color.from_rgb(120, 140, 160),
+            )
+            target = message or (interaction.message if interaction else None)
+            if target:
+                await target.edit(embed=embed, view=None)
+            return
+        self.index = min(self.index, len(self.pets) - 1)
+        self._sync_buttons()
+        target = message or (interaction.message if interaction else None)
+        if target:
+            await target.edit(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+    @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary, row=2)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        self.index = (self.index - 1) % len(self.pets)
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+    @discord.ui.button(label="🟢 Feed Pet", style=discord.ButtonStyle.success, row=0)
+    async def feed(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            async with db.execute(
+                "SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_id IN (?, ?) AND quantity > 0",
+                (self.user_id, "pet_snack", "halloween_pet_candy"),
+            ) as cursor:
+                owned = {row[0]: row[1] for row in await cursor.fetchall()}
+        options = [item for item in ("pet_snack", "halloween_pet_candy") if owned.get(item, 0) > 0]
+        if not options:
+            return await interaction.response.send_message("❌ You don't have any Pet Treats or Halloween Pet Candy.", ephemeral=True)
+        await interaction.response.send_message(
+            f"🍪 Choose a treat for **{pet['emoji']} {pet['nickname'] or pet['name']}**:",
+            view=FeedTreatView(self.cog, self.user_id, pet["pet_id"], owned, interaction.message, self.ctx),
+            ephemeral=True,
+        )
+
+
+    @discord.ui.button(label="📊 Pet Stats", style=discord.ButtonStyle.secondary, row=0)
+    async def stats(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        passive = pet.get("passive", {})
+        passive_level = passive_level_for_pet(pet["level"])
+        passive_value = get_passive_value(pet, pet["level"])
+        value_text = (
+            f"{passive_value * 100:.1f}%"
+            if passive_value < 1
+            else f"{passive_value:.2f}"
+        )
+        source = (
+            "Halloween Egg"
+            if passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS
+            else "Normal Egg"
+        )
+        embed = discord.Embed(
+            title=f"📊 {pet['emoji']} {pet['nickname'] or pet['name']} — Stats",
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        embed.add_field(
+            name="📈 Progression",
+            value=(
+                f"**Level:** {pet['level']}\n"
+                f"**XP:** {pet['xp']}/{xp_needed_for_next_level(pet['level'])}\n"
+                f"**Passive Level:** {passive_level}/{PET_PASSIVE_MAX_LEVEL}"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name=f"✨ {passive.get('name', 'Unknown Passive')}",
+            value=(
+                f"{passive.get('description', 'No passive description.')}\n"
+                f"**Current Strength:** {value_text}"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🐣 Origin",
+            value=f"**{source}**\n{'⭐ Equipped' if pet['is_active'] else 'Not equipped'}",
+            inline=False,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+    @discord.ui.button(label="Equip Pet", style=discord.ButtonStyle.primary, row=0)
+    async def equip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        if pet["is_active"]:
+            changed = await self.cog._unequip_pet(self.user_id, pet["pet_id"])
+            if not changed:
+                return await interaction.response.send_message("❌ That pet is no longer equipped.", ephemeral=True)
+            await interaction.response.edit_message(content=None, embed=self.cog._pet_embed(self.ctx, {**pet, "is_active": False}, self.index, len(self.pets)), view=self)
+        else:
+            definition, error = await self.cog._equip_pet(self.user_id, pet["pet_id"])
+            if error:
+                return await interaction.response.send_message(error, ephemeral=True)
+            self.pets = await self.cog._get_owned_pets(self.user_id)
+            self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), 0)
+            self._sync_buttons()
+            await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+
+    @discord.ui.button(label="🔒 Favorite", style=discord.ButtonStyle.primary, row=1)
+    async def favorite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        favorited, error = await self.cog._set_pet_favorite(self.user_id, pet["pet_id"], not pet["is_favorite"])
+        if error:
+            return await interaction.response.send_message(error, ephemeral=True)
+        self.pets = await self.cog._get_owned_pets(self.user_id)
+        self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), self.index)
+        self._sync_buttons()
+        action = "favorited and locked" if favorited else "unfavorited and unlocked"
+        await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)),
+            view=self,
+        )
+
+    @discord.ui.button(label="✏️ Rename Pet", style=discord.ButtonStyle.secondary, row=1)
+    async def rename(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        modal = RenamePetModal(
+            self.cog,
+            self.user_id,
+            pet["pet_id"],
+            interaction.message,
+            self.ctx,
+        )
+        await interaction.response.send_modal(modal)
+
+
+    @discord.ui.button(label="🔴 Release Pet", style=discord.ButtonStyle.danger, row=1)
+    async def release(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pet = self.pets[self.index]
+        if pet["is_favorite"]:
+            return await interaction.response.send_message(
+                "🔒 **This pet is favorited and protected!** Unfavorite it first if you want to release it.",
+                ephemeral=True,
+            )
+        await interaction.response.send_message(
+            (
+                f"⚠️ **Are you sure?**\n\n"
+                f"You are about to permanently release **{pet['emoji']} {pet['nickname'] or pet['name']}**.\n"
+                f"Level **{pet['level']}** • **{pet['xp']} XP**\n\n"
+                f"This cannot be undone."
+            ),
+            view=ReleaseConfirmationView(self.cog, self.user_id, pet, interaction.message, self.ctx),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary, row=2)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        self.index = (self.index + 1) % len(self.pets)
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+
 class Pets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -409,6 +767,7 @@ class Pets(commands.Cog):
         additions = {
             "pet_type": "TEXT DEFAULT ''",
             "is_active": "INTEGER DEFAULT 0",
+            "is_favorite": "INTEGER DEFAULT 0",
         }
 
         for column, definition in additions.items():
@@ -572,24 +931,331 @@ class Pets(commands.Cog):
 
         return choices[:25]
 
-    @commands.hybrid_command(name="pets", description="View your pet collection.")
-    async def pets(self, ctx: commands.Context):
-        await ctx.defer()
-
+    async def _get_owned_pets(self, user_id):
+        """Return all recognized, non-egg pets owned by a user in stable order."""
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
             async with db.execute(
                 """
-                SELECT pet_type, pet_stage, nickname, level, xp, is_active
+                SELECT pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite
                 FROM pets
                 WHERE user_id = ? AND COALESCE(pet_type, pet_stage) != 'egg'
                 ORDER BY pet_id
                 """,
-                (ctx.author.id,),
+                (user_id,),
             ) as cursor:
                 rows = await cursor.fetchall()
 
-        if not rows:
+        pets = []
+        for pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite in rows:
+            pet_type_id = pet_type or pet_stage
+            definition = get_pet_definition(pet_type_id)
+            if not definition:
+                continue
+            pets.append({
+                "pet_id": pet_id,
+                "pet_type": pet_type_id,
+                "name": definition["name"],
+                "emoji": definition["emoji"],
+                "description": definition["description"],
+                "nickname": nickname,
+                "level": level or 1,
+                "xp": xp or 0,
+                "is_active": bool(is_active),
+                "is_favorite": bool(is_favorite),
+                "passive": definition.get("passive", {}),
+            })
+        return pets
+
+    def _pet_embed(self, ctx, pet, page, total):
+        level = pet["level"]
+        xp = pet["xp"]
+        needed = xp_needed_for_next_level(level)
+        passive = pet.get("passive", {})
+        passive_level = passive_level_for_pet(level)
+        passive_value = get_passive_value(pet, level)
+        value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
+        display_name = pet["nickname"] or pet["name"]
+        active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
+
+        embed = discord.Embed(
+            title=f"🐾 {ctx.author.display_name}'s Pet",
+            description=(
+                f"{pet['emoji']} **{display_name}**\n"
+                + (f"-# Original: {pet['name']}\n" if pet["nickname"] else "")
+                + f"*{pet['description']}*\n\n"
+                + ("🔒 **FAVORITED — PROTECTED FROM RELEASE**" if pet["is_favorite"] else "-# 🔒 Favorite this pet to lock it and prevent accidental release.")
+                + f"\n{active_text}"
+            ),
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        embed.add_field(
+            name="📈 Level & XP",
+            value=(
+                f"**Level {level}**\n"
+                f"`{self.xp_bar(xp, needed)}`\n"
+                f"**{xp}/{needed} XP** to Level {level + 1}"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name=f"✨ Passive — {passive.get('name', 'Unknown')}",
+            value=(
+                f"**Passive Level {passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
+                f"{passive.get('description', 'No passive description.')}\n"
+                f"Current strength: **{value_text}**"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🍪 Treat XP",
+            value=(
+                f"🍖 Pet Treat — **+{PET_TREAT_XP} XP**\n"
+                f"🎃 Halloween Pet Candy — **+{HALLOWEEN_PET_CANDY_XP} XP**"
+            ),
+            inline=False,
+        )
+        embed.set_footer(text=f"Pet {page + 1}/{total} • Pets can level beyond Passive Level 5; passive strength caps at 5 for now.")
+        return embed
+
+    async def _feed_specific_pet(self, user_id, pet_id, treat):
+        xp_amounts = {
+            "pet_snack": PET_TREAT_XP,
+            "halloween_pet_candy": HALLOWEEN_PET_CANDY_XP,
+        }
+        if treat not in xp_amounts:
+            return None, "❌ That isn't a valid pet treat."
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+
+            async with db.execute(
+                """
+                SELECT pet_id, pet_type, pet_stage, nickname, level, xp, is_active
+                FROM pets
+                WHERE user_id = ? AND pet_id = ?
+                LIMIT 1
+                """,
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row or (row[1] or row[2]) == "egg":
+                await db.rollback()
+                return None, "❌ That pet no longer exists in your collection."
+
+            definition = get_pet_definition(row[1] or row[2])
+            if not definition:
+                await db.rollback()
+                return None, "❌ That pet is no longer configured."
+
+            async with db.execute(
+                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
+                (user_id, treat),
+            ) as cursor:
+                treat_row = await cursor.fetchone()
+
+            if not treat_row or treat_row[0] <= 0:
+                await db.rollback()
+                return None, f"❌ You don't have any **{ITEM_REGISTRY[treat]['name']}**!"
+
+            pet = {
+                "pet_id": row[0],
+                "pet_type": row[1] or row[2],
+                "name": definition["name"],
+                "emoji": definition["emoji"],
+                "description": definition["description"],
+                "nickname": row[3],
+                "level": row[4] or 1,
+                "xp": row[5] or 0,
+                "is_active": bool(row[6]),
+                "passive": definition.get("passive", {}),
+            }
+            base_xp = xp_amounts[treat]
+            treat_bonus = 0.0
+            if pet["passive"].get("id") == "treat_xp_bonus":
+                treat_bonus = get_passive_value(pet, pet["level"])
+            xp_amount = int(base_xp * (1 + treat_bonus))
+
+            await db.execute(
+                "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                (user_id, treat),
+            )
+            await db.execute(
+                "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
+                (user_id, treat),
+            )
+
+            old_level = pet["level"]
+            new_level = old_level
+            new_xp = pet["xp"] + xp_amount
+            while new_xp >= xp_needed_for_next_level(new_level):
+                new_xp -= xp_needed_for_next_level(new_level)
+                new_level += 1
+
+            await db.execute(
+                "UPDATE pets SET level = ?, xp = ? WHERE pet_id = ? AND user_id = ?",
+                (new_level, new_xp, pet_id, user_id),
+            )
+            await db.commit()
+
+        return {
+            "pet": pet,
+            "treat": ITEM_REGISTRY[treat],
+            "xp_amount": xp_amount,
+            "old_level": old_level,
+            "new_level": new_level,
+            "leveled_up": new_level > old_level,
+            "passive_level": passive_level_for_pet(new_level),
+        }, None
+
+    async def _equip_pet(self, user_id, pet_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                "SELECT pet_type, pet_stage FROM pets WHERE user_id = ? AND pet_id = ? LIMIT 1",
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if not row:
+                await db.rollback()
+                return None, "❌ That pet no longer exists in your collection."
+            definition = get_pet_definition(row[0] or row[1])
+            if not definition:
+                await db.rollback()
+                return None, "❌ That pet is no longer configured."
+            await db.execute("UPDATE pets SET is_active = 0 WHERE user_id = ?", (user_id,))
+            await db.execute("UPDATE pets SET is_active = 1 WHERE user_id = ? AND pet_id = ?", (user_id, pet_id))
+            await db.commit()
+        return definition, None
+
+    async def _unequip_pet(self, user_id, pet_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "UPDATE pets SET is_active = 0 WHERE user_id = ? AND pet_id = ? AND is_active = 1",
+                (user_id, pet_id),
+            )
+            changed = cursor.rowcount
+            await db.commit()
+        return changed > 0
+
+    async def _rename_pet(self, user_id, pet_id, nickname):
+        nickname = nickname.strip()
+        if len(nickname) > 30:
+            return None
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                """
+                SELECT pet_type, pet_stage
+                FROM pets
+                WHERE user_id = ? AND pet_id = ?
+                LIMIT 1
+                """,
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row or (row[0] or row[1]) == "egg":
+                await db.rollback()
+                return None
+
+            definition = get_pet_definition(row[0] or row[1])
+            if not definition:
+                await db.rollback()
+                return None
+
+            await db.execute(
+                """
+                UPDATE pets
+                SET nickname = ?
+                WHERE user_id = ? AND pet_id = ?
+                """,
+                (nickname, user_id, pet_id),
+            )
+            await db.commit()
+
+        return {
+            "pet_id": pet_id,
+            "name": definition["name"],
+            "nickname": nickname,
+            "emoji": definition["emoji"],
+        }
+
+    async def _set_pet_favorite(self, user_id, pet_id, favorite):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                "SELECT pet_type, pet_stage FROM pets WHERE user_id = ? AND pet_id = ? LIMIT 1",
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if not row or (row[0] or row[1]) == "egg":
+                await db.rollback()
+                return False, "❌ That pet no longer exists in your collection."
+            if not get_pet_definition(row[0] or row[1]):
+                await db.rollback()
+                return False, "❌ That pet is no longer configured."
+            await db.execute(
+                "UPDATE pets SET is_favorite = ? WHERE user_id = ? AND pet_id = ?",
+                (1 if favorite else 0, user_id, pet_id),
+            )
+            await db.commit()
+        return bool(favorite), None
+
+
+    async def _release_pet(self, user_id, pet_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                """
+                SELECT pet_type, pet_stage, nickname, level, xp, is_active, is_favorite
+                FROM pets
+                WHERE user_id = ? AND pet_id = ?
+                LIMIT 1
+                """,
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if not row:
+                await db.rollback()
+                return None
+            if row[6]:
+                await db.rollback()
+                return {"protected": True}
+            pet_type = row[0] or row[1]
+            definition = get_pet_definition(pet_type)
+            if not definition:
+                await db.rollback()
+                return None
+            await db.execute(
+                "DELETE FROM pets WHERE user_id = ? AND pet_id = ?",
+                (user_id, pet_id),
+            )
+            await db.commit()
+        return {
+            "pet_id": pet_id,
+            "name": definition["name"],
+            "emoji": definition["emoji"],
+            "nickname": row[2],
+            "level": row[3] or 1,
+            "xp": row[4] or 0,
+            "is_active": bool(row[5]),
+        }
+
+    @commands.hybrid_command(name="pets", description="View and manage your pet collection.")
+    async def pets(self, ctx: commands.Context):
+        await ctx.defer()
+        pets = await self._get_owned_pets(ctx.author.id)
+        if not pets:
             embed = discord.Embed(
                 title=f"🐾 {ctx.author.display_name}'s Pet Collection",
                 description=(
@@ -601,236 +1267,30 @@ class Pets(commands.Cog):
             )
             return await ctx.send(embed=embed)
 
-        lines = []
-        for pet_type, pet_stage, nickname, level, xp, is_active in rows:
-            pet_id = pet_type or pet_stage
-            definition = get_pet_definition(pet_id)
-            if not definition:
-                continue
-            needed = xp_needed_for_next_level(level or 1)
-            passive_level = passive_level_for_pet(level or 1)
-            name = nickname or definition["name"]
-            marker = " ⭐ **ACTIVE**" if is_active else ""
-            lines.append(
-                f"{definition['emoji']} **{name}** — Level **{level}** "
-                f"({xp}/{needed} XP) • Passive Lv. **{passive_level}/{PET_PASSIVE_MAX_LEVEL}**{marker}"
-            )
+        view = PetManagementView(self, ctx.author.id, ctx, pets, 0)
+        await ctx.send(embed=self._pet_embed(ctx, pets[0], 0, len(pets)), view=view)
 
-        embed = discord.Embed(
-            title=f"🐾 {ctx.author.display_name}'s Pet Collection",
-            description="\n".join(lines) or "No recognized pets found.",
-            color=discord.Color.from_rgb(120, 140, 160),
-        )
-        embed.set_footer(text="Use /pet equip to choose your active companion.")
-        await ctx.send(embed=embed)
-
-    @commands.hybrid_group(
-        name="pet",
-        description="Manage your active station companion.",
-        invoke_without_command=True,
-    )
-    async def pet(self, ctx: commands.Context):
-        await self._send_pet_status(ctx)
-
-    @pet.command(name="equip", description="Equip a pet from your collection.")
-    @app_commands.describe(pet="Choose a pet you own.")
-    @app_commands.autocomplete(pet=_pet_autocomplete)
-    async def pet_equip(self, ctx: commands.Context, pet: str):
-        await ctx.defer()
-        pet = pet.lower().strip()
-
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await self.ensure_schema(db)
-            await db.execute("BEGIN IMMEDIATE")
-
-            # The autocomplete passes the unique database pet_id, so duplicate
-            # pets can be selected individually instead of always choosing the newest
-            # pet of that species.
-            try:
-                selected_pet_id = int(pet)
-            except (TypeError, ValueError):
-                return await ctx.send("❌ Please select a pet from the autocomplete list.")
-
-            async with db.execute(
-                """
-                SELECT pet_id, pet_type, pet_stage
-                FROM pets
-                WHERE user_id = ? AND pet_id = ?
-                LIMIT 1
-                """,
-                (ctx.author.id, selected_pet_id),
-            ) as cursor:
-                row = await cursor.fetchone()
-
-            if not row:
-                return await ctx.send("❌ You don't own that pet.")
-
-            # Validate the pet definition before changing active-pet state.
-            # Otherwise a legacy/unconfigured pet could deactivate the user's
-            # current companion and then fail with "no longer configured."
-            selected_pet_type = row[1] or row[2]
-            definition = get_pet_definition(selected_pet_type)
-            if not definition:
-                return await ctx.send("❌ That pet is no longer configured.")
-
-            await db.execute(
-                "UPDATE pets SET is_active = 0 WHERE user_id = ?",
-                (ctx.author.id,),
-            )
-            await db.execute(
-                "UPDATE pets SET is_active = 1 WHERE pet_id = ?",
-                (row[0],),
-            )
-            await db.commit()
-
-        await ctx.send(
-            f"{ctx.author.mention} 🐾 **Companion Equipped!**\n"
-            f"{definition['emoji']} **{definition['name']}** is now your active pet!"
-        )
-
-    @pet.command(name="feed", description="Feed your active pet a treat.")
-    @app_commands.describe(treat="Choose a pet treat you own.")
-    @app_commands.autocomplete(treat=_treat_autocomplete)
-    async def pet_feed(self, ctx: commands.Context, treat: str):
-        await ctx.defer()
-        treat = treat.lower().strip()
-
-        xp_amounts = {
-            "pet_snack": PET_TREAT_XP,
-            "halloween_pet_candy": HALLOWEEN_PET_CANDY_XP,
-        }
-
-        if treat not in xp_amounts:
-            return await ctx.send("❌ That isn't a pet treat.")
-
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await self.ensure_schema(db)
-            await db.execute("BEGIN IMMEDIATE")
-
-            pet = await get_active_pet(db, ctx.author.id)
-            if not pet:
-                return await ctx.send(
-                    "❌ You don't have an active pet. Hatch a pet and use `/pet equip` first!"
-                )
-
-            async with db.execute(
-                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
-                (ctx.author.id, treat),
-            ) as cursor:
-                row = await cursor.fetchone()
-
-            if not row or row[0] <= 0:
-                return await ctx.send(
-                    f"❌ You don't have any **{ITEM_REGISTRY[treat]['name']}**!"
-                )
-
-            await db.execute(
-                """
-                UPDATE inventory
-                SET quantity = quantity - 1
-                WHERE user_id = ? AND item_id = ?
-                """,
-                (ctx.author.id, treat),
-            )
-            await db.execute(
-                "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
-                (ctx.author.id, treat),
-            )
-
-            base_xp = xp_amounts[treat]
-            pet_effects = await get_active_pet_effects(db, ctx.author.id)
-
-            xp_amount = int(base_xp * (1 + pet_effects["treat_xp_bonus"]))
-
-            result = await add_pet_xp(db, ctx.author.id, xp_amount)
-            await db.commit()
-
-        info = ITEM_REGISTRY[treat]
-        level_line = ""
-        if result and result["leveled_up"]:
-            level_line = (
-                f"\n🎉 **Level Up!** Your pet reached **Level {result['new_level']}**!\n"
-                f"✨ Passive is currently **Level {result['passive_level']}/{PET_PASSIVE_MAX_LEVEL}**."
-            )
-
-        await ctx.send(
-            f"{ctx.author.mention} {info['emoji']} **{pet['name']}** enjoyed the "
-            f"**{info['name']}**!\n"
-            f"✨ **+{xp_amount} Pet XP**"
-            f"{level_line}"
-        )
-
-    async def _send_pet_status(self, ctx):
-        await ctx.defer()
-
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await self.ensure_schema(db)
-            pet = await get_active_pet(db, ctx.author.id)
-
-        if not pet:
+    async def _refresh_pet_view(self, message, user_id, pet_id, allow_missing=False, ctx=None):
+        if not message or ctx is None:
+            return
+        pets = await self._get_owned_pets(user_id)
+        if not pets:
             embed = discord.Embed(
-                title=f"🐾 {ctx.author.display_name}'s Pet Bay",
-                description=(
-                    "You don't have an active pet yet!\n\n"
-                    "🥚 Find an egg while scavenging.\n"
-                    "⏳ Incubate it with `/incubator start`.\n"
-                    "🐣 Hatch it with `/incubator hatch`.\n"
-                    "🐾 Then equip it with `/pet equip`."
-                ),
+                title=f"🐾 {ctx.author.display_name}'s Pet Collection",
+                description="Your collection is empty!",
                 color=discord.Color.from_rgb(120, 140, 160),
             )
-            return await ctx.send(embed=embed)
-
-        level = pet["level"]
-        xp = pet["xp"]
-        needed = xp_needed_for_next_level(level)
-        passive = pet["passive"]
-        passive_level = passive_level_for_pet(level)
-        passive_value = get_passive_value(pet, level)
-
-        if passive_value < 1:
-            value_text = f"{passive_value * 100:.1f}%"
-        else:
-            value_text = f"{passive_value:.2f}"
-
-        embed = discord.Embed(
-            title=f"🐾 {ctx.author.display_name}'s Pet",
-            description=(
-                f"{pet['emoji']} **{pet['nickname'] or pet['name']}**\n"
-                f"*{pet['description']}*"
-            ),
-            color=discord.Color.from_rgb(120, 140, 160),
-        )
-        embed.add_field(
-            name="📈 Level & XP",
-            value=(
-                f"Level **{level}**\n"
-                f"`{self.xp_bar(xp, needed)}`\n"
-                f"**{xp}/{needed} XP** to Level {level + 1}"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name=f"✨ Passive — {passive.get('name', 'Unknown')}",
-            value=(
-                f"Passive Level **{passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
-                f"{passive.get('description', 'No passive description.')}\n"
-                f"Current strength: **{value_text}**"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="🍪 Feeding",
-            value=(
-                f"Pet Treat: **+{PET_TREAT_XP} XP**\n"
-                f"🎃 Halloween Pet Candy: **+{HALLOWEEN_PET_CANDY_XP} XP**"
-            ),
-            inline=False,
-        )
-        embed.set_footer(
-            text="Pets can level beyond Passive Level 5; passive strength caps at 5 for now."
-        )
-        await ctx.send(embed=embed)
+            try:
+                await message.edit(embed=embed, view=None)
+            except discord.HTTPException:
+                pass
+            return
+        index = next((i for i, pet in enumerate(pets) if pet["pet_id"] == pet_id), min(len(pets) - 1, 0))
+        view = PetManagementView(self, user_id, ctx, pets, index)
+        try:
+            await message.edit(embed=self._pet_embed(ctx, pets[index], index, len(pets)), view=view)
+        except discord.HTTPException:
+            pass
 
     @commands.hybrid_group(
         name="incubator",
@@ -1026,7 +1486,7 @@ class Pets(commands.Cog):
         active_note = (
             " It has been automatically equipped because you didn't have an active pet!"
             if not has_active else
-            " Use `/pet equip` whenever you're ready to make it your active companion!"
+            " Use `/pets` to manage and equip your new companion!"
         )
 
         await ctx.send(

@@ -36,9 +36,9 @@ UPGRADE_DATA = {
         "levels": {
             1: {"cost": 2500, "component": "reinforced_laser_parts_1", "charges": 11, "stardust": 0.03, "rare": 0.005},
             2: {"cost": 7500, "component": "reinforced_laser_parts_2", "charges": 12, "stardust": 0.05, "rare": 0.010},
-            3: {"cost": 20000, "component": "reinforced_laser_parts_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
-            4: {"cost": 50000, "component": "reinforced_laser_parts_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
-            5: {"cost": 125000, "component": "reinforced_laser_parts_5", "charges": 15, "stardust": 0.12, "rare": 0.025},
+            3: {"cost": 15000, "component": "reinforced_laser_parts_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
+            4: {"cost": 35000, "component": "reinforced_laser_parts_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
+            5: {"cost": 50000, "component": "reinforced_laser_parts_5", "charges": 15, "stardust": 0.12, "rare": 0.035},
         },
     },
     "scavenging": {
@@ -48,9 +48,9 @@ UPGRADE_DATA = {
         "levels": {
             1: {"cost": 2500, "component": "drone_upgrade_kit_1", "charges": 11, "stardust": 0.03, "rare": 0.005},
             2: {"cost": 7500, "component": "drone_upgrade_kit_2", "charges": 12, "stardust": 0.05, "rare": 0.010},
-            3: {"cost": 20000, "component": "drone_upgrade_kit_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
-            4: {"cost": 50000, "component": "drone_upgrade_kit_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
-            5: {"cost": 125000, "component": "drone_upgrade_kit_5", "charges": 15, "stardust": 0.12, "rare": 0.025},
+            3: {"cost": 15000, "component": "drone_upgrade_kit_3", "charges": 13, "stardust": 0.07, "rare": 0.015},
+            4: {"cost": 35000, "component": "drone_upgrade_kit_4", "charges": 14, "stardust": 0.09, "rare": 0.020},
+            5: {"cost": 50000, "component": "drone_upgrade_kit_5", "charges": 15, "stardust": 0.12, "rare": 0.035},
         },
     },
     "salvage": {
@@ -60,9 +60,9 @@ UPGRADE_DATA = {
         "levels": {
             1: {"cost": 2500, "component": "salvage_rig_kit_1", "bonus_chance": 0.10},
             2: {"cost": 7500, "component": "salvage_rig_kit_2", "bonus_chance": 0.20},
-            3: {"cost": 20000, "component": "salvage_rig_kit_3", "bonus_chance": 0.35},
-            4: {"cost": 50000, "component": "salvage_rig_kit_4", "bonus_chance": 0.50},
-            5: {"cost": 125000, "component": "salvage_rig_kit_5", "bonus_chance": 0.65},
+            3: {"cost": 15000, "component": "salvage_rig_kit_3", "bonus_chance": 0.35},
+            4: {"cost": 35000, "component": "salvage_rig_kit_4", "bonus_chance": 0.50},
+            5: {"cost": 50000, "component": "salvage_rig_kit_5", "bonus_chance": 0.65},
         },
     },
 }
@@ -199,7 +199,7 @@ class Upgrades(commands.Cog):
         stardust, mining_level, scavenging_level, salvage_level = await self.get_levels(user_id)
         embed = discord.Embed(
             title="⚙️ Exploration Upgrades",
-            description="Permanent upgrades for your mining laser, scavenging drone, and salvage rig.\n\nEach system has **5 levels**, and every upgrade requires both **Stardust and materials**.",
+            description="Permanent upgrades for your mining laser, scavenging drone, and salvage rig.\n\nEach system has **5 levels**, and you must complete them **in order**. Every upgrade requires both **Stardust and materials**.",
             color=discord.Color.from_rgb(0, 229, 255),
         )
         for system, level in (("mining", mining_level), ("scavenging", scavenging_level), ("salvage", salvage_level)):

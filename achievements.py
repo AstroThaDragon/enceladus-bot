@@ -11,13 +11,13 @@ ACHIEVEMENTS = {
     "halloween_half": {
         "name": "Haunted Collector",
         "emoji": "🎃",
-        "description": "Collect at least 50% of the Halloween Space Junk collectibles.",
+        "description": "Collect at least 50% of the Halloween collectibles.",
         "reward": "Permanent profile background: Haunted Halloween",
     },
     "halloween_full": {
         "name": "Horror Enthusiast",
         "emoji": "👻",
-        "description": "Collect 100% of the Halloween Space Junk collectibles.",
+        "description": "Collect 100% of the Halloween collectibles.",
         "reward": "Permanent profile title: Horror Enthusiast",
     },
 
@@ -47,6 +47,70 @@ ACHIEVEMENTS = {
         "description": "Hatch a Halloween Egg.",
         "reward": "Permanent profile background: Haunting Friend",
     },
+    "halloween_wine_cabinet": {
+        "name": "Seal Breaker",
+        "emoji": "🍷",
+        "description": "Break the seal on the Cursed Wine Cabinet. You were warned.",
+        "reward": "Permanent profile title: Seal Breaker",
+    },
+
+    # Future one-time Halloween item achievements.
+    # These remain locked/inactive until their corresponding item is enabled
+    # in inventory.py.
+    "halloween_glitched_cartridge": {
+        "name": "Drowned in Code",
+        "emoji": "💾",
+        "description": "Use the Glitched Cartridge.",
+        "reward": "Permanent profile title: Drowned in Code",
+    },
+    "halloween_smile_photo": {
+        "name": "Spread the Word",
+        "emoji": "📸",
+        "description": "Use the Hyper-realistic Dog Photo.",
+        "reward": "Permanent profile title: Spread the Word",
+    },
+    "halloween_red_pokeball": {
+        "name": "Red's Shadow",
+        "emoji": "🔴",
+        "description": "Use the Glitched Red Pokeball.",
+        "reward": "Permanent profile title: Red's Shadow",
+    },
+    "halloween_hazmat_suit": {
+        "name": "Boundary Breaker",
+        "emoji": "☣️",
+        "description": "Use the Yellow Hazmat Suit.",
+        "reward": "Permanent profile title: Boundary Breaker",
+    },
+    "halloween_glow_chalk": {
+        "name": "Otherworld Passenger",
+        "emoji": "🖍️",
+        "description": "Use the Glow-in-the-dark Chalk.",
+        "reward": "Permanent profile title: Otherworld Passenger",
+    },
+    "halloween_ouija_board": {
+        "name": "Spirit Communicator",
+        "emoji": "🔮",
+        "description": "Use the Ouija Board.",
+        "reward": "Permanent profile title: Spirit Communicator",
+    },
+    "halloween_marker": {
+        "name": "Unitologist",
+        "emoji": "👽",
+        "description": "Use the Unknown Alien Artifact.",
+        "reward": "Permanent profile title: Unitologist",
+    },
+    "halloween_tails": {
+        "name": "Glowing Gem",
+        "emoji": "💎",
+        "description": "Use the Doll of Tails.",
+        "reward": "Permanent profile background: Glowing Gem",
+    },
+    "halloween_malo": {
+        "name": "MalO",
+        "emoji": "📱",
+        "description": "Use the Hacked Phone.",
+        "reward": "Permanent profile background: MalO",
+    },
 }
 
 HALLOWEEN_BACKGROUND_ID = "halloween_haunted"
@@ -55,6 +119,27 @@ HALLOWEEN_CANDY_BACKGROUND_ID = "halloween_candy_collector"
 HALLOWEEN_CANDY_TITLE_ID = "title_candy_nommer"
 HALLOWEEN_HATCH_BACKGROUND_ID = "halloween_haunting_friend"
 HALLOWEEN_BAG_BACKGROUND_ID = "halloween_trick_or_treat"
+HALLOWEEN_WINE_TITLE_ID = "title_seal_breaker"
+
+HALLOWEEN_SPECIAL_ITEM_TITLE_IDS = {
+    "halloween_wine_cabinet": "title_seal_breaker",
+    "halloween_glitched_cartridge": "title_drowned_in_code",
+    "halloween_smile_photo": "title_spread_the_word",
+    "halloween_red_pokeball": "title_reds_shadow",
+    "halloween_hazmat_suit": "title_boundary_breaker",
+    "halloween_glow_chalk": "title_otherworld_passenger",
+    "halloween_ouija_board": "title_spirit_communicator",
+    "halloween_marker": "title_unitologist",
+}
+
+HALLOWEEN_SPECIAL_ITEM_BACKGROUND_IDS = {
+    "halloween_tails": "background_glowing_gem",
+    "halloween_malo": "background_malo",
+}
+
+HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS = set(
+    HALLOWEEN_SPECIAL_ITEM_TITLE_IDS
+) | set(HALLOWEEN_SPECIAL_ITEM_BACKGROUND_IDS)
 
 
 async def ensure_achievement_tables(db):
@@ -82,6 +167,14 @@ async def ensure_achievement_tables(db):
             achievement_id TEXT NOT NULL,
             progress INTEGER DEFAULT 0,
             PRIMARY KEY (user_id, achievement_id)
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS used_collectibles (
+            user_id INTEGER NOT NULL,
+            collectible_id TEXT NOT NULL,
+            used_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, collectible_id)
         )
     """)
 
@@ -369,6 +462,45 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.close()
 
+    async def unlock_special_item_achievement(self, user_id, achievement_id, title_id=None, db=None):
+        """Unlock a permanent achievement reward for a one-time special item."""
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+
+        try:
+            await ensure_achievement_tables(db)
+
+            async with db.execute(
+                "SELECT 1 FROM achievements WHERE user_id = ? AND achievement_id = ?",
+                (user_id, achievement_id),
+            ) as cursor:
+                already_unlocked = await cursor.fetchone()
+
+            if not already_unlocked:
+                await db.execute(
+                    "INSERT INTO achievements (user_id, achievement_id) VALUES (?, ?)",
+                    (user_id, achievement_id),
+                )
+
+            if title_id:
+                await db.execute(
+                    """
+                    INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                    VALUES (?, ?, 'title', 1)
+                    ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = MAX(quantity, 1)
+                    """,
+                    (user_id, title_id),
+                )
+
+            if owns_db:
+                await db.commit()
+
+            return not already_unlocked
+        finally:
+            if owns_db:
+                await db.close()
+
     async def check_user_achievements(self, user_id, db=None):
         entries = get_halloween_collectibles()
         total = len(entries)
@@ -523,6 +655,23 @@ class Achievements(commands.Cog):
                     bag_row = await cursor.fetchone()
                 bag_progress = min(bag_row[0] if bag_row else 0, 25)
                 progress = f"Progress: **{bag_progress}/25**"
+            elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
+                # One-time special collectibles are binary achievements.
+                # Their permanent usage record is stored in used_collectibles.
+                collectible_id = achievement_id.removeprefix("halloween_")
+                try:
+                    async with db.execute(
+                        """
+                        SELECT 1
+                        FROM used_collectibles
+                        WHERE user_id = ? AND collectible_id = ?
+                        """,
+                        (user_id, collectible_id),
+                    ) as cursor:
+                        item_used = await cursor.fetchone()
+                    progress = "Progress: **1/1**" if item_used else "Progress: **0/1**"
+                except aiosqlite.Error:
+                    progress = "Progress: **0/1**"
             else:
                 progress = f"Progress: **{found}/{total}**"
             status = "✅ **Unlocked**" if is_unlocked else "🔒 **Locked**"

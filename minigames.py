@@ -128,16 +128,19 @@ class BlackjackView(discord.ui.View):
             await db.commit()
 
         outcome_text = {
-            "blackjack": f"🃏 **BLACKJACK!** Payout: **{payout:,} Stardust**",
-            "win": f"🎉 **You win!** Payout: **{payout:,} Stardust**",
-            "push": f"🤝 **Push.** Your wager is returned: **{payout:,} Stardust**",
-            "bust": "💥 **Bust!** The house takes the wager.",
+            "blackjack": "🃏 **BLACKJACK!**",
+            "win": "🎉 **You win!**",
+            "push": "🤝 **Push.**",
+            "bust": "💥 **Bust!**",
             "loss": "💀 **Dealer wins.**",
-            "timeout": (
-                f"⏰ **Table closed.** Your unfinished hand is refunded: **{payout:,} Stardust** "
-                "and your **1 Arcade Token** entry token is returned."
-            ),
+            "timeout": "⏰ **Table closed.** Your unfinished hand is refunded.",
         }[outcome]
+
+        result_summary = self.cog.format_game_result(self.bet, payout)
+        outcome_text = f"{outcome_text}\n{result_summary}"
+        if outcome == "timeout":
+            outcome_text += "\n🪙 Your **1 Arcade Token** entry token is also returned."
+
         embed = self.build_embed(finished=True, status=outcome_text)
         if outcome == "timeout":
             embed.set_footer(
@@ -301,13 +304,15 @@ class TriviaView(discord.ui.View):
             await db.commit()
 
         if correct:
-            result = f"🧠 **Correct!** You earned **{payout:,} Stardust**."
+            result = "🧠 **Correct!**"
         else:
             result = f"❌ **Incorrect.** The correct answer was **{self.options[self.answer]}**."
 
+        result_summary = self.cog.format_game_result(0, payout)
+
         embed = discord.Embed(
             title=f"🚀 Enceladus Space Trivia — {self.display_name}",
-            description=f"**{self.question}**\n\n{result}",
+            description=f"**{self.question}**\n\n{result}\n{result_summary}",
             color=discord.Color.from_rgb(0, 229, 255)
         )
         embed.set_footer(text=f"Stardust: {new_balance:,}")
@@ -328,11 +333,14 @@ class TriviaView(discord.ui.View):
                 arcade_coins_spent=1,
             )
             await db.commit()
+        result_summary = self.cog.format_game_result(0, 0)
+
         embed = discord.Embed(
             title=f"🚀 Enceladus Space Trivia — {self.display_name}",
             description=(
                 f"**{self.question}**\n\n"
-                f"⏰ **Time's up!** The correct answer was **{self.options[self.answer]}**."
+                f"⏰ **Time's up!** The correct answer was **{self.options[self.answer]}**.\n"
+                f"{result_summary}"
             ),
             color=discord.Color.from_rgb(0, 229, 255)
         )
@@ -1006,6 +1014,23 @@ class Minigames(commands.Cog):
             return f"🎰 **Maximum bet:** {self.MAX_BET:,} Stardust."
         return None
 
+    @staticmethod
+    def format_game_result(bet, payout):
+        """Build one consistent result summary for every Stardust wager game."""
+        profit = payout - bet
+
+        if profit > 0:
+            result_line = f"🎉 **WIN!** Profit: **+{profit:,} Stardust**"
+        elif profit == 0:
+            result_line = "🤝 **PUSH!** Profit: **0 Stardust**"
+        else:
+            result_line = f"💀 **LOSS!** Profit: **{profit:,} Stardust**"
+
+        return (
+            f"{result_line}\n"
+            f"💰 Stardust returned: **{payout:,}**"
+        )
+
     async def play_slots(self, interaction, bet):
         error = self.validate_bet(bet)
         if error:
@@ -1038,7 +1063,7 @@ class Minigames(commands.Cog):
         if result.get("error") == "insufficient":
             stardust_available = int(new_balance or 0)
             return await interaction.followup.send(
-                f"💸 **Not enough Stardust!** You have `{stardust_available:,}`, but your bet is `{bet:,}`.\n"
+                f"💸 **Not enough Stardust!** You have **{stardust_available:,}**, but your bet is **{bet:,}**.\n"
                 f"🪙 Your Arcade Token is not consumed.",
                 ephemeral=True,
             )
@@ -1055,15 +1080,23 @@ class Minigames(commands.Cog):
         display = " | ".join(reels)
 
         if matches == 3:
-            outcome = f"🎉 **JACKPOT!** Three matching symbols!\n💰 Payout: **{payout:,} Stardust**"
+            outcome = "🎰 **JACKPOT!** Three matching symbols!"
         elif matches == 2:
-            outcome = f"✨ **Two of a kind!**\n💰 Payout: **{payout:,} Stardust**"
+            outcome = "✨ **Two of a kind!**"
         else:
-            outcome = "💨 No match. The house wins this spin."
+            outcome = "💨 **No match.** The house wins this spin."
+
+        result_summary = self.format_game_result(bet, payout)
 
         embed = discord.Embed(
             title=f"🎰 Slots — {interaction.user.display_name}",
-            description=f"**{display}**\n\n💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Token**\n{outcome}",
+            description=(
+                f"**{display}**\n\n"
+                f"💰 Bet: **{bet:,} Stardust**\n"
+                f"🪙 Entry fee: **1 Arcade Token**\n"
+                f"{outcome}\n"
+                f"{result_summary}"
+            ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
         embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used")
@@ -1110,7 +1143,7 @@ class Minigames(commands.Cog):
         if result.get("error") == "insufficient":
             stardust_available = int(new_balance or 0)
             return await interaction.followup.send(
-                f"💸 **Not enough Stardust!** You have `{stardust_available:,}`, but your bet is `{bet:,}`.\n"
+                f"💸 **Not enough Stardust!** You have **{stardust_available:,}**, but your bet is **{bet:,}**.\n"
                 f"🪙 Your Arcade Token is not consumed.",
                 ephemeral=True,
             )
@@ -1123,15 +1156,21 @@ class Minigames(commands.Cog):
 
         choice_names = {"low": "Low (2-6)", "seven": "Seven (exactly 7)", "high": "High (8-12)"}
         if result["won"]:
-            outcome = f"🎯 **You hit {choice_names[choice]}!**\n💰 Payout: **{result['payout']:,} Stardust**"
+            outcome = f"🎯 **You hit {choice_names[choice]}!**"
         else:
             outcome = "💨 **No hit.** The house keeps your wager."
+
+        result_summary = self.format_game_result(bet, result["payout"])
 
         embed = discord.Embed(
             title=f"🎲 Enceladus Dice Table — {interaction.user.display_name}",
             description=(
                 f"🎲 **{result['die_one']} + {result['die_two']} = {result['total']}**\n\n"
-                f"💰 Bet: **{bet:,} Stardust**\n🪙 Entry fee: **1 Arcade Token**\n🎯 Choice: **{choice_names[choice]}**\n{outcome}"
+                f"💰 Bet: **{bet:,} Stardust**\n"
+                f"🪙 Entry fee: **1 Arcade Token**\n"
+                f"🎯 Choice: **{choice_names[choice]}**\n"
+                f"{outcome}\n"
+                f"{result_summary}"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -1178,7 +1217,7 @@ class Minigames(commands.Cog):
             if stardust < bet:
                 await db.rollback()
                 return await interaction.followup.send(
-                    f"💸 **Not enough Stardust!** You have `{stardust:,}`, but your bet is `{bet:,}`.\n"
+                    f"💸 **Not enough Stardust!** You have **{stardust:,}**, but your bet is **{bet:,}**.\n"
                     f"🪙 Your Arcade Token is not consumed.",
                     ephemeral=True
                 )
@@ -1268,17 +1307,19 @@ class Minigames(commands.Cog):
             )
 
         if result["won"]:
-            winnings = result["payout"] - bet
-            status = f"🎉 **WIN!** You profit **+{winnings:,} Stardust**."
+            status = f"🎉 **WIN!** Your {result['bet_type']} bet hit!"
         else:
-            status = f"💀 **The house wins.** You lose **{bet:,} Stardust**."
+            status = "💀 **LOSS!** The house wins."
+
+        result_summary = self.format_game_result(bet, result["payout"])
 
         embed = discord.Embed(
             title=f"🎡 Roulette — {interaction.user.display_name}",
             description=(
                 f"**The wheel lands on:** {result['result']} — {result['color']}\n\n"
                 f"🎟️ Your bet: **{bet:,} Stardust** on **{choice}**\n"
-                f"{status}"
+                f"{status}\n"
+                f"{result_summary}"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )

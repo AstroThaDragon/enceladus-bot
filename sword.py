@@ -186,7 +186,7 @@ FAIL_MESSAGES = [
     "⚔️ The sword almost accepts you.\nThen remembers standards exist.",
     "⚔️ Ancient celestial energy spirals around the blade.\nYou accomplish nothing.",
     "⚔️ The sword hums approvingly.\nThen immediately changes its mind.",
-    "⚔️ The blade grants you a brief glimpse of greatness.\nThen takes it back."
+    "⚔️ The blade grants you a brief glimpse of greatness.\nThen takes it back.",
     "⚔️ The Cosmic Blade considered your request.\nIt respectfully declined.",
 	"⚔️ You reached for the blade.\nThe blade reached for a different destiny.",
 	"⚔️ The sword examined your qualifications.\nThe examination was brief.",
@@ -437,7 +437,7 @@ class Sword(commands.Cog):
                 reset_timestamp = self.get_next_midnight_reset()
 
                 return await ctx.send(
-                    f"⏳ You've already attempted to pull the cosmic blade today!\\n"
+                    f"⏳ You've already attempted to pull the cosmic blade today!\n"
                     f"⚔️ You may attempt another pull <t:{reset_timestamp}:R>."
                 )
 
@@ -447,12 +447,12 @@ class Sword(commands.Cog):
             owner_ping = f"<@&{OWNER_ROLE_ID}>"
 
             if not success:
-                fail_text = random.choice(FAIL_MESSAGES)
+                fail_text = random.choice(FAIL_MESSAGES).replace("\\n", "\n")
 
                 return await ctx.send(
-                    f"⚔️ {user.mention} attempts to pull the sword!\\n\\n"
-                    f"**{fail_text}**\\n\\n"
-                    f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\\n\\n"
+                    f"⚔️ {user.mention} attempts to pull the sword!\n\n"
+                    f"**{fail_text}**\n\n"
+                    f"You failed to pull the sword! Maybe you'll be more determined tomorrow? Probably?\n\n"
                     f"-# ***Your Attempts:*** {user_attempts}"
                 )
 
@@ -508,18 +508,18 @@ class Sword(commands.Cog):
                 raise
 
             message = (
-                f"{owner_ping}\\n"
-                f"🌌⚔️ **THE COSMIC BLADE HAS BEEN PULLED FROM THE STONE!** ⚔️🌌\\n\\n"
-                f"{user.mention} has become the new wielder of the blade!\\n"
+                f"{owner_ping}\n"
+                f"🌌⚔️ **THE COSMIC BLADE HAS BEEN PULLED FROM THE STONE!** ⚔️🌌\n\n"
+                f"{user.mention} has become the new wielder of the blade!\n"
             )
 
             if previous_wielder and previous_wielder.id != user.id:
                 message += (
-                    f"\\nThe blade's blessing leaves {previous_wielder.mention}..."
+                    f"\nThe blade's blessing leaves {previous_wielder.mention}..."
                 )
 
             message += (
-                f"\\n\\n ⚔️ **{user.display_name}'s Attempts:** {user_attempts}"
+                f"\n\n ⚔️ **{user.display_name}'s Attempts:** {user_attempts}"
             )
 
             await ctx.send(message)

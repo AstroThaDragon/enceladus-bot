@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from emojis import EMOJIS
 from database import ECONOMY_DB_NAME
+from upgrades import UPGRADE_DATA
 
 MATERIAL_NAMES = {
     "iron_ore": (EMOJIS.get("iron_ore", "⛏️"), "Iron Ore"),
@@ -57,7 +58,81 @@ RECIPES = {
     "trick_or_treat_bag": {"name": "Trick-or-Treat Bag", "emoji": EMOJIS.get("trick_or_treat_bag", "🎃"), "result": "trick_or_treat_bag", "ingredients": {"halloween_candy": 25, "halloween_plastic": 10}},
 }
 
-CHOICES = [app_commands.Choice(name=f"{r['emoji']} {r['name']}", value=k) for k, r in RECIPES.items()]
+# Discord command choice labels do not render custom emoji markup reliably.
+# Use normal Unicode emoji in the dropdown while keeping the custom emoji markup
+# for places where Discord can render it (such as regular messages/embeds).
+# Tiered upgrade components must be crafted and applied in order.
+# A player cannot craft tier N until tier N-1 has actually been installed.
+TIERED_RECIPE_PROGRESSIONS = {
+    "reinforced_laser_parts_": "mining",
+    "drone_upgrade_kit_": "scavenging",
+    "salvage_rig_kit_": "salvage",
+}
+
+
+def get_tiered_recipe_progression(recipe):
+    """Return (system, tier) for a tiered upgrade recipe, or (None, None)."""
+    result = recipe.get("result", "")
+
+    for prefix, system in TIERED_RECIPE_PROGRESSIONS.items():
+        if result.startswith(prefix):
+            suffix = result[len(prefix):]
+            if suffix.isdigit():
+                return system, int(suffix)
+
+    return None, None
+
+
+RECIPE_EMOJI_FALLBACKS = {
+    "reinforced_laser_parts": "🛠️",
+    "drone_upgrade_kit": "🛸",
+    "nanite_retrofit_kit": "🧬",
+    "astral_power_core": "🌌",
+    "salvage_rig_kit": "♻️",
+    "makeshift_medkit": "🩹",
+    "trick_or_treat_bag": "🎃",
+}
+
+MATERIAL_EMOJI_FALLBACKS = {
+    "iron_ore": "⛏️",
+    "copper_ore": "🟠",
+    "titanium_chunk": "⛏️",
+    "aluminum_ore": "⬜",
+    "scrap_metal": "🔩",
+    "nuts_bolts": "🔧",
+    "wiring": "🧵",
+    "circuit_board": "🟩",
+    "glue": "🧴",
+    "gauze": "🧻",
+    "medical_alcohol": "🧴",
+    "bandaids": "🩹",
+    "antiseptic_ointment": "🧪",
+    "halloween_candy": "🍬",
+    "halloween_plastic": "🧴",
+    "astral_core": "🌌",
+    "reinforced_laser_parts": "🛠️",
+    "drone_upgrade_kit": "🛸",
+    "nanite_retrofit_kit": "🧬",
+    "astral_power_core": "🌌",
+    "salvage_rig_kit": "♻️",
+}
+
+
+def recipe_display_emoji(recipe):
+    result = recipe["result"]
+    if result.startswith("reinforced_laser_parts_"):
+        return RECIPE_EMOJI_FALLBACKS["reinforced_laser_parts"]
+    if result.startswith("drone_upgrade_kit_"):
+        return RECIPE_EMOJI_FALLBACKS["drone_upgrade_kit"]
+    if result.startswith("salvage_rig_kit_"):
+        return RECIPE_EMOJI_FALLBACKS["salvage_rig_kit"]
+    return RECIPE_EMOJI_FALLBACKS.get(result, "🔨")
+
+
+CHOICES = [
+    app_commands.Choice(name=f"{recipe_display_emoji(r)} {r['name']}", value=k)
+    for k, r in RECIPES.items()
+]
 
 
 class Crafting(commands.Cog):
@@ -93,6 +168,71 @@ class Crafting(commands.Cog):
         lines += ["", f"🔨 **Produces:** {recipe['emoji']} {recipe['name']} ×1", "", destination]
         return discord.Embed(title="🔨 Crafting", description="\n".join(lines), color=discord.Color.from_rgb(0, 229, 255))
 
+    @commands.hybrid_command(name="recipes", description="View all available crafting recipes.")
+    async def recipes(self, ctx):
+        await ctx.defer()
+
+        items = list(RECIPES.items())
+        page_size = 5
+        pages = []
+
+        for start in range(0, len(items), page_size):
+            chunk = items[start:start + page_size]
+            lines = []
+            for _recipe_id, recipe in chunk:
+                emoji = recipe_display_emoji(recipe)
+                materials = []
+                for item_id, amount in recipe["ingredients"].items():
+                    _icon, name = MATERIAL_NAMES[item_id]
+                    material_emoji = MATERIAL_EMOJI_FALLBACKS.get(item_id, "🔹")
+                    materials.append(f"{material_emoji} {name} ×{amount}")
+                lines.append(
+                    f"{emoji} **{recipe['name']}**\n"
+                    + " • ".join(materials)
+                )
+
+            embed = discord.Embed(
+                title="📖 Crafting Recipes",
+                description="\n\n".join(lines),
+                color=discord.Color.from_rgb(0, 229, 255),
+            )
+            embed.set_footer(
+                text=f"Page {len(pages) + 1}/{(len(items) + page_size - 1) // page_size} • Use /craft to make an item."
+            )
+            pages.append(embed)
+
+        class RecipesView(discord.ui.View):
+            def __init__(self, owner_id, embeds):
+                super().__init__(timeout=300)
+                self.owner_id = owner_id
+                self.embeds = embeds
+                self.current_page = 0
+
+            async def interaction_check(self, interaction):
+                if interaction.user.id != self.owner_id:
+                    await interaction.response.send_message(
+                        "❌ This recipe menu belongs to someone else.", ephemeral=True
+                    )
+                    return False
+                return True
+
+            @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+            async def previous(self, interaction, button):
+                self.current_page = (self.current_page - 1) % len(self.embeds)
+                await interaction.response.edit_message(
+                    embed=self.embeds[self.current_page], view=self
+                )
+
+            @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+            async def next(self, interaction, button):
+                self.current_page = (self.current_page + 1) % len(self.embeds)
+                await interaction.response.edit_message(
+                    embed=self.embeds[self.current_page], view=self
+                )
+
+        view = RecipesView(ctx.author.id, pages)
+        await ctx.send(embed=pages[0], view=view)
+
     @commands.hybrid_command(name="craft", description="Craft components used for permanent exploration upgrades.")
     @app_commands.describe(recipe="Choose an upgrade component to craft.")
     @app_commands.choices(recipe=CHOICES)
@@ -101,6 +241,42 @@ class Crafting(commands.Cog):
         data = RECIPES.get(recipe)
         if not data:
             return await ctx.send("❌ That recipe does not exist.")
+
+        progression_system, progression_tier = get_tiered_recipe_progression(data)
+
+        if progression_system and isinstance(progression_tier, int) and progression_tier > 1:
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as progress_db:
+                column = UPGRADE_DATA[progression_system]["column"]
+                async with progress_db.execute(
+                    f"SELECT COALESCE({column}, 0) FROM users WHERE user_id = ?",
+                    (ctx.author.id,),
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+            current_level = row[0] if row else 0
+            required_level = progression_tier - 1
+
+            if current_level < required_level:
+                info = UPGRADE_DATA[progression_system]
+                prefix = next(
+                    prefix
+                    for prefix in TIERED_RECIPE_PROGRESSIONS
+                    if data["result"].startswith(prefix)
+                )
+                previous_display = {
+                    "reinforced_laser_parts_": "Reinforced Laser Parts",
+                    "drone_upgrade_kit_": "Drone Upgrade Kit",
+                    "salvage_rig_kit_": "Salvage Rig Kit",
+                }[prefix]
+                previous_display = f"{previous_display} {required_level}"
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 🚫 **Upgrade progression locked!**\n\n"
+                    f"You must **craft and use {previous_display}** before you can "
+                    f"craft **{data['name']}**.\n\n"
+                    f"Current **{info['name']}** level: **{current_level}/5**\n"
+                    f"Required level: **{required_level}/5**"
+                )
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)

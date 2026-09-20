@@ -160,7 +160,7 @@ class LeaderboardView(discord.ui.View):
             elif i == 3:
                 medal = "🥉"
             else:
-                medal = f"`#{i}`"
+                medal = f"#{i}"
 
             description_lines.append(f"{medal} <@{user_id}> • Level **{level}** ({xp:,} XP)")
 

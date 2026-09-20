@@ -23,7 +23,7 @@ CANDY_CHANCE = 0.30
 PLASTIC_CHANCE = 0.20
 TRICK_OR_TREAT_BAG_CHANCE = 0.10
 # Independent pet egg roll. This only runs while Halloween is active.
-HALLOWEEN_PET_EGG_CHANCE = 0.025
+HALLOWEEN_PET_EGG_CHANCE = 1 / 35
 HALLOWEEN_PET_CANDY_CHANCE = 0.12
 PLASTIC_MIN = 4
 PLASTIC_MAX = 10
@@ -61,16 +61,15 @@ HALLOWEEN_SPACE_JUNK = [
     ("key_tag", "Red Key Tag", "🏷️", "A red key tag, with the numbers '237' on it.", 20, 7),
     ("broken_chainsaw", "Broken Chainsaw", EMOJIS["broken_chainsaw"], "A heavy broken saw. Faintly etched along the guide bar are the words, 'The Saw is Family.'", 65, 15),
     ("scissor_hand_glove", "Scissor Hand Glove", "✂️", "A glove with sharp scissor blades for fingers.", 40, 8),
-    ("puzzle_box", "Unknown Puzzle Box", EMOJIS["puzzle_box"], "We have such sights to show you.", 80, 15),
-    ("proton_pack", "Proton Pack?", EMOJIS["proton_pack"], "Who you gonna call??", 100, 15),
+    ("puzzle_box", "Unknown Puzzle Box", EMOJIS["puzzle_box"], "We have such sights to show you.", 80, 12),
+    ("proton_pack", "Proton Pack?", EMOJIS["proton_pack"], "Who you gonna call?", 100, 18),
     ("broken_camcorder", "Broken Camcorder", EMOJIS["broken_camcorder"], "It is a biological necessity. You see, I am a doctor.", 85, 12),
-    ("necronomicon", "Suspiciously Evil Book", "📕", "A suspicious book. It looks like it has a face on it. Probably shouldn't recite what's inside...", 50, 16),
+    ("necronomicon", "Suspiciously Evil Book", "📕", "A suspicious book. It looks like it has a face on it. Probably shouldn't recite what's inside...", 50, 10),
     ("large_bolts", "Large Bolts", "🔩", "Very large bolts. Looked like they'd go into a neck...?", 75, 20),
     ("toilet_paper", "Suspicious Toilet Paper", "🧻", "An ancient roll of paper. Darkened and dirty. Looks like it wrapped around someone.", 35, 10),
-    ("porcelain_doll", "Broken Porcelain Doll", EMOJIS["porcelain_doll"], "A broken porcelain doll, who's energy is darker than anything we've seen...", 120, 25),
+    ("porcelain_doll", "Broken Porcelain Doll", EMOJIS["porcelain_doll"], "A broken porcelain doll, who's energy is darker than anything we've seen...", 120, 14),
     ("red_headed_doll", "Red-headed Doll", EMOJIS["red_headed_doll"], "We're friends till the end... remember?", 100, 15),
-    ("spooky_razor", "Spooky-looking Razor", "🪒", "The closest shave you'll ever know.", 75, 12),
-    ("ouija_board", "A Ouija Board", EMOJIS["ouija_board"], "What an excellent day for an exorcism.", 100, 25),
+    ("ouija_board", "A Ouija Board", EMOJIS["ouija_board"], "What an excellent day for an exorcism.", 100, 12),
     ("hand", "Sentient Hand", "🫳", "*The hand uses sign-language to say, 'You're a handful.'", 135, 20),
     ("bloodied_knife", "Bloodied Knife", "🔪", "A knife full of blood. You can faintly hear someone say 'go to sleep...'", 75, 10),
     ("bloody_ring", "Blood-soaked Gold Ring", EMOJIS["gold_ring"], "Do you want to play with me?", 90, 15),
@@ -81,13 +80,23 @@ HALLOWEEN_SPACE_JUNK = [
     ("mysterious_slab", "Mysterious Slab", EMOJIS["mysterious_slab"], "Return his slab, or suffer his curse.", 90, 10),
     ("marker", "Unknown Alien Artifact", "👽", "**Make us whole.**", 100, 15),
     ("cupcake", "Cupcake with Eyes", "🧁", "Was a loving companion in the game. But was a violation in the movie. :(", 40, 12),
-    ("old_wallpaper", "Old Wallpaper", EMOJIS["old_wallpaper"], "This shouldn't exist.", 65, 15),
+    ("old_wallpaper", "Roll of Old Wallpaper", EMOJIS["old_wallpaper"], "This shouldn't exist.", 65, 15),
     ("toy_remote", "Red Toy Remote", EMOJIS["toy_remote"], "Thank you for using our 'Limited-Time Imaginary Friend' remote! We hope you enjoy the next 2 days with your very own real, not-so-imaginary, friend!", 35, 10),
     ("dead_turtle", "Really Dead Turtle", EMOJIS["dead_turtle"], "It's been dead for *much* too long.", 75, 10),
     ("tails_doll", "A Doll of Tails", EMOJIS["doll_gem"], "Can you feel the sunshine?", 85, 10),
     ("coffee_mug", "Coffee Mug with Sticky Note", "☕", "A 'normal' coffee mug with a sticky note that reads 'Not a Mimic!'", 35, 8),
-    ("pill_bottle", "Painkillers", EMOJIS["pill_bottle"], "It's the best decision I'll ever make.", 35, 15),
+    ("pill_bottle", "Painkillers", EMOJIS["pill_bottle"], "It's the best decision I'll ever make.", 35, 11),
     ("bear_skull", "Bear Plush with Exposed Skull", "🐻", "*You say something to it. It repeats it right back...*", 65, 10),
+    ("music_box", "Wind-up Music Box", "🎼", "A wind-up music box that plays a cheerful, yet deeply anxiety-inducing lullaby. Don't let it run out... it'll get you.", 45, 12),
+    ("mans_cane", "Crooked Man's Cane", "🦯", "A warped walking stick that taps against the ground when nobody is moving it...", 35, 8),
+    ("ancient_alien", "Face-hugging Fossil", "🦂", "A calcified, skeletal creature resembling a scorpion, with a whip-like tail. Looks like it could 'hug' a face...", 85, 10),
+    ("smile_photo", "Hyper-realistic Dog Photo", "🐶", "A grainy digital photo of a husky with a terrifying human-like smile. While holding it, in your mind, all you hear is **'spread the word.'**", 50, 6),
+    ("glitched_cartridge", "Glitched Cartridge", "👾", "An old N64 game cartridge with the label torn off and 'MAJORA' written on it in black marker. You hear in your mind, '**You shouldn't have done that.'**", 95, 14),
+    ("twigs_bundle", "Bundle of Twigs", "🪾", "A crude stick figure tied together with black twine. Finding one of these means you are hopelessly lost...", 35, 6),
+    ("glow_chalk", "Glow-in-the-dark Chalk", "🖊️", "A single piece of luminous chalk. Mainly used for marking elevator buttons when you are trying to visit a dimension you don't belong in.", 25, 6),
+    ("wine_cabinet", "Cursed Wine Cabinet", "🍷", "A small, wax-sealed wooden cabinet. It rattles violently when left alone. **Do NOT, under ANY circumstances, break the seal.**", 150, 12),
+    ("hazmat_suit", "Yellow Hazmat Suit", "☢️", "A heavy rubber suit that smells like damp carpet and fluorescent lights. It feels like you accidentally slipped out of reality to find this.", 95, 14),
+    ("red_pokeball", "Glitched Red Pokeball", "🔴", "A corrupted Poke sphere that constantly flickers between existences. White hands occasionally reach out from the static seam...", 115, 16),
 ]
 
 def get_sell_reward(item_id):
@@ -230,6 +239,7 @@ HALLOWEEN_DAMAGE_MESSAGES = [
     ("heard something charging down the corridor at an unreasonable speed", 9, 17),
     ("saw the hallway lights go out one by one behind you", 8, 16),
     ("heard a door slam somewhere very, very far away", 5, 11),
+    ("heard a large all-seeing shark swimming nearby, then accidentally flashed your light at it", 8, 15),
 
     # 👻 Enceladus-specific chaos
     ("asked the station AI if the hallway was haunted. It said 'yes.'", 5, 10),
@@ -272,7 +282,6 @@ HALLOWEEN_KNOCKOUT_LINES = [
 
     # Reference-ish knockouts
     "The motion tracker stopped beeping. You did not.",
-    "Your plasma cutter is still on the floor. You're not.",
     "The security cameras have officially decided they didn't see anything.",
     "The station AI has classified you as 'temporarily deceased-ish.'",
     "The containment team has been notified. They sound extremely tired.",
@@ -281,6 +290,7 @@ HALLOWEEN_KNOCKOUT_LINES = [
     "Your crewmate insists there was never anything behind you.",
     "The giant monster outside appears to have continued walking.",
     "You have been removed from the Halloween party for excessive screaming.",
+    "You were ejected from the ship due to a group vote",
 ]
 
 

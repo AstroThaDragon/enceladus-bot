@@ -486,15 +486,14 @@ class Economy(commands.Cog):
             "prototype_drill_bit": {"name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
             "cosmic_insurance": {"name": f"{EMOJIS.get('cosmic_insurance', '📋')} Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
             "fate_anchor": {"name": f"{EMOJIS.get('fate_anchor', '⚓')} Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
-            "stardust_cache": {"name": f"{EMOJIS.get('stardust_cache', '🎁')} Contraband Stardust Cache", "cost": 2500, "desc": "Open it for an unpredictable Stardust payoff."},
             "revive_kit": {"name": f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
             "stop_sign": {"name": "🛑 Stop Sign", "cost": 250, "type": "defense_weapon", "desc": "Lethal Company-inspired station debris. 8% chance to prevent a scavenging hazard."},
-            "stick": {"name": "🪵 Stick", "cost": 150, "type": "defense_weapon", "desc": "Undertale-inspired weapon. 4% chance to prevent a scavenging hazard."},
-            "wooden_sword": {"name": "🗡️ Wooden Sword", "cost": 300, "type": "defense_weapon", "desc": "Minecraft-inspired starter weapon. 10% chance to prevent a scavenging hazard."},
-            "wooden_shield": {"name": "🛡️ Wooden Shield", "cost": 400, "type": "defense_weapon", "desc": "Minecraft-inspired starter shield. 7% chance to prevent a scavenging hazard."},
-            "wooden_spoon": {"name": "🥄 Wooden Spoon", "cost": 175, "type": "defense_weapon", "desc": "A mighty station kitchen utensil. 2% chance to prevent a scavenging hazard."},
-            "heavy_wrench": {"name": "🔧 Suspiciously Heavy Wrench", "cost": 325, "type": "defense_weapon", "desc": "A maintenance tool that doubles as a weapon. 12% chance to prevent a scavenging hazard."},
-            "plasma_cutter": {"name": "🔫 Plasma Cutter", "cost": 2500, "type": "defense_weapon", "halloween_only": True, "desc": "Halloween-only Dead Space-inspired weapon. 25% chance to prevent a scavenging hazard."},
+            "stick": {"name": "🪵 Stick", "cost": 450, "type": "defense_weapon", "desc": "Undertale-inspired weapon. 4% chance to prevent a scavenging hazard."},
+            "wooden_sword": {"name": "🗡️ Wooden Sword", "cost": 800, "type": "defense_weapon", "desc": "Minecraft-inspired starter weapon. 10% chance to prevent a scavenging hazard."},
+            "wooden_shield": {"name": "🛡️ Wooden Shield", "cost": 650, "type": "defense_weapon", "desc": "Minecraft-inspired starter shield. 7% chance to prevent a scavenging hazard."},
+            "wooden_spoon": {"name": "🥄 Wooden Spoon", "cost": 300, "type": "defense_weapon", "desc": "A mighty station kitchen utensil. 2% chance to prevent a scavenging hazard."},
+            "heavy_wrench": {"name": "🔧 Suspiciously Heavy Wrench", "cost": 2000, "type": "defense_weapon", "desc": "A maintenance tool that doubles as a weapon. 12% chance to prevent a scavenging hazard."},
+            "plasma_cutter": {"name": "🔫 Plasma Cutter", "cost": 6000, "type": "defense_weapon", "halloween_only": True, "desc": "Halloween-only Dead Space-inspired weapon. 25% chance to prevent a scavenging hazard."},
             "title_outer_rim_wanderer": {"name": "🏷️ Title: Outer Rim Wanderer", "cost": 750, "type": "title", "desc": "A title for explorers who venture beyond the station."},
             "title_starborn": {"name": "🏷️ Title: Starborn", "cost": 750, "type": "title", "desc": "A prestigious title for those touched by the stars."},
             "title_voidfarer": {"name": "🏷️ Title: Voidfarer", "cost": 750, "type": "title", "desc": "For those brave enough to chart the endless void."},
@@ -526,7 +525,6 @@ class Economy(commands.Cog):
             "prototype_drill_bit": (5, "daily"),
             "cosmic_insurance": (5, "daily"),
             "fate_anchor": (3, "daily"),
-            "stardust_cache": (3, "daily"),
             "revive_kit": (3, "daily"),
             "stop_sign": (1, "lifetime"),
             "stick": (1, "lifetime"),
@@ -864,7 +862,7 @@ class Economy(commands.Cog):
         # Build the 1–7 day streak ladder.
         # We can expand this later when the economy gets larger.
         streak_rows = []
-        rewards = [100, 150, 200, 250, 300, 350, 400]
+        rewards = [500, 600, 700, 800, 900, 1000, 1150]
 
         for day, day_reward in enumerate(rewards, start=1):
             mark = "✅" if new_streak >= day else "❌"
@@ -1258,8 +1256,8 @@ class Economy(commands.Cog):
             if stardust < cost:
                 await db.rollback()
                 return await ctx.send(
-                    f"💸 **Insufficient Stardust!** You have `{stardust}` "
-                    f"Stardust, but this item costs `{cost:,}`."
+                    f"💸 **Insufficient Stardust!** You have **{stardust:,}** "
+                    f"Stardust, but this item costs **{cost:,}**."
                 )
 
             # ─────────────────────────────────────────────
@@ -2119,9 +2117,9 @@ class Economy(commands.Cog):
             )
 
             await ctx.send(
-                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **1x `{target_item}`** "
+                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **1x {target_item}** "
                 f"for ✨ **{payout:,} Stardust**{candy_text}!\n"
-                f"📦 **Remaining:** `{remaining}x`"
+                f"📦 **Remaining:** **{remaining}x**"
                 f"{overflow_text}"
             )
 
@@ -2186,7 +2184,6 @@ class Economy(commands.Cog):
                 "prototype_drill_bit",
                 "cosmic_insurance",
                 "fate_anchor",
-                "stardust_cache",
             },
 
             "consumables": {

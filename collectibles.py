@@ -60,43 +60,37 @@ class Collectibles(commands.Cog):
         }
 
         pages = []
+        page_size = 30
+
         for category, entries in categories.items():
             if not entries:
                 continue
 
             found = sum(1 for item_id, *_ in entries if item_id in owned)
             total = len(entries)
-            lines = []
-            for item_id, name, emoji, _desc in entries:
-                if item_id in owned:
-                    lines.append(f"{emoji} **{name}**")
-                else:
-                    lines.append(f"❓ **???**")
+            total_pages = (total + page_size - 1) // page_size
 
-            # Keep Discord field values safely below the 1024-character limit.
-            chunks = []
-            current = ""
-            for line in lines:
-                if current and len(current) + len(line) + 1 > 1000:
-                    chunks.append(current)
-                    current = line
-                else:
-                    current = f"{current}\n{line}" if current else line
-            if current:
-                chunks.append(current)
+            for start in range(0, total, page_size):
+                chunk_entries = entries[start:start + page_size]
+                page_number = start // page_size + 1
+                lines = []
 
-            for index, chunk in enumerate(chunks):
-                suffix = f" • Part {index + 1}/{len(chunks)}" if len(chunks) > 1 else ""
+                for item_id, name, emoji, _desc in chunk_entries:
+                    if item_id in owned:
+                        lines.append(f"{emoji} **{name}**")
+                    else:
+                        lines.append("❓ **???**")
+
                 embed = discord.Embed(
                     title=f"📚 {ctx.author.display_name}'s Collectibles",
                     description=(
-                        f"**{category}**{suffix}\n"
+                        f"**{category}** • Part **{page_number}/{total_pages}**\n"
                         f"Collected: **{found}/{total}** ({found / total * 100:.0f}%)\n\n"
-                        "Undiscovered collectibles remain hidden until you find them."
+                        + "\n\n".join(lines)
+                        + "\n\nUndiscovered collectibles remain hidden until you find them."
                     ),
                     color=discord.Color.dark_purple(),
                 )
-                embed.add_field(name="Collection", value=chunk, inline=False)
                 pages.append(embed)
 
         if not pages:
