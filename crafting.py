@@ -17,11 +17,11 @@ MATERIAL_NAMES = {
     "wiring": (EMOJIS.get("wiring", "🧵"), "Wiring"),
     "circuit_board": (EMOJIS.get("circuit_board", "🟩"), "Circuit Board"),
     "glue": (EMOJIS.get("glue", "🧴"), "Industrial Glue"),
-    "gauze": ("🧻", "Sterile Gauze"),
-    "medical_alcohol": ("🧴", "Medical Alcohol"),
-    "bandaids": ("🩹", "Bandaids"),
-    "antiseptic_ointment": ("🧪", "Antiseptic Ointment"),
-    "halloween_candy": ("🍬", "Halloween Candy"),
+    "gauze": (EMOJIS.get("gauze", "🧻"), "Sterile Gauze"),
+    "medical_alcohol": (EMOJIS.get("alcohol", "🧴"), "Medical Alcohol"),
+    "bandaids": (EMOJIS.get("bandaid", "🩹"), "Bandaids"),
+    "antiseptic_ointment": (EMOJIS.get("ointment", "🧪"), "Antiseptic Ointment"),
+    "halloween_candy": (EMOJIS.get("halloween_candy", "🍬"), "Halloween Candy"),
     "halloween_plastic": ("🧴", "Halloween Themed Plastic"),
     "astral_core": ("🌌", "Astral Core"),
     "nanite_retrofit_kit": (EMOJIS.get("nanite_retrofit", "🧬"), "Nanite Retrofit Kit"),
@@ -183,11 +183,10 @@ class Crafting(commands.Cog):
                 emoji = recipe_display_emoji(recipe)
                 materials = []
                 for item_id, amount in recipe["ingredients"].items():
-                    _icon, name = MATERIAL_NAMES[item_id]
-                    material_emoji = MATERIAL_EMOJI_FALLBACKS.get(item_id, "🔹")
+                    material_emoji, name = MATERIAL_NAMES[item_id]
                     materials.append(f"{material_emoji} {name} ×{amount}")
                 lines.append(
-                    f"{emoji} **{recipe['name']}**\n"
+                    f"{recipe['emoji']} **{recipe['name']}**\n"
                     + " • ".join(materials)
                 )
 
