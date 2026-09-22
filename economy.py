@@ -277,7 +277,8 @@ class ShopView(discord.ui.View):
                     "🔢 Choose **5 different numbers from 1–99**\n"
                     "📦 Maximum: **25 active tickets** per user per cycle\n"
                     "🏆 Top prize: **10,000 Stardust** for matching all 5\n\n"
-                    "Use `/lottery buy` to choose your numbers and purchase a ticket."
+                    "Use `/lottery buy` to choose your numbers and purchase a ticket.\n\n"
+                    "NOTE: Lotteries are only available when a staff member opens one. Wait until it's announced!"
                 ),
                 inline=False,
             )
