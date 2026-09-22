@@ -2106,6 +2106,56 @@ class Economy(commands.Cog):
             ) as cursor:
                 rows = await cursor.fetchall()
 
+        # Application-command autocomplete does not reliably render Discord
+        # custom-emoji markup, so use normal Unicode fallbacks for sell choices.
+        sell_autocomplete_emojis = {
+            # Materials / ores
+            "iron_ore": "⛏️",
+            "copper_ore": "🟠",
+            "titanium_chunk": "⛏️",
+            "aluminum_ore": "⬜",
+            "circuit_board": "🟩",
+            "glue": "🧴",
+            "scrap_metal": "🔩",
+            "nuts_bolts": "🔧",
+            "wiring": "🧵",
+            # Haunted / seasonal materials
+            "haunted_circuit": "⚡",
+            "screaming_crystal": "💎",
+            # Space Junk
+            "space_pizza": "🍕",
+            "floppy_disk": "💾",
+            "meteorite": "☄️",
+            "rubber_duck": "🦆",
+            "rusty_gear": "⚙️",
+            "tape_deck": "📼",
+            "alien_artifact": "👽",
+            "space_boot": "🥾",
+            "holo_poster": "🖼️",
+            "broken_laser": "🔧",
+            "lost_logbook": "📓",
+            "left_sock": "🧦",
+            "warp_mug": "☕",
+            "space_pudding": "🍮",
+            "tangled_cables": "🪢",
+            "moon_cheese": "🧀",
+            "golden_spatula": "🥄",
+            "parking_ticket": "🎫",
+            "floating_plant": "🪴",
+            "tinted_visor": "🕶️",
+            "purring_lint": "🧶",
+            "pet_rock": "🪨",
+            "space_taco": "🌮",
+            "rusty_wrench": "🔧",
+            "alien_fossil": "🦴",
+            "big_red_button": "🔴",
+            "antique_compass": "🧭",
+            "broken_clock": "🕰️",
+            "perplexing_painting": "🖼️",
+            "cosmic_banana": "🍌",
+            "cosmic_coin": "🪙",
+        }
+
         choices = []
         sellable_rows = []
 
@@ -2171,12 +2221,18 @@ class Economy(commands.Cog):
         for item_id, owned_quantity, info, _is_space_junk in sellable_rows:
             display_name = info["name"]
             search_text = f"{display_name} {item_id}".lower()
+
+            raw_emoji = str(info.get("emoji", ""))
+            if raw_emoji.startswith("<:") or raw_emoji.startswith("<a:"):
+                display_emoji = sell_autocomplete_emojis.get(item_id, "📦")
+            else:
+                display_emoji = raw_emoji or sell_autocomplete_emojis.get(item_id, "📦")
             if current and current not in search_text:
                 continue
 
             choices.append(
                 app_commands.Choice(
-                    name=f"{info['emoji']} {display_name} (x{owned_quantity})",
+                    name=f"{display_emoji} {display_name} (x{owned_quantity})",
                     value=item_id
                 )
             )
