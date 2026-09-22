@@ -414,6 +414,44 @@ class Fortunes(commands.Cog):
             self._user_locks[user_id] = lock
         return lock
 
+    async def _has_solar_phoenix(self, db, user_id: int) -> bool:
+        """Return whether the user currently has Solar Phoenix equipped."""
+        async with db.execute(
+            """
+            SELECT 1
+            FROM pets
+            WHERE user_id = ? AND is_active = 1 AND pet_type = 'solar_phoenix'
+            LIMIT 1
+            """,
+            (user_id,),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+    async def _try_phoenix_rescue(self, db, user_id: int, current_month: str) -> bool:
+        """
+        Use Solar Phoenix's once-per-month streak rescue if available.
+
+        This is intentionally transactional: callers should already be inside
+        their user lock and database transaction when invoking it.
+        """
+        if not await self._has_solar_phoenix(db, user_id):
+            return False
+
+        async with db.execute(
+            "SELECT COALESCE(phoenix_rescue_month, '') FROM users WHERE user_id = ?",
+            (user_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+
+        if row and row[0] == current_month:
+            return False
+
+        await db.execute(
+            "UPDATE users SET phoenix_rescue_month = ? WHERE user_id = ?",
+            (current_month, user_id),
+        )
+        return True
+
     async def _process_streak_reset(self, now_et):
         """Safely catch up the daily streak reset."""
         current_date_et = self.get_fortune_day(now_et)
@@ -483,6 +521,19 @@ class Fortunes(commands.Cog):
                                 json.dumps(active_effects),
                                 user_id,
                             ),
+                        )
+                    elif await self._try_phoenix_rescue(
+                        db, user_id, now_et.strftime("%Y-%m")
+                    ):
+                        # Solar Phoenix rescues one broken fortune streak per month.
+                        await db.execute(
+                            """
+                            UPDATE users
+                            SET last_broken_streak = 0,
+                                last_fortune_streak_date = ?
+                            WHERE user_id = ?
+                            """,
+                            (yesterday_et, user_id),
                         )
                     else:
                         if streak >= 3:
@@ -581,6 +632,9 @@ class Fortunes(commands.Cog):
 
             if "last_broken_streak" not in column_names:
                 await db.execute("ALTER TABLE users ADD COLUMN last_broken_streak INTEGER DEFAULT 0")
+
+            if "phoenix_rescue_month" not in column_names:
+                await db.execute("ALTER TABLE users ADD COLUMN phoenix_rescue_month TEXT")
 
             await db.commit()
 
@@ -765,6 +819,12 @@ class Fortunes(commands.Cog):
                 if previous_date == yesterday_et:
                     current_streak = previous_streak + 1
                 elif active_effects.pop("fate_anchor", False):
+                    current_streak = previous_streak + 1
+                elif await self._try_phoenix_rescue(
+                    db, user_id, now_et.strftime("%Y-%m")
+                ):
+                    # The Phoenix restores the missed day and lets today's
+                    # fortune continue the old streak normally.
                     current_streak = previous_streak + 1
                 else:
                     current_streak = 1

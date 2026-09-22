@@ -117,6 +117,7 @@ MATERIAL_NAMES = {
     "drone_upgrade_kit_4": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit IV"),
     "drone_upgrade_kit_5": (EMOJIS.get("drone_upgrade_kit", "🛸"), "Drone Upgrade Kit V"),
     "astral_power_core": (EMOJIS.get("astral_power_core", "🌌"), "Astral Power Core"),
+    "nanite_retrofit_kit": ("🧬", "Nanite Retrofit Kit"),
     "salvage_rig_kit": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit (Legacy)"),
     "salvage_rig_kit_1": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit"),
     "salvage_rig_kit_2": (EMOJIS.get("salvage_rig_kit", "♻️"), "Salvage Rig Kit II"),
@@ -365,7 +366,11 @@ class Upgrades(commands.Cog):
                     f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
                 )
                 + f"💰 Spent: **{data['cost']:,} Stardust**\n"
-                "🧰 Required materials were consumed."
+                + "🧰 **Materials Consumed:**\n"
+                + "\n".join(
+                    f"{MATERIAL_NAMES[item_id][0]} {MATERIAL_NAMES[item_id][1]} ×{amount}"
+                    for item_id, amount in consumptions
+                )
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )

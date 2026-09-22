@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
-from seasonal_updates.halloween import get_collectibles as get_halloween_collectibles
+from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
 
 
 async def ensure_collectible_tables(db):

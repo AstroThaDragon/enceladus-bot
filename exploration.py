@@ -10,23 +10,46 @@ from datetime import datetime, timedelta
 import pytz
 from emojis import EMOJIS
 from inventory import add_inventory_item, ITEM_REGISTRY
-from seasonal_updates.halloween import (
-    BONUS_ROLL_CHANCE as HALLOWEEN_BONUS_ROLL_CHANCE,
+from seasonal_updates.halloween.halloween import (
     CANDY_CHANCE as HALLOWEEN_CANDY_CHANCE,
     PLASTIC_CHANCE as HALLOWEEN_PLASTIC_CHANCE,
     TRICK_OR_TREAT_BAG_CHANCE as HALLOWEEN_BAG_CHANCE,
     PLASTIC_MIN as HALLOWEEN_PLASTIC_MIN,
     PLASTIC_MAX as HALLOWEEN_PLASTIC_MAX,
-    get_space_junk as get_halloween_space_junk,
     HALLOWEEN_DAMAGE_MESSAGES,
     HALLOWEEN_KNOCKOUT_LINES,
     is_active as halloween_is_active,
     HALLOWEEN_PET_EGG_CHANCE,
     HALLOWEEN_PET_CANDY_CHANCE,
+    halloween_channel_message,
+    is_halloween_channel,
 )
-from collectibles import record_collectible
-from pets import add_pet_xp, get_active_pet_effects, NORMAL_EGG_CHANCE, PET_XP_PER_EXPLORATION
+from pets import (
+    add_pet_xp,
+    get_active_pet_effects,
+    get_haunted_exploration_pet_xp,
+    grant_haunted_pet,
+    NORMAL_EGG_CHANCE,
+    roll_normal_exploration_pet_xp,
+)
 from defense import roll_hazard_defense
+from seasonal_updates.halloween.haunted import (
+    resolve_haunted_choice,
+    HAUNTED_DAILY_ATTEMPTS,
+    HAUNTED_LOCATIONS,
+    SANITY_MAX,
+    choose_encounter,
+    clear_run,
+    consume_attempt,
+    get_active_run,
+    get_or_create_profile,
+    is_insane,
+    sanity_percent,
+    start_run,
+    update_sanity,
+    advance_run,
+    grant_haunted_completion_rewards,
+)
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
@@ -82,7 +105,7 @@ LOOT_OVERFLOW_VALUES = {
 }
 
 
-SCAVENGE_STARDUST_CACHE_CHANCE = 0.20
+SCAVENGE_STARDUST_CACHE_CHANCE = 0.125
 SCAVENGE_STARDUST_CACHE_MIN = 750
 SCAVENGE_STARDUST_CACHE_MAX = 3500
 
@@ -348,6 +371,453 @@ class Exploration(commands.Cog):
             f"{prefix}💀 **You are unconscious.** You can use `/revive` or buy `/shop buy full_revive` "
             f"to return now; otherwise you will recover at 50% HP on **{knocked_out_until}**."
         )
+
+    @commands.hybrid_group(
+        name="explore",
+        description="Explore Enceladus and its seasonal locations.",
+    )
+    async def explore(self, ctx: commands.Context):
+        """Root for exploration subcommands."""
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Use `/explore haunted` to enter the Haunted Exploration event!")
+
+    @explore.command(
+        name="haunted",
+        description="Enter Haunted Exploration and choose a location.",
+    )
+    async def explore_haunted(self, ctx: commands.Context):
+        if not is_halloween_channel(ctx.channel):
+            return await ctx.send(halloween_channel_message())
+        if not halloween_is_active():
+            return await ctx.send(
+                "🎃 **Haunted Exploration is currently dormant.**\n"
+                "This event is only available during the Halloween event."
+            )
+
+        user_id = ctx.author.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                await self.ensure_schema(db)
+                profile = await get_or_create_profile(db, user_id)
+
+            embed = self._haunted_location_embed(ctx.author, profile)
+            await ctx.send(embed=embed, view=HauntedLocationView(self))
+
+    def _haunted_location_embed(self, member, profile):
+        sanity = sanity_percent(profile["sanity"])
+        state = "☠️ **INSANE**" if is_insane(profile["sanity"]) else "🧠 **Stable**"
+        active = profile["active_location"]
+
+        description = (
+            "Something is wrong with this part of Enceladus. The corridors are too quiet, "
+            "the shadows move when nobody is looking, and nobody can agree on where these places came from.\n\n"
+            "Choose somewhere to explore. Each run is made of multiple stages, and your choices can affect your Sanity."
+        )
+        if active in HAUNTED_LOCATIONS:
+            description += (
+                f"\n\n⚠️ You currently have an active run in **{HAUNTED_LOCATIONS[active]['name']}** "
+                f"(Stage {profile['active_stage']}/{profile['active_total_stages']}). Starting another run will replace it."
+            )
+
+        embed = discord.Embed(
+            title="🎃 Haunted Exploration",
+            description=description,
+            color=discord.Color.dark_purple(),
+        )
+        embed.add_field(
+            name="🧠 Sanity",
+            value=f"**{sanity}/100**\n{state}\nRegenerates continuously over time.",
+            inline=True,
+        )
+        embed.add_field(
+            name="🎟️ Daily Attempts",
+            value=f"**{profile['attempts']}/{HAUNTED_DAILY_ATTEMPTS}**",
+            inline=True,
+        )
+        embed.add_field(
+            name="📖 How it works",
+            value="Choose a location, face encounters, make choices, or run away. Completing a run awards location-specific ingredients, Candy, Stardust, and a rarity-based chance at Halloween collectibles.",
+            inline=False,
+        )
+        embed.set_footer(text=f"Explorer: {member.display_name} • Halloween event")
+        return embed
+
+    def _haunted_info_embed(self):
+        embed = discord.Embed(
+            title="📖 Haunted Exploration — Field Guide",
+            description=(
+                "Haunted Exploration is a multi-stage Halloween adventure. Pick a location and work your way "
+                "through encounters by choosing what to do."
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        embed.add_field(
+            name="🧠 Sanity",
+            value=(
+                "Sanity starts at **100** and regenerates continuously. Some choices reduce it. "
+                "At **0 Sanity**, you enter the **Insane** state."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🫥 Losing Your Grip",
+            value=(
+                "Low Sanity makes reality less reliable. Hallucinations can appear, encounters become more unstable, "
+                "and at **0 Sanity** the world can become profoundly wrong. Insanity does not merely mean taking more damage."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🎟️ Attempts",
+            value=(
+                f"You get **{HAUNTED_DAILY_ATTEMPTS} attempts per day**. Starting an adventure consumes one attempt. "
+                "The daily reset follows Eastern Time."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="👻 Stages",
+            value=(
+                "Runs have multiple stages. Lower Sanity can make a run longer, and Insane runs are the longest. "
+                "Your choices are the heart of the adventure."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🏃 Running Away",
+            value=(
+                "You can run away instead of taking an encounter choice. Most escapes work, but there is a small "
+                "chance that something happens while you escape."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="👻 Haunted Content",
+            value="Phase 2 adds end-of-adventure rewards, location-specific ingredients, rarity, Candy, Stardust, and Haunted-only collectible discoveries. Phase 3 adds location-specific encounters, while universal encounters can still appear anywhere.",
+            inline=False,
+        )
+        return embed
+
+    async def _start_haunted_run(self, interaction: discord.Interaction, location_id: str):
+        if not halloween_is_active():
+            return await interaction.response.send_message(
+                "🎃 **Haunted Exploration is currently dormant.**",
+                ephemeral=True,
+            )
+
+        user_id = interaction.user.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                await self.ensure_schema(db)
+                consumed, profile = await consume_attempt(db, user_id)
+                if not consumed:
+                    return await interaction.response.send_message(
+                        "🎟️ **You're out of Haunted Exploration attempts for today.**\n"
+                        "Come back after the daily reset.",
+                        ephemeral=True,
+                    )
+
+                total_stages = await start_run(db, user_id, location_id, profile["sanity"])
+
+            location = HAUNTED_LOCATIONS[location_id]
+            await interaction.response.edit_message(
+                content=f"{location['emoji']} **{location['name']}** selected.",
+                embed=None,
+                view=None,
+            )
+            await self._show_haunted_stage(interaction, location_id, 1, total_stages)
+
+    async def _show_haunted_stage(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int):
+        user_id = interaction.user.id
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            await self.ensure_schema(db)
+            profile = await get_or_create_profile(db, user_id)
+            async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                effect_row = await cursor.fetchone()
+            try:
+                effects = json.loads(effect_row[0] or "{}") if effect_row else {}
+                if not isinstance(effects, dict):
+                    effects = {}
+            except (TypeError, ValueError):
+                effects = {}
+
+            force_universal = bool(stage == 1 and effects.get("haunted_run_force_universal"))
+            force_location = bool(stage == 1 and effects.get("haunted_run_force_location"))
+            discovery_bonus = float(effects.get("haunted_run_discovery_bonus", 0.0))
+            encounter = choose_encounter(
+                location_id,
+                profile["sanity"],
+                force_universal=force_universal,
+                force_location=force_location,
+                discovery_bonus=discovery_bonus,
+            )
+
+            malo_warning = None
+            malo_warning_chance = float(effects.get("haunted_run_malo_warning_chance", 0.0))
+            if malo_warning_chance and random.random() < malo_warning_chance:
+                dangerous = [
+                    (index, choice)
+                    for index, choice in enumerate(encounter.get("choices", []))
+                    if (
+                        (choice.get("risk", "medium") if isinstance(choice, dict) else "medium")
+                        in {"high", "extreme"}
+                    )
+                ]
+                if dangerous:
+                    _, warned_choice = random.choice(dangerous)
+                    warned_label = warned_choice.get("label", "one of the choices") if isinstance(warned_choice, dict) else warned_choice[0]
+                    malo_warning = warned_label
+
+            if force_universal:
+                effects.pop("haunted_run_force_universal", None)
+            if force_location:
+                effects.pop("haunted_run_force_location", None)
+            if force_universal or force_location:
+                await db.execute(
+                    "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                    (json.dumps(effects), user_id),
+                )
+                await db.commit()
+
+        location = HAUNTED_LOCATIONS[location_id]
+        sanity = sanity_percent(profile["sanity"])
+        encounter_text = encounter["text"]
+        if sanity <= 0:
+            encounter_text = "🩸 **INSANITY**\n\n" + encounter_text
+        elif sanity <= 25:
+            encounter_text = "🫥 **Your grip on reality is slipping.**\n\n" + encounter_text
+        embed = discord.Embed(
+            title=f"{location['emoji']} {location['name']}",
+            description=encounter_text,
+            color=discord.Color.dark_red() if sanity <= 25 else discord.Color.dark_purple(),
+        )
+        embed.add_field(name="📍 Stage", value=f"**{stage}/{total_stages}**", inline=True)
+        embed.add_field(name="🧠 Sanity", value=f"**{sanity}/100**", inline=True)
+
+        if malo_warning:
+            embed.add_field(
+                name="👁️ MalO's Warning",
+                value=(
+                    f"MalO is staring at **{malo_warning}**.\n"
+                    "*You are not entirely sure why.*"
+                ),
+                inline=False,
+            )
+
+        pet_discovery_message = None
+        if encounter.get("discovery_id"):
+            discovery_id = encounter["discovery_id"]
+            achievements_cog = self.bot.get_cog("Achievements")
+            if achievements_cog:
+                await achievements_cog.record_haunted_discovery(
+                    user_id,
+                    discovery_id,
+                    location_id,
+                    sanity=profile["sanity"],
+                    db=db,
+                )
+
+            pet_result = await grant_haunted_pet(db, user_id, location_id)
+            if pet_result and pet_result.get("new"):
+                pet_discovery_message = pet_result["message"]
+
+            # Discovery records and pet rewards are part of the same stage setup.
+            await db.commit()
+
+        embed.set_footer(text="Choose carefully. Or run.")
+
+        await interaction.followup.send(
+            embed=embed,
+            view=HauntedEncounterView(self, location_id, stage, total_stages, encounter),
+        )
+        if pet_discovery_message:
+            await interaction.followup.send(pet_discovery_message)
+
+    async def _resolve_haunted_choice(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int, encounter, choice_index: int):
+        user_id = interaction.user.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                await self.ensure_schema(db)
+                run = await get_active_run(db, user_id)
+                if not run or run["location_id"] != location_id or run["stage"] != stage:
+                    return await interaction.response.send_message(
+                        "⚠️ This encounter is no longer active. Start a new Haunted Exploration run.",
+                        ephemeral=True,
+                    )
+
+                # The same choice can resolve differently each time.  Risk is
+                # readable from the button style, but the exact Sanity swing is not.
+                current_profile = await get_or_create_profile(db, user_id)
+                choice, outcome = resolve_haunted_choice(
+                    encounter,
+                    choice_index,
+                    current_profile["sanity"],
+                )
+                sanity_delta = int(outcome.get("sanity", 0))
+                result_text = outcome.get("text", "Something happens.")
+
+                async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                    effect_row = await cursor.fetchone()
+                try:
+                    effects = json.loads(effect_row[0] or "{}") if effect_row else {}
+                    if not isinstance(effects, dict):
+                        effects = {}
+                except (TypeError, ValueError):
+                    effects = {}
+
+                if sanity_delta < 0:
+                    pet_protection = float(effects.get("haunted_run_negative_protection", 0.0))
+                    if pet_protection and random.random() < pet_protection:
+                        sanity_delta = 0
+                        result_text += "\n\n🐾 **Your Haunted companion sensed the danger and intervened.**"
+                    elif effects.pop("haunted_run_block_next_negative", False):
+                        sanity_delta = 0
+                        result_text += "\n\n🛡️ **A ward absorbed the supernatural backlash.**"
+                    elif effects.pop("haunted_run_half_next_negative", False):
+                        sanity_delta = int(sanity_delta / 2)
+                        result_text += "\n\n🪞 **The Mirror Ward reflects part of the fear away.**"
+                    elif effects.get("haunted_run_flat_protection"):
+                        protection = int(effects.pop("haunted_run_flat_protection"))
+                        sanity_delta = min(0, sanity_delta + protection)
+                        result_text += "\n\n📺 **The Security Monitor warned you in time, cushioning the hit.**"
+
+                    multiplier = float(effects.get("haunted_run_sanity_multiplier", 1.0))
+                    if multiplier < 1.0 and sanity_delta < 0:
+                        sanity_delta = int(sanity_delta * multiplier)
+
+                await db.execute(
+                    "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                    (json.dumps(effects), user_id),
+                )
+
+                new_sanity = await update_sanity(db, user_id, sanity_delta)
+
+                # Global Haunted discovery achievements are evaluated after the
+                # choice resolves, because some of them depend on the resulting
+                # Sanity (for example, Worth It and Unwell).
+                if encounter.get("discovery_id"):
+                    achievements_cog = self.bot.get_cog("Achievements")
+                    if achievements_cog:
+                        await achievements_cog.mark_haunted_discovery_outcome(
+                            user_id,
+                            encounter["discovery_id"],
+                            sanity_delta,
+                            new_sanity,
+                            db=db,
+                        )
+
+                # Collectible bonuses are resolved before advance_run clears the
+                # run-scoped effects on completion.
+                collectible_bonus = float(effects.get("haunted_run_collectible_bonus", 0.0))
+                next_stage = await advance_run(db, user_id)
+                reward = None
+                if next_stage is None:
+                    ingredient_bonus = float(effects.get("haunted_run_ingredient_bonus", 0.0))
+                    reward_bonus = float(effects.get("haunted_run_reward_bonus", 0.0))
+                    reward = await grant_haunted_completion_rewards(
+                        db,
+                        self.bot,
+                        user_id,
+                        location_id,
+                        collectible_bonus=collectible_bonus,
+                        ingredient_bonus=ingredient_bonus,
+                        reward_bonus=reward_bonus,
+                    )
+                    haunted_pet_xp_amount, haunted_home_bonus = await get_haunted_exploration_pet_xp(
+                        db,
+                        user_id,
+                        location_id,
+                    )
+                    pet_xp_result = await add_pet_xp(
+                        db,
+                        user_id,
+                        haunted_pet_xp_amount,
+                    )
+
+            await interaction.response.edit_message(view=None)
+
+            if next_stage is None:
+                assert reward is not None
+                reward_lines = [
+                    f"{reward['rarity_emoji']} **{reward['rarity_label']} Haul**",
+                    f"✨ **+{reward['stardust']:,} Stardust**",
+                    f"🍬 **+{reward['candy']} Halloween Candy**",
+                    f"{reward['ingredient_emoji']} **+{reward['ingredient_added']} {reward['ingredient_name']}**",
+                ]
+                if pet_xp_result:
+                    xp_line = f"🐾 **+{pet_xp_result['xp_added']} Pet XP**"
+                    if haunted_home_bonus:
+                        xp_line += f" *(+{haunted_home_bonus} home-location bonus)*"
+                    if pet_xp_result["leveled_up"]:
+                        xp_line += f" • 🎉 **Pet Level {pet_xp_result['new_level']}!**"
+                    reward_lines.append(xp_line)
+                if reward['candy_overflow']:
+                    reward_lines.append(
+                        f"📦 Candy overflow: **{reward['candy_overflow']}** → **+{reward['overflow_stardust']} Stardust**"
+                    )
+                if reward['ingredient_overflow']:
+                    reward_lines.append(
+                        f"📦 Ingredient overflow: **{reward['ingredient_overflow']}** → **+{reward['ingredient_overflow_stardust']} Stardust**"
+                    )
+                if reward['collectible_found'] and reward['collectible']:
+                    collectible = reward['collectible']
+                    reward_lines.append(
+                        f"🎃 **Halloween Collectible Found:** {collectible[2]} **{collectible[1]}**"
+                    )
+
+                await interaction.followup.send(
+                    f"✨ **Stage {stage} complete!**\n{result_text}\n\n"
+                    f"🏁 You made it through **{total_stages} stages** of {HAUNTED_LOCATIONS[location_id]['name']}!\n"
+                    f"🧠 Sanity: **{sanity_percent(new_sanity)}/100**\n\n"
+                    "🎁 **Adventure Rewards**\n" + "\n".join(reward_lines)
+                )
+                return
+
+            await interaction.followup.send(f"{result_text}")
+            await self._show_haunted_stage(interaction, location_id, next_stage, total_stages)
+
+    async def _run_away_haunted(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int):
+        user_id = interaction.user.id
+        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            async with aiosqlite.connect(self.get_db_path()) as db:
+                await self.ensure_schema(db)
+                run = await get_active_run(db, user_id)
+                if not run or run["location_id"] != location_id or run["stage"] != stage:
+                    return await interaction.response.send_message(
+                        "⚠️ This encounter is no longer active. Start a new Haunted Exploration run.",
+                        ephemeral=True,
+                    )
+
+                rare_escape = random.random() < 0.08
+                if rare_escape:
+                    sanity_loss = random.randint(4, 10)
+                    new_sanity = await update_sanity(db, user_id, -sanity_loss)
+                    escape_text = random.choice([
+                        "You bolt for the exit. The door slams shut behind you by itself. Something follows you for three steps before disappearing.",
+                        "You run. Your footsteps keep going after you stop. You decide not to investigate.",
+                        "You make it out—then realize the hallway outside has one extra door. You do not go back.",
+                    ])
+                else:
+                    new_sanity = await update_sanity(db, user_id, 0)
+                    escape_text = random.choice([
+                        "You decide you've had enough and make a very respectable tactical retreat.",
+                        "Nope. Absolutely not. You turn around and leave.",
+                        "You retreat before whatever is lurking here gets the chance to introduce itself.",
+                    ])
+
+                await clear_run(db, user_id)
+
+            await interaction.response.edit_message(view=None)
+            suffix = "\n\n⚠️ **Something happened while you escaped.**" if rare_escape else ""
+            await interaction.followup.send(
+                f"🏃 **You ran away.**\n{escape_text}{suffix}\n\n"
+                f"🧠 Sanity: **{sanity_percent(new_sanity)}/100**\n"
+                "No reward was earned from this run."
+            )
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
@@ -630,7 +1100,8 @@ class Exploration(commands.Cog):
             pet_effects = await get_active_pet_effects(db, user_id)
             upgrade_cog = self.bot.get_cog("Upgrades")
             mining_upgrade = await upgrade_cog.get_effects(user_id, "mining") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
-            max_mining_charges = mining_upgrade["max_charges"]
+            # Space Dragon grants +3 maximum Mining charges at passive level 5.
+            max_mining_charges = mining_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
 
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
@@ -685,7 +1156,11 @@ class Exploration(commands.Cog):
             found_stardust = int(
                 random.randint(50, 150)
                 * mining_upgrade["stardust_mult"]
-                * (1 + pet_effects["stardust_bonus"])
+                * (
+                    1
+                    + pet_effects["stardust_bonus"]
+                    + pet_effects.get("extra_charges", 0.0)
+                )
             )
 
             if effects.pop("prototype_drill_bit", False):
@@ -741,9 +1216,9 @@ class Exploration(commands.Cog):
                 )
 
             # Halloween bonus resources are independent rolls during the active event.
-            halloween_junk = get_halloween_space_junk()
+            halloween_active = halloween_is_active()
             seasonal_findings = []
-            if halloween_junk and random.random() < HALLOWEEN_CANDY_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_CANDY_CHANCE:
                 candy_found = 1
                 candy_doubled = False
 
@@ -778,7 +1253,7 @@ class Exploration(commands.Cog):
                     )
 
             # Special pet candy is seasonal too, but is separate from ordinary Halloween Candy.
-            if halloween_junk and random.random() < HALLOWEEN_PET_CANDY_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_PET_CANDY_CHANCE:
                 pet_candy_found = random.randint(1, 2)
 
                 if (
@@ -812,7 +1287,7 @@ class Exploration(commands.Cog):
                             f"could not be stored (cap {normal_treat_max})"
                         )
 
-            if halloween_junk and random.random() < HALLOWEEN_PLASTIC_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
                 plastic_found = random.randint(HALLOWEEN_PLASTIC_MIN, HALLOWEEN_PLASTIC_MAX)
                 added_plastic, plastic_quantity, plastic_max = await add_inventory_item(
                     db, user_id, "halloween_plastic", "crafting_material", plastic_found
@@ -976,7 +1451,7 @@ class Exploration(commands.Cog):
 
                 rarity_badge = "legendary"
 
-            await add_pet_xp(db, user_id, PET_XP_PER_EXPLORATION)
+            pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
 
             await db.execute("""
                 UPDATE users 
@@ -1006,12 +1481,30 @@ class Exploration(commands.Cog):
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: {cooldown_text}")
+        mining_pet_charge_bonus = pet_effects.get("extra_charge_count", 0)
+        mining_pet_stardust_bonus = pet_effects.get("extra_charges", 0.0)
+        mining_pet_note = (
+            f" • 🐉 Space Dragon: **+{mining_pet_charge_bonus} Max Charges**"
+            if mining_pet_charge_bonus
+            else ""
+        )
         embed.add_field(
             name="🛠️ Mining Laser Upgrade",
             value=(f"Tier **{mining_upgrade['level']}/5** • Max Charges: **{max_mining_charges}**\n"
-                   f"Stardust Bonus: **+{(mining_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{mining_upgrade['rare_bonus'] * 100:.1f}%**"),
+                   f"Stardust Bonus: **+{(mining_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{mining_upgrade['rare_bonus'] * 100:.1f}%**"
+                   f"\nPet Stardust Bonus: **+{mining_pet_stardust_bonus * 100:.0f}%**{mining_pet_note}"),
             inline=False
         )
+
+        if pet_xp_result:
+            pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
+            if pet_xp_result["leveled_up"]:
+                pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
+            embed.add_field(
+                name="🐾 Companion Progress",
+                value=pet_xp_text,
+                inline=False,
+            )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
@@ -1074,7 +1567,8 @@ class Exploration(commands.Cog):
             upgrade_cog = self.bot.get_cog("Upgrades")
             scavenging_upgrade = await upgrade_cog.get_effects(user_id, "scavenging") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
             salvage_upgrade = await upgrade_cog.get_effects(user_id, "salvage") if upgrade_cog else {"level": 0, "bonus_chance": 0.0}
-            max_scavenge_charges = scavenging_upgrade["max_charges"]
+            # Space Dragon grants +3 maximum Scavenging charges at passive level 5.
+            max_scavenge_charges = scavenging_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
             scavenging_rare_bonus = scavenging_upgrade.get("rare_bonus", 0.0)
             salvage_bonus_chance = max(0.0, salvage_upgrade.get("bonus_chance", 0.0))
 
@@ -1187,15 +1681,9 @@ class Exploration(commands.Cog):
                 loot_rarity_note = ""
 
             else:
-                # During Halloween, the normal Space Junk slot is fully replaced
-                # by the seasonal Halloween Space Junk pool. Outside the event,
-                # scavenging uses the normal Space Junk pool as usual.
-                halloween_junk = get_halloween_space_junk()
-                if halloween_junk:
-                    item_id, item_name, item_emoji, item_desc, _stardust_value, _candy_value = random.choice(halloween_junk)
-                    item_name = f"{item_emoji} {item_name}"
-                else:
-                    item_id, item_name = random.choice(list(junk_items.items()))
+                # Halloween collectibles are exclusive to Haunted Exploration.
+                # Scavenge keeps its normal Space Junk pool during the event.
+                item_id, item_name = random.choice(list(junk_items.items()))
                 item_type = "space_junk"
                 loot_rarity_note = ""
 
@@ -1233,14 +1721,24 @@ class Exploration(commands.Cog):
                         f"\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
-            if pet_effects["charge_save"] and random.random() < pet_effects["charge_save"]:
+            effective_scavenge_charge_save = max(
+                pet_effects["charge_save"],
+                pet_effects["scavenge_charge_save"],
+            )
+            if effective_scavenge_charge_save and random.random() < effective_scavenge_charge_save:
                 new_charges = charges
+                scavenge_charge_saved = True
             else:
                 new_charges = charges - 1
+                scavenge_charge_saved = False
             found_stardust = int(
                 random.randint(45, 120)
                 * scavenging_upgrade["stardust_mult"]
-                * (1 + pet_effects["stardust_bonus"])
+                * (
+                    1
+                    + pet_effects["stardust_bonus"]
+                    + pet_effects.get("extra_charges", 0.0)
+                )
             )
 
             if effects.pop("quantum_battery", False):
@@ -1275,6 +1773,11 @@ class Exploration(commands.Cog):
                     else:
                         defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
                     hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
+                elif pet_effects["scavenge_hazard_avoidance"] and random.random() < pet_effects["scavenge_hazard_avoidance"]:
+                    hazard_note = (
+                        "\n\n🐾 **Pet Warning!** Your companion noticed the hazard a moment before it hit "
+                        "and pulled you out of the way!\n**0 HP damage taken.**"
+                    )
                 elif halloween_is_active() and HALLOWEEN_DAMAGE_MESSAGES:
                     halloween_message, halloween_min_damage, halloween_max_damage = random.choice(HALLOWEEN_DAMAGE_MESSAGES)
                     hazard = halloween_message
@@ -1285,6 +1788,20 @@ class Exploration(commands.Cog):
                     hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
 
             new_hp = max(0, hp - damage_taken)
+            if (
+                damage_taken > 0
+                and pet_effects["scavenge_first_aid"]
+                and random.random() < pet_effects["scavenge_first_aid"]
+            ):
+                recovered_hp = random.randint(4, 8)
+                old_hp_after_hazard = new_hp
+                new_hp = min(max_hp, new_hp + recovered_hp)
+                actual_recovery = new_hp - old_hp_after_hazard
+                if actual_recovery > 0:
+                    hazard_note += (
+                        f"\n\n🩺 **First Aid!** Your pet patched you up for **+{actual_recovery} HP**."
+                    )
+
             if new_hp <= 0 and effects.pop("cosmic_insurance", False):
                 new_hp = 1
                 hazard_note += "\n\n📋 **Cosmic Insurance:** Your coverage kept you at **1 HP**."
@@ -1309,32 +1826,34 @@ class Exploration(commands.Cog):
             pet_findings = []
             bonus_overflow_findings = []
 
-            # During an active seasonal event, Space Junk can be found as an
-            # independent bonus alongside the normal scavenging loot.
-            halloween_junk = get_halloween_space_junk()
-            if halloween_junk and random.random() < HALLOWEEN_BONUS_ROLL_CHANCE:
-                seasonal_item_id, seasonal_name, seasonal_emoji, _seasonal_desc, _seasonal_stardust, _seasonal_candy = random.choice(halloween_junk)
-                added_seasonal, seasonal_quantity, seasonal_max = await add_inventory_item(
-                    db, user_id, seasonal_item_id, "space_junk", 1
+            # Some Haunted pets have a permanent, year-round scavenging passive
+            # that can find an additional miscellaneous Space Junk item.
+            if pet_effects["scavenge_bonus_loot"] and random.random() < pet_effects["scavenge_bonus_loot"]:
+                bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
+                bonus_added, bonus_quantity, bonus_max = await add_inventory_item(
+                    db, user_id, bonus_item_id, "space_junk", 1
                 )
-                if added_seasonal:
-                    seasonal_findings.append(
-                        f"{seasonal_emoji} {seasonal_name} ×{added_seasonal}"
+                if bonus_added:
+                    pet_findings.append(
+                        f"{bonus_item_name} ×{bonus_added} — **Pet Bonus Find**"
                     )
-                    await record_collectible(db, self.bot, user_id, seasonal_item_id, "Halloween")
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get(seasonal_item_id, 10)
+                    overflow_stardust = LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
                     new_stardust += overflow_stardust
-                    seasonal_findings.append(
-                        f"{seasonal_emoji} {seasonal_name} → +{overflow_stardust} Stardust (inventory full)"
+                    pet_findings.append(
+                        f"{bonus_item_name} → Inventory Full (+{overflow_stardust:,} Stardust)"
                     )
+
+            # Seasonal non-collectible resources remain available during Halloween.
+            # Halloween collectibles themselves are exclusive to Haunted Exploration.
+            halloween_active = halloween_is_active()
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
             # Halloween and normal eggs each get their own roll, so both can be
             # found during the same scavenging run. Halloween eggs stop dropping
             # automatically when the event ends.
             egg_rolls = []
-            if halloween_junk and random.random() < HALLOWEEN_PET_EGG_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_PET_EGG_CHANCE:
                 egg_rolls.append("halloween_egg")
             if random.random() < NORMAL_EGG_CHANCE:
                 egg_rolls.append("normal_egg")
@@ -1355,7 +1874,7 @@ class Exploration(commands.Cog):
 
             # Halloween resources are independent bonus rolls and never replace normal loot.
             candy_doubled = False
-            if halloween_junk and random.random() < HALLOWEEN_CANDY_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_CANDY_CHANCE:
                 candy_found = 1
 
                 # Sam's Trick-or-Treating passive can double the base candy haul.
@@ -1386,7 +1905,7 @@ class Exploration(commands.Cog):
                         f"📦 Candy Overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
                     )
 
-            if halloween_junk and random.random() < HALLOWEEN_PLASTIC_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
                 plastic_found = random.randint(HALLOWEEN_PLASTIC_MIN, HALLOWEEN_PLASTIC_MAX)
                 added_plastic, plastic_quantity, plastic_max = await add_inventory_item(
                     db, user_id, "halloween_plastic", "crafting_material", plastic_found
@@ -1399,7 +1918,7 @@ class Exploration(commands.Cog):
                     seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
 
             # A Trick-or-Treat Bag is an especially rare direct seasonal find.
-            if halloween_junk and random.random() < HALLOWEEN_BAG_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_BAG_CHANCE:
                 added_bag, bag_quantity, bag_max = await add_inventory_item(
                     db, user_id, "trick_or_treat_bag", "consumable", 1
                 )
@@ -1419,7 +1938,11 @@ class Exploration(commands.Cog):
                 effective_material_chance = min(1.0, chance * (1 + salvage_bonus_chance))
                 if random.random() < effective_material_chance:
                     amount_found = random.randint(1, 5)
-                    if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
+                    effective_scavenge_material_bonus = max(
+                        pet_effects["material_bonus"],
+                        pet_effects["scavenge_material_bonus"],
+                    )
+                    if effective_scavenge_material_bonus and random.random() < effective_scavenge_material_bonus:
                         amount_found += 1
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "crafting_material", amount_found
@@ -1461,7 +1984,11 @@ class Exploration(commands.Cog):
                     effective_mineral_chance = min(1.0, chance * (1 + salvage_bonus_chance))
                     if random.random() < effective_mineral_chance:
                         amount_found = random.randint(1, 5)
-                        if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
+                        effective_scavenge_material_bonus = max(
+                            pet_effects["material_bonus"],
+                            pet_effects["scavenge_material_bonus"],
+                        )
+                        if effective_scavenge_material_bonus and random.random() < effective_scavenge_material_bonus:
                             amount_found += 1
                         added_mineral, mineral_quantity, mineral_max = await add_inventory_item(
                             db, user_id, mineral_id, "mineral", amount_found
@@ -1522,6 +2049,10 @@ class Exploration(commands.Cog):
                 bonus_sections.append(
                     "🐾 **Pet Find:** " + " • ".join(pet_findings)
                 )
+            if scavenge_charge_saved:
+                bonus_sections.append(
+                    "🐾 **Pet Bonus:** Your companion preserved this scavenging charge!"
+                )
             if bonus_overflow_findings:
                 bonus_sections.append(
                     "📦 **Overflow:** " + " • ".join(bonus_overflow_findings)
@@ -1529,7 +2060,7 @@ class Exploration(commands.Cog):
 
             bonus_material_text = "\n\n" + "\n\n".join(bonus_sections) if bonus_sections else ""
 
-            await add_pet_xp(db, user_id, PET_XP_PER_EXPLORATION)
+            pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
 
             await db.execute("""
                 UPDATE users 
@@ -1560,10 +2091,18 @@ class Exploration(commands.Cog):
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
+        scavenge_pet_charge_bonus = pet_effects.get("extra_charge_count", 0)
+        scavenge_pet_stardust_bonus = pet_effects.get("extra_charges", 0.0)
+        scavenge_pet_note = (
+            f" • 🐉 Space Dragon: **+{scavenge_pet_charge_bonus} Max Charges**"
+            if scavenge_pet_charge_bonus
+            else ""
+        )
         embed.add_field(
             name="🛠️ Scavenging Drone Upgrade",
             value=(f"Tier **{scavenging_upgrade['level']}/5** • Max Charges: **{max_scavenge_charges}**\n"
-                   f"Stardust Bonus: **+{(scavenging_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{scavenging_upgrade['rare_bonus'] * 100:.1f}%**"),
+                   f"Stardust Bonus: **+{(scavenging_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{scavenging_upgrade['rare_bonus'] * 100:.1f}%**"
+                   f"\nPet Stardust Bonus: **+{scavenge_pet_stardust_bonus * 100:.0f}%**{scavenge_pet_note}"),
             inline=False
         )
         embed.add_field(
@@ -1575,6 +2114,16 @@ class Exploration(commands.Cog):
             ),
             inline=False
         )
+
+        if pet_xp_result:
+            pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
+            if pet_xp_result["leveled_up"]:
+                pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
+            embed.add_field(
+                name="🐾 Companion Progress",
+                value=pet_xp_text,
+                inline=False,
+            )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
@@ -1879,5 +2428,132 @@ class Exploration(commands.Cog):
             embed=embed,
             view=RevivalView()
         )
+
+class HauntedLocationView(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=90)
+        self.cog = cog
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 Haunted Exploration is currently dormant.", ephemeral=True)
+            return False
+        return True
+
+        for index, (location_id, location) in enumerate(HAUNTED_LOCATIONS.items()):
+            self.add_item(HauntedLocationButton(self.cog, location_id, location, index))
+        self.add_item(HauntedInfoButton(self.cog))
+
+
+class HauntedLocationButton(discord.ui.Button):
+    def __init__(self, cog, location_id, location, index):
+        super().__init__(
+            label=location["name"],
+            emoji=location["emoji"],
+            style=discord.ButtonStyle.secondary,
+            row=index // 5,
+        )
+        self.cog = cog
+        self.location_id = location_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.cog._start_haunted_run(interaction, self.location_id)
+
+
+class HauntedInfoButton(discord.ui.Button):
+    def __init__(self, cog):
+        super().__init__(
+            label="Info",
+            emoji="📖",
+            style=discord.ButtonStyle.primary,
+            row=3,
+        )
+        self.cog = cog
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            embed=self.cog._haunted_info_embed(),
+            ephemeral=True,
+        )
+
+
+class HauntedEncounterView(discord.ui.View):
+    def __init__(self, cog, location_id, stage, total_stages, encounter):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.location_id = location_id
+        self.stage = stage
+        self.total_stages = total_stages
+        self.encounter = encounter
+
+        for index, choice in enumerate(encounter["choices"]):
+            label = choice.get("label", "Choose") if isinstance(choice, dict) else choice[0]
+            risk = choice.get("risk", "medium") if isinstance(choice, dict) else "medium"
+            self.add_item(HauntedChoiceButton(self.cog, self.location_id, self.stage, self.total_stages, self.encounter, index, label, risk))
+
+        self.add_item(HauntedRunButton(self.cog, self.location_id, self.stage, self.total_stages))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 Haunted Exploration is currently dormant.", ephemeral=True)
+            return False
+        return True
+
+
+class HauntedChoiceButton(discord.ui.Button):
+    def __init__(self, cog, location_id, stage, total_stages, encounter, index, label, risk="medium"):
+        styles = {
+            "low": discord.ButtonStyle.secondary,
+            "medium": discord.ButtonStyle.primary,
+            "high": discord.ButtonStyle.danger,
+            "extreme": discord.ButtonStyle.danger,
+        }
+        super().__init__(label=label, style=styles.get(risk, discord.ButtonStyle.secondary), row=0)
+        self.cog = cog
+        self.location_id = location_id
+        self.stage = stage
+        self.total_stages = total_stages
+        self.encounter = encounter
+        self.index = index
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.cog._resolve_haunted_choice(
+            interaction,
+            self.location_id,
+            self.stage,
+            self.total_stages,
+            self.encounter,
+            self.index,
+        )
+
+
+class HauntedRunButton(discord.ui.Button):
+    def __init__(self, cog, location_id, stage, total_stages):
+        super().__init__(
+            label="Run Away",
+            emoji="🏃",
+            style=discord.ButtonStyle.danger,
+            row=1,
+        )
+        self.cog = cog
+        self.location_id = location_id
+        self.stage = stage
+        self.total_stages = total_stages
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.cog._run_away_haunted(
+            interaction,
+            self.location_id,
+            self.stage,
+            self.total_stages,
+        )
+
+
 async def setup(bot):
     await bot.add_cog(Exploration(bot))

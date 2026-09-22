@@ -21,6 +21,15 @@ BACKGROUND_ARTISTS = {
     "halloween_trick_or_treat": "Daisy Anderson on Pexels",
     "background_glowing_gem": "SynoMatesXD on Reddit",
     "background_malo": "@upsetfroglet on Tumblr",
+
+    # Haunted achievement backgrounds
+    "background_the_graveyard": "Just Jus on Unsplash",
+    "background_abandoned_sanctuary": "Giancarlo Corti on Unsplash",
+    "background_midnight_pizzeria": "InkBuddy10 on Reddit",
+    "background_dead_air": "Dan Coe on Flickr",
+    "background_fogbound": "KoolShooters on Pexels",
+    "background_dead_end": "Rebecca Johnsen on Unsplash",
+    "background_watched_from_the_trees": "Ben Griffiths on Unsplash",
 }
 
 class Profile(commands.Cog):
@@ -392,6 +401,13 @@ class Profile(commands.Cog):
             "halloween_trick_or_treat": "Trick-or-Treat",
             "background_glowing_gem": "Glowing Gem",
             "background_malo": "MalO",
+            "background_the_graveyard": "The Graveyard",
+            "background_abandoned_sanctuary": "Abandoned Sanctuary",
+            "background_midnight_pizzeria": "Midnight Pizzeria",
+            "background_dead_air": "Dead Air",
+            "background_fogbound": "Fogbound",
+            "background_dead_end": "Dead-End",
+            "background_watched_from_the_trees": "Watched From the Trees",
         }
 
 
@@ -438,6 +454,13 @@ class Profile(commands.Cog):
                 "halloween_trick_or_treat": "🎃",
                 "background_glowing_gem": "💎",
                 "background_malo": "📱",
+                "background_the_graveyard": "🪦",
+                "background_abandoned_sanctuary": "⛪",
+                "background_midnight_pizzeria": "🍕",
+                "background_dead_air": "📡",
+                "background_fogbound": "🌫️",
+                "background_dead_end": "🛣️",
+                "background_watched_from_the_trees": "🌲",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -471,7 +494,14 @@ class Profile(commands.Cog):
             "halloween_haunting_friend": "Haunting Friend",
             "halloween_trick_or_treat": "Trick-or-Treat",
             "background_glowing_gem": "Glowing Gem",
-            "background_malo": "MalO"
+            "background_malo": "MalO",
+            "background_the_graveyard": "The Graveyard",
+            "background_abandoned_sanctuary": "Abandoned Sanctuary",
+            "background_midnight_pizzeria": "Midnight Pizzeria",
+            "background_dead_air": "Dead Air",
+            "background_fogbound": "Fogbound",
+            "background_dead_end": "Dead-End",
+            "background_watched_from_the_trees": "Watched From the Trees"
         }
 
         if background not in valid_backgrounds:

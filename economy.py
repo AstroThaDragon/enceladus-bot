@@ -10,8 +10,12 @@ import datetime
 import time
 from datetime import datetime, timedelta
 import pytz
-from seasonal_updates.halloween import is_active as halloween_is_active
-from seasonal_updates.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
+from seasonal_updates.halloween.halloween import is_active as halloween_is_active
+from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
+
+HALLOWEEN_SPACE_JUNK_IDS = {
+    item_id for item_id, *_ in HALLOWEEN_SPACE_JUNK
+}
 
 
 # Space Junk salvage pools. Each junk item always yields exactly one base
@@ -89,6 +93,22 @@ SALVAGE_OVERFLOW_VALUES = {
     "circuit_board": 20, "glue": 6, "scrap_metal": 3, "nuts_bolts": 4, "wiring": 5,
 }
 
+
+# Normal station materials that are safe to include in the bulk
+# "Sell All Ores & Materials" option. Haunted/Halloween materials are
+# intentionally excluded so seasonal crafting stock is never bulk-sold.
+NORMAL_SELL_ALL_MATERIAL_IDS = {
+    "titanium_chunk",
+    "iron_ore",
+    "copper_ore",
+    "aluminum_ore",
+    "circuit_board",
+    "glue",
+    "scrap_metal",
+    "nuts_bolts",
+    "wiring",
+}
+
 class ShopCategorySelect(discord.ui.Select):
     def __init__(self, shop_view):
         self.shop_view = shop_view
@@ -123,6 +143,12 @@ class ShopCategorySelect(discord.ui.Select):
                 emoji="✨",
                 value="special",
                 description="Rare and unusual station items."
+            ),
+            discord.SelectOption(
+                label="Lottery",
+                emoji="🎟️",
+                value="lottery",
+                description="Monthly Stardust lottery tickets."
             ),
             discord.SelectOption(
                 label="Backgrounds",
@@ -238,6 +264,25 @@ class ShopView(discord.ui.View):
             item_ids = [
                 "time_crystal",
             ]
+
+        elif category == "lottery":
+            embed.description = (
+                "🎟️ **Monthly Lottery**\n"
+                "Choose your own five numbers from 1–99 and enter the monthly drawing."
+            )
+            embed.add_field(
+                name="🎟️ Lottery Ticket",
+                value=(
+                    "💰 Price: **100 Stardust** per ticket\n"
+                    "🔢 Choose **5 different numbers from 1–99**\n"
+                    "📦 Maximum: **25 active tickets** per user per cycle\n"
+                    "🏆 Top prize: **10,000 Stardust** for matching all 5\n\n"
+                    "Use `/lottery buy` to choose your numbers and purchase a ticket."
+                ),
+                inline=False,
+            )
+            embed.set_footer(text="Use /lottery to view the current drawing and your tickets.")
+            return embed
 
         elif category == "backgrounds":
             embed.description = (
@@ -722,6 +767,18 @@ class Economy(commands.Cog):
             """
         )
 
+        # Daily/monthly one-shot pet effects (Void Merchant / Solar Phoenix).
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pet_effect_usage (
+                user_id INTEGER NOT NULL,
+                effect_id TEXT NOT NULL,
+                period_key TEXT NOT NULL,
+                PRIMARY KEY (user_id, effect_id, period_key)
+            )
+            """
+        )
+
         
     @commands.hybrid_command(
         name="balance",
@@ -774,7 +831,7 @@ class Economy(commands.Cog):
 
     @commands.hybrid_command(
         name="daily",
-        description="Claim your daily Stardust reward and build your streak! Rewards max out at 400 Stardust."
+        description="Claim your daily Stardust reward and build your streak! Rewards max out at 1,150 Stardust."
     )
     async def daily(self, ctx: commands.Context):
         """Claim the daily Stardust reward and build a consecutive-day streak."""
@@ -815,11 +872,15 @@ class Economy(commands.Cog):
 
             stardust, streak, last_daily, hp = row if row else (0, 0, "", 100)
 
+            from pets import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, user_id)
+
             # Already claimed today.
             if last_daily == today_str:
                 await db.rollback()
 
-                reward = min(400, 100 + max(0, streak - 1) * 50)
+                daily_rewards = [500, 600, 700, 800, 900, 1000, 1150]
+                reward = daily_rewards[min(max(1, streak), len(daily_rewards)) - 1]
 
                 return await ctx.send(
                     f"{ctx.author.mention} 📅 **Daily already claimed!**\n"
@@ -833,15 +894,50 @@ class Economy(commands.Cog):
                 last_daily and last_daily != yesterday_str
             )
 
-            # Continue the streak if yesterday was claimed.
-            # The streak is intentionally NOT capped at 7 anymore.
-            if last_daily == yesterday_str:
+            # Solar Phoenix can automatically rescue one missed daily streak
+            # once per calendar month at passive level 5. The rescue happens
+            # before today's increment, so the player keeps the old streak.
+            streak_rescued = False
+            if (
+                streak_was_reset
+                and streak > 0
+                and pet_effects.get("streak_rescue")
+            ):
+                month_key = today.strftime("%Y-%m")
+                async with db.execute(
+                    "SELECT 1 FROM pet_effect_usage WHERE user_id = ? AND effect_id = ? AND period_key = ?",
+                    (user_id, "solar_phoenix_streak_rescue", month_key),
+                ) as cursor:
+                    rescue_used = await cursor.fetchone()
+
+                if not rescue_used:
+                    await db.execute(
+                        "INSERT INTO pet_effect_usage (user_id, effect_id, period_key) VALUES (?, ?, ?)",
+                        (user_id, "solar_phoenix_streak_rescue", month_key),
+                    )
+                    streak_rescued = True
+
+            # Continue the streak if yesterday was claimed, or if Solar Phoenix
+            # rescued the missed day.
+            if last_daily == yesterday_str or streak_rescued:
                 new_streak = max(1, streak) + 1
             else:
                 new_streak = 1
 
-            # Reward increases by 50 per day, but is currently capped at 400.
-            reward = min(400, 100 + (new_streak - 1) * 50)
+            # Use the displayed 1–7 day reward ladder. Streaks beyond day 7
+            # continue at the day-7 reward until the ladder is expanded.
+            daily_rewards = [500, 600, 700, 800, 900, 1000, 1150]
+            reward = daily_rewards[min(new_streak, len(daily_rewards)) - 1]
+
+            daily_bonus = float(pet_effects.get("daily_bonus", 0.0))
+            reward = int(reward * (1 + daily_bonus))
+
+            doubled = False
+            double_chance = float(pet_effects.get("daily_double", 0.0))
+            if double_chance and random.random() < double_chance:
+                reward *= 2
+                doubled = True
+
             new_stardust = stardust + reward
 
             # Daily also restores +50 HP, regardless of current HP, capped at 100.
@@ -873,11 +969,18 @@ class Economy(commands.Cog):
             )
 
         reset_note = ""
-        if streak_was_reset:
+        if streak_rescued:
+            reset_note = (
+                "\n\n☀️ **Solar Phoenix rescued your daily streak!** "
+                "Your monthly streak rescue has been used."
+            )
+        elif streak_was_reset:
             reset_note = (
                 "\n\n⚠️ **Your daily streak was reset** because you missed a day. "
                 "You're starting a new streak today!"
             )
+        if doubled:
+            reset_note += "\n✨ **Solar Phoenix doubled today's payout!**"
 
         embed = discord.Embed(
             title="📅 Daily Stardust",
@@ -1087,12 +1190,66 @@ class Economy(commands.Cog):
         """Show items currently available in the station shop."""
         current = current.lower().strip()
 
+        # Application-command autocomplete choices do not render Discord's
+        # custom-emoji markup, so use normal Unicode emojis for the picker.
+        autocomplete_emojis = {
+            "nanite_patch": "🩹",
+            "medkit": "🧰",
+            "revive": "⚕️",
+            "full_revive": "💉",
+            "laser_charge_cell": "🔋",
+            "laser_power_cell": "⚡",
+            "fuel_refill": "⚛️",
+            "drone_battery": "🔋",
+            "drone_power_cell": "⚡",
+            "drone_quantum_battery": "⚛️",
+            "pet_snack": "🍪",
+            "time_crystal": "💎",
+            "neon_grid": "🌆",
+            "deep_void": "🌌",
+            "solaris_ring": "💫",
+            "fuel_stabilizer": "🛢️",
+            "hazard_shield": "🛡️",
+            "lucky_scanner": "📡",
+            "prototype_drill_bit": "⚙️",
+            "station_rations": "🥫",
+            "ore_magnet": "🧲",
+            "cosmic_insurance": "📋",
+            "fate_anchor": "⚓",
+            "revive_kit": "💉",
+            "stop_sign": "🛑",
+            "stick": "🪵",
+            "wooden_sword": "🗡️",
+            "wooden_shield": "🛡️",
+            "wooden_spoon": "🥄",
+            "heavy_wrench": "🔧",
+            "plasma_cutter": "🔫",
+            "title_outer_rim_wanderer": "🏷️",
+            "title_starborn": "🏷️",
+            "title_voidfarer": "🏷️",
+        }
+
+        def autocomplete_name(item_id, info):
+            raw_name = info["name"]
+            fallback_emoji = autocomplete_emojis.get(item_id, "📦")
+
+            # The catalog's display names may contain custom Discord emoji
+            # markup. For autocomplete, strip that markup and prepend a
+            # renderable Unicode emoji instead.
+            if raw_name.startswith("<:") or raw_name.startswith("<a:"):
+                closing = raw_name.find(">")
+
+                if closing != -1:
+                    raw_name = raw_name[closing + 1:].lstrip()
+
+            return f"{fallback_emoji} {raw_name}"
+
         available_items = []
         seen_items = set()
 
         # Permanent shop items.
         for item_id, info in self.SHOP_ITEMS.items():
-            display_name = info["name"]
+            display_name = autocomplete_name(item_id, info)
 
             if current and current not in display_name.lower():
                 continue
@@ -1114,7 +1271,7 @@ class Economy(commands.Cog):
             if not info:
                 continue
 
-            display_name = info["name"]
+            display_name = autocomplete_name(item_id, info)
 
             if current and current not in display_name.lower():
                 continue
@@ -1132,6 +1289,7 @@ class Economy(commands.Cog):
         return available_items[:25]
 
     @commands.hybrid_command(name="shop_buy", description="Purchase an item from the station vendor catalog.")
+    @app_commands.rename(item_id="item")
     @app_commands.describe(item_id="Choose an item to purchase.", quantity="How many would you like to buy? (1-99)")
     @app_commands.autocomplete(item_id=shop_buy_autocomplete)
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
@@ -1172,11 +1330,11 @@ class Economy(commands.Cog):
         is_daily_offer = item_id in self.daily_rotation()
 
         if is_daily_offer and is_permanent_item:
-            unit_cost = int(item["cost"] * 0.85)
+            base_unit_cost = int(item["cost"] * 0.85)
         else:
-            unit_cost = item["cost"]
+            base_unit_cost = item["cost"]
 
-        cost = unit_cost * quantity
+        cost = base_unit_cost * quantity
 
         db_path = self.get_db_path()
 
@@ -1204,6 +1362,10 @@ class Economy(commands.Cog):
                 "medkit": "medkits",
             }
 
+            # Lock before reading inventory, balance, or purchase-limit state.
+            # All critical reads and writes now share one atomic snapshot.
+            await db.execute("BEGIN IMMEDIATE")
+
             if item_id in legacy_columns:
                 column = legacy_columns[item_id]
 
@@ -1223,10 +1385,6 @@ class Economy(commands.Cog):
                     inventory_row = await cursor.fetchone()
 
                 current_quantity = (inventory_row[0] or 0) if inventory_row else 0
-
-            # Lock the database before checking inventory, balance, and
-            # purchase limits so the entire purchase is atomic.
-            await db.execute("BEGIN IMMEDIATE")
 
             if current_quantity + quantity > max_stack:
                 await db.rollback()
@@ -1252,6 +1410,34 @@ class Economy(commands.Cog):
                 )
 
             stardust, charges, hp, max_hp = row
+
+            from pets import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, user_id)
+
+            # Void Merchant's normal shop discount stacks on top of an existing
+            # Daily Offer discount. Its level-5 free-purchase effect is a
+            # one-purchase-per-day proc and is claimed inside this same lock.
+            shop_discount = max(0.0, min(0.99, float(pet_effects.get("shop_discount", 0.0))))
+            unit_cost = max(1, int(base_unit_cost * (1 - shop_discount)))
+            cost = unit_cost * quantity
+            free_purchase = False
+
+            free_chance = float(pet_effects.get("shop_free_purchase", 0.0))
+            if free_chance > 0:
+                today_key = self.rotation_date()
+                async with db.execute(
+                    "SELECT 1 FROM pet_effect_usage WHERE user_id = ? AND effect_id = ? AND period_key = ?",
+                    (user_id, "void_merchant_free_purchase", today_key),
+                ) as cursor:
+                    free_used = await cursor.fetchone()
+
+                if not free_used and random.random() < free_chance:
+                    await db.execute(
+                        "INSERT INTO pet_effect_usage (user_id, effect_id, period_key) VALUES (?, ?, ?)",
+                        (user_id, "void_merchant_free_purchase", today_key),
+                    )
+                    cost = 0
+                    free_purchase = True
 
             if stardust < cost:
                 await db.rollback()
@@ -1383,16 +1569,21 @@ class Economy(commands.Cog):
 
                 await db.commit()
 
+                price_note = (
+                    "🕳️ **Void Merchant:** This purchase was completely free!"
+                    if free_purchase else
+                    f"for **{cost:,} Stardust**!"
+                )
                 if item_type == "title":
                     return await ctx.send(
-                        f"🏷️ **Title Unlocked!** You purchased "
-                        f"**{item['name']}** for **{cost:,} Stardust**!"
+                        f"🏷️ **Title Unlocked!** You purchased **{item['name']}** "
+                        + price_note
                     )
 
                 return await ctx.send(
                     f"{ctx.author.mention} 🔄 **Purchase Successful!** Added **{quantity}x "
-                    f"{item['name']}** to your inventory for "
-                    f"**{cost:,} Stardust**!"
+                    f"{item['name']}** to your inventory "
+                    + price_note
                 )
 
             if item["type"] == "revive":
@@ -1895,7 +2086,7 @@ class Economy(commands.Cog):
         interaction: discord.Interaction,
         current: str
     ):
-        """Show space junk the user currently owns and can sell."""
+        """Show sellable items the user currently owns."""
         user_id = interaction.user.id
         current = current.lower().strip()
 
@@ -1904,197 +2095,345 @@ class Economy(commands.Cog):
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
                 """
-                SELECT item_id, quantity
+                SELECT item_id, quantity, item_type
                 FROM inventory
                 WHERE user_id = ?
-                  AND item_type = 'space_junk'
                   AND quantity > 0
+                ORDER BY item_id
                 """,
                 (user_id,)
             ) as cursor:
                 rows = await cursor.fetchall()
 
         choices = []
+        sellable_rows = []
 
-        # Always offer the option to sell all junk.
-        if not current or "sell all" in current:
-            choices.append(
-                app_commands.Choice(
-                    name="🗑️ Sell All Space Junk",
-                    value="all"
-                )
-            )
-
-        for item_id, quantity in rows:
-            if item_id not in self.JUNK_PRICES and get_halloween_sell_reward(item_id) is None and item_id not in ITEM_REGISTRY:
-                continue
-
+        for item_id, owned_quantity, item_type in rows:
             info = ITEM_REGISTRY.get(item_id)
             if not info:
                 continue
 
-            display_name = info["name"]
+            # Space Junk can be sold using the existing normal buyback table
+            # or the Halloween-specific Stardust + Candy reward.
+            is_space_junk = str(item_type).lower() == "space_junk" or info.get("type") == "Space Junk"
+            is_material = bool(info.get("sell_price")) and info.get("type") in {
+                "Mineral",
+                "Crafting Material",
+                "Haunted Ingredient",
+            }
 
-            if current and current not in display_name.lower():
+            if not is_space_junk and not is_material:
+                continue
+
+            if is_space_junk:
+                if (
+                    item_id not in self.JUNK_PRICES
+                    and get_halloween_sell_reward(item_id) is None
+                ):
+                    continue
+            elif not info.get("sell_price"):
+                continue
+
+            sellable_rows.append((item_id, owned_quantity, info, is_space_junk))
+
+        normal_junk_owned = any(
+            is_space_junk and item_id in self.JUNK_PRICES
+            for item_id, _quantity, _info, is_space_junk in sellable_rows
+        )
+        normal_material_owned = any(
+            item_id in NORMAL_SELL_ALL_MATERIAL_IDS
+            for item_id, _quantity, _info, _is_space_junk in sellable_rows
+        )
+
+        # Bulk options are deliberately separate so limited-time Halloween
+        # Space Junk and Haunted ingredients can never be swept up accidentally.
+        show_all = not current or "all" in current or "sell all" in current
+        show_junk_all = show_all or "junk" in current or "space junk" in current
+        show_material_all = show_all or "material" in current or "ore" in current
+
+        if normal_junk_owned and show_junk_all:
+            choices.append(
+                app_commands.Choice(
+                    name="🗑️ Sell All Space Junk",
+                    value="all_junk"
+                )
+            )
+
+        if normal_material_owned and show_material_all:
+            choices.append(
+                app_commands.Choice(
+                    name="🔧 Sell All Ores & Materials",
+                    value="all_materials"
+                )
+            )
+
+        for item_id, owned_quantity, info, _is_space_junk in sellable_rows:
+            display_name = info["name"]
+            search_text = f"{display_name} {item_id}".lower()
+            if current and current not in search_text:
                 continue
 
             choices.append(
                 app_commands.Choice(
-                    name=f"{info['emoji']} {display_name} (x{quantity})",
+                    name=f"{info['emoji']} {display_name} (x{owned_quantity})",
                     value=item_id
                 )
             )
 
-        choices.sort(key=lambda choice: choice.name.lower())
+        bulk_choices = [
+            choice for choice in choices
+            if choice.value in {"all_junk", "all_materials"}
+        ]
+        item_choices = [
+            choice for choice in choices
+            if choice.value not in {"all_junk", "all_materials"}
+        ]
+        item_choices.sort(key=lambda choice: choice.name.lower())
 
-        return choices[:25]
+        return (bulk_choices + item_choices)[:25]
 
-    @commands.hybrid_command(name="shop_sell", description="Sell salvaged space junk from your inventory for Stardust.")
-    @app_commands.describe(item="The junk item ID to sell, or 'all' to sell every piece of space junk.")
-    async def sell(self, ctx: commands.Context, item: str):
+
+    @commands.hybrid_command(
+        name="shop_sell",
+        description="Sell Space Junk, ores, and crafting materials for Stardust."
+    )
+    @app_commands.describe(
+        item="Choose an item to sell, sell all normal Space Junk, or sell all normal ores & materials.",
+        quantity="How many to sell (1-99).",
+    )
+    @app_commands.autocomplete(item=shop_sell_autocomplete)
+    async def sell(
+        self,
+        ctx: commands.Context,
+        item: str,
+        quantity: int = 1
+    ):
         await ctx.defer()
 
         user_id = ctx.author.id
         target_item = item.lower().strip()
         db_path = self.get_db_path()
 
+        if quantity < 1 or quantity > 99:
+            return await ctx.send("❌ Quantity must be between **1 and 99**.")
+
+        from inventory import ITEM_REGISTRY, add_inventory_item
+
         async with aiosqlite.connect(db_path) as db:
             # Lock the database before reading inventory so concurrent sell
-            # requests cannot both cash out the same space junk.
+            # requests cannot both cash out the same inventory.
             await db.execute("BEGIN IMMEDIATE")
 
-            # Option A: Sell ALL space junk
-            if target_item == "all":
+            # ------------------------------------------------------------------
+            # Option A: Sell all NORMAL Space Junk.
+            # Halloween Space Junk is intentionally excluded.
+            # ------------------------------------------------------------------
+            if target_item == "all_junk":
                 async with db.execute(
                     """
                     SELECT item_id, quantity
                     FROM inventory
                     WHERE user_id = ?
                       AND item_type = 'space_junk'
+                      AND item_id IN ({})
                       AND quantity > 0
-                    """,
-                    (user_id,)
+                    """.format(",".join("?" * len(self.JUNK_PRICES))),
+                    (user_id, *self.JUNK_PRICES.keys())
                 ) as cursor:
                     junk_rows = await cursor.fetchall()
 
+                # Halloween Space Junk is seasonal and intentionally excluded
+                # from the bulk "Sell All Space Junk" option.
+                junk_rows = [
+                    (item_id, quantity)
+                    for item_id, quantity in junk_rows
+                    if item_id not in HALLOWEEN_SPACE_JUNK_IDS
+                ]
+
+
                 if not junk_rows:
+                    await db.rollback()
                     return await ctx.send(
-                        "🎒 **Inventory Empty!** You don't have any space junk to sell."
+                        "🎒 **Inventory Empty!** You don't have any normal Space Junk to sell."
+                    )
+
+                total_payout = sum(
+                    self.JUNK_PRICES[item_id] * quantity
+                    for item_id, quantity in junk_rows
+                )
+                item_count = sum(quantity for _, quantity in junk_rows)
+
+                for item_id, _quantity in junk_rows:
+                    await db.execute(
+                        """
+                        DELETE FROM inventory
+                        WHERE user_id = ?
+                          AND item_id = ?
+                        """,
+                        (user_id, item_id),
+                    )
+
+                await db.execute(
+                    "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                    (total_payout, user_id)
+                )
+                await db.commit()
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
+                    f"for a total of ✨ **{total_payout:,} Stardust**!"
+                )
+
+            # ------------------------------------------------------------------
+            # Option B: Sell all NORMAL ores & crafting materials.
+            # Haunted Ingredients and Halloween materials are excluded.
+            # ------------------------------------------------------------------
+            if target_item == "all_materials":
+                placeholders = ",".join("?" * len(NORMAL_SELL_ALL_MATERIAL_IDS))
+                material_ids = tuple(NORMAL_SELL_ALL_MATERIAL_IDS)
+
+                async with db.execute(
+                    f"""
+                    SELECT item_id, quantity
+                    FROM inventory
+                    WHERE user_id = ?
+                      AND item_id IN ({placeholders})
+                      AND quantity > 0
+                    """,
+                    (user_id, *material_ids)
+                ) as cursor:
+                    material_rows = await cursor.fetchall()
+
+                if not material_rows:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🎒 **Inventory Empty!** You don't have any normal ores or materials to sell."
                     )
 
                 total_payout = 0
-                total_candy = 0
-                for item_id, quantity in junk_rows:
-                    payout, candy = self.get_junk_sell_reward(item_id)
-                    total_payout += payout * quantity
-                    total_candy += candy * quantity
+                item_count = 0
+                sold_lines = []
+                for item_id, owned_quantity in material_rows:
+                    info = ITEM_REGISTRY.get(item_id, {})
+                    unit_price = int(info.get("sell_price", 0) or 0)
+                    if unit_price <= 0:
+                        continue
+                    total_payout += unit_price * owned_quantity
+                    item_count += owned_quantity
+                    sold_lines.append(
+                        f"{info.get('emoji', '📦')} {info.get('name', item_id)} ×{owned_quantity}"
+                    )
 
-                item_count = sum(quantity for _, quantity in junk_rows)
+                if not sold_lines:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🎒 **Nothing Sellable!** You don't have any priced normal ores or materials."
+                    )
 
                 await db.execute(
-                    """
+                    f"""
                     DELETE FROM inventory
                     WHERE user_id = ?
-                      AND item_type = 'space_junk'
+                      AND item_id IN ({placeholders})
                     """,
-                    (user_id,)
+                    (user_id, *material_ids)
                 )
-
                 await db.execute(
-                    """
-                    UPDATE users
-                    SET stardust = stardust + ?
-                    WHERE user_id = ?
-                    """,
+                    "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
                     (total_payout, user_id)
                 )
-
-                candy_added = 0
-                candy_overflow = 0
-                if total_candy > 0:
-                    from inventory import add_inventory_item
-                    candy_added, _, _ = await add_inventory_item(
-                        db, user_id, "halloween_candy", "consumable", total_candy
-                    )
-                    candy_overflow = total_candy - candy_added
-                    if candy_overflow > 0:
-                        # Keep excess candy from disappearing when the 99-stack is full.
-                        overflow_payout = candy_overflow * 5
-                        total_payout += overflow_payout
-                        await db.execute(
-                            "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
-                            (overflow_payout, user_id),
-                        )
-
                 await db.commit()
 
-                candy_text = f" and 🍬 **{candy_added} Halloween Candy**" if candy_added else ""
-                overflow_text = (
-                    f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
-                    if candy_overflow else ""
-                )
+                preview = "\n".join(sold_lines[:12])
+                if len(sold_lines) > 12:
+                    preview += f"\n…and {len(sold_lines) - 12} more."
+
                 return await ctx.send(
                     f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
-                    f"for a total of ✨ **{total_payout:,} Stardust**{candy_text}!"
-                    f"{overflow_text}"
+                    f"for ✨ **{total_payout:,} Stardust**!\n\n"
+                    f"🔧 **Materials Sold:**\n{preview}"
                 )
 
-            # Option B: Sell ONE unit of a specific junk item
+            # ------------------------------------------------------------------
+            # Option C: Sell a selected quantity of one sellable item.
+            # ------------------------------------------------------------------
             async with db.execute(
                 """
-                SELECT quantity
+                SELECT quantity, item_type
                 FROM inventory
                 WHERE user_id = ?
                   AND item_id = ?
-                  AND item_type = 'space_junk'
+                  AND quantity > 0
                 """,
                 (user_id, target_item)
             ) as cursor:
                 row = await cursor.fetchone()
 
-            if not row or (row[0] or 0) <= 0:
+            info = ITEM_REGISTRY.get(target_item)
+            if not row or not info:
+                await db.rollback()
                 return await ctx.send(
-                    f"❌ You don't have `{target_item}` in your space junk inventory!"
+                    f"❌ You don't have `{target_item}` in your inventory, or it isn't sellable."
                 )
 
-            quantity = row[0] or 0
-            payout, candy_reward = self.get_junk_sell_reward(target_item)
+            owned_quantity, stored_item_type = row
+            is_space_junk = (
+                str(stored_item_type).lower() == "space_junk"
+                or info.get("type") == "Space Junk"
+            )
 
-            if quantity > 1:
+            if is_space_junk:
+                if (
+                    target_item not in self.JUNK_PRICES
+                    and get_halloween_sell_reward(target_item) is None
+                ):
+                    await db.rollback()
+                    return await ctx.send("❌ That Space Junk item cannot be sold.")
+                unit_payout, unit_candy_reward = self.get_junk_sell_reward(target_item)
+            else:
+                unit_payout = int(info.get("sell_price", 0) or 0)
+                unit_candy_reward = 0
+                if unit_payout <= 0 or info.get("type") not in {
+                    "Mineral",
+                    "Crafting Material",
+                    "Haunted Ingredient",
+                }:
+                    await db.rollback()
+                    return await ctx.send("❌ That item cannot be sold.")
+
+            if quantity > owned_quantity:
+                await db.rollback()
+                return await ctx.send(
+                    f"❌ You only have **{owned_quantity}x** of **{info['name']}** in your inventory."
+                )
+
+            payout = unit_payout * quantity
+            candy_reward = unit_candy_reward * quantity
+            remaining = owned_quantity - quantity
+
+            if remaining > 0:
                 await db.execute(
                     """
                     UPDATE inventory
-                    SET quantity = quantity - 1
-                    WHERE user_id = ?
-                      AND item_id = ?
-                      AND item_type = 'space_junk'
+                    SET quantity = ?
+                    WHERE user_id = ? AND item_id = ?
                     """,
-                    (user_id, target_item)
+                    (remaining, user_id, target_item)
                 )
             else:
                 await db.execute(
-                    """
-                    DELETE FROM inventory
-                    WHERE user_id = ?
-                      AND item_id = ?
-                      AND item_type = 'space_junk'
-                    """,
+                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
                     (user_id, target_item)
                 )
 
             await db.execute(
-                """
-                UPDATE users
-                SET stardust = stardust + ?
-                WHERE user_id = ?
-                """,
+                "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
                 (payout, user_id)
             )
 
             candy_added = 0
             candy_overflow = 0
             if candy_reward > 0:
-                from inventory import add_inventory_item
                 candy_added, _, _ = await add_inventory_item(
                     db, user_id, "halloween_candy", "consumable", candy_reward
                 )
@@ -2104,12 +2443,11 @@ class Economy(commands.Cog):
                     payout += overflow_payout
                     await db.execute(
                         "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
-                        (overflow_payout, user_id),
+                        (overflow_payout, user_id)
                     )
 
             await db.commit()
 
-            remaining = quantity - 1
             candy_text = f" and 🍬 **{candy_added} Halloween Candy**" if candy_added else ""
             overflow_text = (
                 f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
@@ -2117,11 +2455,12 @@ class Economy(commands.Cog):
             )
 
             await ctx.send(
-                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **1x {target_item}** "
+                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity}x {info['name']}** "
                 f"for ✨ **{payout:,} Stardust**{candy_text}!\n"
                 f"📦 **Remaining:** **{remaining}x**"
                 f"{overflow_text}"
             )
+
 
     async def item_category_autocomplete(
         self,

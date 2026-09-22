@@ -14,6 +14,24 @@ EVENT_START_DAY = 1
 EVENT_END_MONTH = 11
 EVENT_END_DAY = 5
 
+# Discord channel where all Lair of Frights / Halloween gameplay is allowed.
+# Keep this in the seasonal module so the channel can be changed in one place.
+HALLOWEEN_CHANNEL_ID = 1551692566829867058
+
+
+def is_halloween_channel(channel_or_id) -> bool:
+    """Return True when a channel/id is the designated Halloween event channel."""
+    channel_id = getattr(channel_or_id, "id", channel_or_id)
+    return channel_id == HALLOWEEN_CHANNEL_ID
+
+
+def halloween_channel_message() -> str:
+    """Standard response for Halloween content used outside the event channel."""
+    return (
+        "🎃 **Lair of Frights is contained to its own channel.**\n"
+        f"Head over to <#{HALLOWEEN_CHANNEL_ID}> to use the Halloween event commands and menus!"
+    )
+
 # Chance that a scavenging run also finds one Halloween Space Junk item.
 # This is an independent bonus roll, so normal scavenging loot is unaffected.
 BONUS_ROLL_CHANCE = 0.15

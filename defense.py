@@ -8,7 +8,7 @@ from discord.ext import commands
 from database import ECONOMY_DB_NAME
 from pets import get_active_pet_effects
 
-DEFENSE_CAP = 0.75
+DEFENSE_CAP = 0.70
 DEFENSE_WEAPONS = {
     "stop_sign": {"name": "Stop Sign", "emoji": "🛑", "chance": 0.08, "desc": "A surprisingly sturdy traffic sign. Somehow useful in a fight."},
     "stick": {"name": "Stick", "emoji": "🪵", "chance": 0.04, "desc": "It's a stick. You picked it up. What did you expect?"},
@@ -77,18 +77,19 @@ async def equip_weapon(db, user_id, weapon_id):
     if weapon_id not in DEFENSE_WEAPONS:
         return False, "Unknown defensive weapon."
 
+    # Lock before checking ownership or modifying active_effects so the
+    # ownership check and equip operation share the same atomic transaction.
+    await db.execute("BEGIN IMMEDIATE")
+
     async with db.execute(
         "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
         (user_id, weapon_id),
     ) as cursor:
         row = await cursor.fetchone()
-    if not row or (row[0] or 0) <= 0:
-        return False, "You don't own that defensive weapon."
 
-    # Lock the economy database before reading/modifying the JSON blob.
-    # Without this, two concurrent active_effects updates can both read the
-    # same old JSON and the later write can silently erase the other's change.
-    await db.execute("BEGIN IMMEDIATE")
+    if not row or (row[0] or 0) <= 0:
+        await db.rollback()
+        return False, "You don't own that defensive weapon."
 
     async with db.execute(
         "SELECT active_effects FROM users WHERE user_id = ?",

@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
-from seasonal_updates.halloween import is_active as halloween_is_active
+from seasonal_updates.halloween.halloween import is_active as halloween_is_active
 
 
 # ============================================================================
@@ -30,6 +30,23 @@ from seasonal_updates.halloween import is_active as halloween_is_active
 #   halloween_bonus      -> chance to gain an extra Halloween seasonal item
 #   treat_xp_bonus       -> percentage bonus to Pet XP from treats
 #   candy_bonus          -> chance to double Halloween Candy
+#   scavenge_first_aid   -> chance to recover HP after a scavenging hazard
+#   scavenge_hazard_avoidance -> chance to completely avoid a scavenging hazard
+#   scavenge_charge_save -> chance to preserve a scavenging charge
+#   scavenge_material_bonus -> chance to find an extra scavenging material unit
+#   scavenge_bonus_loot  -> chance to find an extra miscellaneous scavenging item
+#   extra_charges        -> Stardust bonus for mining/scavenging; at passive
+#                           level 5 also grants +3 maximum charges to both
+#                           exploration systems
+#   dragonrider_success  -> percentage-point bonus to Dragonrider success chance
+#   dragonrider_attempts -> at passive level 5 grants +1 Dragonrider attempt/day
+#   minigame_payout      -> percentage bonus to non-Trivia minigame payouts
+#   trickster_tokens     -> at passive level 5: +1 token on wins, -1 extra token on losses
+#   shop_discount        -> percentage discount applied to shop prices
+#   shop_free_purchase   -> at passive level 5: 20% chance to make one purchase/day free
+#   daily_bonus          -> percentage bonus to the daily Stardust reward
+#   daily_double         -> at passive level 5: 25% chance to double the daily payout
+#   streak_rescue        -> at passive level 5: one automatic streak rescue/month
 #
 # "levels" contains the passive's strength at passive levels 1-5.
 # Pets can continue leveling past 5, but passive strength stops increasing at 5
@@ -37,6 +54,37 @@ from seasonal_updates.halloween import is_active as halloween_is_active
 # ============================================================================
 
 PET_PASSIVE_MAX_LEVEL = 5
+
+# Reusable definitions for the newer special passives. They are kept separate
+# from individual pet entries so a pet can opt into one without duplicating
+# the level tuning. Level 5 contains the former level-6 special effect.
+SPECIAL_PASSIVE_DEFINITIONS = {
+    "dragonrider_success": {
+        "name": "Dragonrider Success+",
+        "description": "Improves Dragonrider success chance. At passive level 5, grants 1 additional Dragonrider attempt per week.",
+        "levels": [0.01, 0.02, 0.03, 0.04, 0.05],
+    },
+    "minigame_payout": {
+        "name": "Minigame Payout+",
+        "description": "Increases Stardust payouts from non-Trivia minigames.",
+        "levels": [0.04, 0.08, 0.12, 0.16, 0.20],
+    },
+    "trickster_tokens": {
+        "name": "Trickster Token",
+        "description": "At passive level 5, winning a non-Trivia minigame grants 1 additional Arcade Token, while losing consumes 1 extra token.",
+        "levels": [0.0, 0.0, 0.0, 0.0, 1.0],
+    },
+    "shop_discount": {
+        "name": "Shop Discount+",
+        "description": "Reduces Stardust prices in the station shop. At passive level 5, also has a 20% chance to make one purchase per day free.",
+        "levels": [0.03, 0.06, 0.09, 0.12, 0.15],
+    },
+    "daily_bonus": {
+        "name": "/daily Reward+",
+        "description": "Increases the Stardust awarded by /daily. At passive level 5, has a 25% chance to double the payout and grants one automatic daily streak rescue per month.",
+        "levels": [0.05, 0.10, 0.15, 0.20, 0.25],
+    },
+}
 
 PETS = {
     # ------------------------------------------------------------------
@@ -102,6 +150,104 @@ PETS = {
             "levels": [0.05, 0.10, 0.20, 0.25, 0.30],
         },
     },
+    "glorpy": {
+        "name": "Glorpy",
+        "emoji": "👽",
+        "description": "A bright green alien cat named Glorpy. It likes to glorp.",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "rare_loot_bonus",
+            "name": "Zib Zib",
+            "description": "Glorpy uses their magical alien powers to 'zib zib' more rare loot from explorations.",
+            "levels": [0.007, 0.009, 0.012, 0.016, 0.020],
+        },
+    },
+    "little_star": {
+        "name": "Little Star",
+        "emoji": "🌟",
+        "description": "A bright, glowing little star that follows you around wherever you go!",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "stardust_bonus",
+            "name": "Twinkle Twinkle Little Star",
+            "description": "The little star seems rather fond of you! It will now give a chance to find extra Stardust!",
+            "levels": [0.02, 0.04, 0.06, 0.08, 0.12],
+        },
+    },
+    "meteor": {
+        "name": "Friendly Meteor",
+        "emoji": "☄️",
+        "description": "A huge, glowing, yet suspiciously friendly meteor that follows you around! Still suspicious... but cute!",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "hazard_reduction",
+            "name": "Meteor Shower",
+            "description": "Your friendly meteor will sometimes have a chance to split itself into bits and shoot at the hazard, reducing some of the HP taken! *Still suspicious...*",
+            "levels": [0.03, 0.06, 0.09, 0.12, 0.15],
+        },
+    },
+    "space_dragon": {
+        "name": "Space Dragon",
+        "emoji": "🐲",
+        "description": "A massive dragon with cosmic colors all over, looking like you're staring into space itself when gazing upon it!",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "extra_charges",
+            "name": "Dragon's Magic",
+            "description": "The large space dragon will now give you extra Stardust for Mining and Scavenging, and when maxed, will grant you 3 extra charges as well!",
+            # Levels 1-5 provide +2%, +5%, +10%, +13%, +13% Stardust.
+            # Level 5 additionally grants +3 maximum mining/scavenging charges.
+            "levels": [0.02, 0.05, 0.10, 0.13, 0.13],
+        },
+    },
+    "ethereal_cloud": {
+        "name": "Ethereal Cloud",
+        "emoji": "☁️",
+        "description": "A big, floating cloud that roams around you! It smells like ozone, and occasionally drizzles specks of cosmic energy.",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "dragonrider_success",
+            "name": "Helping Cloud",
+            "description": "The cloud helps you with your Dragonrider Test! Increases your odds of successfully completing our test. At level 5, you get one extra attempt a week!",
+            "levels": [0.01, 0.02, 0.03, 0.04, 0.05],
+        },
+    },
+    "cosmic_trickster": {
+        "name": "Cosmic Trickster",
+        "emoji": "🥷",
+        "description": "A ninja-like trickster, but cosmic! Maybe you shouldn't get on its bad side...",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "minigame_payout",
+            "name": "Tricksters Gamble",
+            "description": "The trickster seems fond of you! Thankfully... it now gives you the chance of increasing the amount of payout from minigames! At level 5, winning a non-trivia game gives you one extra Arcade Token! But losing consumes one additional Arcade Token...",
+            "levels": [0.04, 0.08, 0.12, 0.16, 0.20],
+        },
+    },
+    "void_merchant": {
+        "name": "Void Merchant",
+        "emoji": "🕳️",
+        "description": "A tall, suspicious merchant. You cannot see its face, and it never speaks. Though, it seems helpful enough...",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "shop_discount",
+            "name": "Merchant's Favor",
+            "description": "It seems like the merchant helps you more than you'd expect! You now have a shop discount from the merchant depending on your level! At level 5, you have a 20% chance of getting your purchase free of charge! **Free purchase can only proc once per day.**",
+            "levels": [0.03, 0.06, 0.09, 0.12, 0.15],
+        },
+    },
+    "solar_phoenix": {
+        "name": "Solar Phoenix",
+        "emoji": "🐦‍🔥",
+        "description": "A large phoenix made of pure solar energy. Its impossibly hot, even going close to it can cause fourth-degree burns without protective clothing!",
+        "egg": "normal_egg",
+        "passive": {
+            "id": "daily_bonus",
+            "name": "Burning Sun",
+            "description": "The phoenix is rather helpful, despite being able to practically melt you like the sun! You now have Stardust increases to your /daily command! At level 5, you have a 25% chance to double the payout and grants one automatic daily streak rescue per month, for any streaks!",
+            "levels": [0.05, 0.10, 0.15, 0.20, 0.25],
+        },
+    },
 }
 
 HALLOWEEN_PETS = {
@@ -161,6 +307,12 @@ HALLOWEEN_PETS = {
         "emoji": "🐲",
         "description": "A big skeleton dragon! Undead never seemed so awesome and powerful!",
         "egg": "halloween_egg",
+        "normal_passive": {
+            "id": "scavenge_first_aid",
+            "name": "Dragon's Blessing",
+            "description": "After taking damage from a scavenging hazard, has a chance to recover a small amount of HP.",
+            "levels": [0.05, 0.07, 0.09, 0.12, 0.15],
+        },
         "passive": {
             "id": "halloween_bonus",
             "name": "Hallows Hoard",
@@ -173,6 +325,12 @@ HALLOWEEN_PETS = {
         "emoji": "🎃",
         "description": "A mysterious, sack-headed trick-or-treater who enforces the sacred rules of Halloween. If you refuse him a treat or blow out your Jack-o'-Lantern early, he'll make sure you face a terrifying trick.",
         "egg": "halloween_egg",
+        "normal_passive": {
+            "id": "scavenge_hazard_avoidance",
+            "name": "Samhain Protection",
+            "description": "Sam appreciates you loving Halloween, even when it's not! He has a chance for you to completely avoid a hazard.",
+            "levels": [0.06, 0.08, 0.10, 0.14, 0.18],
+        },
         "passive": {
             "id": "candy_bonus",
             "name": "Trick 'r Treat",
@@ -194,7 +352,322 @@ HALLOWEEN_PETS = {
     },
 }
 
-ALL_PETS = {**PETS, **HALLOWEEN_PETS}
+
+# ============================================================================
+# HAUNTED EXPLORATION PETS
+# ============================================================================
+# These companions are discovered directly while exploring their associated
+# Haunted location. They are intentionally NOT part of either egg pool.
+#
+# The passive effects use the existing pet passive system so these pets work
+# with the current exploration/pet UI immediately. The Haunted location and
+# discovery text are stored here for Haunted Exploration to consume.
+# ============================================================================
+
+HAUNTED_PETS = {
+    "the_patient": {
+        "name": "The Patient",
+        "emoji": "🩺",
+        "description": "A pale little hospital patient who should have been discharged a very, very long time ago. They quietly follow you through the halls, occasionally looking toward rooms you haven't noticed yet.",
+        "egg": None,
+        "haunted_location": "asylum",
+        "discovery_message": "You hear a soft hospital call button ring from an empty room. When you look inside, a small patient is sitting on the bed, watching you. They slowly climb down and walk over.\n\n**🐾 You discovered The Patient!**\nThe Patient is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_first_aid",
+            "name": "First Aid",
+            "description": "After taking damage from a scavenging hazard, has a chance to recover a small amount of HP.",
+            "levels": [0.03, 0.05, 0.07, 0.09, 0.12],
+        },
+        "passive": {
+            "id": "haunted_sanity_reduction",
+            "name": "Patient Instinct",
+            "description": "The Patient reduces supernatural Sanity loss in the Abandoned Asylum.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "graveyard_ghoul": {
+        "name": "Graveyard Ghoul",
+        "emoji": "👻",
+        "description": "A small graveyard ghoul that crawled out from somewhere it absolutely should not have. It is surprisingly friendly.",
+        "egg": None,
+        "haunted_location": "graveyard",
+        "discovery_message": "Something rustles beneath a freshly disturbed patch of earth. A little ghoul pokes its head out, looks at you, and gives an awkward wave.\n\n**🐾 You discovered Graveyard Ghoul!**\nGraveyard Ghoul is now in your pets inventory.",
+        "normal_passive": {
+            "id": "rare_loot_bonus",
+            "name": "Grave Robber",
+            "description": "Slightly improves the chance of finding rare scavenging loot.",
+            "levels": [0.005, 0.008, 0.011, 0.014, 0.018],
+        },
+        "passive": {
+            "id": "haunted_ingredient_bonus",
+            "name": "Unearthed",
+            "description": "The Graveyard Ghoul increases ingredient finds in the Forgotten Graveyard.",
+            "levels": [0.05, 0.08, 0.12, 0.16, 0.2],
+        },
+    },
+    "little_resident": {
+        "name": "The Little Resident",
+        "emoji": "🧸",
+        "description": "A tiny ghost who insists that the Haunted House is their home. They seem mildly offended whenever you suggest otherwise.",
+        "egg": None,
+        "haunted_location": "haunted_house",
+        "discovery_message": "You find a tiny figure sitting at the end of a hallway. You blink. It is closer. You blink again. It is holding out its hand.\n\n**🐾 You discovered The Little Resident!**\nThe Little Resident is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_bonus_loot",
+            "name": "Housekeeping",
+            "description": "Sometimes finds an extra miscellaneous item while scavenging.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+        "passive": {
+            "id": "haunted_reward_bonus",
+            "name": "Houseguest",
+            "description": "The Little Resident increases Stardust rewards in the Haunted House.",
+            "levels": [0.03, 0.05, 0.07, 0.09, 0.12],
+        },
+    },
+    "the_forgotten": {
+        "name": "The Forgotten",
+        "emoji": "👻",
+        "description": "A ghostly member of a forgotten congregation, still wearing the remains of its old ceremonial robes. It never speaks. It simply watches.",
+        "egg": None,
+        "haunted_location": "church",
+        "discovery_message": "The empty pews begin to creak one by one. At the altar stands a robed figure you are certain wasn't there a moment ago.\n\nIt turns toward you.\n\n**🐾 You discovered The Forgotten!**\nThe Forgotten is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_hazard_avoidance",
+            "name": "Watchful Spirit",
+            "description": "Has a chance to completely avoid a scavenging hazard.",
+            "levels": [0.03, 0.05, 0.07, 0.09, 0.12],
+        },
+        "passive": {
+            "id": "haunted_negative_protection",
+            "name": "Silent Warning",
+            "description": "The Forgotten has a chance to negate a negative outcome in the Abandoned Church.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "ghost_cat": {
+        "name": "Ghost Cat",
+        "emoji": "🐈",
+        "description": "A translucent little cat that wanders through trees, walls, and occasionally your personal space. It seems completely comfortable being dead.",
+        "egg": None,
+        "haunted_location": "witch_woods",
+        "discovery_message": "A soft meow comes from behind you. When you turn around, a ghostly cat is sitting there. It meows again, walks directly through a tree, and looks back at you as if you're the strange one.\n\n**🐾 You discovered Ghost Cat!**\nGhost Cat is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_charge_save",
+            "name": "Phantom Paws",
+            "description": "Has a chance to preserve a scavenging charge after a run.",
+            "levels": [0.04, 0.07, 0.10, 0.13, 0.17],
+        },
+        "passive": {
+            "id": "haunted_discovery_bonus",
+            "name": "Nine Lives",
+            "description": "Ghost Cat increases rare-discovery chances in the Witch’s Woods.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+    },
+    "broken_bear": {
+        "name": "Broken Bear",
+        "emoji": "🐻",
+        "description": "A broken-down bear animatronic from the pizzeria. One eye flickers, its jaw hangs slightly crooked, and somehow it still wants to be your friend.",
+        "egg": None,
+        "haunted_location": "dilapidated_pizzeria",
+        "discovery_message": "A metal footstep echoes from the darkened stage. A battered bear animatronic slowly steps into view. Its head twitches toward you.\n\nThen it waves.\n\n**🐾 You discovered Broken Bear!**\nBroken Bear is now in your pets inventory.",
+        "normal_passive": {
+            "id": "hazard_reduction",
+            "name": "Security Protocol",
+            "description": "Reduces damage taken from scavenging hazards.",
+            "levels": [0.02, 0.04, 0.06, 0.08, 0.10],
+        },
+        "passive": {
+            "id": "haunted_negative_protection",
+            "name": "Security Sweep",
+            "description": "Broken Bear has a chance to negate a negative outcome in the Dilapidated Pizzeria.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "longarms": {
+        "name": "Longarms",
+        "emoji": "🧸",
+        "description": "A large blue toy creature with an absurdly long reach, a cheerful face, and a habit of appearing where you absolutely did not leave it.",
+        "egg": None,
+        "haunted_location": "abandoned_toy_workshop",
+        "discovery_message": "You hear something dragging across the factory floor.\n\nscrape... scrape... scrape...\n\nA large blue toy slowly steps out from between the machines. It stares at you for a moment, then gives an enthusiastic wave with one very long arm.\n\n**🐾 You discovered Longarms!**\nLongarms is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_material_bonus",
+            "name": "Long Reach",
+            "description": "Sometimes finds an additional unit when recovering scavenging materials.",
+            "levels": [0.02, 0.04, 0.06, 0.08, 0.10],
+        },
+        "passive": {
+            "id": "haunted_ingredient_bonus",
+            "name": "Long Reach",
+            "description": "Longarms increases ingredient finds in the Abandoned Toy Workshop.",
+            "levels": [0.05, 0.08, 0.12, 0.16, 0.2],
+        },
+    },
+    "dead_air": {
+        "name": "Dead-Air",
+        "emoji": "📻",
+        "description": "A strange little broadcast entity that emerged from the station's dead signal. It occasionally emits static when something nearby isn't quite right.",
+        "egg": None,
+        "haunted_location": "broadcast_station",
+        "discovery_message": "Every monitor in the station suddenly switches to static. When the picture returns, a tiny figure is standing beside you on the screen.\n\nYou turn around. Nothing.\n\nThe static crackles again.\n\n**🐾 You discovered Dead-Air!**\nDead-Air is now in your pets inventory.",
+        "normal_passive": {
+            "id": "rare_loot_bonus",
+            "name": "Signal Sweep",
+            "description": "Slightly improves the chance of finding rare scavenging loot.",
+            "levels": [0.005, 0.008, 0.011, 0.014, 0.018],
+        },
+        "passive": {
+            "id": "haunted_discovery_bonus",
+            "name": "Signal Boost",
+            "description": "Dead-Air increases rare-discovery chances in the Abandoned Broadcast Station.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+    },
+    "hotel_guest": {
+        "name": "Hotel Guest",
+        "emoji": "🧍",
+        "description": "A quiet guest who appears to have been staying at the Endless Hotel for far too long. They never speak, but they always seem to know which way you're going.",
+        "egg": None,
+        "haunted_location": "endless_hotel",
+        "discovery_message": "You turn a corner and find someone standing at the end of the hallway.\n\nYou turn another corner.\n\nThey're there again.\n\nWhen you finally stop running, they simply walk over and stand beside you.\n\n**🐾 You discovered Hotel Guest!**\nHotel Guest is now in your pets inventory.",
+        "normal_passive": {
+            "id": "cooldown_reduction",
+            "name": "Know the Way",
+            "description": "Slightly reduces the cooldown for normal exploration.",
+            "levels": [0.03, 0.05, 0.08, 0.10, 0.12],
+        },
+        "passive": {
+            "id": "haunted_stage_reduction",
+            "name": "Late Checkout",
+            "description": "Hotel Guest has a chance to remove one stage from an Endless Hotel run.",
+            "levels": [0.1, 0.15, 0.2, 0.25, 0.3],
+        },
+    },
+    "fogling": {
+        "name": "Fogling",
+        "emoji": "🌫️",
+        "description": "A tiny creature made almost entirely of fog. It is difficult to tell where its body ends and the mist begins.",
+        "egg": None,
+        "haunted_location": "fogbound_town",
+        "discovery_message": "A small shape forms beneath a streetlight. The fog gathers around it until two glowing eyes appear.\n\nIt waddles toward you and dissolves into mist around your feet.\n\nThen it reforms beside you.\n\n**🐾 You discovered Fogling!**\nFogling is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_hazard_avoidance",
+            "name": "Mistwalker",
+            "description": "Has a chance to completely avoid a scavenging hazard.",
+            "levels": [0.03, 0.05, 0.07, 0.09, 0.12],
+        },
+        "passive": {
+            "id": "haunted_sanity_reduction",
+            "name": "Into the Mist",
+            "description": "Fogling reduces supernatural Sanity loss in Fogbound Town.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "malo": {
+        "name": "MalO",
+        "emoji": "👁️",
+        "description": "MalO. She looks exactly as she should. She follows you exactly as she should. The only problem is that you don't remember inviting her along.",
+        "egg": None,
+        "haunted_location": "derelict_research_facility",
+        "discovery_message": "You find a terminal displaying **MalO ver1.0.0**.\n\nA photograph appears on the screen.\n\nThen another.\n\nIn each one, the figure is closer.\n\nThe newest photograph was taken just now.\n\nYou turn around.\n\nShe is already there.\n\n**👁️ You discovered MalO.**\n\nYou do not remember finding her. You remember seeing her. Then she was beside you.\n\n**MalO is now in your pets inventory.**\n\nYou do not remember putting her there.",
+        "normal_passive": {
+            "id": "scavenge_bonus_loot",
+            "name": "Unwanted Assistance",
+            "description": "Sometimes finds an extra miscellaneous item while scavenging.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+        "passive": {
+            "id": "haunted_malo",
+            "name": "Unknown Companion",
+            "description": "MalO increases rare-discovery chances in the Research Facility and can warn you about dangerous choices.",
+            "levels": [0.03, 0.05, 0.07, 0.09, 0.12],
+        },
+    },
+    "patch": {
+        "name": "Patch",
+        "emoji": "🐾",
+        "description": "A glitched animal that looks like reality forgot what an animal was supposed to look like. Patch has too many eyes, too many limbs, and absolutely no concern about any of it.",
+        "egg": None,
+        "haunted_location": "yellow_halls",
+        "discovery_message": "You hear claws tapping somewhere behind you.\n\nYou turn around.\n\nSomething is standing in the hallway. It looks almost like an animal. Almost.\n\nIt has too many eyes. Too many legs. One of its limbs bends in a direction that makes no sense.\n\nIt tilts its head.\n\nThen it happily walks over.\n\n**🐾 You discovered Patch!**\nPatch is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_material_bonus",
+            "name": "Wrong Reality",
+            "description": "Sometimes causes an additional unit of scavenging material to appear.",
+            "levels": [0.02, 0.04, 0.06, 0.08, 0.10],
+        },
+        "passive": {
+            "id": "haunted_negative_protection",
+            "name": "Wrong Turn",
+            "description": "Patch has a chance to negate a negative outcome in the Yellow Halls.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "roadside_hitchhiker": {
+        "name": "Roadside Hitchhiker",
+        "emoji": "🚗",
+        "description": "A silent hitchhiker who appears beside roads that should not exist. They never ask where you're going. They already seem to know.",
+        "egg": None,
+        "haunted_location": "dead_end_highway",
+        "discovery_message": "You see someone standing beside the highway.\n\nYou slow down.\n\nThey raise a hand.\n\nThere is no road behind them.\n\nWhen you look again, they're sitting in your passenger seat.\n\nThey quietly point toward the road ahead.\n\n**🐾 You discovered Roadside Hitchhiker!**\nRoadside Hitchhiker is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_bonus_loot",
+            "name": "Roadside Find",
+            "description": "Sometimes discovers bonus miscellaneous loot while scavenging.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+        "passive": {
+            "id": "haunted_negative_protection",
+            "name": "Wrong Way",
+            "description": "The Roadside Hitchhiker has a chance to negate a negative outcome on the Dead-End Highway.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "drowned_conductor": {
+        "name": "Drowned Conductor",
+        "emoji": "🚂",
+        "description": "A soaked railway conductor who somehow remains perfectly composed despite being permanently underwater. They still seem determined to get you to the last stop.",
+        "egg": None,
+        "haunted_location": "drowned_station",
+        "discovery_message": "A train whistle echoes through the flooded station. A conductor emerges from the dark water, checks an ancient watch, and looks directly at you.\n\nThey gesture for you to follow.\n\nYou probably shouldn't.\n\n**🐾 You discovered Drowned Conductor!**\nDrowned Conductor is now in your pets inventory.",
+        "normal_passive": {
+            "id": "scavenge_charge_save",
+            "name": "Last Stop",
+            "description": "Has a chance to preserve a scavenging charge after a run.",
+            "levels": [0.04, 0.07, 0.10, 0.13, 0.17],
+        },
+        "passive": {
+            "id": "haunted_sanity_reduction",
+            "name": "Last Stop",
+            "description": "The Drowned Conductor reduces supernatural Sanity loss in the Drowned Station.",
+            "levels": [0.05, 0.08, 0.11, 0.14, 0.18],
+        },
+    },
+    "the_watcher": {
+        "name": "The Watcher",
+        "emoji": "👁️",
+        "description": "A tall, silent figure that watches from the trees. It never seems to blink. Somehow, it has decided that following you is preferable to watching from a distance.",
+        "egg": None,
+        "haunted_location": "silent_campground",
+        "discovery_message": "You find a photograph on the ground.\n\nThe figure in the background is closer than it was in the previous photograph.\n\nYou hear a branch snap behind you.\n\nYou do not turn around.\n\nSomething quietly walks beside you anyway.\n\n**🐾 You discovered The Watcher!**\nThe Watcher is now in your pets inventory.\n\nYou still don't look behind you.",
+        "normal_passive": {
+            "id": "rare_loot_bonus",
+            "name": "Never Alone",
+            "description": "Slightly improves the chance of finding rare scavenging loot.",
+            "levels": [0.005, 0.008, 0.011, 0.014, 0.018],
+        },
+        "passive": {
+            "id": "haunted_discovery_bonus",
+            "name": "Don’t Look Back",
+            "description": "The Watcher increases rare-discovery chances in the Silent Campground.",
+            "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
+        },
+    },
+}
+
+ALL_PETS = {**PETS, **HALLOWEEN_PETS, **HAUNTED_PETS}
 
 EGG_POOLS = {
     "normal_egg": [pet_id for pet_id, pet in PETS.items() if pet["egg"] == "normal_egg"],
@@ -205,10 +678,14 @@ EGG_POOLS = {
 }
 
 # Pet progression tuning.
-# Exploration grants a small amount of ordinary XP.
-PET_XP_PER_EXPLORATION = 5
-PET_TREAT_XP = 25
-HALLOWEEN_PET_CANDY_XP = 100
+# Exploration grants a randomized amount of ordinary XP.
+NORMAL_EXPLORATION_PET_XP_MIN = 10
+NORMAL_EXPLORATION_PET_XP_MAX = 30
+HAUNTED_EXPLORATION_PET_XP_MIN = 15
+HAUNTED_EXPLORATION_PET_XP_MAX = 50
+HAUNTED_HOME_PET_XP_BONUS = 10
+PET_TREAT_XP = 50
+HALLOWEEN_PET_CANDY_XP = 150
 
 # Egg drops are independent bonus rolls during scavenging.
 NORMAL_EGG_CHANCE = 0.15
@@ -220,7 +697,7 @@ INCUBATOR_NOTIFICATION_CHANNEL_ID = 1548034265508356166
 
 def xp_needed_for_next_level(level: int) -> int:
     """XP needed to advance from the supplied level to the next one."""
-    return 100 + max(0, level - 1) * 50
+    return 250 + max(0, level - 1) * 100
 
 
 def passive_level_for_pet(level: int) -> int:
@@ -229,6 +706,70 @@ def passive_level_for_pet(level: int) -> int:
 
 def get_pet_definition(pet_type: str):
     return ALL_PETS.get(pet_type)
+
+
+def get_haunted_pet_for_location(location_id: str):
+    """Return the Haunted pet definition associated with a location."""
+    for pet_id, pet in HAUNTED_PETS.items():
+        if pet.get("haunted_location") == location_id:
+            return pet_id, pet
+    return None, None
+
+
+def get_haunted_pet_discovery_message(pet_type: str) -> str:
+    """Return the location pet's discovery text, with a safe fallback."""
+    pet = HAUNTED_PETS.get(pet_type)
+    if not pet:
+        return ""
+    return pet.get(
+        "discovery_message",
+        f"**🐾 You discovered {pet['name']}!**\n{pet['name']} is now in your pets inventory.",
+    )
+
+
+async def grant_haunted_pet(db, user_id: int, location_id: str):
+    """Grant the unique Haunted pet for a location if the user does not own it."""
+    pet_type, definition = get_haunted_pet_for_location(location_id)
+    if not pet_type or not definition:
+        return None
+
+    async with db.execute(
+        "SELECT pet_id FROM pets WHERE user_id = ? AND pet_type = ? LIMIT 1",
+        (user_id, pet_type),
+    ) as cursor:
+        existing = await cursor.fetchone()
+
+    if existing:
+        return {
+            "pet_type": pet_type,
+            "name": definition["name"],
+            "emoji": definition["emoji"],
+            "new": False,
+            "message": "",
+        }
+
+    async with db.execute(
+        "SELECT pet_id FROM pets WHERE user_id = ? AND is_active = 1 LIMIT 1",
+        (user_id,),
+    ) as cursor:
+        has_active = await cursor.fetchone()
+
+    await db.execute(
+        """
+        INSERT INTO pets
+            (user_id, pet_stage, pet_type, nickname, level, xp, is_active)
+        VALUES (?, ?, ?, '', 1, 0, ?)
+        """,
+        (user_id, pet_type, pet_type, 0 if has_active else 1),
+    )
+
+    return {
+        "pet_type": pet_type,
+        "name": definition["name"],
+        "emoji": definition["emoji"],
+        "new": True,
+        "message": get_haunted_pet_discovery_message(pet_type),
+    }
 
 
 def get_passive_value(pet: dict, level: int | None = None) -> float:
@@ -271,6 +812,9 @@ async def get_active_pet(db, user_id: int):
             "level": level or 1,
             "xp": xp or 0,
             "passive": {},
+            "normal_passive": {},
+            "haunted_passive": {},
+            "haunted_location": None,
         }
 
     return {
@@ -283,6 +827,9 @@ async def get_active_pet(db, user_id: int):
         "level": level or 1,
         "xp": xp or 0,
         "passive": definition.get("passive", {}),
+        "normal_passive": definition.get("normal_passive", definition.get("passive", {})),
+        "haunted_passive": definition.get("passive", {}) if definition.get("haunted_location") else {},
+        "haunted_location": definition.get("haunted_location"),
     }
 
 
@@ -308,6 +855,30 @@ async def get_active_pet_effects(db, user_id: int):
             "treat_xp_bonus": 0.0,
             "atomic_breath": 0.0,
             "candy_bonus": 0.0,
+            "scavenge_first_aid": 0.0,
+            "scavenge_hazard_avoidance": 0.0,
+            "scavenge_charge_save": 0.0,
+            "scavenge_material_bonus": 0.0,
+            "scavenge_bonus_loot": 0.0,
+            "extra_charges": 0.0,
+            "extra_charge_count": 0,
+            "dragonrider_success": 0.0,
+            "dragonrider_extra_attempts": 0,
+            "minigame_payout": 0.0,
+            "trickster_tokens": 0,
+            "shop_discount": 0.0,
+            "shop_free_purchase": 0.0,
+            "daily_bonus": 0.0,
+            "daily_double": 0.0,
+            "streak_rescue": 0,
+            "haunted_sanity_reduction": 0.0,
+            "haunted_ingredient_bonus": 0.0,
+            "haunted_reward_bonus": 0.0,
+            "haunted_negative_protection": 0.0,
+            "haunted_discovery_bonus": 0.0,
+            "haunted_stage_reduction": 0.0,
+            "haunted_malo": 0.0,
+            "haunted_location": None,
         }
 
     passive = pet.get("passive", {})
@@ -327,30 +898,153 @@ async def get_active_pet_effects(db, user_id: int):
         "treat_xp_bonus": 0.0,
         "atomic_breath": 0.0,
         "candy_bonus": 0.0,
+        "scavenge_first_aid": 0.0,
+        "scavenge_hazard_avoidance": 0.0,
+        "scavenge_charge_save": 0.0,
+        "scavenge_material_bonus": 0.0,
+        "scavenge_bonus_loot": 0.0,
+        "extra_charges": 0.0,
+        "extra_charge_count": 0,
+        "dragonrider_success": 0.0,
+        "dragonrider_extra_attempts": 0,
+        "minigame_payout": 0.0,
+        "trickster_tokens": 0,
+        "shop_discount": 0.0,
+        "shop_free_purchase": 0.0,
+        "daily_bonus": 0.0,
+        "daily_double": 0.0,
+        "streak_rescue": 0,
     }
 
-    if effect_id == "stardust_bonus":
-        effects["stardust_bonus"] = value
-    elif effect_id == "material_bonus":
-        effects["material_bonus"] = value
-    elif effect_id == "rare_loot_bonus":
-        effects["rare_bonus"] = value
-    elif effect_id == "hazard_reduction":
-        effects["hazard_reduction"] = value
-    elif effect_id == "charge_save":
-        effects["charge_save"] = value
-    elif effect_id == "cooldown_reduction":
-        effects["cooldown_reduction"] = value
-    elif effect_id == "halloween_bonus":
-        effects["halloween_bonus"] = value
-    elif effect_id == "treat_xp_bonus":
-        effects["treat_xp_bonus"] = value
-    elif effect_id == "atomic_breath":
-        effects["atomic_breath"] = value
-    elif effect_id == "candy_bonus":
-        effects["candy_bonus"] = value
+    normal_passive = pet.get("normal_passive")
+    if normal_passive:
+        normal_value = get_passive_value({"passive": normal_passive, "level": pet["level"]}, pet["level"])
+        normal_effect_id = normal_passive.get("id")
+    else:
+        normal_value = value
+        normal_effect_id = effect_id
 
+    if normal_effect_id == "stardust_bonus":
+        effects["stardust_bonus"] = normal_value
+    elif normal_effect_id == "material_bonus":
+        effects["material_bonus"] = normal_value
+    elif normal_effect_id == "rare_loot_bonus":
+        effects["rare_bonus"] = normal_value
+    elif normal_effect_id == "hazard_reduction":
+        effects["hazard_reduction"] = normal_value
+    elif normal_effect_id == "charge_save":
+        effects["charge_save"] = normal_value
+    elif normal_effect_id == "cooldown_reduction":
+        effects["cooldown_reduction"] = normal_value
+    elif normal_effect_id == "halloween_bonus":
+        effects["halloween_bonus"] = normal_value
+    elif normal_effect_id == "treat_xp_bonus":
+        effects["treat_xp_bonus"] = normal_value
+    elif normal_effect_id == "atomic_breath":
+        effects["atomic_breath"] = normal_value
+    elif normal_effect_id == "candy_bonus":
+        effects["candy_bonus"] = normal_value
+    elif normal_effect_id == "scavenge_first_aid":
+        effects["scavenge_first_aid"] = normal_value
+    elif normal_effect_id == "scavenge_hazard_avoidance":
+        effects["scavenge_hazard_avoidance"] = normal_value
+    elif normal_effect_id == "scavenge_charge_save":
+        effects["scavenge_charge_save"] = normal_value
+    elif normal_effect_id == "scavenge_material_bonus":
+        effects["scavenge_material_bonus"] = normal_value
+    elif normal_effect_id == "scavenge_bonus_loot":
+        effects["scavenge_bonus_loot"] = normal_value
+
+    elif normal_effect_id == "extra_charges":
+        effects["extra_charges"] = normal_value
+        if effects["passive_level"] >= PET_PASSIVE_MAX_LEVEL:
+            effects["extra_charge_count"] = 3
+    elif normal_effect_id == "dragonrider_success":
+        effects["dragonrider_success"] = normal_value
+        if effects["passive_level"] >= PET_PASSIVE_MAX_LEVEL:
+            effects["dragonrider_extra_attempts"] = 1
+    elif normal_effect_id == "minigame_payout":
+        effects["minigame_payout"] = normal_value
+    elif normal_effect_id == "trickster_tokens":
+        if effects["passive_level"] >= PET_PASSIVE_MAX_LEVEL:
+            effects["trickster_tokens"] = 1
+    elif normal_effect_id == "shop_discount":
+        effects["shop_discount"] = normal_value
+        if effects["passive_level"] >= PET_PASSIVE_MAX_LEVEL:
+            effects["shop_free_purchase"] = 0.20
+    elif normal_effect_id == "daily_bonus":
+        effects["daily_bonus"] = normal_value
+        if effects["passive_level"] >= PET_PASSIVE_MAX_LEVEL:
+            effects["daily_double"] = 0.25
+            effects["streak_rescue"] = 1
+
+    # Haunted passives remain separate and are consumed only by Haunted Exploration.
+    haunted_passive = pet.get("passive", {}) if pet.get("haunted_location") else {}
+    haunted_value = get_passive_value({"passive": haunted_passive, "level": pet["level"]}, pet["level"]) if haunted_passive else 0.0
+    haunted_effect_id = haunted_passive.get("id")
+    if haunted_effect_id == "haunted_sanity_reduction":
+        effects["haunted_sanity_reduction"] = haunted_value
+    elif haunted_effect_id == "haunted_ingredient_bonus":
+        effects["haunted_ingredient_bonus"] = haunted_value
+    elif haunted_effect_id == "haunted_reward_bonus":
+        effects["haunted_reward_bonus"] = haunted_value
+    elif haunted_effect_id == "haunted_negative_protection":
+        effects["haunted_negative_protection"] = haunted_value
+    elif haunted_effect_id == "haunted_discovery_bonus":
+        effects["haunted_discovery_bonus"] = haunted_value
+    elif haunted_effect_id == "haunted_stage_reduction":
+        effects["haunted_stage_reduction"] = haunted_value
+    elif haunted_effect_id == "haunted_malo":
+        effects["haunted_malo"] = haunted_value
+    elif normal_effect_id == "haunted_sanity_reduction":
+        effects["haunted_sanity_reduction"] = value
+    elif normal_effect_id == "haunted_ingredient_bonus":
+        effects["haunted_ingredient_bonus"] = value
+    elif normal_effect_id == "haunted_reward_bonus":
+        effects["haunted_reward_bonus"] = value
+    elif normal_effect_id == "haunted_negative_protection":
+        effects["haunted_negative_protection"] = value
+    elif normal_effect_id == "haunted_discovery_bonus":
+        effects["haunted_discovery_bonus"] = value
+    elif normal_effect_id == "haunted_stage_reduction":
+        effects["haunted_stage_reduction"] = value
+    elif normal_effect_id == "haunted_malo":
+        effects["haunted_malo"] = value
+
+    effects["haunted_location"] = pet.get("haunted_location")
     return effects
+
+
+def roll_normal_exploration_pet_xp() -> int:
+    """Roll Pet XP awarded by a normal exploration."""
+    return random.randint(
+        NORMAL_EXPLORATION_PET_XP_MIN,
+        NORMAL_EXPLORATION_PET_XP_MAX,
+    )
+
+
+def roll_haunted_exploration_pet_xp() -> int:
+    """Roll the base Pet XP awarded by a Haunted Exploration."""
+    return random.randint(
+        HAUNTED_EXPLORATION_PET_XP_MIN,
+        HAUNTED_EXPLORATION_PET_XP_MAX,
+    )
+
+
+async def get_haunted_exploration_pet_xp(
+    db,
+    user_id: int,
+    location_id: str,
+):
+    """Roll Haunted Exploration Pet XP and apply the matching-pet bonus."""
+    amount = roll_haunted_exploration_pet_xp()
+    home_bonus = 0
+
+    pet = await get_active_pet(db, user_id)
+    if pet and pet.get("haunted_location") == location_id:
+        home_bonus = HAUNTED_HOME_PET_XP_BONUS
+
+    return amount + home_bonus, home_bonus
 
 
 async def add_pet_xp(db, user_id: int, amount: int):
@@ -417,9 +1111,18 @@ class FeedTreatSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message("❌ This treat menu isn't for you.", ephemeral=True)
-        result, error = await self.cog._feed_specific_pet(self.user_id, self.pet_id, self.values[0])
+        result, error = await self.cog._feed_specific_pet(
+            self.user_id,
+            self.pet_id,
+            self.values[0],
+        )
         if error:
             return await interaction.response.send_message(error, ephemeral=True)
+        if result is None:
+            return await interaction.response.send_message(
+                "❌ Feeding failed because no result was returned.",
+                ephemeral=True,
+            )
         pet = result["pet"]
         level_line = ""
         if result["leveled_up"]:
@@ -624,18 +1327,27 @@ class PetManagementView(discord.ui.View):
             return
         pet = self.pets[self.index]
         passive = pet.get("passive", {})
+        normal_passive = pet.get("normal_passive", passive)
+        haunted_passive = pet.get("haunted_passive", {})
         passive_level = passive_level_for_pet(pet["level"])
-        passive_value = get_passive_value(pet, pet["level"])
+        passive_value = get_passive_value({"passive": passive, "level": pet["level"]}, pet["level"])
+        normal_value = get_passive_value({"passive": normal_passive, "level": pet["level"]}, pet["level"])
         value_text = (
             f"{passive_value * 100:.1f}%"
             if passive_value < 1
             else f"{passive_value:.2f}"
         )
-        source = (
-            "Halloween Egg"
-            if passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS
-            else "Normal Egg"
+        normal_value_text = (
+            f"{normal_value * 100:.1f}%"
+            if normal_value < 1
+            else f"{normal_value:.2f}"
         )
+        if pet["pet_type"] in HAUNTED_PETS:
+            source = "Haunted Exploration"
+        elif passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS:
+            source = "Halloween Egg"
+        else:
+            source = "Normal Egg"
         embed = discord.Embed(
             title=f"📊 {pet['emoji']} {pet['nickname'] or pet['name']} — Stats",
             color=discord.Color.from_rgb(120, 140, 160),
@@ -649,14 +1361,49 @@ class PetManagementView(discord.ui.View):
             ),
             inline=False,
         )
-        embed.add_field(
-            name=f"✨ {passive.get('name', 'Unknown Passive')}",
-            value=(
-                f"{passive.get('description', 'No passive description.')}\n"
-                f"**Current Strength:** {value_text}"
-            ),
-            inline=False,
+        has_dual_passive = bool(
+            normal_passive
+            and passive
+            and normal_passive.get("id") != passive.get("id")
         )
+
+        if has_dual_passive:
+            embed.add_field(
+                name=f"✨ Normal Passive — {normal_passive.get('name', 'Unknown')}",
+                value=(
+                    f"{normal_passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {normal_value_text}"
+                ),
+                inline=False,
+            )
+
+            if pet["pet_type"] in HAUNTED_PETS and haunted_passive:
+                secondary_label = "👻 Haunted Passive"
+                secondary_extra = (
+                    f"\n**Location:** {pet.get('haunted_location', 'Associated Haunted location')}"
+                )
+            else:
+                secondary_label = "🎃 Halloween Passive"
+                secondary_extra = ""
+
+            embed.add_field(
+                name=f"{secondary_label} — {passive.get('name', 'Unknown')}",
+                value=(
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {value_text}"
+                    f"{secondary_extra}"
+                ),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name=f"✨ {passive.get('name', 'Unknown Passive')}",
+                value=(
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {value_text}"
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="🐣 Origin",
             value=f"**{source}**\n{'⭐ Equipped' if pet['is_active'] else 'Not equipped'}",
@@ -964,6 +1711,9 @@ class Pets(commands.Cog):
                 "is_active": bool(is_active),
                 "is_favorite": bool(is_favorite),
                 "passive": definition.get("passive", {}),
+                "normal_passive": definition.get("normal_passive", definition.get("passive", {})),
+                "haunted_passive": definition.get("passive", {}) if definition.get("haunted_location") else {},
+                "haunted_location": definition.get("haunted_location"),
             })
         return pets
 
@@ -972,9 +1722,13 @@ class Pets(commands.Cog):
         xp = pet["xp"]
         needed = xp_needed_for_next_level(level)
         passive = pet.get("passive", {})
+        normal_passive = pet.get("normal_passive", passive)
+        haunted_passive = pet.get("haunted_passive", {})
         passive_level = passive_level_for_pet(level)
-        passive_value = get_passive_value(pet, level)
+        passive_value = get_passive_value({"passive": passive, "level": level}, level)
+        normal_value = get_passive_value({"passive": normal_passive, "level": level}, level)
         value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
+        normal_value_text = f"{normal_value * 100:.1f}%" if normal_value < 1 else f"{normal_value:.2f}"
         display_name = pet["nickname"] or pet["name"]
         active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
 
@@ -998,15 +1752,52 @@ class Pets(commands.Cog):
             ),
             inline=False,
         )
-        embed.add_field(
-            name=f"✨ Passive — {passive.get('name', 'Unknown')}",
-            value=(
-                f"**Passive Level {passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
-                f"{passive.get('description', 'No passive description.')}\n"
-                f"Current strength: **{value_text}**"
-            ),
-            inline=False,
+        has_dual_passive = bool(
+            normal_passive
+            and passive
+            and normal_passive.get("id") != passive.get("id")
         )
+
+        if has_dual_passive:
+            embed.add_field(
+                name=f"✨ Normal Passive — {normal_passive.get('name', 'Unknown')}",
+                value=(
+                    f"**Passive Level {passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
+                    f"{normal_passive.get('description', 'No passive description.')}\n"
+                    f"Current strength: **{normal_value_text}**"
+                ),
+                inline=False,
+            )
+
+            if pet["pet_type"] in HAUNTED_PETS and haunted_passive:
+                secondary_label = "👻 Haunted Passive"
+                secondary_extra = (
+                    f"\nOnly active in: **{pet.get('haunted_location', 'Associated Haunted location')}**"
+                )
+            else:
+                secondary_label = "🎃 Halloween Passive"
+                secondary_extra = ""
+
+            embed.add_field(
+                name=f"{secondary_label} — {passive.get('name', 'Unknown')}",
+                value=(
+                    f"**Passive Level {passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"Current strength: **{value_text}**"
+                    f"{secondary_extra}"
+                ),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name=f"✨ Passive — {passive.get('name', 'Unknown Passive')}",
+                value=(
+                    f"**Passive Level {passive_level}/{PET_PASSIVE_MAX_LEVEL}**\n"
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"Current strength: **{value_text}**"
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="🍪 Treat XP",
             value=(

@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 import pytz
 import random
 from emojis import EMOJIS
-from seasonal_updates.halloween import HALLOWEEN_SPACE_JUNK, HALLOWEEN_ITEMS
+from seasonal_updates.halloween import halloween as halloween_season
+from seasonal_updates.halloween.halloween import halloween_channel_message, is_halloween_channel
 
 
 # ---------------------------------------------------------------------------
@@ -20,6 +21,30 @@ from seasonal_updates.halloween import HALLOWEEN_SPACE_JUNK, HALLOWEEN_ITEMS
 #
 # ``enabled`` controls whether the item can currently be used with /use.
 # Keep future ideas disabled until their effect is implemented below.
+HAUNTED_CRAFTED_USE_ITEMS = {
+    "ghost_radio": {"name": "Ghost Radio", "emoji": "📻", "effect": "haunted_ghost_radio", "message": "📻 **Ghost Radio activated!** Your next Haunted run will tune into a transmission that overrides the normal encounter roll."},
+    "mascot_tracker": {"name": "Mascot Tracker", "emoji": "📡", "effect": "haunted_mascot_tracker", "message": "📡 **Mascot Tracker activated!** Your next Haunted run has an improved chance of uncovering a Halloween collectible."},
+    "room_314_key": {"name": "Room 314 Key", "emoji": "🗝️", "effect": "haunted_room_314_key", "message": "🗝️ **Room 314 Key ready!** Your next Endless Hotel run can unlock a shortcut through the impossible hotel."},
+    "fog_lantern": {"name": "Fog Lantern", "emoji": "🏮", "effect": "haunted_fog_lantern", "message": "🏮 **Fog Lantern lit!** Your next Fogbound Town run will blunt supernatural Sanity loss."},
+    "spectral_receiver": {"name": "Spectral Receiver", "emoji": "📡", "effect": "haunted_spectral_receiver", "message": "📡 **Spectral Receiver tuned!** Your next Haunted run has an improved collectible discovery chance."},
+    "security_monitor": {"name": "Security Monitor", "emoji": "📺", "effect": "haunted_security_monitor", "message": "📺 **Security Monitor online!** Your next Haunted run gets one burst of protection from a Sanity hit."},
+    "warding_sigil": {"name": "Warding Sigil", "emoji": "🕯️", "effect": "haunted_warding_sigil", "message": "🕯️ **Warding Sigil prepared!** It will completely block the first negative Sanity choice of your next Haunted run."},
+    "mirror_ward": {"name": "Mirror Ward", "emoji": "🪞", "effect": "haunted_mirror_ward", "message": "🪞 **Mirror Ward prepared!** It will halve the first negative Sanity choice of your next Haunted run."},
+    "dead_air_charm": {"name": "Dead-Air Charm", "emoji": "📡", "effect": "haunted_dead_air_charm", "message": "📡 **Dead-Air Charm prepared!** Your next Broadcast Station run will suppress part of its supernatural Sanity drain."},
+    "empty_room_token": {"name": "Empty Room Token", "emoji": "🪙", "effect": "haunted_empty_room_token", "message": "🪙 **Empty Room Token prepared!** Your next Endless Hotel run will ignore its first negative Sanity choice."},
+    "watchers_eye": {"name": "Watcher’s Eye", "emoji": "👁️", "effect": "haunted_watchers_eye", "message": "👁️ **Watcher’s Eye awakened!** Your next Haunted run will reveal a location-specific encounter instead of a random universal one at its first stage."},
+    "containment_mark": {"name": "Containment Mark", "emoji": "⛓️", "effect": "haunted_containment_mark", "message": "⛓️ **Containment Mark prepared!** Your next Research Facility run will heavily reduce supernatural Sanity loss."},
+    "yellow_halls_beacon": {"name": "Yellow Halls Beacon", "emoji": "💡", "effect": "haunted_yellow_halls_beacon", "message": "💡 **Yellow Halls Beacon prepared!** Your next Yellow Halls run will blunt supernatural Sanity loss."},
+    "yellow_halls_unmarked_key": {"name": "Unmarked Door Key", "emoji": "🗝️", "effect": "haunted_yellow_halls_unmarked_key", "message": "🗝️ **Unmarked Door Key prepared!** Your next Yellow Halls run will ignore its first negative Sanity choice."},
+    "highway_payphone_kit": {"name": "Payphone Repair Kit", "emoji": "☎️", "effect": "haunted_highway_payphone_kit", "message": "☎️ **Payphone Repair Kit prepared!** Your next Dead-End Highway run will force a strange roadside signal encounter."},
+    "highway_motel_ward": {"name": "Motel Room Ward", "emoji": "🚪", "effect": "haunted_highway_motel_ward", "message": "🚪 **Motel Room Ward prepared!** Your next Dead-End Highway run will ignore its first negative Sanity choice."},
+    "drowned_flood_lamp": {"name": "Flood Lamp", "emoji": "🔦", "effect": "haunted_drowned_flood_lamp", "message": "🔦 **Flood Lamp prepared!** Your next Drowned Station run will blunt supernatural Sanity loss."},
+    "drowned_last_stop_ticket": {"name": "Last Stop Ticket", "emoji": "🎫", "effect": "haunted_drowned_last_stop_ticket", "message": "🎫 **Last Stop Ticket prepared!** Your next Drowned Station run can take a shorter route through the station."},
+    "campground_static_filter": {"name": "Static Filter", "emoji": "📻", "effect": "haunted_campground_static_filter", "message": "📻 **Static Filter prepared!** Your next Silent Campground run will suppress some supernatural Sanity loss."},
+    "campground_tendril_ward": {"name": "Tendril Ward", "emoji": "🖤", "effect": "haunted_campground_tendril_ward", "message": "🖤 **Tendril Ward prepared!** Your next Silent Campground run will make rare Halloween finds easier to uncover."},
+}
+
+
 HALLOWEEN_SPECIAL_USE_ITEMS = {
     "wine_cabinet": {
         "enabled": True,
@@ -277,15 +302,15 @@ ITEM_REGISTRY = {
     "quantum_battery": {"name": "Quantum Battery", "emoji": EMOJIS.get("quantum_battery", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Materials & Minerals
-    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": EMOJIS["titanium_chunk"], "max_quantity": 99, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
-    "iron_ore": {"name": "Iron Ore", "emoji": EMOJIS["iron_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
-    "copper_ore": {"name": "Copper Ore", "emoji": EMOJIS["copper_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
-    "aluminum_ore": {"name": "Aluminum Ore", "emoji": EMOJIS["aluminum_ore"], "max_quantity": 99, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
-    "circuit_board": {"name": "Circuit Board", "emoji": EMOJIS["circuit_board"], "max_quantity": 99, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
-    "glue": {"name": "Industrial Glue", "emoji": EMOJIS["glue"], "max_quantity": 99, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
-    "scrap_metal": {"name": "Scrap Metal", "emoji": EMOJIS["scrap_metal"], "max_quantity": 99, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
-    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": EMOJIS["nuts_bolts"], "max_quantity": 99, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
-    "wiring": {"name": "Wiring", "emoji": EMOJIS["wiring"], "max_quantity": 99, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
+    "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": EMOJIS["titanium_chunk"], "max_quantity": 99, "sell_price": 15, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
+    "iron_ore": {"name": "Iron Ore", "emoji": EMOJIS["iron_ore"], "max_quantity": 99, "sell_price": 3, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
+    "copper_ore": {"name": "Copper Ore", "emoji": EMOJIS["copper_ore"], "max_quantity": 99, "sell_price": 5, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
+    "aluminum_ore": {"name": "Aluminum Ore", "emoji": EMOJIS["aluminum_ore"], "max_quantity": 99, "sell_price": 4, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
+    "circuit_board": {"name": "Circuit Board", "emoji": EMOJIS["circuit_board"], "max_quantity": 99, "sell_price": 20, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
+    "glue": {"name": "Industrial Glue", "emoji": EMOJIS["glue"], "max_quantity": 99, "sell_price": 6, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
+    "scrap_metal": {"name": "Scrap Metal", "emoji": EMOJIS["scrap_metal"], "max_quantity": 99, "sell_price": 3, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
+    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": EMOJIS["nuts_bolts"], "max_quantity": 99, "sell_price": 4, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
+    "wiring": {"name": "Wiring", "emoji": EMOJIS["wiring"], "max_quantity": 99, "sell_price": 5, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
 
     # Defensive Weapons
     "stop_sign": {"name": "Stop Sign", "emoji": "🛑", "max_quantity": 1, "type": "Defense Weapon", "desc": "A surprisingly sturdy traffic sign. Provides a small chance to prevent a scavenging hazard."},
@@ -325,6 +350,33 @@ ITEM_REGISTRY = {
     "medical_alcohol": {"name": "Medical Alcohol", "emoji": EMOJIS["alcohol"], "max_quantity": 99, "type": "Medical Supply", "desc": "Medical-grade alcohol useful for disinfecting wounds and equipment."},
     "bandaids": {"name": "Bandaids", "emoji": EMOJIS["bandaid"], "max_quantity": 99, "type": "Medical Supply", "desc": "Basic adhesive bandages recovered from abandoned medical supplies."},
     "antiseptic_ointment": {"name": "Antiseptic Ointment", "emoji": EMOJIS["ointment"], "max_quantity": 99, "type": "Medical Supply", "desc": "Antiseptic ointment useful for treating minor wounds."},
+
+    # Haunted Exploration ingredients
+    "ectoplasm": {"name": "Ectoplasm", "emoji": "🫧", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A cold, translucent residue left behind by something that should not exist."},
+    "medical_residue": {"name": "Strange Medical Residue", "emoji": "🧪", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "An unsettling substance scraped from abandoned medical equipment."},
+    "grave_dust": {"name": "Grave Dust", "emoji": "🪦", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Fine dust gathered from forgotten graves. It feels unnaturally cold."},
+    "bone_fragment": {"name": "Bone Fragment", "emoji": "🦴", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A small fragment of bone recovered from somewhere it definitely should not have been."},
+    "black_wax": {"name": "Black Ritual Wax", "emoji": "🕯️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Dark wax that refuses to fully harden, even in the cold."},
+    "cursed_fabric": {"name": "Cursed Fabric", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A scrap of old fabric that seems to shift when nobody is watching."},
+    "consecrated_salt": {"name": "Consecrated Salt", "emoji": "🧂", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Salt recovered from an abandoned sanctuary. It gives off a faint warmth."},
+    "ritual_chalk": {"name": "Ritual Chalk", "emoji": "🖍️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Chalk used to mark symbols that are better left unexplained."},
+    "witchroot": {"name": "Witchroot", "emoji": "🌿", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A twisted root from the Witch's Woods with a faintly sweet smell."},
+    "mooncap_mushroom": {"name": "Mooncap Mushroom", "emoji": "🍄", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A pale mushroom that only seems to grow where moonlight should not reach."},
+    "bloodstained_gauze": {"name": "Bloodstained Gauze", "emoji": "🩸", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Old gauze carrying stains that look disturbingly fresh."},
+    "cracked_syringe": {"name": "Cracked Syringe", "emoji": "💉", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A damaged syringe recovered from a room nobody remembers entering."},
+    "spectral_thread": {"name": "Spectral Thread", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A nearly invisible strand that slips through ordinary fabric."},
+    "wilted_bloom": {"name": "Wilted Grave Bloom", "emoji": "🥀", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A dead flower that remains strangely fragrant long after it should have rotted."},
+    "funeral_thread": {"name": "Funeral Thread", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Dark thread taken from an old burial shroud."},
+    "grave_marker_shard": {"name": "Grave Marker Shard", "emoji": "🪨", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A chipped piece of stone bearing a name that has almost faded away."},
+    "broken_doll_piece": {"name": "Broken Doll Piece", "emoji": "🪆", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A piece of an old doll. It always seems to be facing the wrong way."},
+    "attic_mothwing": {"name": "Attic Moth Wing", "emoji": "🦋", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A dusty wing from a moth that should have been far too large."},
+    "dusty_looking_glass": {"name": "Dusty Looking-Glass Shard", "emoji": "🪞", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A mirror shard whose reflection lags just a little behind reality."},
+    "bell_fragment": {"name": "Bell Fragment", "emoji": "🔔", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A fragment from an old church bell that faintly rings when held."},
+    "incense_resin": {"name": "Old Incense Resin", "emoji": "🫙", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A hardened aromatic resin found beside an abandoned altar."},
+    "cracked_holy_water_vial": {"name": "Cracked Holy Water Vial", "emoji": "💧", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A chipped vial containing a few drops of strangely warm water."},
+    "nightshade_berry": {"name": "Nightshade Berry", "emoji": "🫐", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A dark berry that seems to absorb the light around it."},
+    "spider_lily": {"name": "Spider Lily", "emoji": "🌺", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A pale woodland flower growing where the ground feels unnaturally cold."},
+    "glowmoss": {"name": "Glowmoss", "emoji": "🟢", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Soft moss with a faint green glow that brightens in darkness."},
 
     # Space Junk
     "space_pizza": {"name": "Dehydrated Space Pizza", "emoji": "🍕", "max_quantity": 99, "type": "Space Junk", "desc": "Slightly freezer-burned."},
@@ -370,14 +422,93 @@ ITEM_REGISTRY = {
     "title_outer_rim_wanderer": {"name": "Outer Rim Wanderer", "emoji": "🏷️", "max_quantity": 1, "type": "Title","desc": "A title for explorers who venture beyond the station."},
     "title_starborn": {"name": "Starborn", "emoji": "✨", "max_quantity": 1, "type": "Title", "desc": "A prestigious title for those touched by the stars."},
     "title_voidfarer": {"name": "Voidfarer", "emoji": "🌌", "max_quantity": 1, "type": "Title", "desc": "A title for those brave enough to chart the endless void."},
+    "title_patient_zero": {"name": "Patient Zero", "emoji": "🏥", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Abandoned Asylum."},
+    "title_housebroken": {"name": "Housebroken", "emoji": "🏚️", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Haunted House."},
+    "title_into_the_woods": {"name": "Into the Woods", "emoji": "🌲", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in Witch's Woods."},
+    "title_playtime_is_over": {"name": "Playtime Is Over", "emoji": "🧸", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Toy Workshop."},
+    "title_no_vacancy": {"name": "No Vacancy", "emoji": "🏨", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Endless Hotel."},
+    "title_it_saw_you_too": {"name": "It Saw You Too", "emoji": "🧪", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Research Facility."},
+    "title_lost_actually": {"name": "Lost, Actually", "emoji": "🟨", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Yellow Halls."},
+    "title_mind_the_water": {"name": "Mind the Water", "emoji": "🌊", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by uncovering every rare discovery in the Drowned Station."},
+    "title_haunted_explorer": {"name": "Haunted Explorer", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title for those who discovered something they probably should not have."},
+    "title_something_is_very_wrong": {"name": "Something Is Very Wrong", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title earned by discovering something impossible."},
+    "title_worth_it": {"name": "Worth It", "emoji": "🩸", "max_quantity": 1, "type": "Title", "desc": "A title for surviving a discovery that really hurt."},
+    "title_unwell": {"name": "Unwell", "emoji": "🫥", "max_quantity": 1, "type": "Title", "desc": "A title earned after a discovery pushes you to 0 Sanity."},
+    "title_the_other_side": {"name": "The Other Side", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title for discovering something while completely insane."},
+    "title_i_shouldnt_have_looked": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "max_quantity": 1, "type": "Title", "desc": "A title for discovering every rare Haunted discovery."},
+    "title_practiced_alchemist": {"name": "Practiced Alchemist", "emoji": "🧪", "max_quantity": 1, "type": "Title", "desc": "A title for brewing Haunted items."},
+    "title_alchemist": {"name": "Alchemist", "emoji": "🧪", "max_quantity": 1, "type": "Title", "desc": "A title for crafting five Haunted Cauldron items."},
+    "title_improvised_engineer": {"name": "Improvised Engineer", "emoji": "🛠️", "max_quantity": 1, "type": "Title", "desc": "A title for assembling your first Haunted Workshop item."},
+    "title_haunted_handyman": {"name": "Haunted Handyman", "emoji": "🛠️", "max_quantity": 1, "type": "Title", "desc": "A title for assembling five Haunted Workshop items."},
+    "title_occult_hobbyist": {"name": "Occult Hobbyist", "emoji": "🕯️", "max_quantity": 1, "type": "Title", "desc": "A title for performing your first Haunted ritual."},
+    "title_occultist": {"name": "Occultist", "emoji": "🕯️", "max_quantity": 1, "type": "Title", "desc": "A title for performing five Haunted rituals."},
     "title_horror_enthusiast": {"name": "Horror Enthusiast", "emoji": "👻", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting every Halloween Space Junk collectible."},
-    "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."}
-    ,"title_seal_breaker": {"name": "Seal Breaker", "emoji": "🍷", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by breaking the seal on the Cursed Wine Cabinet."}
+    "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."},
+    "title_seal_breaker": {"name": "Seal Breaker", "emoji": "🍷", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by breaking the seal on the Cursed Wine Cabinet."},
+
+    
+    "mascot_fabric": {"name": "Mascot Fabric", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Faded fabric torn from an old mascot costume."},
+    "blackened_grease": {"name": "Blackened Grease", "emoji": "🛢️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Thick grease with a burnt smell that never quite leaves your hands."},
+    "mechanical_parts": {"name": "Mechanical Parts", "emoji": "⚙️", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "Useful gears, springs, brackets, and other salvaged machine parts."},
+    "stuffing": {"name": "Old Stuffing", "emoji": "☁️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Dusty stuffing pulled from something that should have stayed stitched shut."},
+    "bent_toy_parts": {"name": "Bent Toy Parts", "emoji": "🧸", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Plastic and metal pieces from a broken toy that seems to have been recently handled."},
+    "faded_paint": {"name": "Faded Paint", "emoji": "🎨", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Peeling paint with colors that look wrong under dim light."},
+    "plastic_eye": {"name": "Plastic Eye", "emoji": "👁️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A toy eye that always seems to be looking just slightly to the side of you."},
+    "radio_components": {"name": "Radio Components", "emoji": "📻", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "Salvaged knobs, coils, speakers, and other broadcast hardware."},
+    "damaged_vhs_tape": {"name": "Damaged VHS Tape", "emoji": "📼", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A warped tape whose label has been completely rubbed away."},
+    "burnt_capacitor": {"name": "Burnt Capacitor", "emoji": "🔋", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A scorched capacitor that still carries a faint static charge."},
+    "recorded_static": {"name": "Recorded Static", "emoji": "📡", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A recording of pure static that occasionally contains a voice."},
+    "bent_key": {"name": "Bent Hotel Key", "emoji": "🗝️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A brass room key bent almost in half. The room number keeps changing."},
+    "hotel_carpet_thread": {"name": "Hotel Carpet Thread", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Thread pulled from an ancient hotel carpet. It smells faintly damp."},
+    "old_guest_receipt": {"name": "Old Guest Receipt", "emoji": "🧾", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A receipt for a guest who apparently checked in tomorrow."},
+    "flickering_bulb": {"name": "Flickering Bulb", "emoji": "💡", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "A dying bulb that flickers even when disconnected."},
+    "dusty_cleaning_rag": {"name": "Dusty Cleaning Rag", "emoji": "🧹", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A cleaning rag carrying dust from somewhere that has no visible floor."},
+    "condensed_fog": {"name": "Condensed Fog", "emoji": "🌫️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Cold vapor sealed in a container. It moves against gravity."},
+    "rusty_pipe": {"name": "Rusty Pipe", "emoji": "🪈", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "A corroded length of pipe with something dark dried inside."},
+    "cracked_brick": {"name": "Cracked Brick", "emoji": "🧱", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "A chunk of masonry from a street that doesn't appear on any map."},
+    "damaged_battery": {"name": "Damaged Battery", "emoji": "🔋", "max_quantity": 99, "sell_price": 10, "type": "Crafting Material", "desc": "A partially discharged battery recovered from abandoned equipment."},
+    "chemical_sample": {"name": "Unknown Chemical Sample", "emoji": "🧪", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A sealed sample whose color changes when nobody is looking."},
+    "broken_lab_glass": {"name": "Broken Lab Glass", "emoji": "🔬", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A shard of laboratory glass with a residue that glows faintly."},
+    "contaminated_gloves": {"name": "Contaminated Gloves", "emoji": "🧤", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Protective gloves stained by an experiment that is better left unidentified."},
+    "unknown_biological_residue": {"name": "Unknown Biological Residue", "emoji": "🫀", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A sample collected from somewhere it absolutely should not have been."},
+
+    # Haunted Exploration — The Yellow Halls
+    "yellow_wallpaper_scrap": {"name": "Yellow Wallpaper Scrap", "emoji": "🟨", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A peeling strip of old yellow wallpaper. The damp backing feels strangely warm."},
+    "damp_carpet_fiber": {"name": "Damp Carpet Fiber", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A thread pulled from the perpetually damp carpet. It smells faintly of mildew and something older."},
+    "frayed_electrical_wire": {"name": "Frayed Electrical Wire", "emoji": "🔌", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A length of exposed wire pulled from a wall that should not have had wiring behind it."},
+    "unmarked_key": {"name": "Unmarked Key", "emoji": "🗝️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A plain metal key with no number, label, or obvious lock. It is always slightly warm."},
+    "strange_fluorescent_tube": {"name": "Strange Fluorescent Tube", "emoji": "💡", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A humming fluorescent tube that continues glowing long after it has been removed from the ceiling."},
+    "yellow_hall_light_cover": {"name": "Yellowed Light Cover", "emoji": "🔲", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A brittle fluorescent light cover stained the same sickly yellow as the halls."},
+
+    # Haunted Exploration — The Dead-End Highway
+    "rusted_road_sign": {"name": "Rusted Road Sign", "emoji": "🛣️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A corroded piece of highway signage. The destination printed on it does not exist on any map."},
+    "damaged_payphone_part": {"name": "Damaged Payphone Part", "emoji": "☎️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A broken component from a roadside payphone. It still carries a faint dial tone."},
+    "old_road_map": {"name": "Old Road Map", "emoji": "🗺️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A weathered highway map with several roads drawn in that do not appear on the original."},
+    "contaminated_fuel_can": {"name": "Contaminated Fuel Can", "emoji": "⛽", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "An old fuel can containing a dark, oily residue that moves when the can is still."},
+    "rusty_car_part": {"name": "Rusty Car Part", "emoji": "🔩", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A corroded piece of an abandoned vehicle. You cannot quite identify which part of the car it came from."},
+    "motel_key": {"name": "Motel Key", "emoji": "🗝️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A tarnished motel key stamped with a room number that seems to change when you blink."},
+
+    # Haunted Exploration — The Drowned Station
+    "waterlogged_transit_ticket": {"name": "Waterlogged Transit Ticket", "emoji": "🎫", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A soaked transit ticket from a station whose name has been scratched away."},
+    "corroded_train_part": {"name": "Corroded Train Part", "emoji": "🚇", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A rusted fragment of a train that spent far too long beneath the water."},
+    "flooded_flashlight": {"name": "Flooded Flashlight", "emoji": "🔦", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A waterlogged flashlight that should be useless, yet its bulb occasionally flickers."},
+    "damaged_conductor": {"name": "Damaged Conductor's Badge", "emoji": "🎟️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A corroded conductor's badge bearing a name that has almost completely dissolved."},
+    "contaminated_water_sample": {"name": "Contaminated Water Sample", "emoji": "💧", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Dark station water sealed in a vial. Something moves inside when the vial is shaken."},
+    "submerged_key": {"name": "Submerged Station Key", "emoji": "🗝️", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A heavy key recovered from the flooded tracks. The lock it belongs to is nowhere in sight."},
+
+    # Haunted Exploration — The Silent Campground
+    "static_damaged_radio": {"name": "Static-Damaged Radio", "emoji": "📻", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A battered handheld radio that produces static even when switched off."},
+    "distorted_photograph": {"name": "Distorted Photograph", "emoji": "📷", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A photograph whose background contains shapes that were not visible when the picture was taken."},
+    "strange_notebook_page": {"name": "Strange Notebook Page", "emoji": "📓", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A torn page covered in frantic notes about something standing between the trees."},
+    "corrupted_video_tape": {"name": "Corrupted Video Tape", "emoji": "📼", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A damaged recording that occasionally shows a tall figure where nobody was standing."},
+    "damaged_antenna": {"name": "Damaged Antenna", "emoji": "📡", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A bent antenna covered in scratches. Radios behave strangely whenever it is nearby."},
+    "blackened_tree_bark": {"name": "Blackened Tree Bark", "emoji": "🌲", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A piece of bark from a tree with no visible source. It is cold despite being dry."},
+    "unidentified_black_tendril": {"name": "Unidentified Black Tendril", "emoji": "🖤", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A thin, rubbery black strand that seems to twitch when nobody is looking directly at it."},
 }
 
 # Seasonal Space Junk is registered here so it automatically appears in /inventory
 # while its event module remains the place where the seasonal definitions live.
-for _item_id, _name, _emoji, _desc, _stardust, _candy in HALLOWEEN_SPACE_JUNK:
+for _item_id, _name, _emoji, _desc, _stardust, _candy in halloween_season.HALLOWEEN_SPACE_JUNK:
     ITEM_REGISTRY[_item_id] = {
         "name": _name,
         "emoji": _emoji,
@@ -390,7 +521,7 @@ del _item_id, _name, _emoji, _desc
 
 # Seasonal Halloween crafting/healing items are registered separately from
 # Space Junk so they can be used normally without becoming collectibles.
-ITEM_REGISTRY.update(HALLOWEEN_ITEMS)
+ITEM_REGISTRY.update(halloween_season.HALLOWEEN_ITEMS)
 
 async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
     """
@@ -636,7 +767,7 @@ class Inventory(commands.Cog):
         if not inv_rows and not user_items:
             return await ctx.send("📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!")
 
-        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Voucher": [], "Currency": []}
+        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Haunted Ingredient": [], "Voucher": [], "Currency": []}
         for item_id, count in user_items:
             info = ITEM_REGISTRY.get(item_id)
             if info:
@@ -647,7 +778,7 @@ class Inventory(commands.Cog):
             cat = info.get("type", "Space Junk")
             categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity or 0}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
 
-        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Voucher":"Vouchers","Currency":"Currencies"}
+        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Haunted Ingredient":"Haunted Ingredients","Voucher":"Vouchers","Currency":"Currencies"}
         pages=[]
         for cat, items in categories.items():
             if not items: continue
@@ -707,12 +838,16 @@ class Inventory(commands.Cog):
             "fate_anchor",
             "quantum_battery",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
+            *HAUNTED_CRAFTED_USE_ITEMS.keys(),
+            *[
+                item_id
+                for item_id, info in ITEM_REGISTRY.items()
+                if info.get("type") == "Haunted Potion"
+            ],
         }
 
-        # Build a quantity lookup from the inventory table.  We intentionally
-        # do not require an owned row to exist before returning choices: this
-        # keeps the Discord picker populated even for users who currently have
-        # no /use-compatible item.  The command itself still verifies ownership.
+        # Only show items the user actually owns.  /use is an inventory
+        # action, so the autocomplete should not offer the entire catalog.
         quantities = {}
         try:
             async with aiosqlite.connect(self.get_db_path()) as db:
@@ -725,14 +860,21 @@ class Inventory(commands.Cog):
                     """,
                     (interaction.user.id,)
                 ) as cursor:
-                    quantities = {item_id: quantity for item_id, quantity in await cursor.fetchall()}
+                    quantities = {
+                        item_id: quantity
+                        for item_id, quantity in await cursor.fetchall()
+                    }
         except Exception:
-            # Autocomplete must never fail the interaction because the database
-            # is temporarily unavailable.  We can still return the catalog.
-            quantities = {}
+            # If the inventory database cannot be read, do not expose the
+            # global item catalog. Returning no choices is safer and avoids
+            # suggesting items the user may not own.
+            return []
 
         choices = []
-        for item_id in usable_items:
+        for item_id, quantity in quantities.items():
+            if item_id not in usable_items:
+                continue
+
             info = ITEM_REGISTRY.get(item_id)
             if not info:
                 continue
@@ -742,7 +884,6 @@ class Inventory(commands.Cog):
             if current and current not in search_text:
                 continue
 
-            quantity = quantities.get(item_id, 0)
             choices.append(
                 app_commands.Choice(
                     name=f"{get_use_autocomplete_emoji(item_id, info.get('emoji'))} {display_name} (x{quantity})",
@@ -990,12 +1131,22 @@ class Inventory(commands.Cog):
             "fate_anchor",
             "quantum_battery",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
+            *HAUNTED_CRAFTED_USE_ITEMS.keys(),
         }
 
         if item_id not in valid:
             return await ctx.send(
                 "❌ That item cannot be used here. Use `/revive` for an Emergency Revival Kit."
             )
+
+        item_info = ITEM_REGISTRY.get(item_id, {})
+        is_halloween_item = (
+            item_id in HALLOWEEN_SPECIAL_USE_ITEMS
+            or item_id in HAUNTED_CRAFTED_USE_ITEMS
+            or item_info.get("type") == "Haunted Potion"
+        )
+        if is_halloween_item and not is_halloween_channel(ctx.channel):
+            return await ctx.send(halloween_channel_message())
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             await self.ensure_effect_schema(db)
@@ -1042,6 +1193,163 @@ class Inventory(commands.Cog):
                 )
 
             hp, max_hp, mining, scavenging, last_mined, last_scavenged, effects_raw = user
+            effects = json.loads(effects_raw or "{}")
+
+            # Seasonal Workshop/Ritual items use the same persistent active-effect
+            # system as the normal consumables, but their effects are consumed by
+            # Haunted Exploration rather than Mine/Scavenge.
+            if item_id in HAUNTED_CRAFTED_USE_ITEMS:
+                config = HAUNTED_CRAFTED_USE_ITEMS[item_id]
+                effect_key = config["effect"]
+                if effects.get(effect_key):
+                    return await ctx.send(
+                        f"⚠️ **{config['name']}** is already prepared. Start a Haunted run first."
+                    )
+
+                effects[effect_key] = True
+                await db.execute(
+                    "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                    (json.dumps(effects), user_id),
+                )
+                if row[0] > 1:
+                    await db.execute(
+                        "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                        (user_id, item_id),
+                    )
+                else:
+                    await db.execute(
+                        "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                        (user_id, item_id),
+                    )
+
+                await db.commit()
+                return await ctx.send(
+                    f"{ctx.author.mention} {config['message']}"
+                )
+
+            # Haunted Cauldron potions are registered by cauldron.py into the
+            # shared ITEM_REGISTRY.  Their effect metadata lives on the registry
+            # entry so inventory.py does not need to import cauldron.py (which
+            # would create a circular import).
+            potion_info = ITEM_REGISTRY.get(item_id, {})
+            potion_effect = potion_info.get("haunted_effect")
+            if potion_info.get("type") == "Haunted Potion" and isinstance(potion_effect, dict):
+                effect_type = str(potion_effect.get("type") or "")
+                amount = int(potion_effect.get("amount", 1) or 1)
+
+                if effect_type == "sanity_restore":
+                    # Calming/Restorative potions apply immediately.  Refresh
+                    # continuous Sanity regeneration first, then add the potion
+                    # amount and cap at 100.  The small schema bootstrap keeps
+                    # the potion usable even before the user has entered Haunted
+                    # Exploration for the first time.
+                    await db.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS haunted_profiles (
+                            user_id INTEGER PRIMARY KEY,
+                            sanity REAL NOT NULL DEFAULT 100,
+                            sanity_updated_at REAL NOT NULL DEFAULT 0,
+                            haunted_attempts INTEGER NOT NULL DEFAULT 20,
+                            attempts_date TEXT NOT NULL DEFAULT '',
+                            active_location TEXT DEFAULT '',
+                            active_stage INTEGER NOT NULL DEFAULT 0,
+                            active_total_stages INTEGER NOT NULL DEFAULT 0,
+                            active_started_at REAL NOT NULL DEFAULT 0
+                        )
+                        """
+                    )
+                    now = time.time()
+                    async with db.execute(
+                        "SELECT sanity, sanity_updated_at FROM haunted_profiles WHERE user_id = ?",
+                        (user_id,),
+                    ) as cursor:
+                        sanity_row = await cursor.fetchone()
+
+                    if sanity_row:
+                        current_sanity = max(0.0, min(100.0, float(sanity_row[0])))
+                        updated_at = float(sanity_row[1] or now)
+                        elapsed = max(0.0, now - updated_at)
+                        current_sanity = min(100.0, current_sanity + elapsed * 100.0 / (6 * 60 * 60))
+                    else:
+                        current_sanity = 100.0
+
+                    restored = max(0.0, min(100.0, current_sanity + float(amount)) - current_sanity)
+                    new_sanity = min(100.0, current_sanity + float(amount))
+
+                    if sanity_row:
+                        await db.execute(
+                            "UPDATE haunted_profiles SET sanity = ?, sanity_updated_at = ? WHERE user_id = ?",
+                            (new_sanity, now, user_id),
+                        )
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO haunted_profiles
+                                (user_id, sanity, sanity_updated_at, haunted_attempts, attempts_date)
+                            VALUES (?, ?, ?, 20, '')
+                            """,
+                            (user_id, new_sanity, now),
+                        )
+
+                    if row[0] > 1:
+                        await db.execute(
+                            "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+                    else:
+                        await db.execute(
+                            "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+
+                    await db.commit()
+                    return await ctx.send(
+                        f"{ctx.author.mention} {potion_info['emoji']} **{potion_info['name']} consumed!**\n"
+                        f"🧠 Restored **+{restored:.0f} Sanity** — now at **{new_sanity:.0f}/100**."
+                    )
+
+                effect_keys = {
+                    "run_protection": "haunted_potion_run_protection",
+                    "encounter_insight": "haunted_potion_encounter_insight",
+                    "rare_encounter_bias": "haunted_potion_rare_encounter_bias",
+                    "sanity_guard": "haunted_potion_sanity_guard",
+                    "curse_protection": "haunted_potion_curse_protection",
+                }
+                effect_key = effect_keys.get(effect_type)
+                if effect_key:
+                    if effects.get(effect_key):
+                        return await ctx.send(
+                            f"⚠️ **{potion_info['name']}** is already prepared. Start a Haunted run first."
+                        )
+
+                    effects[effect_key] = amount
+                    await db.execute(
+                        "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                        (json.dumps(effects), user_id),
+                    )
+                    if row[0] > 1:
+                        await db.execute(
+                            "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+                    else:
+                        await db.execute(
+                            "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+
+                    await db.commit()
+                    effect_messages = {
+                        "run_protection": "🛡️ Its protection will apply to your next Haunted run.",
+                        "encounter_insight": "👁️ Your perception will be sharpened during your next Haunted run.",
+                        "rare_encounter_bias": "🎃 Strange encounters should be easier to notice on your next Haunted run.",
+                        "sanity_guard": "🧠 Its ward will soften supernatural Sanity loss on your next Haunted run.",
+                        "curse_protection": "🛡️ It will block the first negative Sanity choice of your next Haunted run.",
+                    }
+                    return await ctx.send(
+                        f"{ctx.author.mention} {potion_info['emoji']} **{potion_info['name']} prepared!**\n"
+                        f"{effect_messages.get(effect_type, 'Its effect is ready for your next Haunted run.')}"
+                    )
 
             # Halloween Space Junk effects are handled separately from the normal
             # consumable/effect system because their use can be permanently one-time.
@@ -1448,8 +1756,56 @@ class Inventory(commands.Cog):
                 inline=False
             )
         effects = json.loads(effects_raw or "{}")
-        if effects:
-            embed.add_field(name="✨ Active Effects", value="\n".join(f"• {name.replace('_', ' ').title()}" for name in effects), inline=False)
+
+        # Defense equipment is stored in active_effects, but it is actual
+        # equipment rather than a temporary effect. Resolve it through the
+        # defense system so /status shows the real weapon name and chance.
+        from defense import get_defense_info, DEFENSE_WEAPONS, DEFENSE_CAP
+
+        async with aiosqlite.connect(self.get_db_path()) as defense_db:
+            weapon_id, weapon_chance, pet_chance, combined_defense = await get_defense_info(
+                defense_db, user_id
+            )
+
+        if weapon_id:
+            weapon = DEFENSE_WEAPONS[weapon_id]
+            defense_value = (
+                f"{weapon['emoji']} **{weapon['name']}**"
+                + chr(10)
+                + f"🛡️ Weapon Protection: **{weapon_chance * 100:.1f}%**"
+                + chr(10)
+                + f"🛡️ Combined Defense: **{combined_defense * 100:.1f}%** "
+                + f"(cap {DEFENSE_CAP * 100:.0f}%)"
+            )
+        else:
+            defense_value = (
+                "None equipped"
+                + chr(10)
+                + f"🛡️ Combined Defense: **{combined_defense * 100:.1f}%** "
+                + f"(cap {DEFENSE_CAP * 100:.0f}%)"
+            )
+
+        embed.add_field(
+            name="🛡️ Defense",
+            value=defense_value,
+            inline=False,
+        )
+
+        # defense_weapon is equipment state, not a generic active effect.
+        other_effects = {
+            name: value
+            for name, value in effects.items()
+            if name != "defense_weapon"
+        }
+        if other_effects:
+            embed.add_field(
+                name="✨ Active Effects",
+                value=chr(10).join(
+                    f"• {name.replace('_', ' ').title()}" for name in other_effects
+                ),
+                inline=False,
+            )
+
         embed.set_footer(text="Use /inventory for items, /shop rotating for today's offers, and /revive if unconscious.")
         await ctx.send(embed=embed)
 

@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
-from seasonal_updates.halloween import get_collectibles as get_halloween_collectibles
+from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
 
 ACHIEVEMENTS = {
     "halloween_half": {
@@ -53,6 +53,40 @@ ACHIEVEMENTS = {
         "description": "Break the seal on the Cursed Wine Cabinet. You were warned.",
         "reward": "Permanent profile title: Seal Breaker",
     },
+
+
+    # -----------------------------------------------------------------------
+    # Haunted Exploration discovery achievements
+    # -----------------------------------------------------------------------
+    "haunted_asylum": {"name": "Patient Zero", "emoji": "🏥", "description": "Discover every rare discovery in the Abandoned Asylum.", "reward": "Permanent profile title: Patient Zero"},
+    "haunted_graveyard": {"name": "Six Feet Under", "emoji": "🪦", "description": "Discover every rare discovery in the Forgotten Graveyard.", "reward": "Permanent profile background: The Graveyard"},
+    "haunted_house": {"name": "Housebroken", "emoji": "🏚️", "description": "Discover every rare discovery in the Haunted House.", "reward": "Permanent profile title: Housebroken"},
+    "haunted_church": {"name": "Forgive Me", "emoji": "⛪", "description": "Discover every rare discovery in the Abandoned Church.", "reward": "Permanent profile background: Abandoned Sanctuary"},
+    "haunted_witch_woods": {"name": "Into the Woods", "emoji": "🌲", "description": "Discover every rare discovery in Witch's Woods.", "reward": "Permanent profile title: Into the Woods"},
+    "haunted_pizzeria": {"name": "Five Nights Wasn't Enough", "emoji": "🍕", "description": "Discover every rare discovery in the Dilapidated Pizzeria.", "reward": "Permanent profile background: Midnight Pizzeria"},
+    "haunted_toy_workshop": {"name": "Playtime Is Over", "emoji": "🧸", "description": "Discover every rare discovery in the Abandoned Toy Workshop.", "reward": "Permanent profile title: Playtime Is Over"},
+    "haunted_broadcast": {"name": "You're Live", "emoji": "📡", "description": "Discover every rare discovery in the Abandoned Broadcast Station.", "reward": "Permanent profile background: Dead Air"},
+    "haunted_hotel": {"name": "No Vacancy", "emoji": "🏨", "description": "Discover every rare discovery in the Endless Hotel.", "reward": "Permanent profile title: No Vacancy"},
+    "haunted_fogbound": {"name": "Population: ???", "emoji": "🌫️", "description": "Discover every rare discovery in Fogbound Town.", "reward": "Permanent profile background: Fogbound"},
+    "haunted_research": {"name": "It Saw You Too", "emoji": "🧪", "description": "Discover all four rare discoveries in the Derelict Research Facility.", "reward": "Permanent profile title: It Saw You Too"},
+    "haunted_yellow_halls": {"name": "Lost, Actually", "emoji": "🟨", "description": "Discover every rare discovery in the Yellow Halls.", "reward": "Permanent profile title: Lost, Actually"},
+    "haunted_highway": {"name": "Wrong Turn", "emoji": "🛣️", "description": "Discover every rare discovery on the Dead-End Highway.", "reward": "Permanent profile background: Dead-End"},
+    "haunted_drowned": {"name": "Mind the Water", "emoji": "🌊", "description": "Discover every rare discovery in the Drowned Station.", "reward": "Permanent profile title: Mind the Water"},
+    "haunted_campground": {"name": "Don't Look Behind You", "emoji": "🌲", "description": "Discover every rare discovery in the Silent Campground.", "reward": "Permanent profile background: Watched From the Trees"},
+    "haunted_first_discovery": {"name": "I Was Curious", "emoji": "👁️", "description": "Discover your first rare Haunted discovery.", "reward": "Permanent profile title: Haunted Explorer"},
+    "haunted_impossible": {"name": "That Wasn't There Before", "emoji": "👁️", "description": "Discover an impossible environmental anomaly.", "reward": "Permanent profile title: Something Is Very Wrong"},
+    "haunted_worth_it": {"name": "Worth It", "emoji": "🩸", "description": "Survive a rare discovery that causes a major Sanity loss.", "reward": "Permanent profile title: Worth It"},
+    "haunted_unwell": {"name": "Unwell", "emoji": "🫥", "description": "Reach 0 Sanity after triggering a rare discovery.", "reward": "Permanent profile title: Unwell"},
+    "haunted_other_side": {"name": "The Other Side", "emoji": "👁️", "description": "Discover a rare event while at 0 Sanity.", "reward": "Permanent profile title: The Other Side"},
+    "haunted_all_discoveries": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "description": "Discover every rare discovery across all Haunted locations.", "reward": "Permanent profile title: I Shouldn't Have Looked"},
+
+    # Haunted crafting achievements
+    "haunted_cauldron_first": {"name": "Brewed Something Questionable", "emoji": "🧪", "description": "Craft your first item using the Haunted Cauldron.", "reward": "Permanent profile title: Practiced Alchemist"},
+    "haunted_cauldron_five": {"name": "Alchemist", "emoji": "🧪", "description": "Craft 5 items using the Haunted Cauldron.", "reward": "Permanent profile title: Alchemist"},
+    "haunted_workshop_first": {"name": "Made With Whatever Was Lying Around", "emoji": "🛠️", "description": "Craft your first item using the Haunted Workshop.", "reward": "Permanent profile title: Improvised Engineer"},
+    "haunted_workshop_five": {"name": "I Can Fix It", "emoji": "🛠️", "description": "Craft 5 items using the Haunted Workshop.", "reward": "Permanent profile title: Haunted Handyman"},
+    "haunted_ritual_first": {"name": "Something Answered", "emoji": "🕯️", "description": "Craft your first item using the Ritual Table.", "reward": "Permanent profile title: Occult Hobbyist"},
+    "haunted_ritual_five": {"name": "Occultist", "emoji": "🕯️", "description": "Craft 5 items using the Ritual Table.", "reward": "Permanent profile title: Occultist"},
 
     # Future one-time Halloween item achievements.
     # These remain locked/inactive until their corresponding item is enabled
@@ -121,6 +155,39 @@ HALLOWEEN_HATCH_BACKGROUND_ID = "halloween_haunting_friend"
 HALLOWEEN_BAG_BACKGROUND_ID = "halloween_trick_or_treat"
 HALLOWEEN_WINE_TITLE_ID = "title_seal_breaker"
 
+HAUNTED_DISCOVERY_ACHIEVEMENTS = {
+    "asylum": ("haunted_asylum", 3, "title_patient_zero", None),
+    "graveyard": ("haunted_graveyard", 3, None, "background_the_graveyard"),
+    "haunted_house": ("haunted_house", 3, "title_housebroken", None),
+    "church": ("haunted_church", 3, None, "background_abandoned_sanctuary"),
+    "witch_woods": ("haunted_witch_woods", 3, "title_into_the_woods", None),
+    "dilapidated_pizzeria": ("haunted_pizzeria", 3, None, "background_midnight_pizzeria"),
+    "abandoned_toy_workshop": ("haunted_toy_workshop", 3, "title_playtime_is_over", None),
+    "broadcast_station": ("haunted_broadcast", 3, None, "background_dead_air"),
+    "endless_hotel": ("haunted_hotel", 3, "title_no_vacancy", None),
+    "fogbound_town": ("haunted_fogbound", 3, None, "background_fogbound"),
+    "derelict_research_facility": ("haunted_research", 4, "title_it_saw_you_too", None),
+    "yellow_halls": ("haunted_yellow_halls", 3, "title_lost_actually", None),
+    "dead_end_highway": ("haunted_highway", 3, None, "background_dead_end"),
+    "drowned_station": ("haunted_drowned", 3, "title_mind_the_water", None),
+    "silent_campground": ("haunted_campground", 3, None, "background_watched_from_the_trees"),
+}
+
+HAUNTED_CRAFTING_ACHIEVEMENTS = {
+    "cauldron": (("haunted_cauldron_first", 1, "title_practiced_alchemist"), ("haunted_cauldron_five", 5, "title_alchemist")),
+    "workshop": (("haunted_workshop_first", 1, "title_improvised_engineer"), ("haunted_workshop_five", 5, "title_haunted_handyman")),
+    "ritual_table": (("haunted_ritual_first", 1, "title_occult_hobbyist"), ("haunted_ritual_five", 5, "title_occultist")),
+}
+
+HAUNTED_GLOBAL_DISCOVERY_ACHIEVEMENTS = {
+    "haunted_first_discovery": ("title_haunted_explorer", None),
+    "haunted_impossible": ("title_something_is_very_wrong", None),
+    "haunted_worth_it": ("title_worth_it", None),
+    "haunted_unwell": ("title_unwell", None),
+    "haunted_other_side": ("title_the_other_side", None),
+    "haunted_all_discoveries": ("title_i_shouldnt_have_looked", None),
+}
+
 HALLOWEEN_SPECIAL_ITEM_TITLE_IDS = {
     "halloween_wine_cabinet": "title_seal_breaker",
     "halloween_glitched_cartridge": "title_drowned_in_code",
@@ -169,6 +236,16 @@ async def ensure_achievement_tables(db):
             PRIMARY KEY (user_id, achievement_id)
         )
     """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS haunted_discoveries (
+            user_id INTEGER NOT NULL,
+            discovery_id TEXT NOT NULL,
+            location_id TEXT NOT NULL,
+            discovered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, discovery_id)
+        )
+    """)
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS used_collectibles (
             user_id INTEGER NOT NULL,
@@ -501,6 +578,132 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.close()
 
+
+    async def _grant_haunted_achievement(self, db, user_id, achievement_id, title_id=None, background_id=None):
+        async with db.execute(
+            "SELECT 1 FROM achievements WHERE user_id = ? AND achievement_id = ?",
+            (user_id, achievement_id),
+        ) as cursor:
+            if await cursor.fetchone():
+                return False
+        await db.execute(
+            "INSERT INTO achievements (user_id, achievement_id) VALUES (?, ?)",
+            (user_id, achievement_id),
+        )
+        if title_id:
+            await db.execute(
+                """INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                   VALUES (?, ?, 'title', 1)
+                   ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = MAX(quantity, 1)""",
+                (user_id, title_id),
+            )
+        if background_id:
+            async with db.execute("SELECT unlocked_backgrounds FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+            try:
+                unlocked = json.loads(row[0] if row and row[0] else '["default"]')
+                if not isinstance(unlocked, list): unlocked = ["default"]
+            except (TypeError, ValueError):
+                unlocked = ["default"]
+            if "default" not in unlocked: unlocked.insert(0, "default")
+            if background_id not in unlocked: unlocked.append(background_id)
+            await db.execute("UPDATE users SET unlocked_backgrounds = ? WHERE user_id = ?", (json.dumps(unlocked), user_id))
+        return True
+
+    async def record_haunted_discovery(self, user_id, discovery_id, location_id, sanity=100, db=None):
+        """Permanently record a rare Haunted discovery and unlock related achievements."""
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+        try:
+            await ensure_achievement_tables(db)
+            await db.execute("""CREATE TABLE IF NOT EXISTS haunted_discoveries (
+                user_id INTEGER NOT NULL, discovery_id TEXT NOT NULL, location_id TEXT NOT NULL,
+                discovered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, discovery_id)
+            )""")
+            cursor = await db.execute(
+                "INSERT OR IGNORE INTO haunted_discoveries (user_id, discovery_id, location_id) VALUES (?, ?, ?)",
+                (user_id, discovery_id, location_id),
+            )
+            newly_discovered = cursor.rowcount > 0
+
+            unlocked = []
+            if newly_discovered:
+                if await self._grant_haunted_achievement(db, user_id, "haunted_first_discovery", "title_haunted_explorer"):
+                    unlocked.append("haunted_first_discovery")
+
+                location_data = HAUNTED_DISCOVERY_ACHIEVEMENTS.get(location_id)
+                if location_data:
+                    achievement_id, needed, title_id, background_id = location_data
+                    async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
+                        count = (await c.fetchone())[0]
+                    if count >= needed and await self._grant_haunted_achievement(db, user_id, achievement_id, title_id, background_id):
+                        unlocked.append(achievement_id)
+
+                async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
+                    total = (await c.fetchone())[0]
+                if total >= 46 and await self._grant_haunted_achievement(db, user_id, "haunted_all_discoveries", "title_i_shouldnt_have_looked"):
+                    unlocked.append("haunted_all_discoveries")
+
+                if discovery_id in HAUNTED_IMPOSSIBLE_DISCOVERIES and await self._grant_haunted_achievement(db, user_id, "haunted_impossible", "title_something_is_very_wrong"):
+                    unlocked.append("haunted_impossible")
+
+                if float(sanity) <= 0 and await self._grant_haunted_achievement(db, user_id, "haunted_other_side", "title_the_other_side"):
+                    unlocked.append("haunted_other_side")
+
+            if owns_db:
+                await db.commit()
+            return newly_discovered, unlocked
+        finally:
+            if owns_db:
+                await db.close()
+
+    async def add_haunted_crafting_progress(self, user_id, station, amount=1, db=None):
+        """Track Haunted crafting milestones for a crafting station."""
+        if station not in HAUNTED_CRAFTING_ACHIEVEMENTS:
+            return []
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+        try:
+            await ensure_achievement_tables(db)
+            progress_id = f"haunted_crafting_{station}"
+            await db.execute("""INSERT INTO achievement_progress (user_id, achievement_id, progress)
+                VALUES (?, ?, ?) ON CONFLICT(user_id, achievement_id)
+                DO UPDATE SET progress = progress + excluded.progress""", (user_id, progress_id, amount))
+            async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
+                progress = (await c.fetchone())[0]
+            unlocked = []
+            for achievement_id, threshold, title_id in HAUNTED_CRAFTING_ACHIEVEMENTS[station]:
+                if progress >= threshold and await self._grant_haunted_achievement(db, user_id, achievement_id, title_id):
+                    unlocked.append(achievement_id)
+            if owns_db:
+                await db.commit()
+            return unlocked
+        finally:
+            if owns_db:
+                await db.close()
+
+    async def mark_haunted_discovery_outcome(self, user_id, discovery_id, sanity_delta, new_sanity, db=None):
+        """Unlock global discovery achievements tied to surviving or breaking from a discovery."""
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+        try:
+            await ensure_achievement_tables(db)
+            unlocked = []
+            if sanity_delta <= -10 and new_sanity > 0 and await self._grant_haunted_achievement(db, user_id, "haunted_worth_it", "title_worth_it"):
+                unlocked.append("haunted_worth_it")
+            if sanity_delta < 0 and new_sanity <= 0 and await self._grant_haunted_achievement(db, user_id, "haunted_unwell", "title_unwell"):
+                unlocked.append("haunted_unwell")
+            if owns_db:
+                await db.commit()
+            return unlocked
+        finally:
+            if owns_db:
+                await db.close()
+
     async def check_user_achievements(self, user_id, db=None):
         entries = get_halloween_collectibles()
         total = len(entries)
@@ -655,6 +858,25 @@ class Achievements(commands.Cog):
                     bag_row = await cursor.fetchone()
                 bag_progress = min(bag_row[0] if bag_row else 0, 25)
                 progress = f"Progress: **{bag_progress}/25**"
+            elif achievement_id in {v[0] for v in HAUNTED_DISCOVERY_ACHIEVEMENTS.values()}:
+                location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
+                needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]
+                async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
+                    count = (await c.fetchone())[0]
+                progress = f"Progress: **{min(count, needed)}/{needed}**"
+            elif achievement_id == "haunted_all_discoveries":
+                async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
+                    count = (await c.fetchone())[0]
+                progress = f"Progress: **{min(count, 46)}/46**"
+            elif achievement_id in {"haunted_first_discovery", "haunted_impossible", "haunted_worth_it", "haunted_unwell", "haunted_other_side"}:
+                progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
+            elif achievement_id in {a for pair in HAUNTED_CRAFTING_ACHIEVEMENTS.values() for a, _, _ in pair}:
+                station, pair = next((st, p) for st, p in HAUNTED_CRAFTING_ACHIEVEMENTS.items() if any(a == achievement_id for a, _, _ in p))
+                progress_id = f"haunted_crafting_{station}"
+                threshold = next(t for a, t, _ in pair if a == achievement_id)
+                async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
+                    row = await c.fetchone()
+                progress = f"Progress: **{min(row[0] if row else 0, threshold)}/{threshold}**"
             elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
                 # One-time special collectibles are binary achievements.
                 # Their permanent usage record is stored in used_collectibles.

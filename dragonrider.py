@@ -1,5 +1,6 @@
 import random
 import aiosqlite
+from database import ECONOMY_DB_NAME
 import discord
 from discord.ext import commands
 
@@ -353,11 +354,29 @@ class DragonFlight(commands.Cog):
                 CREATE TABLE IF NOT EXISTS dragonflight (
                     user_id INTEGER PRIMARY KEY,
                     attempts INTEGER DEFAULT 0,
+                    daily_attempts INTEGER DEFAULT 0,
                     last_attempt_date TEXT,
+                    weekly_extra_attempts INTEGER DEFAULT 0,
+                    last_extra_attempt_week TEXT,
                     licensed INTEGER DEFAULT 0
                 )
                 """
             )
+
+            async with db.execute("PRAGMA table_info(dragonflight)") as cursor:
+                columns = {row[1] for row in await cursor.fetchall()}
+            if "daily_attempts" not in columns:
+                await db.execute(
+                    "ALTER TABLE dragonflight ADD COLUMN daily_attempts INTEGER DEFAULT 0"
+                )
+            if "weekly_extra_attempts" not in columns:
+                await db.execute(
+                    "ALTER TABLE dragonflight ADD COLUMN weekly_extra_attempts INTEGER DEFAULT 0"
+                )
+            if "last_extra_attempt_week" not in columns:
+                await db.execute(
+                    "ALTER TABLE dragonflight ADD COLUMN last_extra_attempt_week TEXT"
+                )
 
             await db.commit()
 
@@ -386,6 +405,30 @@ class DragonFlight(commands.Cog):
 
         return now_et.date().isoformat()
 
+    def get_current_week_et(self):
+        import datetime
+        import pytz
+
+        et_timezone = pytz.timezone("US/Eastern")
+        now_et = datetime.datetime.now(et_timezone)
+        iso_year, iso_week, _ = now_et.isocalendar()
+
+        return f"{iso_year}-W{iso_week:02d}"
+
+    async def get_dragonrider_pet_effects(self, user_id):
+        """Read Dragonrider-specific effects from the user's active pet."""
+        try:
+            from pets import get_active_pet_effects
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+                return await get_active_pet_effects(db, user_id)
+        except (ImportError, aiosqlite.Error):
+            # The Dragonrider test should remain usable even if the pet system
+            # is unavailable during startup or migration.
+            return {
+                "dragonrider_success": 0.0,
+                "dragonrider_extra_attempts": 0,
+            }
+
     @commands.hybrid_command(
         name="dragonrider",
         aliases=["flytest", "ft"],
@@ -396,14 +439,20 @@ class DragonFlight(commands.Cog):
         guild = ctx.guild
 
         today_et = self.get_today_et()
+        current_week_et = self.get_current_week_et()
+        pet_effects = await self.get_dragonrider_pet_effects(user.id)
+        extra_attempts = int(pet_effects.get("dragonrider_extra_attempts", 0))
+        success_chance = min(1.0, SUCCESS_CHANCE + float(pet_effects.get("dragonrider_success", 0.0)))
 
         async with self._test_lock:
             async with aiosqlite.connect(FLIGHT_DB_PATH) as db:
                 await db.execute("BEGIN IMMEDIATE")
+                max_daily_attempts = 1 + (1 if extra_attempts > 0 else 0)
 
                 async with db.execute(
                     """
-                    SELECT attempts, last_attempt_date, licensed
+                    SELECT attempts, daily_attempts, last_attempt_date, weekly_extra_attempts,
+                           last_extra_attempt_week, licensed
                     FROM dragonflight
                     WHERE user_id = ?
                     """,
@@ -412,7 +461,26 @@ class DragonFlight(commands.Cog):
                     row = await cursor.fetchone()
 
                 if row:
-                    attempts, last_attempt_date, licensed = row
+                    (
+                        attempts,
+                        daily_attempts,
+                        last_attempt_date,
+                        weekly_extra_attempts,
+                        last_extra_attempt_week,
+                        licensed,
+                    ) = row
+                    daily_attempts = daily_attempts or 0
+                    weekly_extra_attempts = weekly_extra_attempts or 0
+                    weekly_extra_available = (
+                        extra_attempts > 0
+                        and weekly_extra_attempts == 0
+                        and last_extra_attempt_week != current_week_et
+                    )
+                    max_daily_attempts = 1 + (1 if weekly_extra_available else 0)
+                    if last_attempt_date == today_et and daily_attempts == 0:
+                        # Legacy rows predate the per-day counter; their recorded
+                        # attempt is treated as today's first attempt.
+                        daily_attempts = 1
 
                     if licensed:
                         await db.rollback()
@@ -420,31 +488,63 @@ class DragonFlight(commands.Cog):
                             "🐉 You already possess a Dragonrider License! Don't try to make the instructor feel even more pain, bro."
                         )
 
-                    if last_attempt_date == today_et:
+                    if last_attempt_date == today_et and daily_attempts >= max_daily_attempts:
                         await db.rollback()
                         reset_timestamp = self.get_next_midnight_reset()
 
                         return await ctx.send(
-                            f"⏳ You've already attempted your Dragon Rider Test today!\n"
+                            f"⏳ You've used all **{max_daily_attempts}** Dragonrider attempt{'s' if max_daily_attempts != 1 else ''} today!\n"
                             f"🐉 You may attempt another test <t:{reset_timestamp}:R>."
                         )
+
+                next_total_attempts = (attempts + 1) if row else 1
+                next_daily_attempts = (daily_attempts + 1) if row and last_attempt_date == today_et else 1
+
+                if row:
+                    used_weekly_extra = (
+                        daily_attempts >= 1
+                        and last_attempt_date == today_et
+                        and extra_attempts > 0
+                        and weekly_extra_attempts == 0
+                        and last_extra_attempt_week != current_week_et
+                    )
+                    next_weekly_extra_attempts = 1 if used_weekly_extra else weekly_extra_attempts
+                    next_extra_attempt_week = (
+                        current_week_et if used_weekly_extra else last_extra_attempt_week
+                    )
+                else:
+                    next_weekly_extra_attempts = 0
+                    next_extra_attempt_week = None
 
                 await db.execute(
                     """
                     INSERT INTO dragonflight (
                         user_id,
                         attempts,
+                        daily_attempts,
                         last_attempt_date,
+                        weekly_extra_attempts,
+                        last_extra_attempt_week,
                         licensed
                     )
-                    VALUES (?, 1, ?, 0)
+                    VALUES (?, ?, ?, ?, ?, ?, 0)
 
                     ON CONFLICT(user_id)
                     DO UPDATE SET
-                        attempts = attempts + 1,
-                        last_attempt_date = excluded.last_attempt_date
+                        attempts = excluded.attempts,
+                        daily_attempts = excluded.daily_attempts,
+                        last_attempt_date = excluded.last_attempt_date,
+                        weekly_extra_attempts = excluded.weekly_extra_attempts,
+                        last_extra_attempt_week = excluded.last_extra_attempt_week
                     """,
-                    (user.id, today_et)
+                    (
+                        user.id,
+                        next_total_attempts,
+                        next_daily_attempts,
+                        today_et,
+                        next_weekly_extra_attempts,
+                        next_extra_attempt_week,
+                    )
                 )
 
                 async with db.execute(
@@ -454,7 +554,7 @@ class DragonFlight(commands.Cog):
                     updated_row = await cursor.fetchone()
 
                 attempts = updated_row[0] if updated_row else 1
-                success = random.random() < SUCCESS_CHANCE
+                success = random.random() < success_chance
 
                 if success:
                     await db.execute(

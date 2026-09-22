@@ -28,6 +28,9 @@ class BlackjackView(discord.ui.View):
         self.dealer = dealer
         self.finished = False
         self.doubled = False
+        self.payout_multiplier = 1.0
+        self.trickster_active = False
+        self.action_lock = asyncio.Lock()
         self.message: discord.Message | None = None
 
     def hand_value(self, hand):
@@ -109,8 +112,23 @@ class BlackjackView(discord.ui.View):
 
             balance = row[0] or 0
             arcade_coins = (token_row[0] or 0) if token_row else 0
-            new_balance = balance + payout
-            new_arcade_coins = min(1000, arcade_coins + (1 if outcome == "timeout" else 0))
+            adjusted_payout = payout if outcome == "timeout" else int(payout * self.payout_multiplier)
+            new_balance = balance + adjusted_payout
+
+            # Cosmic Trickster: the initial entry token was already consumed.
+            # A win refunds one bonus token; a loss/bust consumes one additional
+            # token. Timeouts are handled as a normal refund.
+            if outcome == "timeout":
+                token_change = 1
+            elif self.trickster_active and outcome in {"win", "blackjack"}:
+                token_change = 1
+            elif self.trickster_active and outcome in {"loss", "bust"}:
+                token_change = -1
+            else:
+                token_change = 0
+
+            new_arcade_coins = max(0, min(1000, arcade_coins + token_change))
+            tokens_spent = 0 if outcome == "timeout" else (2 if self.trickster_active and outcome in {"loss", "bust"} else 1)
 
             await db.execute(
                 "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
@@ -122,8 +140,8 @@ class BlackjackView(discord.ui.View):
                 "blackjack",
                 outcome=outcome,
                 stardust_wagered=self.bet,
-                stardust_returned=payout,
-                arcade_coins_spent=0 if outcome == "timeout" else 1,
+                stardust_returned=adjusted_payout,
+                arcade_coins_spent=tokens_spent,
             )
             await db.commit()
 
@@ -136,10 +154,14 @@ class BlackjackView(discord.ui.View):
             "timeout": "⏰ **Table closed.** Your unfinished hand is refunded.",
         }[outcome]
 
-        result_summary = self.cog.format_game_result(self.bet, payout)
+        result_summary = self.cog.format_game_result(self.bet, adjusted_payout)
         outcome_text = f"{outcome_text}\n{result_summary}"
         if outcome == "timeout":
             outcome_text += "\n🪙 Your **1 Arcade Token** entry token is also returned."
+        elif self.trickster_active and outcome in {"win", "blackjack"}:
+            outcome_text += "\n🃏 **Cosmic Trickster:** +1 Arcade Token for winning!"
+        elif self.trickster_active and outcome in {"loss", "bust"}:
+            outcome_text += "\n🃏 **Cosmic Trickster:** The loss consumed an extra Arcade Token."
 
         embed = self.build_embed(finished=True, status=outcome_text)
         if outcome == "timeout":
@@ -157,8 +179,11 @@ class BlackjackView(discord.ui.View):
             await self.finish("timeout", self.bet)
 
     async def hit_callback(self, interaction):
-        await interaction.response.defer()
-        self.player.append(self.deck.pop())
+        async with self.action_lock:
+            if self.finished or self.doubled:
+                return
+            await interaction.response.defer()
+            self.player.append(self.deck.pop())
         # Double Down is only available before taking a regular hit.
         for child in self.children:
             if isinstance(child, discord.ui.Button) and child.label == "Double Down":
@@ -192,49 +217,53 @@ class BlackjackView(discord.ui.View):
             await self.finish("loss", 0)
 
     async def stand_callback(self, interaction):
-        await interaction.response.defer()
-        await self.dealer_turn()
+        async with self.action_lock:
+            if self.finished:
+                return
+            await interaction.response.defer()
+            await self.dealer_turn()
 
     async def double_callback(self, interaction):
-        # Double Down requires matching the current Stardust wager, then forces
-        # exactly one more card. The Arcade Token entry token is not charged again.
-        if self.doubled or self.finished:
-            return
+        async with self.action_lock:
+            # Double Down is only available once, before a regular hit.
+            if self.doubled or self.finished:
+                return
 
-        db_path = self.cog.get_db_path()
-        async with aiosqlite.connect(db_path) as db:
-            await db.execute("BEGIN IMMEDIATE")
-            balance = await self.cog.get_stardust(db, self.user_id)
-            if balance is None:
-                await db.rollback()
-                return await interaction.response.send_message(
-                    "❌ Your station profile could not be loaded.", ephemeral=True
+            db_path = self.cog.get_db_path()
+            async with aiosqlite.connect(db_path) as db:
+                await db.execute("BEGIN IMMEDIATE")
+                balance = await self.cog.get_stardust(db, self.user_id)
+                if balance is None:
+                    await db.rollback()
+                    return await interaction.response.send_message(
+                        "❌ Your station profile could not be loaded.", ephemeral=True
+                    )
+
+                if balance < self.bet:
+                    await db.rollback()
+                    return await interaction.response.send_message(
+                        f"💸 **Not enough Stardust to double down!** You need **{self.bet:,}** more Stardust, "
+                        f"but only have **{balance:,}**.", ephemeral=True
+                    )
+
+                new_balance = balance - self.bet
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_balance, self.user_id)
                 )
-            if balance < self.bet:
-                await db.rollback()
-                return await interaction.response.send_message(
-                    f"💸 **Not enough Stardust to double down!** You need **{self.bet:,}** more Stardust, "
-                    f"but only have **{balance:,}**.", ephemeral=True
-                )
+                await db.commit()
 
-            new_balance = balance - self.bet
-            await db.execute(
-                "UPDATE users SET stardust = ? WHERE user_id = ?",
-                (new_balance, self.user_id)
-            )
-            await db.commit()
+            self.bet *= 2
+            self.doubled = True
+            self.clear_items()
+            self.player.append(self.deck.pop())
+            total = self.hand_value(self.player)
 
-        self.bet *= 2
-        self.doubled = True
-        self.clear_items()
-        self.player.append(self.deck.pop())
-        total = self.hand_value(self.player)
-
-        await interaction.response.defer()
-        if total > 21:
-            await self.finish("bust", 0)
-        else:
-            await self.dealer_turn()
+            await interaction.response.defer()
+            if total > 21:
+                await self.finish("bust", 0)
+            else:
+                await self.dealer_turn()
 
     @discord.ui.button(label="Hit", emoji="🃏", style=discord.ButtonStyle.primary)
     async def hit(self, interaction, button):
@@ -356,7 +385,7 @@ class RouletteBetModal(discord.ui.Modal):
         self.view = view
         self.bet_input = discord.ui.TextInput(
             label="Stardust Bet",
-            placeholder="Enter 1-1000 Stardust",
+            placeholder="Enter 1-5000 Stardust",
             required=True,
             max_length=6,
         )
@@ -406,7 +435,7 @@ class MinigameBetModal(discord.ui.Modal):
         self.game = game
         self.bet_input = discord.ui.TextInput(
             label="Stardust Bet",
-            placeholder="Enter 1-1000 Stardust",
+            placeholder="Enter 1-5000 Stardust",
             required=True,
             max_length=6,
         )
@@ -433,7 +462,7 @@ class DiceBetModal(discord.ui.Modal):
         self.view = view
         self.bet_input = discord.ui.TextInput(
             label="Stardust Bet",
-            placeholder="Enter 1-1000 Stardust",
+            placeholder="Enter 1-5000 Stardust",
             required=True,
             max_length=6,
         )
@@ -645,7 +674,8 @@ class Minigames(commands.Cog):
 
     ARCADE_COIN_COST = 100  # Stardust per Arcade Token.
     MIN_BET = 1
-    MAX_BET = 1000
+    MAX_BET = 5000
+    SLOT_MAX_BET = 1500
 
     SLOT_SYMBOLS = ["🌌", "⭐", "🌙", "🪐", "☄️", "💎"]
 
@@ -813,7 +843,7 @@ class Minigames(commands.Cog):
             row = await cursor.fetchone()
         return (row[0] or 0) if row else None
 
-    async def change_balance(self, user_id, bet, game_callback: Callable[[], dict[str, Any]]) -> tuple[dict[str, Any] | None, int | None]:
+    async def change_balance(self, user_id, bet, game_callback: Callable[[], dict[str, Any]], game: str) -> tuple[dict[str, Any] | None, int | None]:
         """Consume one Arcade Token and resolve one Stardust wager atomically."""
         db_path = self.get_db_path()
 
@@ -838,41 +868,69 @@ class Minigames(commands.Cog):
             arcade_coins = (token_row[0] or 0) if token_row else 0
             stardust = row[0] or 0
 
-            if arcade_coins < 1:
+            from pets import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, user_id)
+            trickster_active = (
+                game != "trivia"
+                and int(pet_effects.get("trickster_tokens", 0)) > 0
+            )
+            required_tokens = 2 if trickster_active else 1
+
+            if arcade_coins < required_tokens:
                 await db.rollback()
-                return {"error": "no_token", "stardust": stardust}, stardust
+                return {
+                    "error": "no_token",
+                    "stardust": stardust,
+                    "required_tokens": required_tokens,
+                }, stardust
 
             if stardust < bet:
                 await db.rollback()
                 return {"error": "insufficient", "stardust": stardust}, stardust
 
             result: dict[str, Any] = game_callback()
-            payout = result.get("payout", 0)
-            new_stardust = stardust - bet + payout
-            new_arcade_coins = arcade_coins - 1
+            payout = int(result.get("payout", 0) or 0)
+            payout_multiplier = 1.0 + float(pet_effects.get("minigame_payout", 0.0))
+            adjusted_payout = int(payout * payout_multiplier)
+            new_stardust = stardust - bet + adjusted_payout
+
+            outcome = result.get("outcome")
+            if trickster_active and outcome == "win":
+                new_arcade_coins = arcade_coins  # spend one, gain one
+                token_spent = 1
+            elif trickster_active and outcome == "loss":
+                new_arcade_coins = arcade_coins - 2
+                token_spent = 2
+            else:
+                new_arcade_coins = arcade_coins - 1
+                token_spent = 1
 
             await db.execute(
                 "UPDATE users SET stardust = ?, arcade_coins = ? WHERE user_id = ?",
                 (new_stardust, new_arcade_coins, user_id)
             )
 
-            game = result.get("game")
+            result_game = result.get("game")
             outcome = result.get("outcome")
-            if game:
+            if isinstance(result_game, str):
                 await self.record_stats(
                     db,
                     user_id,
-                    game,
+                    result_game,
                     outcome=outcome,
                     stardust_wagered=bet,
-                    stardust_returned=payout,
-                    arcade_coins_spent=1,
+                    stardust_returned=adjusted_payout,
+                    arcade_coins_spent=token_spent,
                 )
 
             await db.commit()
 
+        result["payout"] = adjusted_payout
+        result["payout_multiplier"] = payout_multiplier
+        result["trickster_active"] = trickster_active
         result["new_balance"] = new_stardust
         result["arcade_tokens"] = new_arcade_coins
+        result["arcade_tokens_spent"] = token_spent
         return result, new_stardust
 
     async def record_stats(
@@ -888,7 +946,7 @@ class Minigames(commands.Cog):
     ):
         """Record one completed minigame session inside the caller's transaction."""
         wins = 1 if outcome in {"win", "blackjack"} else 0
-        losses = 1 if outcome == "loss" else 0
+        losses = 1 if outcome in {"loss", "bust"} else 0
         pushes = 1 if outcome == "push" else 0
         timeouts = 1 if outcome == "timeout" else 0
         net = stardust_returned - stardust_wagered
@@ -1007,11 +1065,12 @@ class Minigames(commands.Cog):
         """Show the invoking user's persistent minigame statistics."""
         await self.send_stats(ctx, ephemeral=False)
 
-    def validate_bet(self, bet):
+    def validate_bet(self, bet, game=None):
         if bet < self.MIN_BET:
             return f"🎰 **Minimum bet:** {self.MIN_BET:,} Stardust."
-        if bet > self.MAX_BET:
-            return f"🎰 **Maximum bet:** {self.MAX_BET:,} Stardust."
+        max_bet = self.SLOT_MAX_BET if game == "slots" else self.MAX_BET
+        if bet > max_bet:
+            return f"🎰 **Maximum bet:** {max_bet:,} Stardust."
         return None
 
     @staticmethod
@@ -1032,7 +1091,7 @@ class Minigames(commands.Cog):
         )
 
     async def play_slots(self, interaction, bet):
-        error = self.validate_bet(bet)
+        error = self.validate_bet(bet, "slots")
         if error:
             return await interaction.followup.send(error, ephemeral=True)
 
@@ -1049,15 +1108,18 @@ class Minigames(commands.Cog):
                 "outcome": "win" if highest_match >= 2 else "loss",
             }
 
-        result, new_balance = await self.change_balance(interaction.user.id, bet, spin)
+        result, new_balance = await self.change_balance(interaction.user.id, bet, spin, "slots")
         if result is None:
             return await interaction.followup.send(
                 "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
+            required_tokens = result.get("required_tokens", 1)
+            token_text = "Arcade Token" if required_tokens == 1 else "Arcade Tokens"
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
+                f"🪙 **You need {required_tokens} {token_text} to play this round!** "
+                "Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
@@ -1099,11 +1161,16 @@ class Minigames(commands.Cog):
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used")
+        token_note = (
+            " • 🃏 Trickster token returned" if result.get("trickster_active") and result.get("outcome") == "win"
+            else " • 🃏 Trickster extra token consumed" if result.get("trickster_active") and result.get("outcome") == "loss"
+            else ""
+        )
+        embed.set_footer(text=f"Stardust: {new_balance:,} • Arcade Token(s) used{token_note}")
         await interaction.followup.send(embed=embed)
 
     async def play_dice(self, interaction, bet, choice):
-        error = self.validate_bet(bet)
+        error = self.validate_bet(bet, "dice")
         if error:
             return await interaction.followup.send(error, ephemeral=True)
 
@@ -1129,15 +1196,18 @@ class Minigames(commands.Cog):
                 "outcome": "win" if won else "loss",
             }
 
-        result, new_balance = await self.change_balance(interaction.user.id, bet, roll)
+        result, new_balance = await self.change_balance(interaction.user.id, bet, roll, "dice")
         if result is None:
             return await interaction.followup.send(
                 "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
+            required_tokens = result.get("required_tokens", 1)
+            token_text = "Arcade Token" if required_tokens == 1 else "Arcade Tokens"
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
+                f"🪙 **You need {required_tokens} {token_text} to play this round!** "
+                "Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
@@ -1174,11 +1244,16 @@ class Minigames(commands.Cog):
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"Stardust: {new_balance:,} • 1 Arcade Token used")
+        token_note = (
+            " • 🃏 Trickster token returned" if result.get("trickster_active") and result.get("outcome") == "win"
+            else " • 🃏 Trickster extra token consumed" if result.get("trickster_active") and result.get("outcome") == "loss"
+            else ""
+        )
+        embed.set_footer(text=f"Stardust: {new_balance:,} • Arcade Token(s) used{token_note}")
         await interaction.followup.send(embed=embed)
 
     async def play_blackjack(self, interaction, bet):
-        error = self.validate_bet(bet)
+        error = self.validate_bet(bet, "blackjack")
         if error:
             return await interaction.followup.send(error, ephemeral=True)
 
@@ -1207,10 +1282,16 @@ class Minigames(commands.Cog):
             arcade_coins = (token_row[0] or 0) if token_row else 0
             stardust = row[0] or 0
 
-            if arcade_coins < 1:
+            from pets import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, interaction.user.id)
+            trickster_active = int(pet_effects.get("trickster_tokens", 0)) > 0
+            required_tokens = 2 if trickster_active else 1
+            if arcade_coins < required_tokens:
                 await db.rollback()
+                token_text = "Arcade Token" if required_tokens == 1 else "Arcade Tokens"
                 return await interaction.followup.send(
-                    "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
+                    f"🪙 **You need {required_tokens} {token_text} to play this round!** "
+                    "Exchange Stardust for Arcade Tokens from the minigame terminal.",
                     ephemeral=True
                 )
 
@@ -1235,6 +1316,8 @@ class Minigames(commands.Cog):
         player = [deck.pop(), deck.pop()]
         dealer = [deck.pop(), deck.pop()]
         view = BlackjackView(self, interaction, bet, deck, player, dealer)
+        view.payout_multiplier = 1.0 + float(pet_effects.get("minigame_payout", 0.0))
+        view.trickster_active = trickster_active
         view.message = await interaction.followup.send(
             embed=view.build_embed(),
             view=view,
@@ -1250,7 +1333,7 @@ class Minigames(commands.Cog):
                 await view.finish("blackjack", bet + (bet * 3 // 2))
 
     async def play_roulette(self, interaction, bet, choice):
-        error = self.validate_bet(bet)
+        error = self.validate_bet(bet, "roulette")
         if error:
             return await interaction.followup.send(error, ephemeral=True)
 
@@ -1287,15 +1370,18 @@ class Minigames(commands.Cog):
                 "outcome": "win" if won else "loss",
             }
 
-        result, new_balance = await self.change_balance(interaction.user.id, bet, spin)
+        result, new_balance = await self.change_balance(interaction.user.id, bet, spin, "roulette")
         if result is None:
             return await interaction.followup.send(
                 "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
+            required_tokens = result.get("required_tokens", 1)
+            token_text = "Arcade Token" if required_tokens == 1 else "Arcade Tokens"
             return await interaction.followup.send(
-                "🪙 **You need an Arcade Token to play!** Exchange Stardust for Arcade Tokens from the minigame terminal.",
+                f"🪙 **You need {required_tokens} {token_text} to play this round!** "
+                "Exchange Stardust for Arcade Tokens from the minigame terminal.",
                 ephemeral=True,
             )
         if result.get("error") == "insufficient":
