@@ -5,7 +5,11 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
-from pet_variants import build_variant_collectibles
+from pet_variants import (
+    HALLOWEEN_PET_TYPES,
+    NORMAL_PET_TYPES,
+    build_variant_collectibles,
+)
 
 
 async def ensure_collectible_tables(db):
@@ -55,14 +59,33 @@ class Collectibles(commands.Cog):
             ) as cursor:
                 owned = {row[0] for row in await cursor.fetchall()}
 
-        # Each seasonal module can add its own category later.
+        # Keep the permanent variant IDs unchanged, but present normal and
+        # Halloween variants as separate collection categories.
+        variant_entries = build_variant_collectibles()
+        normal_variant_entries = []
+        halloween_variant_entries = []
+
+        normal_pet_types = set(NORMAL_PET_TYPES)
+        halloween_pet_types = set(HALLOWEEN_PET_TYPES)
+
+        for entry in variant_entries:
+            item_id = entry[0]
+            parts = item_id.split(":")
+            pet_type = parts[1] if len(parts) > 1 else ""
+
+            if pet_type in normal_pet_types:
+                normal_variant_entries.append(entry)
+            elif pet_type in halloween_pet_types:
+                halloween_variant_entries.append(entry)
+
         categories = {
-            "🎃 Halloween": get_halloween_collectibles(),
-            "🐾 Pet Variants": build_variant_collectibles(),
+            "🎃 Halloween - Lair of Frights Items": get_halloween_collectibles(),
+            "🐾 Normal Pet Variants": normal_variant_entries,
+            "🎃 Halloween Pet Variants": halloween_variant_entries,
         }
 
         pages = []
-        page_size = 30
+        page_size = 15
 
         for category, entries in categories.items():
             if not entries:
