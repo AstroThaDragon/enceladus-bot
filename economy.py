@@ -235,10 +235,13 @@ class ShopView(discord.ui.View):
         elif category == "upgrades":
             embed.description = (
                 "🛠️ **Station Upgrades**\n"
-                "Special equipment to improve your next expedition."
+                "Permanent equipment and station expansions."
             )
 
             item_ids = [
+                "incubator_2",
+                "incubator_3",
+                "vault_expansion",
                 "fuel_stabilizer",
                 "hazard_shield",
                 "lucky_scanner",
@@ -263,6 +266,7 @@ class ShopView(discord.ui.View):
 
             item_ids = [
                 "time_crystal",
+                "astral_essence",
             ]
 
         elif category == "lottery":
@@ -371,7 +375,8 @@ class ShopView(discord.ui.View):
 class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.VAULT_CAPACITY = 250_000
+        self.DEFAULT_VAULT_CAPACITY = 250_000
+        self.MAX_VAULT_CAPACITY = 500_000
         
         # Define shop catalog
         self.SHOP_ITEMS = {
@@ -449,6 +454,12 @@ class Economy(commands.Cog):
                 "type": "special",
                 "desc": "Bends time backwards to restore a fortune streak missed yesterday (Max 2 uses/month)."
             },
+            "astral_essence": {
+                "name": "✨ Astral Essence",
+                "cost": 5000,
+                "type": "special",
+                "desc": "A concentrated fragment of stellar energy used to fuse duplicate pets and hunt for rare pet variants."
+            },
             "neon_grid": {
                 "name": "🌆 Background Voucher: Neon Grid",
                 "cost": 4000,
@@ -482,6 +493,24 @@ class Economy(commands.Cog):
             "prototype_drill_bit": {
                 "name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "type": "consumable",
                 "desc": "Boosts Stardust from your next mining run."
+            },
+            "incubator_2": {
+                "name": "🥚 Incubator Tube II",
+                "cost": 50_000,
+                "type": "station_upgrade",
+                "desc": "Unlocks a second pet egg incubator tube."
+            },
+            "incubator_3": {
+                "name": "🥚 Incubator Tube III",
+                "cost": 125_000,
+                "type": "station_upgrade",
+                "desc": "Unlocks a third pet egg incubator tube."
+            },
+            "vault_expansion": {
+                "name": "🔐 Vault Expansion",
+                "cost": 150_000,
+                "type": "station_upgrade",
+                "desc": "Raises your Stardust vault capacity to the 500,000 Stardust maximum."
             },
         }
         # Stardust buyback values for space junk items
@@ -561,6 +590,7 @@ class Economy(commands.Cog):
             "drone_quantum_battery": (2, "daily"),
             "pet_snack": (30, "daily"),
             "time_crystal": (2, "monthly"),
+            "astral_essence": (10, "weekly"),
 
             # Rotating shop
             "fuel_stabilizer": (5, "daily"),
@@ -572,6 +602,9 @@ class Economy(commands.Cog):
             "cosmic_insurance": (5, "daily"),
             "fate_anchor": (3, "daily"),
             "revive_kit": (3, "daily"),
+            "incubator_2": (1, "lifetime"),
+            "incubator_3": (1, "lifetime"),
+            "vault_expansion": (1, "lifetime"),
             "stop_sign": (1, "lifetime"),
             "stick": (1, "lifetime"),
             "wooden_sword": (1, "lifetime"),
@@ -595,7 +628,7 @@ class Economy(commands.Cog):
         Daily Offers feature permanent shop items or rotation-only items, but exclude
         backgrounds and titles. Rotation-only items receive no permanent-item discount.
         """
-        excluded_types = {"background_voucher", "title"}
+        excluded_types = {"background_voucher", "title", "station_upgrade"}
         eligible_items = []
 
         for item_id, item in self.SHOP_ITEMS.items():
@@ -728,8 +761,18 @@ class Economy(commands.Cog):
             
         if "vault_stardust" not in existing_columns:
             await db.execute(
-            "ALTER TABLE users ADD COLUMN vault_stardust INTEGER DEFAULT 0"
-        )
+                "ALTER TABLE users ADD COLUMN vault_stardust INTEGER DEFAULT 0"
+            )
+
+        if "vault_capacity" not in existing_columns:
+            await db.execute(
+                f"ALTER TABLE users ADD COLUMN vault_capacity INTEGER DEFAULT {self.DEFAULT_VAULT_CAPACITY}"
+            )
+
+        if "incubator_slots" not in existing_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN incubator_slots INTEGER DEFAULT 1"
+            )
 
         # Daily Stardust reward tracking.
         if "daily_streak" not in existing_columns:
@@ -800,7 +843,7 @@ class Economy(commands.Cog):
             await db.commit()
 
             async with db.execute(
-                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
+                "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0), COALESCE(vault_capacity, ?) FROM users WHERE user_id = ?",
                 (user_id,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -1029,16 +1072,18 @@ class Economy(commands.Cog):
                 """
                 SELECT
                     COALESCE(stardust, 0),
-                    COALESCE(vault_stardust, 0)
+                    COALESCE(vault_stardust, 0),
+                    COALESCE(vault_capacity, ?)
                 FROM users
                 WHERE user_id = ?
                 """,
-                (user_id,)
+                (self.DEFAULT_VAULT_CAPACITY, user_id)
             ) as cursor:
                 row = await cursor.fetchone()
 
         stardust = row[0] if row else 0
         vault = row[1] if row else 0
+        vault_capacity = row[2] if row else self.DEFAULT_VAULT_CAPACITY
         total = stardust + vault
 
         embed = discord.Embed(
@@ -1059,7 +1104,7 @@ class Economy(commands.Cog):
 
         embed.add_field(
             name="🔐 Protected in Vault",
-            value=f"{vault:,} / {self.VAULT_CAPACITY:,} Stardust",
+            value=f"{vault:,} / {vault_capacity:,} Stardust",
             inline=True
         )
 
@@ -1094,11 +1139,13 @@ class Economy(commands.Cog):
             await db.execute("BEGIN IMMEDIATE")
             async with db.execute(
                 "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
-                (user_id,)
+                (self.DEFAULT_VAULT_CAPACITY, user_id)
             ) as cursor:
                 row = await cursor.fetchone()
 
-            stardust, vault = row if row else (0, 0)
+            stardust, vault, vault_capacity = (
+                row if row else (0, 0, self.DEFAULT_VAULT_CAPACITY)
+            )
 
             if amount > stardust:
                 await db.rollback()
@@ -1106,11 +1153,11 @@ class Economy(commands.Cog):
                     f"💸 You only have **{stardust:,} Stardust** available to deposit."
                 )
 
-            if vault + amount > self.VAULT_CAPACITY:
+            if vault + amount > vault_capacity:
                 await db.rollback()
-                remaining_space = max(0, self.VAULT_CAPACITY - vault)
+                remaining_space = max(0, vault_capacity - vault)
                 return await ctx.send(
-                    f"🔐 Your vault can only hold **{self.VAULT_CAPACITY:,} Stardust**. "
+                    f"🔐 Your vault can only hold **{vault_capacity:,} Stardust**. "
                     f"You can deposit **{remaining_space:,}** Stardust."
                 )
 
@@ -1206,6 +1253,7 @@ class Economy(commands.Cog):
             "drone_quantum_battery": "⚛️",
             "pet_snack": "🍪",
             "time_crystal": "💎",
+            "astral_essence": "✨",
             "neon_grid": "🌆",
             "deep_void": "🌌",
             "solaris_ring": "💫",
@@ -1349,12 +1397,9 @@ class Economy(commands.Cog):
 
             item_info = ITEM_REGISTRY.get(item_id)
 
-            if not item_info:
-                return await ctx.send(
-                    "❌ This item is not registered in the master item registry."
-                )
-
-            max_stack = item_info.get("max_quantity", 10)
+            # Permanent station upgrades live on the users table rather than
+            # the inventory registry. They are handled below and return before
+            # any inventory-registry-only code is reached.
 
             # These items are stored directly on the users table.
             legacy_columns = {
@@ -1366,6 +1411,95 @@ class Economy(commands.Cog):
             # Lock before reading inventory, balance, or purchase-limit state.
             # All critical reads and writes now share one atomic snapshot.
             await db.execute("BEGIN IMMEDIATE")
+
+            if item["type"] == "station_upgrade":
+                if quantity != 1:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🛠️ Station upgrades can only be purchased **one at a time**."
+                    )
+
+                async with db.execute(
+                    "SELECT COALESCE(stardust, 0), COALESCE(incubator_slots, 1), "
+                    "COALESCE(vault_capacity, ?) FROM users WHERE user_id = ?",
+                    (self.DEFAULT_VAULT_CAPACITY, user_id),
+                ) as cursor:
+                    upgrade_row = await cursor.fetchone()
+
+                if not upgrade_row:
+                    await db.rollback()
+                    return await ctx.send(
+                        "❌ You don't have an active station profile yet. "
+                        "Run `/profile` or `/mine` first!"
+                    )
+
+                stardust, incubator_slots, vault_capacity = upgrade_row
+
+                if item_id == "incubator_2" and incubator_slots >= 2:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🥚 You already have Incubator Tube II unlocked."
+                    )
+
+                if item_id == "incubator_3" and incubator_slots >= 3:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🥚 You already have Incubator Tube III unlocked."
+                    )
+
+                if item_id == "incubator_3" and incubator_slots < 2:
+                    await db.rollback()
+                    return await ctx.send(
+                        "⚠️ Unlock Incubator Tube II before purchasing Tube III."
+                    )
+
+                if item_id == "vault_expansion" and vault_capacity >= self.MAX_VAULT_CAPACITY:
+                    await db.rollback()
+                    return await ctx.send(
+                        "🔐 Your Stardust vault is already at its 500,000 Stardust maximum."
+                    )
+
+                if stardust < cost:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"💸 **Insufficient Stardust!** You have **{stardust:,}** "
+                        f"Stardust, but this upgrade costs **{cost:,}**."
+                    )
+
+                if item_id == "incubator_2":
+                    await db.execute(
+                        "UPDATE users SET stardust = stardust - ?, incubator_slots = 2 WHERE user_id = ?",
+                        (cost, user_id),
+                    )
+                elif item_id == "incubator_3":
+                    await db.execute(
+                        "UPDATE users SET stardust = stardust - ?, incubator_slots = 3 WHERE user_id = ?",
+                        (cost, user_id),
+                    )
+                else:
+                    await db.execute(
+                        "UPDATE users SET stardust = stardust - ?, vault_capacity = ? WHERE user_id = ?",
+                        (cost, self.MAX_VAULT_CAPACITY, user_id),
+                    )
+
+                await self.record_shop_purchase(db, user_id, item_id, 1)
+                await db.commit()
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 🛠️ **Upgrade Purchased!** "
+                    f"**{item['name']}** is now unlocked for **{cost:,} Stardust**."
+                )
+
+            # Every non-upgrade purchase reaches this point only if the item
+            # exists in the master inventory registry. Narrow the Optional
+            # value here so Pylance can safely type-check all later uses.
+            if item_info is None:
+                await db.rollback()
+                return await ctx.send(
+                    "❌ This item is not registered in the master item registry."
+                )
+
+            max_stack = item_info.get("max_quantity", 1)
 
             if item_id in legacy_columns:
                 column = legacy_columns[item_id]

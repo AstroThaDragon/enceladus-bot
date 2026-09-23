@@ -32,6 +32,7 @@ from pets import (
     NORMAL_EGG_CHANCE,
     roll_normal_exploration_pet_xp,
 )
+from pet_variants import MINING_ESSENCE_CHANCE
 from defense import roll_hazard_defense
 from seasonal_updates.halloween.haunted import (
     resolve_haunted_choice,
@@ -1214,6 +1215,24 @@ class Exploration(commands.Cog):
                     "\n\n📦 **Mineral Overflow:** "
                     + " • ".join(mining_overflow_findings)
                 )
+
+            # Astral Essence is a separate rare mining discovery, independent of
+            # the normal rarity table so it does not replace existing loot.
+            if random.random() < MINING_ESSENCE_CHANCE:
+                added_essence, essence_quantity, essence_max = await add_inventory_item(
+                    db, user_id, "astral_essence", "special", 1
+                )
+                if added_essence:
+                    loot_description += (
+                        f"\n\n✨ **Astral Discovery:** Recovered **Astral Essence**! "
+                        f"({essence_quantity}/{essence_max})"
+                    )
+                else:
+                    new_stardust += 2500
+                    loot_description += (
+                        "\n\n📦 **Astral Essence Overflow:** Your Essence stack is full "
+                        "and the fragment condensed into **+2,500 Stardust** instead."
+                    )
 
             # Halloween bonus resources are independent rolls during the active event.
             halloween_active = halloween_is_active()

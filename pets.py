@@ -11,6 +11,13 @@ from discord.ext import commands, tasks
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
+from pet_variants import (
+    ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME, ASTRAL_ESSENCE_EMOJI,
+    FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
+    HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
+    get_variant_info, get_variant_display, get_variant_ids_for_pet,
+    roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
+)
 
 
 # ============================================================================
@@ -688,7 +695,7 @@ PET_TREAT_XP = 50
 HALLOWEEN_PET_CANDY_XP = 150
 
 # Egg drops are independent bonus rolls during scavenging.
-NORMAL_EGG_CHANCE = 0.15
+NORMAL_EGG_CHANCE = 0.085
 HALLOWEEN_EGG_CHANCE = 1 / 35
 
 INCUBATION_SECONDS = 12 * 60 * 60
@@ -704,8 +711,33 @@ def passive_level_for_pet(level: int) -> int:
     return min(PET_PASSIVE_MAX_LEVEL, max(1, level))
 
 
-def get_pet_definition(pet_type: str):
-    return ALL_PETS.get(pet_type)
+def get_pet_definition(pet_type: str, variant_id: str | None = None):
+    definition = ALL_PETS.get(pet_type)
+    if not definition or not variant_id:
+        return definition
+    variant = get_variant_info(pet_type, variant_id)
+    if not variant:
+        return definition
+    merged = dict(definition)
+    display_name, display_emoji, display_description = get_variant_display(
+        pet_type, definition["name"], variant_id
+    )
+    merged["name"] = display_name
+    merged["emoji"] = display_emoji or definition["emoji"]
+    merged["description"] = display_description or definition["description"]
+    merged["base_name"] = definition["name"]
+    merged["variant_id"] = variant_id
+    return merged
+
+
+async def ensure_pet_variant_schema(db):
+    """Ensure the small variant/fusion migration exists for shared pet helpers."""
+    async with db.execute("PRAGMA table_info(pets)") as cursor:
+        columns = {row[1] async for row in cursor}
+    if "variant_id" not in columns:
+        await db.execute("ALTER TABLE pets ADD COLUMN variant_id TEXT DEFAULT ''")
+    if "fusion_level" not in columns:
+        await db.execute("ALTER TABLE pets ADD COLUMN fusion_level INTEGER DEFAULT 0")
 
 
 def get_haunted_pet_for_location(location_id: str):
@@ -729,6 +761,7 @@ def get_haunted_pet_discovery_message(pet_type: str) -> str:
 
 async def grant_haunted_pet(db, user_id: int, location_id: str):
     """Grant the unique Haunted pet for a location if the user does not own it."""
+    await ensure_pet_variant_schema(db)
     pet_type, definition = get_haunted_pet_for_location(location_id)
     if not pet_type or not definition:
         return None
@@ -780,13 +813,16 @@ def get_passive_value(pet: dict, level: int | None = None) -> float:
 
     passive_level = passive_level_for_pet(level if level is not None else 1)
     index = min(len(values), passive_level) - 1
-    return float(values[index])
+    base_value = float(values[index])
+    fusion_level = max(0, min(5, int(pet.get("fusion_level", pet.get("fusion", 0)) or 0)))
+    return base_value * (1.0 + fusion_level * 0.02)
 
 
 async def get_active_pet(db, user_id: int):
+    await ensure_pet_variant_schema(db)
     async with db.execute(
         """
-        SELECT pet_id, pet_type, pet_stage, nickname, level, xp
+        SELECT pet_id, pet_type, pet_stage, nickname, level, xp, variant_id, fusion_level
         FROM pets
         WHERE user_id = ? AND is_active = 1
         ORDER BY pet_id DESC
@@ -799,13 +835,16 @@ async def get_active_pet(db, user_id: int):
     if not row:
         return None
 
-    pet_id, pet_type, pet_stage, nickname, level, xp = row
-    definition = get_pet_definition(pet_type or pet_stage)
+    pet_id, pet_type, pet_stage, nickname, level, xp, variant_id, fusion_level = row
+    base_pet_type = pet_type or pet_stage
+    definition = get_pet_definition(base_pet_type, variant_id)
     if not definition:
         return {
             "pet_id": pet_id,
-            "pet_type": pet_type or pet_stage,
-            "name": (pet_type or pet_stage or "Unknown Pet").replace("_", " ").title(),
+            "pet_type": base_pet_type,
+            "variant_id": variant_id,
+            "fusion_level": fusion_level or 0,
+            "name": (base_pet_type or "Unknown Pet").replace("_", " ").title(),
             "emoji": "🐾",
             "description": "Unknown pet.",
             "nickname": nickname,
@@ -819,7 +858,9 @@ async def get_active_pet(db, user_id: int):
 
     return {
         "pet_id": pet_id,
-        "pet_type": pet_type,
+        "pet_type": base_pet_type,
+        "variant_id": variant_id,
+        "fusion_level": fusion_level or 0,
         "name": definition["name"],
         "emoji": definition["emoji"],
         "description": definition["description"],
@@ -918,7 +959,7 @@ async def get_active_pet_effects(db, user_id: int):
 
     normal_passive = pet.get("normal_passive")
     if normal_passive:
-        normal_value = get_passive_value({"passive": normal_passive, "level": pet["level"]}, pet["level"])
+        normal_value = get_passive_value({"passive": normal_passive, "level": pet["level"], "fusion_level": pet.get("fusion_level", 0)}, pet["level"])
         normal_effect_id = normal_passive.get("id")
     else:
         normal_value = value
@@ -980,7 +1021,7 @@ async def get_active_pet_effects(db, user_id: int):
 
     # Haunted passives remain separate and are consumed only by Haunted Exploration.
     haunted_passive = pet.get("passive", {}) if pet.get("haunted_location") else {}
-    haunted_value = get_passive_value({"passive": haunted_passive, "level": pet["level"]}, pet["level"]) if haunted_passive else 0.0
+    haunted_value = get_passive_value({"passive": haunted_passive, "level": pet["level"], "fusion_level": pet.get("fusion_level", 0)}, pet["level"]) if haunted_passive else 0.0
     haunted_effect_id = haunted_passive.get("id")
     if haunted_effect_id == "haunted_sanity_reduction":
         effects["haunted_sanity_reduction"] = haunted_value
@@ -1170,10 +1211,12 @@ class ReleaseConfirmationView(discord.ui.View):
                 view=None,
             )
         self.stop()
+        essence_line = "\n✨ **Astral Essence recovered!**" if released.get("essence_awarded") else ""
         await interaction.response.edit_message(
             content=(
                 f"🔴 Released **{released['emoji']} {released['nickname'] or released['name']}** "
-                f"(Level {released['level']}).\n\nThis pet has been permanently removed from your collection."
+                f"(Level {released['level']}).{essence_line}\n\n"
+                "This pet has been permanently removed from your collection."
             ),
             view=None,
         )
@@ -1243,6 +1286,51 @@ class RenamePetModal(discord.ui.Modal):
         )
 
 
+class PetStatsView(discord.ui.View):
+    def __init__(self, cog, user_id, ctx, pets, index=0):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.user_id = user_id
+        self.ctx = ctx
+        self.pets = pets
+        self.index = index
+
+    async def _ensure_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "❌ This pet menu isn't for you.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="◀️ Back to Pets", style=discord.ButtonStyle.primary)
+    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+
+        pets = await self.cog._get_owned_pets(self.user_id)
+        if not pets:
+            self.stop()
+            embed = discord.Embed(
+                title=f"🐾 {self.ctx.author.display_name}'s Pet Collection",
+                description="Your collection is empty!",
+                color=discord.Color.from_rgb(120, 140, 160),
+            )
+            return await interaction.response.edit_message(embed=embed, view=None)
+
+        index = next(
+            (i for i, pet in enumerate(pets) if pet["pet_id"] == self.pets[self.index]["pet_id"]),
+            min(self.index, len(pets) - 1),
+        )
+        self.stop()
+        view = PetManagementView(self.cog, self.user_id, self.ctx, pets, index)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, pets[index], index, len(pets)),
+            view=view,
+        )
+
+
 class PetManagementView(discord.ui.View):
     def __init__(self, cog, user_id, ctx, pets, index=0):
         super().__init__(timeout=600)
@@ -1262,8 +1350,8 @@ class PetManagementView(discord.ui.View):
         previous.disabled = len(self.pets) <= 1
         next_button.disabled = len(self.pets) <= 1
         pet = self.pets[self.index]
-        equip.label = "Unequip Pet" if pet["is_active"] else "Equip Pet"
-        equip.style = discord.ButtonStyle.secondary
+        equip.label = "⭐ Unequip Pet" if pet["is_active"] else "⭐ Equip Pet"
+        equip.style = discord.ButtonStyle.primary
         favorite.label = "🔓 Unfavorite" if pet["is_favorite"] else "🔒 Favorite"
         favorite.style = discord.ButtonStyle.primary
 
@@ -1292,7 +1380,7 @@ class PetManagementView(discord.ui.View):
         if target:
             await target.edit(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
 
-    @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="◀️", style=discord.ButtonStyle.primary, row=2)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
@@ -1300,119 +1388,23 @@ class PetManagementView(discord.ui.View):
         self._sync_buttons()
         await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
 
-    @discord.ui.button(label="🟢 Feed Pet", style=discord.ButtonStyle.success, row=0)
-    async def feed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self._ensure_owner(interaction):
-            return
-        pet = self.pets[self.index]
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            async with db.execute(
-                "SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_id IN (?, ?) AND quantity > 0",
-                (self.user_id, "pet_snack", "halloween_pet_candy"),
-            ) as cursor:
-                owned = {row[0]: row[1] for row in await cursor.fetchall()}
-        options = [item for item in ("pet_snack", "halloween_pet_candy") if owned.get(item, 0) > 0]
-        if not options:
-            return await interaction.response.send_message("❌ You don't have any Pet Treats or Halloween Pet Candy.", ephemeral=True)
-        await interaction.response.send_message(
-            f"🍪 Choose a treat for **{pet['emoji']} {pet['nickname'] or pet['name']}**:",
-            view=FeedTreatView(self.cog, self.user_id, pet["pet_id"], owned, interaction.message, self.ctx),
-            ephemeral=True,
-        )
-
-
-    @discord.ui.button(label="📊 Pet Stats", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="📊 Pet Stats", style=discord.ButtonStyle.primary, row=0)
     async def stats(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
         pet = self.pets[self.index]
-        passive = pet.get("passive", {})
-        normal_passive = pet.get("normal_passive", passive)
-        haunted_passive = pet.get("haunted_passive", {})
-        passive_level = passive_level_for_pet(pet["level"])
-        passive_value = get_passive_value({"passive": passive, "level": pet["level"]}, pet["level"])
-        normal_value = get_passive_value({"passive": normal_passive, "level": pet["level"]}, pet["level"])
-        value_text = (
-            f"{passive_value * 100:.1f}%"
-            if passive_value < 1
-            else f"{passive_value:.2f}"
-        )
-        normal_value_text = (
-            f"{normal_value * 100:.1f}%"
-            if normal_value < 1
-            else f"{normal_value:.2f}"
-        )
-        if pet["pet_type"] in HAUNTED_PETS:
-            source = "Haunted Exploration"
-        elif passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS:
-            source = "Halloween Egg"
-        else:
-            source = "Normal Egg"
-        embed = discord.Embed(
-            title=f"📊 {pet['emoji']} {pet['nickname'] or pet['name']} — Stats",
-            color=discord.Color.from_rgb(120, 140, 160),
-        )
-        embed.add_field(
-            name="📈 Progression",
-            value=(
-                f"**Level:** {pet['level']}\n"
-                f"**XP:** {pet['xp']}/{xp_needed_for_next_level(pet['level'])}\n"
-                f"**Passive Level:** {passive_level}/{PET_PASSIVE_MAX_LEVEL}"
+        await interaction.response.edit_message(
+            embed=self.cog._pet_stats_embed(self.ctx, pet),
+            view=PetStatsView(
+                self.cog,
+                self.user_id,
+                self.ctx,
+                self.pets,
+                self.index,
             ),
-            inline=False,
-        )
-        has_dual_passive = bool(
-            normal_passive
-            and passive
-            and normal_passive.get("id") != passive.get("id")
         )
 
-        if has_dual_passive:
-            embed.add_field(
-                name=f"✨ Normal Passive — {normal_passive.get('name', 'Unknown')}",
-                value=(
-                    f"{normal_passive.get('description', 'No passive description.')}\n"
-                    f"**Current Strength:** {normal_value_text}"
-                ),
-                inline=False,
-            )
-
-            if pet["pet_type"] in HAUNTED_PETS and haunted_passive:
-                secondary_label = "👻 Haunted Passive"
-                secondary_extra = (
-                    f"\n**Location:** {pet.get('haunted_location', 'Associated Haunted location')}"
-                )
-            else:
-                secondary_label = "🎃 Halloween Passive"
-                secondary_extra = ""
-
-            embed.add_field(
-                name=f"{secondary_label} — {passive.get('name', 'Unknown')}",
-                value=(
-                    f"{passive.get('description', 'No passive description.')}\n"
-                    f"**Current Strength:** {value_text}"
-                    f"{secondary_extra}"
-                ),
-                inline=False,
-            )
-        else:
-            embed.add_field(
-                name=f"✨ {passive.get('name', 'Unknown Passive')}",
-                value=(
-                    f"{passive.get('description', 'No passive description.')}\n"
-                    f"**Current Strength:** {value_text}"
-                ),
-                inline=False,
-            )
-        embed.add_field(
-            name="🐣 Origin",
-            value=f"**{source}**\n{'⭐ Equipped' if pet['is_active'] else 'Not equipped'}",
-            inline=False,
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-    @discord.ui.button(label="Equip Pet", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="⭐ Equip Pet", style=discord.ButtonStyle.primary, row=0)
     async def equip(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
@@ -1421,7 +1413,13 @@ class PetManagementView(discord.ui.View):
             changed = await self.cog._unequip_pet(self.user_id, pet["pet_id"])
             if not changed:
                 return await interaction.response.send_message("❌ That pet is no longer equipped.", ephemeral=True)
-            await interaction.response.edit_message(content=None, embed=self.cog._pet_embed(self.ctx, {**pet, "is_active": False}, self.index, len(self.pets)), view=self)
+            self.pets = await self.cog._get_owned_pets(self.user_id)
+            self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), self.index)
+            self._sync_buttons()
+            await interaction.response.edit_message(
+                embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)),
+                view=self,
+            )
         else:
             definition, error = await self.cog._equip_pet(self.user_id, pet["pet_id"])
             if error:
@@ -1430,7 +1428,6 @@ class PetManagementView(discord.ui.View):
             self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), 0)
             self._sync_buttons()
             await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
-
 
     @discord.ui.button(label="🔒 Favorite", style=discord.ButtonStyle.primary, row=1)
     async def favorite(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1443,13 +1440,12 @@ class PetManagementView(discord.ui.View):
         self.pets = await self.cog._get_owned_pets(self.user_id)
         self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), self.index)
         self._sync_buttons()
-        action = "favorited and locked" if favorited else "unfavorited and unlocked"
         await interaction.response.edit_message(
             embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)),
             view=self,
         )
 
-    @discord.ui.button(label="✏️ Rename Pet", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="✏️ Rename Pet", style=discord.ButtonStyle.primary, row=1)
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
@@ -1462,7 +1458,6 @@ class PetManagementView(discord.ui.View):
             self.ctx,
         )
         await interaction.response.send_modal(modal)
-
 
     @discord.ui.button(label="🔴 Release Pet", style=discord.ButtonStyle.danger, row=1)
     async def release(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1485,13 +1480,117 @@ class PetManagementView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="▶️", style=discord.ButtonStyle.primary, row=2)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
         self.index = (self.index + 1) % len(self.pets)
         self._sync_buttons()
         await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+
+
+
+class FusionVariantView(discord.ui.View):
+    def __init__(self, cog, user_id, target_pet_id, base_pet_type, variant_id, ctx):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.target_pet_id = target_pet_id
+        self.base_pet_type = base_pet_type
+        self.variant_id = variant_id
+        self.ctx = ctx
+
+    async def _owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This fusion result isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="🧬 Infuse into Current Pet", style=discord.ButtonStyle.primary)
+    async def infuse(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._owner(interaction):
+            return
+        result = await self.cog._infuse_variant(
+            self.user_id, self.target_pet_id, self.base_pet_type, self.variant_id
+        )
+        self.stop()
+        if result is None:
+            return await interaction.response.edit_message(
+                content="❌ That pet could no longer be found, so the variant was not infused.",
+                view=None,
+            )
+        definition = get_pet_definition(self.base_pet_type, self.variant_id)
+        if not definition:
+            return await interaction.response.edit_message(
+                content="❌ The variant definition could no longer be found.",
+                view=None,
+            )
+        await interaction.response.edit_message(
+            content=(
+                f"🧬 **Variant Infused!**\n\n"
+                f"{definition['emoji']} **{definition['name']}** is now your existing pet's form.\n"
+                f"✨ Level, XP, Fusion, and passive progression were all preserved."
+            ),
+            view=None,
+        )
+
+    @discord.ui.button(label="📦 Keep as Separate Pet", style=discord.ButtonStyle.secondary)
+    async def separate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._owner(interaction):
+            return
+        result = await self.cog._create_variant_pet(
+            self.user_id, self.base_pet_type, self.variant_id
+        )
+        self.stop()
+        if result is None:
+            return await interaction.response.edit_message(
+                content="❌ The variant could not be created as a separate pet.",
+                view=None,
+            )
+        definition = get_pet_definition(self.base_pet_type, self.variant_id)
+        if not definition:
+            return await interaction.response.edit_message(
+                content="❌ The variant definition could no longer be found.",
+                view=None,
+            )
+        await interaction.response.edit_message(
+            content=(
+                f"📦 **Variant Kept Separately!**\n\n"
+                f"{definition['emoji']} **{definition['name']}** was added to your pet collection at Level 1."
+            ),
+            view=None,
+        )
+
+
+class PostFusionConfirmView(discord.ui.View):
+    def __init__(self, cog, ctx, target_pet_id):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.ctx = ctx
+        self.target_pet_id = target_pet_id
+
+    @discord.ui.button(label="Yes, Continue", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("❌ This fusion confirmation isn't for you.", ephemeral=True)
+        self.stop()
+        await interaction.response.defer()
+        await self.cog._execute_pet_fusion(self.ctx, self.target_pet_id)
+        try:
+            await interaction.edit_original_response(view=None)
+        except discord.HTTPException:
+            pass
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("❌ This fusion confirmation isn't for you.", ephemeral=True)
+        self.stop()
+        await interaction.response.edit_message(
+            content="🧬 Fusion cancelled. Your pet and materials were not changed.",
+            view=None,
+        )
 
 
 class Pets(commands.Cog):
@@ -1515,6 +1614,8 @@ class Pets(commands.Cog):
             "pet_type": "TEXT DEFAULT ''",
             "is_active": "INTEGER DEFAULT 0",
             "is_favorite": "INTEGER DEFAULT 0",
+            "variant_id": "TEXT DEFAULT ''",
+            "fusion_level": "INTEGER DEFAULT 0",
         }
 
         for column, definition in additions.items():
@@ -1541,10 +1642,27 @@ class Pets(commands.Cog):
                 egg_id TEXT NOT NULL,
                 started_at REAL NOT NULL,
                 ready_at REAL NOT NULL,
-                notified INTEGER DEFAULT 0
+                notified INTEGER DEFAULT 0,
+                slot_id INTEGER NOT NULL DEFAULT 1
             )
             """
         )
+
+        async with db.execute("PRAGMA table_info(pet_incubators)") as cursor:
+            incubator_columns = {row[1] async for row in cursor}
+
+        if "slot_id" not in incubator_columns:
+            await db.execute(
+                "ALTER TABLE pet_incubators ADD COLUMN slot_id INTEGER NOT NULL DEFAULT 1"
+            )
+
+        async with db.execute("PRAGMA table_info(users)") as cursor:
+            user_columns = {row[1] async for row in cursor}
+
+        if "incubator_slots" not in user_columns:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN incubator_slots INTEGER DEFAULT 1"
+            )
 
         await db.commit()
 
@@ -1573,18 +1691,29 @@ class Pets(commands.Cog):
         ) as cursor:
             return {row[0]: row[1] for row in await cursor.fetchall()}
 
-    async def _incubator_row(self, db, user_id):
+    async def _incubator_rows(self, db, user_id):
         async with db.execute(
             """
-            SELECT incubator_id, egg_id, started_at, ready_at, notified
+            SELECT incubator_id, egg_id, started_at, ready_at, notified, slot_id
             FROM pet_incubators
             WHERE user_id = ?
-            ORDER BY incubator_id DESC
-            LIMIT 1
+            ORDER BY slot_id ASC, incubator_id ASC
             """,
             (user_id,),
         ) as cursor:
-            return await cursor.fetchone()
+            return await cursor.fetchall()
+
+    async def _incubator_row(self, db, user_id):
+        rows = await self._incubator_rows(db, user_id)
+        return rows[-1] if rows else None
+
+    async def _get_incubator_slots(self, db, user_id):
+        async with db.execute(
+            "SELECT COALESCE(incubator_slots, 1) FROM users WHERE user_id = ?",
+            (user_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return max(1, min(3, int(row[0] if row else 1)))
 
     async def _egg_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
@@ -1607,7 +1736,7 @@ class Pets(commands.Cog):
             await self.ensure_schema(db)
             async with db.execute(
                 """
-                SELECT pet_id, pet_type, pet_stage, nickname, level
+                SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level
                 FROM pets
                 WHERE user_id = ? AND COALESCE(pet_type, pet_stage) != 'egg'
                 ORDER BY pet_id
@@ -1619,9 +1748,9 @@ class Pets(commands.Cog):
         choices = []
         pet_counts = {}
 
-        for pet_id, pet_type, pet_stage, nickname, level in rows:
+        for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level in rows:
             pet_type_id = pet_type or pet_stage
-            definition = get_pet_definition(pet_type_id)
+            definition = get_pet_definition(pet_type_id, variant_id)
             if not definition:
                 continue
 
@@ -1684,7 +1813,7 @@ class Pets(commands.Cog):
             await self.ensure_schema(db)
             async with db.execute(
                 """
-                SELECT pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite
+                SELECT pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite, variant_id, fusion_level
                 FROM pets
                 WHERE user_id = ? AND COALESCE(pet_type, pet_stage) != 'egg'
                 ORDER BY pet_id
@@ -1694,14 +1823,16 @@ class Pets(commands.Cog):
                 rows = await cursor.fetchall()
 
         pets = []
-        for pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite in rows:
+        for pet_id, pet_type, pet_stage, nickname, level, xp, is_active, is_favorite, variant_id, fusion_level in rows:
             pet_type_id = pet_type or pet_stage
-            definition = get_pet_definition(pet_type_id)
+            definition = get_pet_definition(pet_type_id, variant_id)
             if not definition:
                 continue
             pets.append({
                 "pet_id": pet_id,
                 "pet_type": pet_type_id,
+                "variant_id": variant_id,
+                "fusion_level": fusion_level or 0,
                 "name": definition["name"],
                 "emoji": definition["emoji"],
                 "description": definition["description"],
@@ -1717,6 +1848,91 @@ class Pets(commands.Cog):
             })
         return pets
 
+    def _pet_stats_embed(self, ctx, pet):
+        level = pet["level"]
+        xp = pet["xp"]
+        passive = pet.get("passive", {})
+        normal_passive = pet.get("normal_passive", passive)
+        haunted_passive = pet.get("haunted_passive", {})
+        passive_level = passive_level_for_pet(level)
+        passive_value = get_passive_value({"passive": passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
+        normal_value = get_passive_value({"passive": normal_passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
+        value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
+        normal_value_text = f"{normal_value * 100:.1f}%" if normal_value < 1 else f"{normal_value:.2f}"
+
+        if pet["pet_type"] in HAUNTED_PETS:
+            source = "Haunted Exploration"
+        elif passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS:
+            source = "Halloween Egg"
+        else:
+            source = "Normal Egg"
+
+        embed = discord.Embed(
+            title=f"📊 {pet['emoji']} {pet['nickname'] or pet['name']} — Stats",
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        embed.add_field(
+            name="📈 Progression",
+            value=(
+                f"**Level:** {level}\n"
+                f"**XP:** {xp}/{xp_needed_for_next_level(level)}\n"
+                f"**Passive Level:** {passive_level}/{PET_PASSIVE_MAX_LEVEL}"
+            ),
+            inline=False,
+        )
+
+        has_dual_passive = bool(
+            normal_passive
+            and passive
+            and normal_passive.get("id") != passive.get("id")
+        )
+
+        if has_dual_passive:
+            embed.add_field(
+                name=f"✨ Normal Passive — {normal_passive.get('name', 'Unknown')}",
+                value=(
+                    f"{normal_passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {normal_value_text}"
+                ),
+                inline=False,
+            )
+
+            if pet["pet_type"] in HAUNTED_PETS and haunted_passive:
+                secondary_label = "👻 Haunted Passive"
+                secondary_extra = (
+                    f"\n**Location:** {pet.get('haunted_location', 'Associated Haunted location')}"
+                )
+            else:
+                secondary_label = "🎃 Halloween Passive"
+                secondary_extra = ""
+
+            embed.add_field(
+                name=f"{secondary_label} — {passive.get('name', 'Unknown')}",
+                value=(
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {value_text}"
+                    f"{secondary_extra}"
+                ),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name=f"✨ {passive.get('name', 'Unknown Passive')}",
+                value=(
+                    f"{passive.get('description', 'No passive description.')}\n"
+                    f"**Current Strength:** {value_text}"
+                ),
+                inline=False,
+            )
+
+        embed.add_field(
+            name="🐣 Origin",
+            value=f"**{source}**\n{'⭐ Equipped' if pet['is_active'] else 'Not equipped'}",
+            inline=False,
+        )
+        embed.set_footer(text="Use ◀️ Back to return to your pet menu.")
+        return embed
+
     def _pet_embed(self, ctx, pet, page, total):
         level = pet["level"]
         xp = pet["xp"]
@@ -1725,8 +1941,8 @@ class Pets(commands.Cog):
         normal_passive = pet.get("normal_passive", passive)
         haunted_passive = pet.get("haunted_passive", {})
         passive_level = passive_level_for_pet(level)
-        passive_value = get_passive_value({"passive": passive, "level": level}, level)
-        normal_value = get_passive_value({"passive": normal_passive, "level": level}, level)
+        passive_value = get_passive_value({"passive": passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
+        normal_value = get_passive_value({"passive": normal_passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
         value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
         normal_value_text = f"{normal_value * 100:.1f}%" if normal_value < 1 else f"{normal_value:.2f}"
         display_name = pet["nickname"] or pet["name"]
@@ -1752,6 +1968,26 @@ class Pets(commands.Cog):
             ),
             inline=False,
         )
+        if pet.get("variant_id"):
+            variant = get_variant_info(pet["pet_type"], pet["variant_id"])
+            if variant:
+                embed.add_field(
+                    name=f"{variant['emoji']} Variant",
+                    value=f"**{variant['name']}**\n{variant['lore']}",
+                    inline=False,
+                )
+
+        fusion_level = int(pet.get("fusion_level", 0) or 0)
+        if fusion_level:
+            bonus = fusion_level * 2
+            embed.add_field(
+                name="🧬 Fusion",
+                value=(
+                    f"**Fusion {fusion_level}/5** • Passive strength **+{bonus}%**\n"
+                    "Further fusions after Fusion 5 only hunt for variants."
+                ),
+                inline=False,
+            )
         has_dual_passive = bool(
             normal_passive
             and passive
@@ -1804,6 +2040,11 @@ class Pets(commands.Cog):
                 f"🍖 Pet Treat — **+{PET_TREAT_XP} XP**\n"
                 f"🎃 Halloween Pet Candy — **+{HALLOWEEN_PET_CANDY_XP} XP**"
             ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🍽️ Feed Your Pet",
+            value="Use **`/feed <pet> <treat> <quantity>`** to give this pet XP.",
             inline=False,
         )
         embed.set_footer(text=f"Pet {page + 1}/{total} • Pets can level beyond Passive Level 5; passive strength caps at 5 for now.")
@@ -2008,7 +2249,7 @@ class Pets(commands.Cog):
             await db.execute("BEGIN IMMEDIATE")
             async with db.execute(
                 """
-                SELECT pet_type, pet_stage, nickname, level, xp, is_active, is_favorite
+                SELECT pet_type, pet_stage, nickname, level, xp, is_active, is_favorite, variant_id, fusion_level
                 FROM pets
                 WHERE user_id = ? AND pet_id = ?
                 LIMIT 1
@@ -2023,10 +2264,19 @@ class Pets(commands.Cog):
                 await db.rollback()
                 return {"protected": True}
             pet_type = row[0] or row[1]
-            definition = get_pet_definition(pet_type)
+            variant_id = row[7] or None
+            definition = get_pet_definition(pet_type, variant_id)
             if not definition:
                 await db.rollback()
                 return None
+
+            essence_awarded = False
+            if random.random() < RELEASE_ESSENCE_CHANCE:
+                added_essence, _quantity, _max_quantity = await add_inventory_item(
+                    db, user_id, ASTRAL_ESSENCE_ID, "special", 1
+                )
+                essence_awarded = added_essence > 0
+
             await db.execute(
                 "DELETE FROM pets WHERE user_id = ? AND pet_id = ?",
                 (user_id, pet_id),
@@ -2040,7 +2290,324 @@ class Pets(commands.Cog):
             "level": row[3] or 1,
             "xp": row[4] or 0,
             "is_active": bool(row[5]),
+            "essence_awarded": essence_awarded,
         }
+
+    async def _infuse_variant(self, user_id, pet_id, base_pet_type, variant_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute(
+                "SELECT pet_type, variant_id FROM pets WHERE user_id = ? AND pet_id = ? LIMIT 1",
+                (user_id, pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row or (row[0] or "") != base_pet_type:
+                await db.rollback()
+                return None
+
+            await db.execute(
+                "UPDATE pets SET variant_id = ? WHERE user_id = ? AND pet_id = ?",
+                (variant_id, user_id, pet_id),
+            )
+            await db.commit()
+
+        return True
+
+    async def _create_variant_pet(self, user_id, base_pet_type, variant_id):
+        definition = get_pet_definition(base_pet_type)
+        variant_info = get_variant_info(base_pet_type, variant_id)
+        if not definition or not variant_info:
+            return None
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+
+            await db.execute(
+                """
+                INSERT INTO pets
+                    (user_id, pet_stage, pet_type, nickname, level, xp, is_active, is_favorite, variant_id, fusion_level)
+                VALUES (?, ?, ?, '', 1, 0, 0, 0, ?, 0)
+                """,
+                (user_id, base_pet_type, base_pet_type, variant_id),
+            )
+            await db.commit()
+
+        return True
+
+    async def _pet_fuse_autocomplete(self, interaction, current):
+        current = (current or "").lower().strip()
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            async with db.execute(
+                """
+                SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite
+                FROM pets
+                WHERE user_id = ? AND COALESCE(pet_type, pet_stage) != 'egg'
+                ORDER BY pet_id
+                """,
+                (interaction.user.id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+
+        for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite in rows:
+            pet_type_id = pet_type or pet_stage
+            if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS:
+                continue
+
+            definition = get_pet_definition(pet_type_id, variant_id)
+            if not definition:
+                continue
+
+            matching_duplicates = sum(
+                1
+                for other_id, other_type, other_stage, _nickname, _level, other_variant_id, _fusion, other_favorite in rows
+                if other_id != pet_id
+                and (other_type or other_stage) == pet_type_id
+                and (other_variant_id or "") == (variant_id or "")
+                and not other_favorite
+            )
+
+            if matching_duplicates < 5:
+                continue
+
+            display_name = nickname or definition["name"]
+            fusion = int(fusion_level or 0)
+            search = (
+                f"{display_name} {definition['name']} {pet_type_id} "
+                f"{pet_id} {fusion} {variant_id or ''}"
+            ).lower()
+            if current and current not in search:
+                continue
+
+            variant_label = f" • {variant_id}" if variant_id else ""
+            choices.append(app_commands.Choice(
+                name=(
+                    f"{definition['emoji']} {display_name}"
+                    f"{variant_label} • Fusion {fusion}/5 • {matching_duplicates} duplicates"
+                )[:100],
+                value=str(pet_id),
+            ))
+
+        return choices[:25]
+
+    @commands.hybrid_command(
+        name="pet_fuse",
+        description="Fuse five matching duplicate pets to strengthen one or hunt for a rare variant.",
+    )
+    @app_commands.describe(pet="Choose the pet you want to fuse.")
+    @app_commands.autocomplete(pet=_pet_fuse_autocomplete)
+    async def pet_fuse(self, ctx: commands.Context, pet: str):
+        await ctx.defer()
+        try:
+            target_pet_id = int(pet)
+        except (TypeError, ValueError):
+            return await ctx.send("❌ That pet selection is invalid.")
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            async with db.execute(
+                "SELECT fusion_level, pet_type, variant_id FROM pets WHERE user_id = ? AND pet_id = ? LIMIT 1",
+                (ctx.author.id, target_pet_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        if not row:
+            return await ctx.send("❌ You don't own that pet.")
+
+        fusion_level = int(row[0] or 0)
+        if fusion_level >= 5:
+            definition = get_pet_definition(row[1] or "", row[2] or None)
+            display = definition["name"] if definition else "this pet"
+            return await ctx.send(
+                f"🧬 **{display} has reached maximum Fusion 5.**\n\n"
+                "Further fusions will **not** increase its passive bonus. "
+                "They only give you another chance to discover a rare variant.\n\n"
+                "This attempt will consume **5 matching duplicates**, **15,000 Stardust**, and **3 Astral Essence**.\n\n"
+                "Continue?",
+                view=PostFusionConfirmView(self, ctx, target_pet_id),
+            )
+
+        return await self._execute_pet_fusion(ctx, target_pet_id)
+
+    async def _execute_pet_fusion(self, ctx: commands.Context, target_pet_id: int):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+
+            async with db.execute(
+                """
+                SELECT pet_id, pet_type, nickname, level, xp, variant_id, fusion_level, is_favorite
+                FROM pets
+                WHERE user_id = ? AND pet_id = ?
+                LIMIT 1
+                """,
+                (ctx.author.id, target_pet_id),
+            ) as cursor:
+                target = await cursor.fetchone()
+
+            if not target:
+                await db.rollback()
+                return await ctx.send("❌ You don't own that pet.")
+
+            pet_type = target[1] or ""
+            if pet_type not in PETS and pet_type not in HALLOWEEN_PETS:
+                await db.rollback()
+                return await ctx.send(
+                    "❌ This pet cannot be fused. Haunted location pets are unique companions."
+                )
+
+            level = int(target[3] or 1)
+            fusion_level = int(target[6] or 0)
+            variant_id = target[5] or ""
+
+            if fusion_level < 5:
+                next_fusion = fusion_level + 1
+                required_level = FUSION_LEVEL_GATES[next_fusion]
+                if level < required_level:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"🔒 **Fusion {next_fusion}** unlocks at **Level {required_level}**. "
+                        f"This pet is currently **Level {level}**."
+                    )
+                cost = FUSION_COSTS[next_fusion]
+                cost_label = f"Fusion {next_fusion}/5"
+            else:
+                next_fusion = 5
+                cost = VARIANT_HUNT_COST
+                cost_label = "Variant Hunt"
+
+            async with db.execute(
+                """
+                SELECT pet_id
+                FROM pets
+                WHERE user_id = ?
+                  AND pet_id != ?
+                  AND pet_type = ?
+                  AND COALESCE(variant_id, '') = ?
+                  AND COALESCE(is_favorite, 0) = 0
+                ORDER BY pet_id
+                LIMIT 5
+                """,
+                (ctx.author.id, target_pet_id, pet_type, variant_id),
+            ) as cursor:
+                duplicate_rows = await cursor.fetchall()
+
+            if len(duplicate_rows) < 5:
+                await db.rollback()
+                variant_text = " with the same variant" if variant_id else ""
+                return await ctx.send(
+                    f"❌ You need **5 non-favorited duplicates** of this pet{variant_text}. "
+                    f"You currently have **{len(duplicate_rows)}/5** available."
+                )
+
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0) FROM users WHERE user_id = ?",
+                (ctx.author.id,),
+            ) as cursor:
+                balance_row = await cursor.fetchone()
+            stardust = int(balance_row[0] or 0) if balance_row else 0
+            if stardust < cost["stardust"]:
+                await db.rollback()
+                return await ctx.send(
+                    f"💸 **Insufficient Stardust!** {cost_label} costs **{cost['stardust']:,}** Stardust. "
+                    f"You have **{stardust:,}**."
+                )
+
+            async with db.execute(
+                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
+                (ctx.author.id, ASTRAL_ESSENCE_ID),
+            ) as cursor:
+                essence_row = await cursor.fetchone()
+            essence_owned = int(essence_row[0] or 0) if essence_row else 0
+            if essence_owned < cost["essence"]:
+                await db.rollback()
+                return await ctx.send(
+                    f"✨ **Not enough Astral Essence!** {cost_label} needs **{cost['essence']}** Essence. "
+                    f"You have **{essence_owned}**."
+                )
+
+            await db.execute(
+                "UPDATE users SET stardust = stardust - ? WHERE user_id = ?",
+                (cost["stardust"], ctx.author.id),
+            )
+            await db.execute(
+                """
+                UPDATE inventory
+                SET quantity = quantity - ?
+                WHERE user_id = ? AND item_id = ?
+                """,
+                (cost["essence"], ctx.author.id, ASTRAL_ESSENCE_ID),
+            )
+            await db.execute(
+                "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
+                (ctx.author.id, ASTRAL_ESSENCE_ID),
+            )
+
+            duplicate_ids = [row[0] for row in duplicate_rows]
+            placeholders = ",".join("?" for _ in duplicate_ids)
+            await db.execute(
+                f"DELETE FROM pets WHERE user_id = ? AND pet_id IN ({placeholders})",
+                [ctx.author.id, *duplicate_ids],
+            )
+
+            if fusion_level < 5:
+                await db.execute(
+                    "UPDATE pets SET fusion_level = ? WHERE user_id = ? AND pet_id = ?",
+                    (next_fusion, ctx.author.id, target_pet_id),
+                )
+
+            discovered_variant = roll_fusion_variant(pet_type, fusion_level, exclude_variant=variant_id)
+            if discovered_variant:
+                from collectibles import record_collectible
+                await record_collectible(
+                    db, self.bot, ctx.author.id,
+                    f"pet_variant:{pet_type}:{discovered_variant}",
+                    category="Pet Variants",
+                )
+
+            await db.commit()
+
+        target_definition = get_pet_definition(pet_type, variant_id)
+        if not target_definition:
+            return await ctx.send("❌ The fused pet definition could no longer be found.")
+
+        if not discovered_variant:
+            if fusion_level < 5:
+                return await ctx.send(
+                    f"🧬 **Fusion complete!** {target_definition['emoji']} **{target_definition['name']}** "
+                    f"is now **Fusion {next_fusion}/5**.\n"
+                    f"✨ Passive strength increased by **+2%**.\n\n"
+                    f"Consumed **5 duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
+                )
+            return await ctx.send(
+                f"🧬 **Variant Hunt complete!** No new variant was discovered this time.\n\n"
+                f"Consumed **5 duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
+            )
+
+        variant_info = get_variant_info(pet_type, discovered_variant)
+        variant_definition = get_pet_definition(pet_type, discovered_variant)
+        if not variant_info or not variant_definition:
+            return await ctx.send("❌ The discovered variant could no longer be loaded.")
+
+        await ctx.send(
+            content=(
+                f"🎉 **RARE VARIANT DISCOVERED!**\n\n"
+                f"{variant_info['emoji']} **{variant_definition['name']}**\n"
+                f"> {variant_info['lore']}\n\n"
+                "What would you like to do with it?\n"
+                "🧬 **Infuse** preserves the current pet's Level, XP, Fusion, and passive progression.\n"
+                "📦 **Keep Separate** creates a fresh Level 1 copy."
+            ),
+            view=FusionVariantView(
+                self, ctx.author.id, target_pet_id, pet_type, discovered_variant, ctx
+            ),
+        )
 
     @commands.hybrid_command(name="pets", description="View and manage your pet collection.")
     async def pets(self, ctx: commands.Context):
@@ -2085,46 +2652,108 @@ class Pets(commands.Cog):
 
     @commands.hybrid_group(
         name="incubator",
-        description="Manage your pet egg incubator.",
+        description="Manage your pet egg incubators.",
         invoke_without_command=True,
     )
     async def incubator(self, ctx: commands.Context):
+        """Show the status of every incubator tube."""
         await ctx.defer()
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
-            await db.execute("BEGIN IMMEDIATE")
-            row = await self._incubator_row(db, ctx.author.id)
+            slots = await self._get_incubator_slots(db, ctx.author.id)
+            rows = await self._incubator_rows(db, ctx.author.id)
             eggs = await self._owned_eggs(db, ctx.author.id)
 
+        by_slot = {int(row[5]): row for row in rows}
         embed = discord.Embed(
-            title=f"🥚 {ctx.author.display_name}'s Pet Incubator",
+            title=f"🥚 {ctx.author.display_name}'s Pet Incubation Bay",
             color=discord.Color.from_rgb(120, 140, 160),
         )
 
-        if row:
-            _incubator_id, egg_id, started_at, ready_at, notified = row
+        tube_titles = ["🧪 TUBE I", "🧪 TUBE II", "🧪 TUBE III"]
+
+        for slot_id in range(1, 4):
+            if slot_id > slots:
+                tube_art = (
+                    "```text\n"
+                    "╭────────╮\n"
+                    "│  🧪    │\n"
+                    "│        │\n"
+                    "│   🔒   │\n"
+                    "│ LOCKED │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "╰────────╯\n"
+                    "```"
+                    "🔒 **Locked**\n"
+                    "Unlock in `/shop` → 🛠️ Upgrades"
+                )
+                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
+                continue
+
+            row = by_slot.get(slot_id)
+            if not row:
+                tube_art = (
+                    "```text\n"
+                    "╭────────╮\n"
+                    "│  🧪    │\n"
+                    "│        │\n"
+                    "│   ·    │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "╰────────╯\n"
+                    "```"
+                    "🟢 **Empty**\n"
+                    "Use `/incubator start <egg>`"
+                )
+                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
+                continue
+
+            _incubator_id, egg_id, _started_at, ready_at, _notified, _slot_id = row
             info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
             remaining = max(0, int(ready_at - time.time()))
 
+            # Fill the lower part of the tube as incubation progresses.
+            progress = max(0.0, min(1.0, 1 - (remaining / INCUBATION_SECONDS)))
+            filled_rows = round(progress * 2)
+            liquid_rows = {
+                "full": "▓▓▓▓▓▓",
+                "empty": "░░░░░░",
+            }
+            liquid = []
+            for row_index in range(2):
+                liquid.append(
+                    liquid_rows["full"] if row_index >= 2 - filled_rows else liquid_rows["empty"]
+                )
+
             if remaining <= 0:
-                status = "✅ **READY TO HATCH!**"
-                instruction = f"Use `/incubator hatch {egg_id}` to reveal your pet!"
+                status = "✨ **READY TO HATCH!**"
+                instruction = f"Use `/incubator hatch {egg_id}`"
             else:
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
-                status = f"⏳ **{hours}h {minutes}m remaining**"
-                instruction = "The incubator will alert you when it's ready."
+                seconds = remaining % 60
+                status = f"⏳ **{hours}h {minutes}m {seconds}s**"
+                instruction = "🔔 Alert when ready"
 
-            embed.description = (
+            tube_art = (
+                "```text\n"
+                "╭────────╮\n"
+                "│  🧪    │\n"
+                "│        │\n"
+               f"│   {info['emoji']}   │\n"
+                "│        │\n"
+               f"│ {liquid[0]} │\n"
+               f"│ {liquid[1]} │\n"
+                "╰────────╯\n"
+                "```"
                 f"{info['emoji']} **{info['name']}**\n"
-                f"{status}\n\n{instruction}"
+                f"{status}\n"
+                f"{instruction}"
             )
-        else:
-            embed.description = (
-                "The incubator is empty. 💤\n\n"
-                "Find an egg during scavenging, then use `/incubator start <egg>`."
-            )
+            embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
 
         if eggs:
             egg_lines = []
@@ -2132,16 +2761,17 @@ class Pets(commands.Cog):
                 info = ITEM_REGISTRY.get(egg_id)
                 if info:
                     egg_lines.append(f"{info['emoji']} **{info['name']}** ×{quantity}")
-            embed.add_field(
-                name="🥚 Eggs in Storage",
-                value="\n".join(egg_lines),
-                inline=False,
-            )
+            if egg_lines:
+                embed.add_field(
+                    name="🥚 Eggs in Storage",
+                    value="\n".join(egg_lines),
+                    inline=False,
+                )
 
-        embed.set_footer(text="Incubation time: 12 hours • Eggs can be hatched after the seasonal event ends.")
+        embed.set_footer(text=f"Unlocked tubes: {slots}/3 • Incubation time: 12 hours")
         await ctx.send(embed=embed)
 
-    @incubator.command(name="start", description="Put an egg into the incubator for 12 hours.")
+    @incubator.command(name="start", description="Put an egg into the first available incubator tube.")
     @app_commands.describe(egg="Choose an egg you own.")
     @app_commands.autocomplete(egg=_egg_autocomplete)
     async def incubator_start(self, ctx: commands.Context, egg: str):
@@ -2155,17 +2785,18 @@ class Pets(commands.Cog):
             await self.ensure_schema(db)
             await db.execute("BEGIN IMMEDIATE")
 
-            existing = await self._incubator_row(db, ctx.author.id)
-            if existing:
-                remaining = max(0, int(existing[3] - time.time()))
-                if remaining > 0:
-                    return await ctx.send(
-                        "⏳ Your incubator is already occupied! "
-                        "Use `/incubator` to check its status."
-                    )
+            slots = await self._get_incubator_slots(db, ctx.author.id)
+            rows = await self._incubator_rows(db, ctx.author.id)
+            occupied_slots = {int(row[5]) for row in rows}
+            available_slot = next(
+                (slot_id for slot_id in range(1, slots + 1) if slot_id not in occupied_slots),
+                None,
+            )
+
+            if available_slot is None:
                 return await ctx.send(
-                    "🥚 Your previous egg is ready to hatch! "
-                    f"Use `/incubator hatch {existing[1]}` before starting another."
+                    "⏳ All unlocked incubator tubes are occupied! "
+                    "Use `/incubator` to check their status."
                 )
 
             async with db.execute(
@@ -2191,23 +2822,23 @@ class Pets(commands.Cog):
             await db.execute(
                 """
                 INSERT INTO pet_incubators
-                    (user_id, egg_id, started_at, ready_at, notified)
-                VALUES (?, ?, ?, ?, 0)
+                    (user_id, egg_id, started_at, ready_at, notified, slot_id)
+                VALUES (?, ?, ?, ?, 0, ?)
                 """,
-                (ctx.author.id, egg, started, ready),
+                (ctx.author.id, egg, started, ready, available_slot),
             )
             await db.commit()
 
         info = ITEM_REGISTRY[egg]
         await ctx.send(
-            f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating!**\n"
-            f"⏳ Incubation time: **12 hours**\n"
+            f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating in Tube {available_slot}!**\n"
+            "⏳ Incubation time: **12 hours**\n"
             "🔔 I'll alert you when it's ready to hatch!\n"
             f"Use `/incubator hatch {egg}` when the timer finishes."
         )
 
     @incubator.command(name="hatch", description="Hatch a ready egg and reveal the pet inside.")
-    @app_commands.describe(egg="Choose the egg currently in your incubator.")
+    @app_commands.describe(egg="Choose the egg currently in an incubator.")
     @app_commands.autocomplete(egg=_egg_autocomplete)
     async def incubator_hatch(self, ctx: commands.Context, egg: str):
         await ctx.defer()
@@ -2215,24 +2846,23 @@ class Pets(commands.Cog):
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
-            row = await self._incubator_row(db, ctx.author.id)
+            rows = await self._incubator_rows(db, ctx.author.id)
 
+            row = next((candidate for candidate in rows if candidate[1] == egg), None)
             if not row:
-                return await ctx.send("❌ Your incubator is empty.")
-
-            _incubator_id, stored_egg, started_at, ready_at, _notified = row
-
-            if stored_egg != egg:
                 return await ctx.send(
-                    f"❌ Your incubator currently contains **{stored_egg}**, not **{egg}**."
+                    f"❌ None of your incubator tubes currently contains **{egg}**."
                 )
+
+            _incubator_id, stored_egg, _started_at, ready_at, _notified, slot_id = row
 
             if time.time() < ready_at:
                 remaining = int(ready_at - time.time())
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
                 return await ctx.send(
-                    f"⏳ That egg isn't ready yet! **{hours}h {minutes}m** remaining."
+                    f"⏳ That egg in **Tube {slot_id}** isn't ready yet! "
+                    f"**{hours}h {minutes}m** remaining."
                 )
 
             pool = EGG_POOLS.get(stored_egg, [])
@@ -2240,7 +2870,8 @@ class Pets(commands.Cog):
                 return await ctx.send("❌ This egg currently has no pets configured.")
 
             pet_type = random.choice(pool)
-            definition = get_pet_definition(pet_type)
+            variant_id = roll_hatched_variant(pet_type)
+            definition = get_pet_definition(pet_type, variant_id)
             if not definition:
                 return await ctx.send("❌ This egg points to a pet that is not currently configured.")
 
@@ -2253,17 +2884,33 @@ class Pets(commands.Cog):
             await db.execute(
                 """
                 INSERT INTO pets
-                    (user_id, pet_stage, pet_type, nickname, level, xp, is_active)
-                VALUES (?, ?, ?, '', 1, 0, ?)
+                    (user_id, pet_stage, pet_type, nickname, level, xp, is_active, variant_id, fusion_level)
+                VALUES (?, ?, ?, '', 1, 0, ?, ?, 0)
                 """,
-                (ctx.author.id, pet_type, pet_type, 0 if has_active else 1),
+                (ctx.author.id, pet_type, pet_type, 0 if has_active else 1, variant_id or ""),
             )
+
+            variant_discovered = False
+            if variant_id:
+                from collectibles import record_collectible
+                await record_collectible(
+                    db, self.bot, ctx.author.id,
+                    f"pet_variant:{pet_type}:{variant_id}",
+                    category="Pet Variants",
+                )
+                variant_discovered = True
+
+            essence_awarded = False
+            if random.random() < HATCH_ESSENCE_CHANCE:
+                added_essence, _quantity, _max_quantity = await add_inventory_item(
+                    db, ctx.author.id, ASTRAL_ESSENCE_ID, "special", 1
+                )
+                essence_awarded = added_essence > 0
             await db.execute(
                 "DELETE FROM pet_incubators WHERE incubator_id = ?",
                 (row[0],),
             )
 
-            # Hatching a Halloween Egg permanently unlocks the Haunting Friend background.
             if stored_egg == "halloween_egg":
                 achievements_cog = self.bot.get_cog("Achievements")
                 if achievements_cog:
@@ -2279,6 +2926,16 @@ class Pets(commands.Cog):
             if not has_active else
             " Use `/pets` to manage and equip your new companion!"
         )
+        discovery_lines = ""
+        if variant_discovered:
+            variant_info = get_variant_info(pet_type, variant_id)
+            discovery_lines = (
+                f"\n\n🎉 **RARE VARIANT DISCOVERED!** {variant_info['emoji']} **{variant_info['name']}**\n"
+                f"> {variant_info['lore']}"
+                if variant_info else ""
+            )
+        if essence_awarded:
+            discovery_lines += "\n✨ **Astral Essence recovered!**"
 
         await ctx.send(
             f"{ctx.author.mention} 🐣 **EGG HATCHED!**\n\n"
@@ -2287,7 +2944,8 @@ class Pets(commands.Cog):
             f"✨ **Passive:** {definition['passive']['name']}\n"
             f"_{definition['passive']['description']}_\n\n"
             f"📈 **Level 1** • Passive Level **1/{PET_PASSIVE_MAX_LEVEL}**\n"
-            f"{active_note}"
+            f"🥚 Hatched from **Tube {slot_id}**\n"
+            f"{active_note}{discovery_lines}"
         )
 
     @tasks.loop(minutes=1)

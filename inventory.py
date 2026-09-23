@@ -299,6 +299,7 @@ ITEM_REGISTRY = {
 
     # Legendary Loot
     "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. Required to craft higher-tier exploration upgrades."},
+    "astral_essence": {"name": "Astral Essence", "emoji": "✨", "max_quantity": 99, "type": "Special", "desc": "A concentrated fragment of strange stellar energy used to fuse duplicate pets and hunt for rare pet variants."},
     "quantum_battery": {"name": "Quantum Battery", "emoji": EMOJIS.get("quantum_battery", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Materials & Minerals
@@ -1744,6 +1745,37 @@ class Inventory(commands.Cog):
         )
         embed.add_field(name="⛏️ Mining", value=f"`{mining or 0}/{max_mining_charges}` charges\n{cooldown(last_mined)}", inline=True)
         embed.add_field(name="🛠️ Scavenging", value=f"`{scavenging or 0}/{max_scavenge_charges}` charges\n{cooldown(last_scavenged)}", inline=True)
+        # Haunted Sanity is only shown while the Halloween event is active.
+        # Keep the Haunted import local to avoid the inventory/haunted import cycle.
+        if halloween_season.is_active():
+            try:
+                from seasonal_updates.halloween.haunted import (
+                    get_or_create_profile,
+                    sanity_percent,
+                )
+
+                async with aiosqlite.connect(self.get_db_path()) as haunted_db:
+                    haunted_profile = await get_or_create_profile(
+                        haunted_db,
+                        user_id,
+                    )
+                    sanity_value = sanity_percent(haunted_profile["sanity"])
+
+                sanity_label = (
+                    "💀 **Critical**"
+                    if sanity_value <= 25
+                    else "🟡 **Unsteady**"
+                    if sanity_value <= 50
+                    else "🟢 **Stable**"
+                )
+                embed.add_field(
+                    name="🧠 Sanity",
+                    value=f"`{sanity_value}/100`\n{sanity_label}",
+                    inline=True,
+                )
+            except Exception:
+                pass
+
         if (hp or 0) <= 0:
             recovery_date = knocked_out_until or "revived"
 

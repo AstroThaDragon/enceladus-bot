@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
+from pet_variants import build_variant_collectibles
 
 
 async def ensure_collectible_tables(db):
@@ -57,6 +58,7 @@ class Collectibles(commands.Cog):
         # Each seasonal module can add its own category later.
         categories = {
             "🎃 Halloween": get_halloween_collectibles(),
+            "🐾 Pet Variants": build_variant_collectibles(),
         }
 
         pages = []
