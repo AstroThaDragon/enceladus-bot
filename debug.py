@@ -97,7 +97,6 @@ class Debug(commands.Cog):
             return await ctx.send("❌ Choose an amount from 1 to 1,000,000.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
-        import aiosqlite
         async with aiosqlite.connect(db_path) as db:
             await db.execute("INSERT OR IGNORE INTO users (user_id, stardust) VALUES (?, 0)", (member.id,))
             await db.execute("UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?", (amount, member.id))
@@ -118,7 +117,6 @@ class Debug(commands.Cog):
             return await ctx.send("❌ Choose a quantity from 1 to 100.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
-        import aiosqlite
         item_type = ITEM_REGISTRY[item_id]["type"].lower().replace(" ", "_")
         async with aiosqlite.connect(db_path) as db:
             await db.execute("""
@@ -131,6 +129,63 @@ class Debug(commands.Cog):
             await db.commit()
         await ctx.send(f"📦 Granted **{quantity}× {ITEM_REGISTRY[item_id]['name']}** to {member.mention} for testing.", ephemeral=True)
 
+    @debug.command(name="pet", description="Grant a configured pet to a member for testing.")
+    @commands.has_permissions(administrator=True)
+    async def pet(self, ctx, member: discord.Member, pet_type: str, level: int = 1, active: bool = True):
+        if not await self.require_access(ctx):
+            return
+
+        from pets import ALL_PETS, get_pet_definition
+
+        pet_type = pet_type.lower().strip()
+        if pet_type not in ALL_PETS:
+            return await ctx.send(
+                "❌ Unknown pet type. Use the pet's configured ID, such as `space_cat`.",
+                ephemeral=True,
+            )
+
+        if level < 1 or level > 100:
+            return await ctx.send("❌ Choose a pet level from 1 to 100.", ephemeral=True)
+
+        definition = get_pet_definition(pet_type)
+        if not definition:
+            return await ctx.send("❌ That pet is not currently configured.", ephemeral=True)
+
+        db_path = ECONOMY_DB_NAME
+        async with aiosqlite.connect(db_path) as db:
+            pets_cog = self.bot.get_cog("Pets")
+            if pets_cog is not None:
+                await pets_cog.ensure_schema(db)
+
+            if active:
+                await db.execute(
+                    "UPDATE pets SET is_active = 0 WHERE user_id = ?",
+                    (member.id,),
+                )
+
+            await db.execute(
+                """
+                INSERT INTO pets
+                    (user_id, pet_stage, pet_type, nickname, level, xp, is_active, is_favorite, variant_id, fusion_level)
+                VALUES (?, ?, ?, '', ?, 0, ?, 0, '', 0)
+                """,
+                (
+                    member.id,
+                    pet_type,
+                    pet_type,
+                    level,
+                    1 if active else 0,
+                ),
+            )
+            await db.commit()
+
+        active_note = " and equipped it" if active else ""
+        await ctx.send(
+            f"🐾 Granted **{definition['emoji']} {definition['name']}** "
+            f"(level {level}) to {member.mention}{active_note} for testing.",
+            ephemeral=True,
+        )
+
     @debug.command(name="ready", description="Clear a mining or scavenging cooldown for testing.")
     @commands.has_permissions(administrator=True)
     async def ready(self, ctx, member: discord.Member, activity: str):
@@ -141,7 +196,6 @@ class Debug(commands.Cog):
             return await ctx.send("❌ Activity must be `mine` or `scavenge`.", ephemeral=True)
         column = "last_mined" if activity == "mine" else "last_scavenged"
         db_path = ECONOMY_DB_NAME
-        import aiosqlite
         async with aiosqlite.connect(db_path) as db:
             await db.execute(f"UPDATE users SET {column} = 0 WHERE user_id = ?", (member.id,))
             await db.commit()
@@ -153,7 +207,6 @@ class Debug(commands.Cog):
         if not await self.require_access(ctx):
             return
         db_path = ECONOMY_DB_NAME
-        import aiosqlite
         async with aiosqlite.connect(db_path) as db:
             async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (member.id,)) as cursor:
                 row = await cursor.fetchone()
@@ -171,7 +224,6 @@ class Debug(commands.Cog):
         if hp < 1 or hp > 100:
             return await ctx.send("❌ Choose an HP value from 1 to 100.", ephemeral=True)
         db_path = ECONOMY_DB_NAME
-        import aiosqlite
         async with aiosqlite.connect(db_path) as db:
             await db.execute("UPDATE users SET hp = ?, max_hp = MAX(COALESCE(max_hp, 100), ?) WHERE user_id = ?", (hp, hp, member.id))
             await db.commit()
