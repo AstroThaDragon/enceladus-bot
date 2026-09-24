@@ -160,10 +160,20 @@ class Fun(commands.Cog):
 
     @app_commands.command(name="echo", description="Have Enceladus repeat after you!")
     @app_commands.describe(message="What should Enceladus say?", channel="Optional: Which channel should it speak in?")
-    async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
+    async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None):
         target_channel = channel or interaction.channel
+
+        if not isinstance(target_channel, (discord.TextChannel, discord.Thread)):
+            return await interaction.response.send_message(
+                "❌ I couldn't find a valid text channel to echo into.",
+                ephemeral=True
+            )
+
         await target_channel.send(message)
-        await interaction.response.send_message(f"Echoed into {target_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(
+            f"Echoed into {target_channel.mention}",
+            ephemeral=True
+        )
 
     @commands.hybrid_command(name="slap", description="Slap a member with a random object!")
     async def slap(self, ctx, member: discord.Member):
@@ -337,7 +347,7 @@ class Fun(commands.Cog):
             await ctx.send("🌌 Something went wrong in the asteroid belt.")
     
     @commands.hybrid_command(name="furryrate", description="Check the local fluff levels!")
-    async def furryrate(self, ctx, member: discord.Member = None):
+    async def furryrate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
         percent = random.randint(0, 100)
         
@@ -357,7 +367,7 @@ class Fun(commands.Cog):
         await ctx.send(f"📊 **Furry Meter for {member.mention}:**\n**[{'█' * (percent // 10)}{'░' * (10 - (percent // 10))}]** {percent}%\n✨ **Diagnosis:** {status}")
 
     @commands.hybrid_command(name="freakyrate", description="Check the local freak-o-meter levels!")
-    async def freakyrate(self, ctx, member: discord.Member = None):
+    async def freakyrate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
         percent = random.randint(0, 100)
         
@@ -384,7 +394,7 @@ class Fun(commands.Cog):
         )
 
     @commands.hybrid_command(name="iqrate", description="Measure your brain power (or lack thereof)!")
-    async def iqrate(self, ctx, member: discord.Member = None):
+    async def iqrate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
         
         iq = random.randint(30, 160)
@@ -414,7 +424,7 @@ class Fun(commands.Cog):
         )
 
     @commands.hybrid_command(name="aurarate", description="Calculate your current aura levels with a reason!")
-    async def aurarate(self, ctx, member: discord.Member = None):
+    async def aurarate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
 
         if random.random() < 0.05:
@@ -505,7 +515,7 @@ class Fun(commands.Cog):
         )
 
     @commands.hybrid_command(name="cringerate", description="How much did you just make the chat physically recoil?")
-    async def cringerate(self, ctx, member: discord.Member = None):
+    async def cringerate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
         percent = random.randint(0, 100)
         
@@ -539,7 +549,7 @@ class Fun(commands.Cog):
         )
 
     @commands.hybrid_command(name="coolrate", description="Check your ice-cold factor!")
-    async def coolrate(self, ctx, member: discord.Member = None):
+    async def coolrate(self, ctx, member: discord.Member | None = None):
         member = member or ctx.author
         percent = random.randint(0, 100)
         

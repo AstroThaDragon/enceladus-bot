@@ -13,6 +13,8 @@ import aiosqlite
 from datetime import datetime, time, timezone, timedelta
 import pytz
 from database import init_db
+from leveling import Leveling
+from typing import cast
 
 load_dotenv()
 
@@ -186,6 +188,10 @@ async def check_bump_timer():
                 print(f"[BUMP LOOP ERROR]: No channel found for {row[1]}")
                 return
 
+            if not isinstance(channel, discord.abc.Messageable):
+                print(f"[BUMP LOOP ERROR]: Channel {row[1]} is not messageable")
+                return
+
             bump_role_id = "1295212860720418887"
 
             reminder_embed = discord.Embed(
@@ -240,6 +246,8 @@ async def stargazing_alert():
     channel = bot.get_channel(channel_id)
     
     if channel:
+        if not isinstance(channel, discord.abc.Messageable):
+            return
         url = "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fin-the-sky.org%2Frss.php%3Ffeed%3Dupcoming"
         
         try:
@@ -267,6 +275,9 @@ async def stargazing_alert():
 # --- EVENTS ---
 @bot.event
 async def on_ready():
+    if bot.user is None:
+        return
+    
     print(f'Logged in as {bot.user.name}')
     await init_bump_db() 
     await init_fun_db() 
@@ -382,7 +393,8 @@ async def on_message(message):
         await message.channel.send(thanks_text)
 
         if user_obj:
-            leveling_cog = bot.get_cog('Leveling')
+            leveling_cog = cast(Leveling, bot.get_cog("Leveling"))
+
             if leveling_cog:
                 await leveling_cog.add_xp(user_obj, 400)
             else:
@@ -409,6 +421,8 @@ async def on_member_join(member):
 
     channel = bot.get_channel(1117377155496673330)
     if channel:
+        if not isinstance(channel, discord.abc.Messageable):
+            return
         count = member.guild.member_count
         if 11 <= (count % 100) <= 13:
             suffix = 'th'
@@ -453,6 +467,8 @@ async def on_member_remove(member):
 
     channel = bot.get_channel(1117377155496673330)
     if channel:
+        if not isinstance(channel, discord.abc.Messageable):
+            return
         count = member.guild.member_count
         content_text = f"Sorry to see you go, {member.name}!"
         
@@ -482,6 +498,10 @@ async def on_member_update(before, after):
     if before.premium_since is None and after.premium_since is not None:
         channel = bot.get_channel(1117417170545160222)
         if channel:
+
+            if not isinstance(channel, discord.abc.Messageable):
+                return
+            
             boost_count = after.guild.premium_subscription_count
             if boost_count < 2: next_level = 2 - boost_count
             elif boost_count < 7: next_level = 7 - boost_count
@@ -513,12 +533,16 @@ async def on_raw_reaction_add(payload):
         return
 
     channel = bot.get_channel(payload.channel_id)
+
     if channel is None:
         try:
             channel = await bot.fetch_channel(payload.channel_id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
             print(f"[VAULT ERROR]: Could not access channel {payload.channel_id}: {e}")
             return
+
+    if not isinstance(channel, discord.abc.Messageable):
+        return
 
     if not hasattr(channel, "is_nsfw"):
         return
@@ -556,12 +580,20 @@ async def on_raw_reaction_add(payload):
                 return
 
             vault_channel = bot.get_channel(VAULT_CHANNEL_ID)
+
             if vault_channel is None:
                 try:
                     vault_channel = await bot.fetch_channel(VAULT_CHANNEL_ID)
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
                     print(f"[VAULT ERROR]: Could not access vault channel {VAULT_CHANNEL_ID}: {e}")
                     return
+
+            if not isinstance(vault_channel, discord.abc.Messageable):
+                print(
+                    f"[VAULT ERROR]: Configured vault channel {VAULT_CHANNEL_ID} "
+                    "is not a messageable channel."
+                )
+                return
 
             embed = discord.Embed(
                 description=message.content,
@@ -620,7 +652,11 @@ async def nasa(interaction: discord.Interaction):
                 
                 if media_type == 'video':
                     if img_url:
-                        embed.description += f"\n\n**Watch the video here:**\n{img_url}"
+                        embed.description = (
+                            f"{desc}\n\n"
+                            f"🔗 [View on NASA APOD]({page_url})"
+                            f"\n\n**Watch the video here:**\n{img_url}"
+                        )
                 elif img_url:
                     embed.set_image(url=img_url)
                 

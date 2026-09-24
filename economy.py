@@ -2985,6 +2985,11 @@ class Economy(commands.Cog):
         eastern = pytz.timezone("US/Eastern")
         cutoff_date = eastern.localize(datetime(2026, 9, 10))
 
+        if not isinstance(ctx.author, discord.Member):
+            return await ctx.send(
+                "❌ I couldn't determine your server membership."
+            )
+
         joined_at = ctx.author.joined_at
 
         if joined_at is None:

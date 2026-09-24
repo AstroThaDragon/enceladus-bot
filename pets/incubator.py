@@ -7,6 +7,9 @@ import aiosqlite
 import discord
 from discord.ext import commands
 
+from typing import cast
+from achievements import Achievements
+
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
 from .variants import (
@@ -17,11 +20,15 @@ from .variants import (
     roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
 )
 from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from achievements import Achievements
 from .config import *
 from .core import *
 
 class PetIncubatorMixin:
-    bot: discord.Client
+    bot: commands.Bot
 
     if TYPE_CHECKING:
         async def ensure_schema(
@@ -177,7 +184,10 @@ class PetIncubatorMixin:
             )
 
             if stored_egg == "halloween_egg":
-                achievements_cog = self.bot.get_cog("Achievements")
+                achievements_cog = cast(
+                    Achievements | None,
+                    self.bot.get_cog("Achievements"),
+                )
                 if achievements_cog:
                     await achievements_cog.add_halloween_hatch_progress(
                         ctx.author.id,
