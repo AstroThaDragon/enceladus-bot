@@ -116,7 +116,7 @@ async def equip_weapon(db, user_id, weapon_id):
 class Defense(commands.Cog):
     def __init__(self, bot): self.bot = bot
 
-    @commands.hybrid_group(name="defense", description="Manage your equipped defensive weapon.", invoke_without_command=True) # pyright: ignore[reportCallIssue]
+    @commands.hybrid_group(name="defense", description="Manage your equipped defensive weapon.", invoke_without_command=True)
     async def defense(self, ctx):
         await ctx.defer()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
