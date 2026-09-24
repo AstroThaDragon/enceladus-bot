@@ -365,7 +365,8 @@ class CauldronView(discord.ui.View):
         button: discord.ui.Button,
     ):
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
         await interaction.response.edit_message(view=self)
 
 
@@ -474,10 +475,11 @@ class SeasonalCraftingView(discord.ui.View):
         else:
             await interaction.response.send_message("❌ The Ritual Table is not loaded.", ephemeral=True)
 
-    @discord.ui.button(label="Close", emoji="✖️", style=discord.ButtonStyle.danger, row=1)
-    async def close_button(self, interaction, button):
+    @discord.ui.button(label="Close", emoji="❌", style=discord.ButtonStyle.danger, row=1)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
         await interaction.response.edit_message(view=self)
 
 

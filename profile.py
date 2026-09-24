@@ -195,7 +195,7 @@ class Profile(commands.Cog):
 
     @commands.hybrid_command(name="profile", description="View your cosmic station profile.")
     @app_commands.describe(member="The user whose profile you want to view")
-    async def profile(self, ctx: commands.Context, member: discord.Member = None):
+    async def profile(self, ctx: commands.Context, member: discord.Member | None = None):
         target = member or ctx.author
         await ctx.defer()
 
@@ -353,10 +353,10 @@ class Profile(commands.Cog):
         mod_role_id = int(os.getenv("MOD_ROLE_ID", "0"))
         admin_role_id = int(os.getenv("ADMIN_ROLE_ID", "0"))
 
-        has_staff_role = any(
-            role.id in {mod_role_id, admin_role_id}
-            for role in ctx.author.roles
-        )
+        has_staff_role = isinstance(ctx.author, discord.Member) and any(
+                role.id in {mod_role_id, admin_role_id}
+                for role in ctx.author.roles
+            )
 
         if not (is_owner or has_staff_role):
             return

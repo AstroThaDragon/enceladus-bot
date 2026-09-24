@@ -282,17 +282,18 @@ class FontPreviewSelect(discord.ui.Select):
         percentage = max(0, min(percentage, 1))
 
         current_role_name = "No Rank"
-        for lvl, rid in sorted(self.cog.level_roles.items(), reverse=True):
-            if rid == 0: continue
-            role = member.get_role(rid)
-            if role:
-                current_role_name = role.name
-                break
+        if isinstance(member, discord.Member):
+            for lvl, rid in sorted(self.cog.level_roles.items(), reverse=True):
+                if rid == 0: continue
+                role = member.get_role(rid)
+                if role:
+                    current_role_name = role.name
+                    break
 
         dragon_rank = "0"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=2) as response:
+                async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=aiohttp.ClientTimeout(total=2)) as response:
                     if response.status == 200:
                         data = await response.json()
                         for i, entry in enumerate(data):
@@ -327,17 +328,18 @@ class FontPreviewSelect(discord.ui.Select):
         badge_size = (45, 45)
 
         try:
-            if member.get_role(STARBORN_ROLE_ID) and os.path.exists("icons/starborn_icon.png"):
-                background.paste(Editor("icons/starborn_icon.png").resize(badge_size), (30, 40)) 
-            if member.get_role(OWNER_ROLE_ID) and os.path.exists("icons/owner_icon.png"):
-                background.paste(Editor("icons/owner_icon.png").resize(badge_size), (30, 170)) 
-            elif member.get_role(ADMIN_ROLE_ID) and os.path.exists("icons/admin_icon.png"):
-                background.paste(Editor("icons/admin_icon.png").resize(badge_size), (30, 170))
-            elif member.get_role(MOD_ROLE_ID) and os.path.exists("icons/mod_icon.png"):
-                background.paste(Editor("icons/mod_icon.png").resize(badge_size), (30, 170))
-            if member.get_role(self.cog.WATCHLIST_ROLE_ID) and os.path.exists("icons/watchlist_icon.png"):
-                background.paste(Editor("icons/watchlist_icon.png").resize(badge_size), (102, 10))
-        except Exception: 
+            if isinstance(member, discord.Member):
+                if member.get_role(STARBORN_ROLE_ID) and os.path.exists("icons/starborn_icon.png"):
+                    background.paste(Editor("icons/starborn_icon.png").resize(badge_size), (30, 40))
+                if member.get_role(OWNER_ROLE_ID) and os.path.exists("icons/owner_icon.png"):
+                    background.paste(Editor("icons/owner_icon.png").resize(badge_size), (30, 170))
+                elif member.get_role(ADMIN_ROLE_ID) and os.path.exists("icons/admin_icon.png"):
+                    background.paste(Editor("icons/admin_icon.png").resize(badge_size), (30, 170))
+                elif member.get_role(MOD_ROLE_ID) and os.path.exists("icons/mod_icon.png"):
+                    background.paste(Editor("icons/mod_icon.png").resize(badge_size), (30, 170))
+                if member.get_role(self.cog.WATCHLIST_ROLE_ID) and os.path.exists("icons/watchlist_icon.png"):
+                    background.paste(Editor("icons/watchlist_icon.png").resize(badge_size), (102, 10))
+        except Exception:
             pass
 
         active_font_path = "fonts/ComicRelief-Regular.ttf"
@@ -392,31 +394,34 @@ class FontPreviewSelect(discord.ui.Select):
                     img.putalpha(a)
                 return Editor(img).resize(icon_size)
 
+            def has_role(role_id: int) -> bool:
+                return isinstance(member, discord.Member) and member.get_role(role_id) is not None
+
             if os.path.exists("icons/sword_icon.png"):
-                background.paste(get_icon("icons/sword_icon.png", bool(member.get_role(SWORD_ROLE_ID))), (current_icon_x, icon_y))
+                background.paste(get_icon("icons/sword_icon.png", has_role(SWORD_ROLE_ID)), (current_icon_x, icon_y))
                 current_icon_x += 60
-                    
+
             if os.path.exists("icons/dragon_icon.png"):
-                background.paste(get_icon("icons/dragon_icon.png", bool(member.get_role(DRAGON_ROLE_ID))), (current_icon_x, icon_y))
+                background.paste(get_icon("icons/dragon_icon.png", has_role(DRAGON_ROLE_ID)), (current_icon_x, icon_y))
                 current_icon_x += 60
-                    
+
             cookie_x = current_icon_x
             if os.path.exists("icons/cookie_icon.png"):
                 background.paste(Editor("icons/cookie_icon.png").resize(icon_size), (cookie_x, icon_y))
-                text_x = cookie_x + 40 
+                text_x = cookie_x + 40
                 if streak_number >= 3 and os.path.exists("icons/fire_icon.png"):
                     background.paste(Editor("icons/fire_icon.png").resize((45, 45)), (text_x, icon_y - 18))
                 background.text((text_x + 22, icon_y - 0), f"{streak_number}", font=font_tiny, color="white", align="center", stroke_width=st_width, stroke_fill=st_col)
 
             if os.path.exists("icons/booster_icon.png"):
-                has_booster = bool(member.get_role(self.cog.BOOSTER_ROLE_ID))
+                has_booster = has_role(self.cog.BOOSTER_ROLE_ID)
                 img = Image.open("icons/booster_icon.png").convert("RGBA")
                 if not has_booster:
                     r, g, b, a = img.split()
                     a = a.point(lambda p: p * 0.3)
                     img.putalpha(a)
                 background.paste(Editor(img).resize((35, 35)), (230, 232))
-        except Exception: 
+        except Exception:
             pass
 
         background.text((550, 50), "Rank", font=font_small, color="white", stroke_width=st_width, stroke_fill=st_col)
@@ -426,7 +431,7 @@ class FontPreviewSelect(discord.ui.Select):
         background.text((230, 130), f"{member.name}", font=font_medium, color="white", stroke_width=st_width, stroke_fill=st_col)
         background.text((230, 95), f"{current_role_name}", font=font_small, color="#d3d3d3", stroke_width=st_width, stroke_fill=st_col)
 
-        is_glowing = member.get_role(self.cog.BOOSTER_ROLE_ID) and (booster_glow == 'on')
+        is_glowing = has_role(self.cog.BOOSTER_ROLE_ID) and (booster_glow == 'on')
         if is_glowing:
             background.rectangle((223, 178), width=614, height=49, fill=(160, 32, 240, 140), radius=15)
             background.rectangle((225, 180), width=610, height=45, fill=(0, 242, 254, 180), radius=13)
@@ -695,7 +700,7 @@ class Leveling(commands.Cog):
             await db.execute("DETACH DATABASE economy")
 
         if expired_users:
-            print(f"[Leveling] Cleaned up {len(expired_users)} departed user(s).")
+            print(f"[Leveling] Cleaned up {len(list(expired_users))} departed user(s).")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -755,7 +760,7 @@ class Leveling(commands.Cog):
             await self._update_member_roles(message.author, new_level)
 
     @commands.hybrid_command(name="rank", description="Check your or another member's level!")
-    async def rank(self, ctx, member: discord.Member = None):
+    async def rank(self, ctx, member: discord.Member | None = None):
         await ctx.defer() 
         member = member or ctx.author
         try:
@@ -795,7 +800,7 @@ class Leveling(commands.Cog):
             dragon_rank = "0"
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=5) as response:
+                    async with session.get("https://draconova-production.up.railway.app/leaderboard", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
                             data = await response.json()
                             for i, entry in enumerate(data):
@@ -1060,7 +1065,7 @@ class Leveling(commands.Cog):
         app_commands.Choice(name="On", value="on"),
         app_commands.Choice(name="Off", value="off"),
     ])
-    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] = None, glow_toggle: app_commands.Choice[str] = None):
+    async def customize(self, ctx, color_hex: Optional[str] = None, background_url: Optional[str] = None, font_choice: app_commands.Choice[str] | None = None, glow_toggle: app_commands.Choice[str] | None = None):
         if not color_hex and not background_url and not font_choice and not glow_toggle: 
             return await ctx.send("Provide a hex color, image URL, pick a font, or toggle your glow!", ephemeral=True)
             
@@ -1142,6 +1147,15 @@ class Leveling(commands.Cog):
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         synced_count = 0
+
+        if not interaction.guild:
+            await interaction.followup.send("This command can only be used in a server.", ephemeral=True)
+            return
+
+        guild = interaction.guild
+
+        for member in guild.members:
+            if member.bot: continue
         
         async with aiosqlite.connect(self.db_path) as db:
             for member in interaction.guild.members:
@@ -1175,7 +1189,12 @@ class Leveling(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def purge_left_members(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        
+
+        if not interaction.guild:
+            await interaction.followup.send("This command can only be used in a server.", ephemeral=True)
+            return
+
+        guild = interaction.guild
         from database import ECONOMY_DB_NAME
 
         async with aiosqlite.connect(self.db_path) as db:
@@ -1190,7 +1209,7 @@ class Leveling(commands.Cog):
                 user_id = row[0]
 
                 # Check if the member is still in the guild
-                if interaction.guild.get_member(user_id) is None:
+                if guild.get_member(user_id) is None:
                     await db.execute(
                         "DELETE FROM economy.inventory WHERE user_id = ?",
                         (user_id,)
@@ -1215,7 +1234,7 @@ class Leveling(commands.Cog):
 
             await db.commit()
             await db.execute("DETACH DATABASE economy")
-            
+
         await interaction.followup.send(f"✅ Cleaned up {deleted_count} former members from the database!", ephemeral=True)
 
     @commands.hybrid_command(name="reset", description="Reset a user's Enceladus data.")
@@ -1263,12 +1282,16 @@ class Leveling(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def font_preview_setup(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="Rank Card Font Previewer! 🌠",
+            title="Rank Card Font Previewer! 🌌",
             description="Use the dropdown menu below to test out any of our custom fonts available! It will generate a private preview card just for you so you can see how your name and levels look before choosing.",
             color=discord.Color.purple()
         )
-        await interaction.channel.send(embed=embed, view=FontView(self))
-        await interaction.response.send_message("✅ Font preview menu deployed!", ephemeral=True)
+
+        if isinstance(interaction.channel, discord.abc.Messageable):
+            await interaction.channel.send(embed=embed, view=FontView(self))
+            await interaction.response.send_message("✅ Font preview menu deployed!", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Unable to send messages in this channel.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))

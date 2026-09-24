@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
+from seasonal_updates.halloween.haunted import HAUNTED_IMPOSSIBLE_DISCOVERIES
 
 ACHIEVEMENTS = {
     "halloween_half": {
@@ -637,12 +638,14 @@ class Achievements(commands.Cog):
                 if location_data:
                     achievement_id, needed, title_id, background_id = location_data
                     async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
-                        count = (await c.fetchone())[0]
+                        row = await c.fetchone()
+                        count = row[0] if row else 0
                     if count >= needed and await self._grant_haunted_achievement(db, user_id, achievement_id, title_id, background_id):
                         unlocked.append(achievement_id)
 
                 async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
-                    total = (await c.fetchone())[0]
+                        total_row = await c.fetchone()
+                        total = total_row[0] if total_row else 0
                 if total >= 46 and await self._grant_haunted_achievement(db, user_id, "haunted_all_discoveries", "title_i_shouldnt_have_looked"):
                     unlocked.append("haunted_all_discoveries")
 
@@ -673,7 +676,8 @@ class Achievements(commands.Cog):
                 VALUES (?, ?, ?) ON CONFLICT(user_id, achievement_id)
                 DO UPDATE SET progress = progress + excluded.progress""", (user_id, progress_id, amount))
             async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
-                progress = (await c.fetchone())[0]
+                row = await c.fetchone()
+                progress = row[0] if row else 0
             unlocked = []
             for achievement_id, threshold, title_id in HAUNTED_CRAFTING_ACHIEVEMENTS[station]:
                 if progress >= threshold and await self._grant_haunted_achievement(db, user_id, achievement_id, title_id):
@@ -809,7 +813,8 @@ class Achievements(commands.Cog):
                 "SELECT COUNT(*) FROM collectibles WHERE user_id = ? AND category = 'Halloween'",
                 (user_id,),
             ) as cursor:
-                found = (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                found = row[0] if row else 0
 
         embed = discord.Embed(
             title=f"🏆 {ctx.author.display_name}'s Achievements",
@@ -862,11 +867,13 @@ class Achievements(commands.Cog):
                 location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
                 needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]
                 async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
-                    count = (await c.fetchone())[0]
+                    row = await c.fetchone()
+                    count = row if row else 0
                 progress = f"Progress: **{min(count, needed)}/{needed}**"
             elif achievement_id == "haunted_all_discoveries":
                 async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
-                    count = (await c.fetchone())[0]
+                    row = await c.fetchone()
+                    count = row if row else 0
                 progress = f"Progress: **{min(count, 46)}/46**"
             elif achievement_id in {"haunted_first_discovery", "haunted_impossible", "haunted_worth_it", "haunted_unwell", "haunted_other_side"}:
                 progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
