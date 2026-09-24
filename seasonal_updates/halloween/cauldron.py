@@ -210,6 +210,49 @@ for _recipe in CAULDRON_RECIPES.values():
         },
     )
 
+CAULDRON_FLAVOR_TEXT = {
+    "calming_draught": [
+        "The cauldron settles into a gentle simmer. For once, whatever is inside seems almost peaceful.",
+        "The brew glows softly as the final ingredient dissolves. The whispers around the cauldron fade to a distant murmur.",
+    ],
+    "warding_incense": [
+        "The wax hisses as the mixture takes shape. The candles around you suddenly burn a little steadier.",
+        "A thin ring of smoke curls from the cauldron and refuses to cross the edge of your workspace.",
+    ],
+    "third_eye_tonic": [
+        "The mixture briefly opens what looks suspiciously like an eye. It blinks once. You decide that's probably fine.",
+        "The tonic clears to a glassy violet. For a moment, you can see something standing behind you. Then it's gone.",
+    ],
+    "gravekeepers_elixir": [
+        "The brew sinks into a deep, earthy black. The cauldron gives a quiet knock from somewhere beneath the surface.",
+        "A chill rolls across the room as the elixir finishes. The smell of fresh-turned soil lingers in the air.",
+    ],
+    "hexbreaker_tonic": [
+        "The mixture snaps with tiny sparks as the final ward takes hold. Whatever curse was watching seems to look away.",
+        "A bitter green flame dances across the brew before vanishing without a trace.",
+    ],
+    "phantom_breath": [
+        "The vapor coils upward, briefly forming the outline of a face before slipping into the bottle.",
+        "Cold mist spills over the rim. Something unseen exhales back at you from inside the cauldron.",
+    ],
+    "witches_remedy": [
+        "The herbs turn the brew a surprisingly comforting green. The cauldron smells almost normal. Almost.",
+        "The mixture gives one final bubble and releases a warm herbal scent... followed by a faint whisper in an unknown language.",
+    ],
+    "bellward_brew": [
+        "The bell fragment sinks beneath the surface. A deep chime echoes from somewhere behind you, but the cauldron is completely still.",
+        "A single clear bell tone rings as the brew settles. Nothing nearby appears to have moved.",
+    ],
+    "nightmare_nectar": [
+        "The cauldron gurgles as the nightshade dissolves. For a moment, its surface reflects a moon that isn't in the sky.",
+        "The nectar comes together with an unsettling sweetness. Something in the room suddenly feels much closer than before.",
+    ],
+    "spectral_solvent": [
+        "The mixture turns transparent, revealing pale shapes drifting beneath the surface before they dissolve away.",
+        "The solvent gives off a cold blue shimmer. The residue around the cauldron briefly disappears entirely.",
+    ],
+}
+
 CAULDRON_RESULT_ITEMS = {
     recipe["result"]: recipe
     for recipe in CAULDRON_RECIPES.values()
@@ -516,7 +559,8 @@ class Cauldron(commands.Cog):
         embed = discord.Embed(
             title="🧙 The Witch's Cauldron",
             description=(
-                "*Something bubbles ominously inside...*\n\n"
+                "*Something bubbles ominously inside...*\n"
+                "*Something beneath the surface knocks three times.*\n\n"
                 "Turn your Haunted Ingredients into strange brews and "
                 "ritual supplies.\n\n"
                 "🧪 **Brew** — Choose something to make\n"
@@ -542,6 +586,7 @@ class Cauldron(commands.Cog):
         embed = discord.Embed(
             title="🧪 Brew at the Cauldron",
             description=(
+                "*The liquid inside bubbles without any heat.*\n\n"
                 "Choose a recipe below. Your ingredients are checked again "
                 "when you brew, so you cannot spend the same ingredients twice."
             ),
@@ -693,7 +738,10 @@ class Cauldron(commands.Cog):
             )
             return
 
+        import random
+        flavor = random.choice(CAULDRON_FLAVOR_TEXT.get(recipe_id, ["The cauldron gives a final, unsettling bubble as the brew settles."]))
         description = (
+            f"*{flavor}*\n\n"
             f"You brewed **{recipe['emoji']} {recipe['name']} ×1**!\n\n"
             f"{recipe['description']}\n\n"
             f"🧪 **Effect:** `{recipe['effect']['type']}`"

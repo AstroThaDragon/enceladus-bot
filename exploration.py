@@ -1884,7 +1884,7 @@ class Exploration(commands.Cog):
                 )
                 if added_egg:
                     pet_findings.append(
-                        f"{egg_info['emoji']} {egg_info['name']} ×{added_egg} — use `/incubator start {egg_id}`"
+                        f"{egg_info['emoji']} **You've found a {egg_info['name']}!** — use `/incubator start {egg_id}`"
                     )
                 else:
                     pet_findings.append(
@@ -2066,7 +2066,7 @@ class Exploration(commands.Cog):
                 )
             if pet_findings:
                 bonus_sections.append(
-                    "🐾 **Pet Find:** " + " • ".join(pet_findings)
+                    "\n".join(pet_findings)
                 )
             if scavenge_charge_saved:
                 bonus_sections.append(

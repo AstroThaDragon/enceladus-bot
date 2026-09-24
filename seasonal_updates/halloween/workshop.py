@@ -155,6 +155,49 @@ for _recipe in WORKSHOP_RECIPES.values():
     )
 
 
+WORKSHOP_FLAVOR_TEXT = {
+    "ghost_radio": [
+        "You reconnect the wiring and give the radio a cautious tap. Static floods the speaker, followed by a voice that definitely wasn't there before.",
+        "The radio crackles to life. Between bursts of static, someone quietly says your name.",
+    ],
+    "mascot_tracker": [
+        "The tracker chirps once. Its display immediately points toward something moving where nothing should be.",
+        "You tighten the last screw. The tracker locks onto a signal that keeps changing locations without moving.",
+    ],
+    "room_314_key": [
+        "The rebuilt key clicks into place. Somewhere nearby, an elevator arrives at a floor that doesn't exist.",
+        "The key turns smoothly. You hear a distant hotel door unlock, despite being nowhere near a hotel.",
+    ],
+    "fog_lantern": [
+        "The lantern flickers on, cutting a clean hole through the fog. Something retreats just beyond its light.",
+        "The repaired lantern burns with a pale glow. The surrounding mist seems reluctant to come any closer.",
+    ],
+    "spectral_receiver": [
+        "The receiver hums as the final connection is made. A second voice appears beneath the static, speaking in reverse.",
+        "The dial spins on its own before settling on a frequency that shouldn't exist.",
+    ],
+    "security_monitor": [
+        "The monitor sputters to life. Its camera feed shows this room from an angle where no camera exists.",
+        "The screen clears. For a second, the hallway feed shows someone standing behind you. When you turn around, nobody is there.",
+    ],
+    "yellow_halls_beacon": [
+        "The fluorescent tube flickers twice before staying on. The endless yellow walls suddenly feel a little farther away.",
+        "The beacon hums to life. Somewhere beyond the walls, something answers with another fluorescent buzz.",
+    ],
+    "highway_payphone_kit": [
+        "The repaired parts fit together. The dead payphone rings immediately. You wisely let it ring.",
+        "The payphone gives a burst of static before displaying a number that isn't on any map.",
+    ],
+    "drowned_flood_lamp": [
+        "The lamp sputters through a final spark and shines through the gloom. Water drips from it, though the casing is sealed.",
+        "The flood lamp comes alive with a cold beam. Somewhere in the darkness, something splashes away.",
+    ],
+    "campground_static_filter": [
+        "The filter hums steadily as the static fades. For a moment, the silence sounds much worse.",
+        "You finish the final connection. The radio clears just enough for a distant voice to whisper, 'Don't listen.'",
+    ],
+}
+
 def ingredient_name(item_id):
     return ITEM_REGISTRY.get(item_id, {}).get("name", item_id.replace("_", " ").title())
 
@@ -264,7 +307,8 @@ class Workshop(commands.Cog):
         embed = discord.Embed(
             title="🔧 Haunted Workshop",
             description=(
-                "Bolts, wires, dead electronics, and things that definitely should not be plugged in.\n\n"
+                "Bolts, wires, dead electronics, and things that definitely should not be plugged in.\n"
+                "*Something in the static clicks when you get close.*\n\n"
                 "Choose something to assemble below."
             ),
             color=discord.Color.dark_purple(),
@@ -328,7 +372,10 @@ class Workshop(commands.Cog):
         if achievements_cog:
             await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "workshop")
 
+        import random
+        flavor = random.choice(WORKSHOP_FLAVOR_TEXT.get(recipe_id, ["The finished device gives an unsettling little hum as it comes to life."]))
         await interaction.response.send_message(
+            f"*{flavor}*\n\n"
             f"🔧 **Assembly complete!** You built **{recipe['emoji']} {recipe['name']} ×1**.",
             ephemeral=True,
         )
@@ -344,7 +391,7 @@ class Workshop(commands.Cog):
         await ctx.defer()
         embed = discord.Embed(
             title="🔧 Haunted Workshop",
-            description="A workbench covered in scavenged parts. Something here has definitely been assembled before.",
+            description="A workbench covered in scavenged parts. Something here has definitely been assembled before.\n\n*Loose wires twitch as you approach. You swear that radio wasn't turned on a moment ago.*",
             color=discord.Color.dark_purple(),
         )
         await ctx.send(

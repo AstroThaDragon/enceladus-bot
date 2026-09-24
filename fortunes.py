@@ -24,11 +24,11 @@ RARITY_WEIGHTS = {
 }
 
 HALLOWEEN_RARITY_WEIGHTS = {
-    "common": 55,
-    "uncommon": 38,
+    "common": 45,
+    "uncommon": 33,
     "rare": 24,
     "legendary": 10,
-    "void": 9
+    "void": 12
 }
 
 CHRISTMAS_RARITY_WEIGHTS = {
@@ -414,18 +414,21 @@ class Fortunes(commands.Cog):
             self._user_locks[user_id] = lock
         return lock
 
-    async def _has_solar_phoenix(self, db, user_id: int) -> bool:
+    async def _has_solar_phoenix(self, user_id: int) -> bool:
         """Return whether the user currently has Solar Phoenix equipped."""
-        async with db.execute(
-            """
-            SELECT 1
-            FROM pets
-            WHERE user_id = ? AND is_active = 1 AND pet_type = 'solar_phoenix'
-            LIMIT 1
-            """,
-            (user_id,),
-        ) as cursor:
-            return await cursor.fetchone() is not None
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            async with db.execute(
+                """
+                SELECT 1
+                FROM pets
+                WHERE user_id = ? AND is_active = 1 AND pet_type = 'solar_phoenix'
+                LIMIT 1
+                """,
+                (user_id,),
+            ) as cursor:
+                return await cursor.fetchone() is not None
 
     async def _try_phoenix_rescue(self, db, user_id: int, current_month: str) -> bool:
         """
@@ -434,7 +437,7 @@ class Fortunes(commands.Cog):
         This is intentionally transactional: callers should already be inside
         their user lock and database transaction when invoking it.
         """
-        if not await self._has_solar_phoenix(db, user_id):
+        if not await self._has_solar_phoenix(user_id):
             return False
 
         async with db.execute(

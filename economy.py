@@ -109,6 +109,11 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
     "wiring",
 }
 
+# Inventory items that can be sold individually through /shop_sell.
+# Their Stardust values are defined by ITEM_REGISTRY in inventory.py.
+SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword'}
+
+
 class ShopCategorySelect(discord.ui.Select):
     def __init__(self, shop_view):
         self.shop_view = shop_view
@@ -2253,6 +2258,7 @@ class Economy(commands.Cog):
             "scrap_metal": "🔩",
             "nuts_bolts": "🔧",
             "wiring": "🧵",
+            "time_crystal": "💎",
             # Haunted / seasonal materials
             "haunted_circuit": "⚡",
             "screaming_crystal": "💎",
@@ -2293,6 +2299,28 @@ class Economy(commands.Cog):
         choices = []
         sellable_rows = []
 
+        # Time Crystals are stored on the users table rather than the inventory
+        # table, so add them to the sell list separately.
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                time_crystal_row = await cursor.fetchone()
+
+        time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
+        if time_crystal_quantity > 0:
+            time_crystal_info = ITEM_REGISTRY.get("time_crystal", {})
+            display_name = time_crystal_info.get("name", "Dilated Time Crystal")
+            search_text = f"{display_name} time_crystal".lower()
+            if not current or current in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"💎 {display_name} (x{time_crystal_quantity})",
+                        value="time_crystal"
+                    )
+                )
+
         for item_id, owned_quantity, item_type in rows:
             info = ITEM_REGISTRY.get(item_id)
             if not info:
@@ -2306,8 +2334,9 @@ class Economy(commands.Cog):
                 "Crafting Material",
                 "Haunted Ingredient",
             }
+            is_sellable_item = item_id in SELLABLE_ITEM_IDS and bool(info.get("sell_price"))
 
-            if not is_space_junk and not is_material:
+            if not is_space_junk and not is_material and not is_sellable_item:
                 continue
 
             if is_space_junk:
@@ -2386,7 +2415,7 @@ class Economy(commands.Cog):
 
     @commands.hybrid_command(
         name="shop_sell",
-        description="Sell Space Junk, ores, and crafting materials for Stardust."
+        description="Sell Time Crystals, Space Junk, materials, medical supplies, recharge items, and equipment for Stardust."
     )
     @app_commands.describe(
         item="Choose an item to sell, sell all normal Space Junk, or sell all normal ores & materials.",
@@ -2547,7 +2576,49 @@ class Economy(commands.Cog):
 
             # ------------------------------------------------------------------
             # Option C: Sell a selected quantity of one sellable item.
+            # Time Crystals are stored on users.time_crystals, not inventory.
             # ------------------------------------------------------------------
+            if target_item == "time_crystal":
+                async with db.execute(
+                    "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    time_crystal_row = await cursor.fetchone()
+
+                owned_quantity = time_crystal_row[0] if time_crystal_row else 0
+                if owned_quantity <= 0:
+                    await db.rollback()
+                    return await ctx.send("❌ You don't have any **Dilated Time Crystals** to sell.")
+
+                if quantity > owned_quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"❌ You only have **{owned_quantity}x** **Dilated Time Crystals** in your inventory."
+                    )
+
+                unit_payout = int(ITEM_REGISTRY.get("time_crystal", {}).get("sell_price", 0) or 0)
+                if unit_payout <= 0:
+                    await db.rollback()
+                    return await ctx.send("❌ Dilated Time Crystals do not currently have a sell price.")
+                payout = unit_payout * quantity
+                remaining = owned_quantity - quantity
+
+                await db.execute(
+                    "UPDATE users SET time_crystals = ? WHERE user_id = ?",
+                    (remaining, user_id)
+                )
+                await db.execute(
+                    "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                    (payout, user_id)
+                )
+                await db.commit()
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity}x Dilated Time Crystal** "
+                    f"for ✨ **{payout:,} Stardust**!\n"
+                    f"📦 **Remaining:** **{remaining}x**"
+                )
+
             async with db.execute(
                 """
                 SELECT quantity, item_type
@@ -2584,11 +2655,14 @@ class Economy(commands.Cog):
             else:
                 unit_payout = int(info.get("sell_price", 0) or 0)
                 unit_candy_reward = 0
-                if unit_payout <= 0 or info.get("type") not in {
-                    "Mineral",
-                    "Crafting Material",
-                    "Haunted Ingredient",
-                }:
+                if unit_payout <= 0 or (
+                    info.get("type") not in {
+                        "Mineral",
+                        "Crafting Material",
+                        "Haunted Ingredient",
+                    }
+                    and target_item not in SELLABLE_ITEM_IDS
+                ):
                     await db.rollback()
                     return await ctx.send("❌ That item cannot be sold.")
 

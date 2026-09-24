@@ -99,6 +99,33 @@ for _recipe in RITUAL_RECIPES.values():
     )
 
 
+RITUAL_FLAVOR_TEXT = {
+    "warding_sigil": [
+        "The final line closes the sigil. The candles lean away from it as though something invisible just stepped closer.",
+        "The chalk flashes white for an instant. Whatever was lingering nearby suddenly feels much farther away.",
+    ],
+    "mirror_ward": [
+        "The mirror catches a reflection that isn't yours. It vanishes the moment the ward is complete.",
+        "The glass fogs from the inside before clearing. For a heartbeat, the reflection smiles a little too late.",
+    ],
+    "dead_air_charm": [
+        "The static dies completely. The silence that replaces it feels almost louder.",
+        "The charm absorbs the last crackle of interference. Somewhere nearby, something tries to speak and cannot.",
+    ],
+    "empty_room_token": [
+        "The final mark is drawn across the token. For a split second, the room around you disappears, leaving only an empty hallway.",
+        "The token goes cold in your hand. Somewhere far away, a hotel room door clicks shut.",
+    ],
+    "watchers_eye": [
+        "The chalk circle closes. The plastic eye twitches once before going perfectly still. You have the uncomfortable feeling that something is now watching with you.",
+        "The eye rolls toward the darkest corner of the room and stops. You decide not to ask what it saw.",
+    ],
+    "containment_mark": [
+        "The final line of chalk burns black. Whatever the mark was meant to contain seems to notice it.",
+        "The mark seals with a sharp crack. Something beneath the table knocks once, then goes silent.",
+    ],
+}
+
 def item_name(item_id):
     return ITEM_REGISTRY.get(item_id, {}).get("name", item_id.replace("_", " ").title())
 
@@ -190,7 +217,8 @@ class RitualTable(commands.Cog):
         embed = discord.Embed(
             title="🕯️ Ritual Table",
             description=(
-                "The surface is covered in chalk marks, candle wax, and diagrams you do not remember drawing.\n\n"
+                "The surface is covered in chalk marks, candle wax, and diagrams you do not remember drawing.\n"
+                "*The candles are already lit. You don't remember lighting them.*\n\n"
                 "Choose a ritual to perform."
             ),
             color=discord.Color.dark_purple(),
@@ -247,7 +275,10 @@ class RitualTable(commands.Cog):
 
             await db.commit()
 
+        import random
+        flavor = random.choice(RITUAL_FLAVOR_TEXT.get(recipe_id, ["The final mark settles into place. The room feels subtly different afterward."]))
         await interaction.response.send_message(
+            f"*{flavor}*\n\n"
             f"🕯️ **Ritual complete.** You created **{recipe['emoji']} {recipe['name']} ×1**.\n\n"
             f"*{recipe['description']}*",
             ephemeral=True,
@@ -264,7 +295,7 @@ class RitualTable(commands.Cog):
         await ctx.defer()
         embed = discord.Embed(
             title="🕯️ Ritual Table",
-            description="A place for things that are too strange for a workshop and too solid for a cauldron.",
+            description="A place for things that are too strange for a workshop and too solid for a cauldron.\n\n*The candles are already lit. You don't remember lighting them.*",
             color=discord.Color.dark_purple(),
         )
         await ctx.send(embed=embed, view=RitualView(self, ctx.author.id))

@@ -1730,6 +1730,33 @@ class Pets(commands.Cog):
             ))
         return choices[:25]
 
+    async def _incubator_egg_autocomplete(self, interaction, current):
+        current = (current or "").lower().strip()
+        action = getattr(getattr(interaction, "namespace", None), "action", None)
+        action = str(action).lower().strip() if action else ""
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            if action == "hatch":
+                rows = await self._incubator_rows(db, interaction.user.id)
+                egg_ids = [row[1] for row in rows]
+            else:
+                owned = await self._owned_eggs(db, interaction.user.id)
+                egg_ids = list(owned.keys())
+
+        choices = []
+        for egg_id in egg_ids:
+            info = ITEM_REGISTRY.get(egg_id)
+            if not info:
+                continue
+            if current and current not in f"{info['name']} {egg_id}".lower():
+                continue
+            choices.append(app_commands.Choice(
+                name=f"{info['emoji']} {info['name']}",
+                value=egg_id,
+            ))
+        return choices[:25]
+
     async def _pet_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
@@ -2050,13 +2077,15 @@ class Pets(commands.Cog):
         embed.set_footer(text=f"Pet {page + 1}/{total} • Pets can level beyond Passive Level 5; passive strength caps at 5 for now.")
         return embed
 
-    async def _feed_specific_pet(self, user_id, pet_id, treat):
+    async def _feed_specific_pet(self, user_id, pet_id, treat, quantity=1):
         xp_amounts = {
             "pet_snack": PET_TREAT_XP,
             "halloween_pet_candy": HALLOWEEN_PET_CANDY_XP,
         }
         if treat not in xp_amounts:
             return None, "❌ That isn't a valid pet treat."
+        if not isinstance(quantity, int) or quantity < 1 or quantity > 99:
+            return None, "❌ Quantity must be between **1** and **99**."
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
@@ -2088,9 +2117,13 @@ class Pets(commands.Cog):
             ) as cursor:
                 treat_row = await cursor.fetchone()
 
-            if not treat_row or treat_row[0] <= 0:
+            owned_quantity = int(treat_row[0])
+            if owned_quantity < quantity:
                 await db.rollback()
-                return None, f"❌ You don't have any **{ITEM_REGISTRY[treat]['name']}**!"
+                return None, (
+                    f"❌ You only have **{owned_quantity}** "
+                    f"of **{ITEM_REGISTRY[treat]['name']}**, but you tried to use **{quantity}**."
+                )
 
             pet = {
                 "pet_id": row[0],
@@ -2105,26 +2138,40 @@ class Pets(commands.Cog):
                 "passive": definition.get("passive", {}),
             }
             base_xp = xp_amounts[treat]
-            treat_bonus = 0.0
-            if pet["passive"].get("id") == "treat_xp_bonus":
-                treat_bonus = get_passive_value(pet, pet["level"])
-            xp_amount = int(base_xp * (1 + treat_bonus))
+            old_level = pet["level"]
+            new_level = old_level
+            new_xp = pet["xp"]
+            xp_amount = 0
+
+            # Apply treats one at a time so a large quantity behaves exactly
+            # like feeding the same treats individually, including passive
+            # bonuses changing when the pet levels up.
+            for _ in range(quantity):
+                treat_bonus = 0.0
+                if pet["passive"].get("id") == "treat_xp_bonus":
+                    treat_bonus = get_passive_value(
+                        {
+                            "passive": pet["passive"],
+                            "level": new_level,
+                            "fusion_level": pet.get("fusion_level", 0),
+                        },
+                        new_level,
+                    )
+                single_xp = int(base_xp * (1 + treat_bonus))
+                xp_amount += single_xp
+                new_xp += single_xp
+                while new_xp >= xp_needed_for_next_level(new_level):
+                    new_xp -= xp_needed_for_next_level(new_level)
+                    new_level += 1
 
             await db.execute(
-                "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
-                (user_id, treat),
+                "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
+                (quantity, user_id, treat),
             )
             await db.execute(
                 "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
                 (user_id, treat),
             )
-
-            old_level = pet["level"]
-            new_level = old_level
-            new_xp = pet["xp"] + xp_amount
-            while new_xp >= xp_needed_for_next_level(new_level):
-                new_xp -= xp_needed_for_next_level(new_level)
-                new_level += 1
 
             await db.execute(
                 "UPDATE pets SET level = ?, xp = ? WHERE pet_id = ? AND user_id = ?",
@@ -2135,12 +2182,62 @@ class Pets(commands.Cog):
         return {
             "pet": pet,
             "treat": ITEM_REGISTRY[treat],
+            "quantity": quantity,
             "xp_amount": xp_amount,
             "old_level": old_level,
             "new_level": new_level,
             "leveled_up": new_level > old_level,
             "passive_level": passive_level_for_pet(new_level),
         }, None
+
+    @commands.hybrid_command(
+        name="feed",
+        description="Feed a pet treats to give it XP.",
+    )
+    @app_commands.describe(
+        pet="Choose the pet to feed.",
+        treat="Choose the treat to use.",
+        quantity="How many treats to use (1-99).",
+    )
+    @app_commands.autocomplete(pet=_pet_autocomplete, treat=_treat_autocomplete)
+    async def feed(
+        self,
+        ctx: commands.Context,
+        pet: str,
+        treat: str,
+        quantity: int,
+    ):
+        await ctx.defer()
+
+        try:
+            pet_id = int(pet)
+        except (TypeError, ValueError):
+            return await ctx.send("❌ Please choose a valid pet from the autocomplete list.")
+
+        result, error = await self._feed_specific_pet(
+            ctx.author.id,
+            pet_id,
+            treat.lower().strip(),
+            quantity,
+        )
+        if error:
+            return await ctx.send(error)
+        if result is None:
+            return await ctx.send("❌ Feeding failed because no result was returned.")
+
+        fed_pet = result["pet"]
+        level_line = ""
+        if result["leveled_up"]:
+            level_line = (
+                f"\n🎉 **Level Up!** Your pet reached **Level {result['new_level']}**!"
+                f"\n✨ Passive is now **Level {result['passive_level']}/{PET_PASSIVE_MAX_LEVEL}**."
+            )
+
+        await ctx.send(
+            f"{fed_pet['emoji']} **{fed_pet['nickname'] or fed_pet['name']}** enjoyed "
+            f"**{result['quantity']}× {result['treat']['name']}**!\n"
+            f"✨ **+{result['xp_amount']} Pet XP**{level_line}"
+        )
 
     async def _equip_pet(self, user_id, pet_id):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
@@ -2619,7 +2716,7 @@ class Pets(commands.Cog):
                 description=(
                     "Your collection is empty!\n\n"
                     "🥚 Eggs can be discovered during scavenging.\n"
-                    "⏳ Use `/incubator start` to begin incubation."
+                    "⏳ Use `/incubator` with **Start incubation** to begin incubation."
                 ),
                 color=discord.Color.from_rgb(120, 140, 160),
             )
@@ -2650,14 +2747,48 @@ class Pets(commands.Cog):
         except discord.HTTPException:
             pass
 
-    @commands.hybrid_group(
+    @commands.hybrid_command(
         name="incubator",
-        description="Manage your pet egg incubators.",
-        invoke_without_command=True,
+        description="View and manage your pet egg incubators.",
     )
-    async def incubator(self, ctx: commands.Context):
-        """Show the status of every incubator tube."""
+    @app_commands.describe(
+        action="Choose Start to begin incubation or Hatch to claim a ready egg.",
+        egg="Choose the egg to start or hatch.",
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="Start incubation", value="start"),
+            app_commands.Choice(name="Hatch ready egg", value="hatch"),
+        ]
+    )
+    @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
+    async def incubator(
+        self,
+        ctx: commands.Context,
+        action: str | None = None,
+        egg: str | None = None,
+    ):
+        """View the incubator bay, start an egg, or hatch a ready egg."""
         await ctx.defer()
+
+        action = action.lower().strip() if action else None
+        egg = egg.lower().strip() if egg else None
+
+        if action == "start":
+            if not egg:
+                return await ctx.send("❌ Choose an egg to start incubating.")
+            return await self._incubator_start(ctx, egg)
+
+        if action == "hatch":
+            if not egg:
+                return await ctx.send("❌ Choose an egg to hatch.")
+            return await self._incubator_hatch(ctx, egg)
+
+        if action is not None:
+            return await ctx.send("❌ Choose **Start** or **Hatch** as the incubator action.")
+
+        if egg:
+            return await ctx.send("❌ Choose **Start** or **Hatch** when providing an egg.")
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
@@ -2706,7 +2837,7 @@ class Pets(commands.Cog):
                     "╰────────╯\n"
                     "```"
                     "🟢 **Empty**\n"
-                    "Use `/incubator start <egg>`"
+                    "Use `/incubator` with **Start incubation** and choose an egg"
                 )
                 embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
                 continue
@@ -2730,7 +2861,7 @@ class Pets(commands.Cog):
 
             if remaining <= 0:
                 status = "✨ **READY TO HATCH!**"
-                instruction = f"Use `/incubator hatch {egg_id}`"
+                instruction = f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}**"
             else:
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
@@ -2771,11 +2902,7 @@ class Pets(commands.Cog):
         embed.set_footer(text=f"Unlocked tubes: {slots}/3 • Incubation time: 12 hours")
         await ctx.send(embed=embed)
 
-    @incubator.command(name="start", description="Put an egg into the first available incubator tube.")
-    @app_commands.describe(egg="Choose an egg you own.")
-    @app_commands.autocomplete(egg=_egg_autocomplete)
-    async def incubator_start(self, ctx: commands.Context, egg: str):
-        await ctx.defer()
+    async def _incubator_start(self, ctx: commands.Context, egg: str):
         egg = egg.lower().strip()
 
         if egg not in EGG_POOLS:
@@ -2834,14 +2961,10 @@ class Pets(commands.Cog):
             f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating in Tube {available_slot}!**\n"
             "⏳ Incubation time: **12 hours**\n"
             "🔔 I'll alert you when it's ready to hatch!\n"
-            f"Use `/incubator hatch {egg}` when the timer finishes."
+            f"Use `/incubator` with **Hatch ready egg** and choose **{egg}** when the timer finishes."
         )
 
-    @incubator.command(name="hatch", description="Hatch a ready egg and reveal the pet inside.")
-    @app_commands.describe(egg="Choose the egg currently in an incubator.")
-    @app_commands.autocomplete(egg=_egg_autocomplete)
-    async def incubator_hatch(self, ctx: commands.Context, egg: str):
-        await ctx.defer()
+    async def _incubator_hatch(self, ctx: commands.Context, egg: str):
         egg = egg.lower().strip()
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
@@ -2989,7 +3112,7 @@ class Pets(commands.Cog):
                             f"<@{user_id}> 🔔 {info['emoji']} "
                             f"**Your pet egg is ready to hatch!**\n"
                             f"Your **{info['name']}** has finished incubating.\n\n"
-                            f"Use `/incubator hatch {egg_id}` to reveal your new companion! 🐣"
+                            f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}** to reveal your new companion! 🐣"
                         )
                     except Exception:
                         # Keep the notification pending if the channel/message
