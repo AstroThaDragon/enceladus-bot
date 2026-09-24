@@ -9,18 +9,26 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
-from pet_variants import (
+from .variants import (
     ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME, ASTRAL_ESSENCE_EMOJI,
     FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
     HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
     get_variant_info, get_variant_display, get_variant_ids_for_pet,
     roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
 )
-
+from typing import TYPE_CHECKING
 from .config import *
 from .core import *
 
 class PetManagementMixin:
+    bot: discord.Client
+
+    if TYPE_CHECKING:
+        async def ensure_schema(
+            self,
+            db: aiosqlite.Connection,
+        ) -> None:
+            ...
     async def _feed_specific_pet(self, user_id, pet_id, treat, quantity=1):
         xp_amounts = {
             "pet_snack": PET_TREAT_XP,

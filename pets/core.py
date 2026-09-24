@@ -2,7 +2,7 @@
 
 import random
 
-from pet_variants import (
+from .variants import (
     get_variant_info,
     get_variant_display,
 )

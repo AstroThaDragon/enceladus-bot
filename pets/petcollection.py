@@ -3,12 +3,12 @@ import discord
 from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
-from pets import (
+from .config import (
     PETS,
     HALLOWEEN_PETS,
     HAUNTED_PETS,
 )
-from pet_variants import (
+from .variants import (
     NORMAL_PET_TYPES,
     HALLOWEEN_PET_TYPES,
     variant_set_for_pet,

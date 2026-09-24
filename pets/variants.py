@@ -329,7 +329,11 @@ def get_fusion_variant_chance(fusion_level):
 def get_variant_roll_pool(pet_type):
     if pet_type in SPECIAL_VARIANTS:
         return SPECIAL_HATCH_VARIANT_WEIGHTS.get(pet_type, {})
+
     category = variant_category_for_pet(pet_type)
+    if category is None:
+        return {}
+
     return HATCH_VARIANT_WEIGHTS.get(category, {})
 
 def roll_hatched_variant(pet_type):

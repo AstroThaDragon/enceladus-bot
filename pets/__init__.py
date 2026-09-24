@@ -13,6 +13,19 @@ from .config import (
     NORMAL_EGG_CHANCE, HALLOWEEN_EGG_CHANCE, INCUBATION_SECONDS,
     INCUBATOR_NOTIFICATION_CHANNEL_ID,
 )
+from .variants import (
+    NORMAL_VARIANTS, HALLOWEEN_VARIANTS, GODZILLA_VARIANTS,
+    SAMHAIN_VARIANTS, FEED_ME_VARIANTS, NORMAL_PET_TYPES,
+    HALLOWEEN_PET_TYPES, SPECIAL_VARIANTS, HATCH_VARIANT_CHANCE,
+    HATCH_VARIANT_WEIGHTS, SPECIAL_HATCH_VARIANT_WEIGHTS,
+    FUSION_VARIANT_CHANCES, MINING_ESSENCE_CHANCE, HATCH_ESSENCE_CHANCE,
+    RELEASE_ESSENCE_CHANCE, ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME,
+    ASTRAL_ESSENCE_EMOJI, FUSION_COSTS, VARIANT_HUNT_COST,
+    FUSION_LEVEL_GATES, PET_DISPLAY_NAMES, variant_set_for_pet,
+    variant_category_for_pet, get_variant_info, get_variant_ids_for_pet,
+    get_variant_display, get_fusion_variant_chance, get_variant_roll_pool,
+    roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
+)
 from .core import (
     xp_needed_for_next_level, passive_level_for_pet, get_pet_definition,
     ensure_pet_variant_schema, get_haunted_pet_for_location,
@@ -37,6 +50,7 @@ __all__ = [
     "HAUNTED_HOME_PET_XP_BONUS", "PET_TREAT_XP", "HALLOWEEN_PET_CANDY_XP",
     "NORMAL_EGG_CHANCE", "HALLOWEEN_EGG_CHANCE", "INCUBATION_SECONDS",
     "INCUBATOR_NOTIFICATION_CHANNEL_ID", "xp_needed_for_next_level",
+    "NORMAL_VARIANTS", "HALLOWEEN_VARIANTS", "GODZILLA_VARIANTS", "SAMHAIN_VARIANTS", "FEED_ME_VARIANTS", "NORMAL_PET_TYPES", "HALLOWEEN_PET_TYPES", "SPECIAL_VARIANTS", "HATCH_VARIANT_CHANCE", "HATCH_VARIANT_WEIGHTS", "SPECIAL_HATCH_VARIANT_WEIGHTS", "FUSION_VARIANT_CHANCES", "MINING_ESSENCE_CHANCE", "HATCH_ESSENCE_CHANCE", "RELEASE_ESSENCE_CHANCE", "ASTRAL_ESSENCE_ID", "ASTRAL_ESSENCE_NAME", "ASTRAL_ESSENCE_EMOJI", "FUSION_COSTS", "VARIANT_HUNT_COST", "FUSION_LEVEL_GATES", "PET_DISPLAY_NAMES", "variant_set_for_pet", "variant_category_for_pet", "get_variant_info", "get_variant_ids_for_pet", "get_variant_display", "get_fusion_variant_chance", "get_variant_roll_pool", "roll_hatched_variant", "roll_fusion_variant", "build_variant_collectibles",
     "passive_level_for_pet", "get_pet_definition", "ensure_pet_variant_schema",
     "get_haunted_pet_for_location", "get_haunted_pet_discovery_message",
     "grant_haunted_pet", "get_passive_value", "get_active_pet",

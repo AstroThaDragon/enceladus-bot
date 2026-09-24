@@ -32,7 +32,7 @@ from pets import (
     NORMAL_EGG_CHANCE,
     roll_normal_exploration_pet_xp,
 )
-from pet_variants import MINING_ESSENCE_CHANCE
+from pets.variants import MINING_ESSENCE_CHANCE
 from defense import roll_hazard_defense
 from seasonal_updates.halloween.haunted import (
     resolve_haunted_choice,

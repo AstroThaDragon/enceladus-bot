@@ -6,10 +6,10 @@ import time
 import aiosqlite
 import discord
 from discord.ext import commands
-
+from .views import FusionVariantView
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
-from pet_variants import (
+from .variants import (
     ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME, ASTRAL_ESSENCE_EMOJI,
     FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
     HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
@@ -17,10 +17,24 @@ from pet_variants import (
     roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
 )
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import discord
+    import aiosqlite
+
 from .config import *
 from .core import *
 
 class PetFusionMixin:
+    bot: discord.Client
+
+    if TYPE_CHECKING:
+        async def ensure_schema(
+            self,
+            db: aiosqlite.Connection,
+        ) -> None:
+            ...
     async def _execute_pet_fusion(self, ctx: commands.Context, target_pet_id: int):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)

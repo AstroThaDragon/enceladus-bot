@@ -13,7 +13,7 @@ from discord.ext import commands, tasks
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
-from pet_variants import (
+from .variants import (
     ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME, ASTRAL_ESSENCE_EMOJI,
     FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
     HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
