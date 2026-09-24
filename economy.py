@@ -2415,7 +2415,7 @@ class Economy(commands.Cog):
 
     @commands.hybrid_command(
         name="shop_sell",
-        description="Sell Time Crystals, Space Junk, materials, medical supplies, recharge items, and equipment for Stardust."
+        description="Sell Time Crystals, materials, equipment, and Space Junk for Stardust."
     )
     @app_commands.describe(
         item="Choose an item to sell, sell all normal Space Junk, or sell all normal ores & materials.",
