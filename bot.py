@@ -58,7 +58,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("seasonal_updates.halloween.ritual_table")
         await self.load_extension("profile")
         await self.load_extension("pets")
-        await self.load_extension("petcollection")
+        await self.load_extension("pets.petcollection")
         await self.load_extension("inventory")
         await self.load_extension("crafting")
         await self.load_extension("upgrades")
