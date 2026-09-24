@@ -2747,14 +2747,48 @@ class Pets(commands.Cog):
         except discord.HTTPException:
             pass
 
-    @commands.hybrid_group(
+    @commands.hybrid_command(
         name="incubator",
         description="View and manage your pet egg incubators.",
-        invoke_without_command=True,
     )
-    async def incubator(self, ctx: commands.Context):
-        """View the incubator bay."""
+    @app_commands.describe(
+        action="Choose Start to begin incubation or Hatch to claim a ready egg.",
+        egg="Choose the egg to start or hatch.",
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="Start incubation", value="start"),
+            app_commands.Choice(name="Hatch ready egg", value="hatch"),
+        ]
+    )
+    @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
+    async def incubator(
+        self,
+        ctx: commands.Context,
+        action: str | None = None,
+        egg: str | None = None,
+    ):
+        """View the incubator bay, start an egg, or hatch a ready egg."""
         await ctx.defer()
+
+        action = action.lower().strip() if action else None
+        egg = egg.lower().strip() if egg else None
+
+        if action == "start":
+            if not egg:
+                return await ctx.send("❌ Choose an egg to start incubating.")
+            return await self._incubator_start(ctx, egg)
+
+        if action == "hatch":
+            if not egg:
+                return await ctx.send("❌ Choose an egg to hatch.")
+            return await self._incubator_hatch(ctx, egg)
+
+        if action is not None:
+            return await ctx.send("❌ Choose **Start** or **Hatch** as the incubator action.")
+
+        if egg:
+            return await ctx.send("❌ Choose **Start** or **Hatch** when providing an egg.")
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
@@ -2803,7 +2837,7 @@ class Pets(commands.Cog):
                     "╰────────╯\n"
                     "```"
                     "🟢 **Empty**\n"
-                    "Use `/incubator start` and choose an egg"
+                    "Use `/incubator` with **Start incubation** and choose an egg"
                 )
                 embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
                 continue
@@ -2827,7 +2861,7 @@ class Pets(commands.Cog):
 
             if remaining <= 0:
                 status = "✨ **READY TO HATCH!**"
-                instruction = f"Use `/incubator hatch` and choose **{egg_id}**"
+                instruction = f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}**"
             else:
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
@@ -2867,26 +2901,6 @@ class Pets(commands.Cog):
 
         embed.set_footer(text=f"Unlocked tubes: {slots}/3 • Incubation time: 12 hours")
         await ctx.send(embed=embed)
-
-    @incubator.command(
-        name="start",
-        description="Start incubating a pet egg.",
-    )
-    @app_commands.describe(egg="Choose the egg to start incubating.")
-    @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
-    async def incubator_start(self, ctx: commands.Context, egg: str):
-        await ctx.defer()
-        return await self._incubator_start(ctx, egg)
-
-    @incubator.command(
-        name="hatch",
-        description="Hatch a ready pet egg.",
-    )
-    @app_commands.describe(egg="Choose the ready egg to hatch.")
-    @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
-    async def incubator_hatch(self, ctx: commands.Context, egg: str):
-        await ctx.defer()
-        return await self._incubator_hatch(ctx, egg)
 
     async def _incubator_start(self, ctx: commands.Context, egg: str):
         egg = egg.lower().strip()
@@ -3098,7 +3112,7 @@ class Pets(commands.Cog):
                             f"<@{user_id}> 🔔 {info['emoji']} "
                             f"**Your pet egg is ready to hatch!**\n"
                             f"Your **{info['name']}** has finished incubating.\n\n"
-                            f"Use `/incubator hatch` and choose **{egg_id}** to reveal your new companion! 🐣"
+                            f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}** to reveal your new companion! 🐣"
                         )
                     except Exception:
                         # Keep the notification pending if the channel/message
