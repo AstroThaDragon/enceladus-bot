@@ -1221,13 +1221,69 @@ class Economy(commands.Cog):
             f"You now have **{stardust + amount:,} Stardust** available to spend."
         )
 
+    async def shop_item_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        """Show items that can be purchased or sold in the shop."""
+        buy_choices = await self.shop_buy_autocomplete(interaction, current)
+        sell_choices = await self.shop_sell_autocomplete(interaction, current)
+
+        combined = []
+        seen = set()
+        for choice in [*buy_choices, *sell_choices]:
+            if choice.value in seen:
+                continue
+            combined.append(choice)
+            seen.add(choice.value)
+
+        return combined[:25]
+
     @commands.hybrid_command(
         name="shop",
-        description="Open the Enceladus Station Trading Post."
+        description="Open the station shop, or buy and sell items."
     )
-    async def shop(self, ctx: commands.Context):
-        view = ShopView(self, ctx.author.id)
+    @app_commands.describe(
+        action="Choose whether to buy or sell an item.",
+        item="Choose the item to buy or sell.",
+        quantity="How many to buy or sell (1-99).",
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="Buy", value="buy"),
+            app_commands.Choice(name="Sell", value="sell"),
+        ]
+    )
+    @app_commands.autocomplete(item=shop_item_autocomplete)
+    async def shop(
+        self,
+        ctx: commands.Context,
+        action: str | None = None,
+        item: str | None = None,
+        quantity: int = 1,
+    ):
+        """Open the shop, purchase an item, or sell an item."""
+        if action:
+            action = action.lower().strip()
 
+        if action == "buy":
+            if not item:
+                return await ctx.send("❌ Choose an item to buy from the shop.")
+            return await self.buy(ctx, item, quantity)
+
+        if action == "sell":
+            if not item:
+                return await ctx.send("❌ Choose an item to sell from the shop.")
+            return await self.sell(ctx, item, quantity)
+
+        if action is not None:
+            return await ctx.send("❌ Choose **Buy** or **Sell** as the shop action.")
+
+        if item:
+            return await ctx.send("❌ Choose **Buy** or **Sell** when providing an item.")
+
+        view = ShopView(self, ctx.author.id)
         embed = view.build_embed("healing")
 
         await ctx.send(
@@ -1342,10 +1398,6 @@ class Economy(commands.Cog):
 
         return available_items[:25]
 
-    @commands.hybrid_command(name="shop_buy", description="Purchase an item from the station vendor catalog.")
-    @app_commands.rename(item_id="item")
-    @app_commands.describe(item_id="Choose an item to purchase.", quantity="How many would you like to buy? (1-99)")
-    @app_commands.autocomplete(item_id=shop_buy_autocomplete)
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
         await ctx.defer()
         user_id = ctx.author.id
@@ -2413,15 +2465,6 @@ class Economy(commands.Cog):
         return (bulk_choices + item_choices)[:25]
 
 
-    @commands.hybrid_command(
-        name="shop_sell",
-        description="Sell Time Crystals, materials, equipment, and Space Junk for Stardust."
-    )
-    @app_commands.describe(
-        item="Choose an item to sell, sell all normal Space Junk, or sell all normal ores & materials.",
-        quantity="How many to sell (1-99).",
-    )
-    @app_commands.autocomplete(item=shop_sell_autocomplete)
     async def sell(
         self,
         ctx: commands.Context,
