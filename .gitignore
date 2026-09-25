@@ -25,3 +25,5 @@ rescue.py
 temp_raw.db
 levels.txt
 REAL_LIVE_DATA.db
+
+.vscode
