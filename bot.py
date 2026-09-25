@@ -14,6 +14,7 @@ from aiohttp import ClientTimeout
 from datetime import datetime, time, timezone, timedelta
 import pytz
 from database import init_db
+from seasonal_updates.halloween.halloween_flavor import install_halloween_flavor
 
 load_dotenv()
 
@@ -69,6 +70,10 @@ class Enceladus(commands.Bot):
         await self.load_extension("admin")
         await self.load_extension("debug")
         print("🌌 All cogs loaded!")
+
+        # Install the rare Halloween-only corruption layer on public commands.
+        halloween_flavor_count = install_halloween_flavor(self)
+        print(f"🎃 Halloween flavor layer installed on {halloween_flavor_count} public commands.")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
         self.add_view(PersistentColorView())

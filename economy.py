@@ -1224,14 +1224,22 @@ class Economy(commands.Cog):
     async def shop_item_autocomplete(
         self,
         interaction: discord.Interaction,
-        current: str,
+        current: str
     ):
-        """Show items that can be purchased or sold in the shop."""
+        action = getattr(interaction.namespace, "action", None)
+
+        if action == "buy":
+            return await self.shop_buy_autocomplete(interaction, current)
+
+        if action == "sell":
+            return await self.shop_sell_autocomplete(interaction, current)
+
         buy_choices = await self.shop_buy_autocomplete(interaction, current)
         sell_choices = await self.shop_sell_autocomplete(interaction, current)
 
         combined = []
         seen = set()
+
         for choice in [*buy_choices, *sell_choices]:
             if choice.value in seen:
                 continue
@@ -1856,6 +1864,16 @@ class Economy(commands.Cog):
                     "consumable",
                     quantity
                 )
+
+                if item_id == "astral_essence":
+                    added_amount, new_quantity, max_quantity = await add_inventory_item(
+                        db,
+                        user_id,
+                        item_id,
+                        "special",
+                        quantity
+                    )
+
 
                 if added_amount != quantity:
                     await db.rollback()
@@ -2850,6 +2868,7 @@ class Economy(commands.Cog):
 
             "special": {
                 "astral_core",
+                "astral_essence",
             },
 
             "junk_am": {

@@ -45,7 +45,7 @@ PETS = {
             "id": "stardust_bonus",
             "name": "Lucky Paws",
             "description": "Finds a little extra Stardust during exploration.",
-            "levels": [0.01, 0.02, 0.03, 0.04, 0.05],
+            "levels": [0.03, 0.05, 0.08, 0.12, 0.15],
         },
     },
     "cosmic_fox": {
@@ -117,7 +117,7 @@ PETS = {
             "id": "stardust_bonus",
             "name": "Twinkle Twinkle Little Star",
             "description": "The little star seems rather fond of you! It will now give a chance to find extra Stardust!",
-            "levels": [0.02, 0.04, 0.06, 0.08, 0.12],
+            "levels": [0.03, 0.05, 0.08, 0.12, 0.15],
         },
     },
     "meteor": {
@@ -141,9 +141,9 @@ PETS = {
             "id": "extra_charges",
             "name": "Dragon's Magic",
             "description": "The large space dragon will now give you extra Stardust for Mining and Scavenging, and when maxed, will grant you 3 extra charges as well!",
-            # Levels 1-5 provide +2%, +5%, +10%, +13%, +13% Stardust.
+            # Levels 1-5 provide +3%, +6%, +10%, +14%, +18% Stardust.
             # Level 5 additionally grants +3 maximum mining/scavenging charges.
-            "levels": [0.02, 0.05, 0.10, 0.13, 0.13],
+            "levels": [0.03, 0.06, 0.10, 0.14, 0.18],
         },
     },
     "ethereal_cloud": {
@@ -210,7 +210,7 @@ HALLOWEEN_PETS = {
             "id": "stardust_bonus",
             "name": "Trickster's Luck",
             "description": "A spooky little bonus to Stardust from exploration.",
-            "levels": [0.01, 0.02, 0.03, 0.04, 0.05],
+            "levels": [0.03, 0.05, 0.08, 0.12, 0.15],
         },
     },
     "black_cat": {

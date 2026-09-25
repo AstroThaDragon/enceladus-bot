@@ -117,6 +117,123 @@ async def grant_haunted_pet(db, user_id: int, location_id: str):
     }
 
 
+PET_PASSIVE_DIALOGUES = {
+    "stardust_bonus": [
+        "found some extra Stardust hiding in the debris!",
+        "sniffed out a little extra Stardust!",
+        "helped uncover some bonus Stardust!",
+    ],
+    "material_bonus": [
+        "found an extra chunk of material!",
+        "dug up one more piece of useful material!",
+        "spotted a little extra material hiding nearby!",
+    ],
+    "hazard_reduction": [
+        "softened the hit and kept some damage off you!",
+        "helped absorb part of the impact!",
+        "took some of the sting out of the hazard!",
+    ],
+    "charge_save": [
+        "saved your exploration charge!",
+        "kept the equipment running without consuming a charge!",
+        "somehow convinced the equipment to keep your charge!",
+    ],
+    "scavenge_charge_save": [
+        "saved your scavenging charge!",
+        "kept the drone powered without using a charge!",
+        "somehow convinced the drone to keep your charge!",
+    ],
+    "scavenge_hazard_avoidance": [
+        "spotted the hazard before it could hit you!",
+        "pulled you safely out of the hazard's path!",
+        "noticed something was wrong and got you clear!",
+    ],
+    "scavenge_first_aid": [
+        "patched you up after the hazard!",
+        "dug out some emergency first aid!",
+        "gave you a quick field treatment!",
+    ],
+    "scavenge_bonus_loot": [
+        "found an extra piece of salvage!",
+        "dug up a bonus piece of space junk!",
+        "spotted something extra worth hauling home!",
+    ],
+    "rare_loot_bonus": [
+        "spotted a rare find hiding among the wreckage!",
+        "noticed something valuable that you might have missed!",
+        "helped uncover a rarer piece of salvage!",
+    ],
+    "candy_bonus": [
+        "found some extra Halloween Candy!",
+        "dug up a little extra Halloween Candy!",
+        "somehow made the Halloween Candy haul bigger!",
+    ],
+    "halloween_bonus": [
+        "found an extra Halloween item!",
+        "uncovered an extra seasonal find!",
+        "spotted one more Halloween goodie!",
+    ],
+    "atomic_breath": [
+        "blasted the incoming hazard before it could reach you!",
+        "vaporized the incoming hazard!",
+        "incinerated the hazard on the spot!",
+    ],
+    "minigame_payout": [
+        "boosted your minigame payout!",
+        "sweetened your winnings!",
+        "managed to squeeze a little extra Stardust out of the game!",
+    ],
+    "trickster_tokens": [
+        "pulled a little trick and helped with your Arcade Tokens!",
+        "performed some suspicious token magic!",
+        "did something questionable with the Arcade Token supply!",
+    ],
+    "daily_bonus": [
+        "helped brighten your daily Stardust reward!",
+        "gave your daily reward a little celestial boost!",
+        "added a little extra sparkle to today's Stardust!",
+    ],
+    "streak_rescue": [
+        "rescued your broken daily streak!",
+        "caught your missed day before it could break the streak!",
+        "somehow convinced the station to forgive your missed daily!",
+    ],
+    "daily_double": [
+        "doubled today's daily Stardust reward!",
+        "made today's daily reward twice as generous!",
+        "went absolutely overboard and doubled the daily payout!",
+    ],
+    "shop_discount": [
+        "talked the merchant into giving you a better price!",
+        "negotiated a discount with the station shop!",
+        "convinced the merchant to knock some Stardust off the price!",
+    ],
+    "shop_free_purchase": [
+        "pulled some suspicious merchant magic and made the purchase free!",
+        "somehow convinced the merchant to let you have it for free!",
+        "talked the shop into a completely free purchase!",
+    ],
+    "dragonrider_success": [
+        "steadied you at just the right moment during the flight test!",
+        "helped you pull off the maneuver that sealed the test!",
+        "gave you a perfectly timed boost during the flight test!",
+    ],
+}
+
+
+def get_pet_passive_message(pet_effects: dict, effect_id: str, **values) -> str:
+    """Return a small companion reaction for a passive that actually helped."""
+    pet_name = pet_effects.get("pet_nickname") or pet_effects.get("pet_name")
+    if not pet_name:
+        return ""
+    lines = PET_PASSIVE_DIALOGUES.get(effect_id)
+    if not lines:
+        return ""
+    emoji = pet_effects.get("pet_emoji", "🐾")
+    line = random.choice(lines).format(**values)
+    return f"{emoji} **{pet_name}** {line}"
+
+
 def get_passive_value(pet: dict, level: int | None = None) -> float:
     passive = pet.get("passive", {})
     values = passive.get("levels", [])
@@ -198,6 +315,10 @@ async def get_active_pet_effects(db, user_id: int):
         return {
             "level": 0,
             "passive_level": 0,
+            "pet_name": "",
+            "pet_nickname": "",
+            "pet_emoji": "🐾",
+            "normal_effect_id": "",
             "stardust_bonus": 0.0,
             "material_bonus": 0.0,
             "rare_bonus": 0.0,
@@ -241,6 +362,10 @@ async def get_active_pet_effects(db, user_id: int):
     effects = {
         "level": pet["level"],
         "passive_level": passive_level_for_pet(pet["level"]),
+        "pet_name": pet.get("name", ""),
+        "pet_nickname": pet.get("nickname") or "",
+        "pet_emoji": pet.get("emoji", "🐾"),
+        "normal_effect_id": "",
         "stardust_bonus": 0.0,
         "material_bonus": 0.0,
         "rare_bonus": 0.0,
@@ -276,6 +401,8 @@ async def get_active_pet_effects(db, user_id: int):
     else:
         normal_value = value
         normal_effect_id = effect_id
+
+    effects["normal_effect_id"] = normal_effect_id or ""
 
     if normal_effect_id == "stardust_bonus":
         effects["stardust_bonus"] = normal_value

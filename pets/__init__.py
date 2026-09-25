@@ -30,7 +30,7 @@ from .core import (
     xp_needed_for_next_level, passive_level_for_pet, get_pet_definition,
     ensure_pet_variant_schema, get_haunted_pet_for_location,
     get_haunted_pet_discovery_message, grant_haunted_pet, get_passive_value,
-    get_active_pet, get_active_pet_effects, roll_normal_exploration_pet_xp,
+    get_active_pet, get_active_pet_effects, get_pet_passive_message, roll_normal_exploration_pet_xp,
     roll_haunted_exploration_pet_xp, get_haunted_exploration_pet_xp, add_pet_xp,
 )
 from .views import (
@@ -54,7 +54,7 @@ __all__ = [
     "passive_level_for_pet", "get_pet_definition", "ensure_pet_variant_schema",
     "get_haunted_pet_for_location", "get_haunted_pet_discovery_message",
     "grant_haunted_pet", "get_passive_value", "get_active_pet",
-    "get_active_pet_effects", "roll_normal_exploration_pet_xp",
+    "get_active_pet_effects", "get_pet_passive_message", "roll_normal_exploration_pet_xp",
     "roll_haunted_exploration_pet_xp", "get_haunted_exploration_pet_xp",
     "add_pet_xp", "FeedTreatSelect", "FeedTreatView",
     "ReleaseConfirmationView", "RenamePetModal", "PetStatsView",
