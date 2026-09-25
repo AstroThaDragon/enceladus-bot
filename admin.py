@@ -6,6 +6,7 @@ import pytz
 from discord import app_commands
 from discord.ext import commands
 from leveling import FontView
+from typing import cast
 from moderation import VerifyView, VERIFICATION_DB_PATH
 from verification import VerificationPanelView
 from database import DB_NAME, ECONOMY_DB_NAME
@@ -980,10 +981,11 @@ class Admin(commands.Cog):
                 color=discord.Color.purple()
             )
 
-            await interaction.channel.send(
-                embed=embed,
-                view=FontView(leveling_cog)
-            )
+            if interaction.channel is not None:
+                await cast(discord.abc.Messageable, interaction.channel).send(
+                    embed=embed,
+                    view=FontView(leveling_cog)
+                )
 
             await interaction.response.send_message(
                 "✅ Font preview menu deployed!",
@@ -1009,10 +1011,11 @@ class Admin(commands.Cog):
                 color=discord.Color.blurple()
             )
 
-            await interaction.channel.send(
-                embed=embed,
-                view=VerifyView(moderation_cog)
-            )
+            if interaction.channel is not None:
+                await cast(discord.abc.Messageable, interaction.channel).send(
+                    embed=embed,
+                    view=VerifyView(moderation_cog)
+                )
 
             await interaction.response.send_message(
                 "✅ Server verification panel deployed!",
@@ -1039,10 +1042,11 @@ class Admin(commands.Cog):
                 color=discord.Color.red()
             )
 
-            await interaction.channel.send(
-                embed=embed,
-                view=VerificationPanelView(verification_cog)
-            )
+            if interaction.channel is not None:
+                await cast(discord.abc.Messageable, interaction.channel).send(
+                    embed=embed,
+                    view=VerificationPanelView(verification_cog)
+                )
 
             await interaction.response.send_message(
                 "✅ NSFW verification panel deployed!",

@@ -1024,14 +1024,26 @@ class Fortunes(commands.Cog):
 
     @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. For restoration purposes only! (Admin only)")
     @commands.has_permissions(administrator=True)
-    async def set_fortune_streak(self, ctx, member: discord.Member, streak: int):
+    async def set_fortune_streak(
+        self, 
+        ctx: commands.Context, 
+        member: discord.Member, 
+        streak: int,
+        claimed_today: bool = True
+    ):
         if streak < 0:
             return await ctx.send("⚠️ Streak cannot be negative.")
 
         async with self._get_user_lock(member.id):
             et_timezone = pytz.timezone("US/Eastern")
             now_et = datetime.datetime.now(et_timezone)
-            current_date_et = self.get_fortune_day(now_et)
+            
+            # If they ALREADY claimed today, set date to today.
+            # If they HAVE NOT claimed today yet, set date to yesterday so today's claim works.
+            if not claimed_today:
+                now_et -= datetime.timedelta(days=1)
+                
+            current_date_et = str(self.get_fortune_day(now_et))
 
             async with aiosqlite.connect(self.db_path) as db:
                 await db.execute(
@@ -1056,13 +1068,14 @@ class Fortunes(commands.Cog):
 
                 await db.commit()
 
+        status_msg = "already claimed today" if claimed_today else "can claim today"
         await ctx.send(
-            f"✅ Restored {member.mention}'s fortune streak to **{streak} day{'s' if streak != 1 else ''}**."
+            f"✅ Restored {member.mention}'s fortune streak to **{streak} day{'s' if streak != 1 else ''}** ({status_msg})."
         )
 
-    @fortune.error
-    async def fortune_error(self, ctx, error):
-        await ctx.send(f"⚠️ Fortune command error: `{error}`")
+    @set_fortune_streak.error
+    async def set_fortune_streak_error(self, ctx: commands.Context, error: Exception):
+        await ctx.send(f"⚠️ Set fortune streak command error: `{error}`")
         raise error
 
 

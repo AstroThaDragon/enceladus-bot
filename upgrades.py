@@ -280,10 +280,15 @@ class Upgrades(commands.Cog):
                 (user_id,),
             )
             async with db.execute(
-                f"SELECT COALESCE(stardust, 0), COALESCE({column}, 0) FROM users WHERE user_id = ?",
-                (user_id,),
-            ) as cursor:
-                stardust, level = await cursor.fetchone()
+                        f"SELECT COALESCE(stardust, 0), COALESCE({column}, 0) FROM users WHERE user_id = ?",
+                        (user_id,),
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                        if row is None:
+                            await db.rollback()
+                            return await ctx.send("❌ Could not find user data.")
+
+                        stardust, level = row
 
             if level >= MAX_LEVEL:
                 await db.rollback()

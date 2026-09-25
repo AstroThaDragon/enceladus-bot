@@ -1476,23 +1476,25 @@ class Minigames(commands.Cog):
             embed.add_field(name=f"{chr(65 + index)}.", value=option, inline=False)
 
         for index, option in enumerate(shuffled_options):
-            button = discord.ui.Button(
-                label=chr(65 + index),
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"trivia_{interaction.user.id}_{index}",
-            )
+                button = discord.ui.Button(
+                    label=chr(65 + index),
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"trivia_{interaction.user.id}_{index}",
+                )
 
-            async def callback(button_interaction, selected=index):
-                await view.answer_question(button_interaction, selected)
+                def make_callback(selected_index: int):
+                    async def callback(interaction: discord.Interaction):
+                        await view.answer_question(interaction, selected_index)
+                    return callback
 
-            button.callback = callback
-            view.add_item(button)
+                button.callback = make_callback(index)
+                view.add_item(button)
 
         view.message = await interaction.followup.send(
-            embed=view.build_embed(),
-            view=view,
-            wait=True
-        )
+                embed=embed,
+                view=view,
+                wait=True
+            )
 
     @commands.hybrid_command(
         name="minigames",

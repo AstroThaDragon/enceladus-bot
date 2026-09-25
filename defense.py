@@ -116,7 +116,7 @@ async def equip_weapon(db, user_id, weapon_id):
 class Defense(commands.Cog):
     def __init__(self, bot): self.bot = bot
 
-    @commands.hybrid_group(name="defense", description="Manage your equipped defensive weapon.", invoke_without_command=True)
+    @commands.hybrid_group(name="defense", description="Manage your equipped defensive weapon.")
     async def defense(self, ctx):
         await ctx.defer()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
@@ -129,10 +129,14 @@ class Defense(commands.Cog):
         else:
             embed.add_field(name="Equipped Weapon", value="None", inline=False)
         if pet_chance:
-            embed.add_field(name="☢️ Atomic Breath", value=f"**{pet_chance * 100:.1f}%**", inline=True)
+            embed.add_field(name="⚛️ Atomic Breath", value=f"**{pet_chance * 100:.1f}%**", inline=True)
         embed.add_field(name="Combined Defense", value=f"**{combined * 100:.1f}%** (cap {DEFENSE_CAP * 100:.0f}%)", inline=False)
         embed.set_footer(text="Defense prevents a scavenging hazard entirely. Hazard Reduction remains separate.")
         await ctx.send(embed=embed)
+
+    @defense.command(name="view", description="View your currently equipped defense items.")
+    async def defense_view(self, ctx):
+        await self.defense(ctx)
 
     @defense.command(name="equip", description="Equip a defensive weapon you own.")
     @app_commands.describe(weapon_id="Choose a defensive weapon from your inventory.")

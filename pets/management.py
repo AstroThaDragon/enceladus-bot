@@ -69,7 +69,7 @@ class PetManagementMixin:
             ) as cursor:
                 treat_row = await cursor.fetchone()
 
-            owned_quantity = int(treat_row[0])
+            owned_quantity = int(treat_row[0]) if treat_row else 0
             if owned_quantity < quantity:
                 await db.rollback()
                 return None, (

@@ -1135,40 +1135,40 @@ class Economy(commands.Cog):
 
         async with aiosqlite.connect(db_path) as db:
             await self.ensure_schema(db)
+            
+            # Ensure user exists
             await db.execute(
                 "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
                 (user_id,)
             )
             await db.commit()
 
-            await db.execute("BEGIN IMMEDIATE")
+            # Query current balances and vault capacity (if stored in DB, otherwise use constant)
             async with db.execute(
                 "SELECT COALESCE(stardust, 0), COALESCE(vault_stardust, 0) FROM users WHERE user_id = ?",
-                (self.DEFAULT_VAULT_CAPACITY, user_id)
+                (user_id,)
             ) as cursor:
                 row = await cursor.fetchone()
 
-            stardust, vault, vault_capacity = (
-                row if row else (0, 0, self.DEFAULT_VAULT_CAPACITY)
-            )
+            stardust, vault = row if row else (0, 0)
+            vault_capacity = self.DEFAULT_VAULT_CAPACITY
 
             if amount > stardust:
-                await db.rollback()
                 return await ctx.send(
                     f"💸 You only have **{stardust:,} Stardust** available to deposit."
                 )
 
             if vault + amount > vault_capacity:
-                await db.rollback()
                 remaining_space = max(0, vault_capacity - vault)
                 return await ctx.send(
                     f"🔐 Your vault can only hold **{vault_capacity:,} Stardust**. "
                     f"You can deposit **{remaining_space:,}** Stardust."
                 )
 
+            # Perform deposit update
             await db.execute(
-                "UPDATE users SET stardust = ?, vault_stardust = ? WHERE user_id = ?",
-                (stardust - amount, vault + amount, user_id)
+                "UPDATE users SET stardust = stardust - ?, vault_stardust = vault_stardust + ? WHERE user_id = ?",
+                (amount, amount, user_id)
             )
             await db.commit()
 
@@ -2985,7 +2985,7 @@ class Economy(commands.Cog):
         eastern = pytz.timezone("US/Eastern")
         cutoff_date = eastern.localize(datetime(2026, 9, 10))
 
-        joined_at = ctx.author.joined_at
+        joined_at = ctx.author.joined_at if isinstance(ctx.author, discord.Member) else None
 
         if joined_at is None:
             return await ctx.send(

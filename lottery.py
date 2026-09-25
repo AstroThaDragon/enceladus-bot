@@ -150,7 +150,8 @@ class Lottery(commands.Cog):
                     "SELECT COUNT(*) FROM lottery_tickets WHERE cycle_id = ?",
                     (cycle_id,),
                 ) as cursor:
-                    active_tickets = (await cursor.fetchone())[0]
+                    row = await cursor.fetchone()
+                    active_tickets = row[0] if row else 0
             else:
                 cycle_id = opened_at = tickets_sold = total_payout = active_tickets = None
 
@@ -210,10 +211,14 @@ class Lottery(commands.Cog):
 
     @commands.hybrid_group(
         name="lottery",
-        description="View and participate in the monthly Enceladus lottery.",
-        invoke_without_command=True,
+        description="View and participate in the monthly Enceladus lottery."
     )
     async def lottery(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await self.send_status(ctx)
+
+    @lottery.command(name="status", description="View the current lottery status.")
+    async def lottery_status(self, ctx: commands.Context):
         await self.send_status(ctx)
 
     @lottery.command(name="buy", description="Buy one lottery ticket with five unique numbers.")
@@ -249,7 +254,8 @@ class Lottery(commands.Cog):
                 "SELECT COUNT(*) FROM lottery_tickets WHERE cycle_id = ? AND user_id = ?",
                 (cycle_id, user_id),
             ) as cursor:
-                ticket_count = (await cursor.fetchone())[0]
+                    row = await cursor.fetchone()
+                    ticket_count = row[0] if row else 0
 
             if ticket_count >= self.MAX_TICKETS_PER_USER:
                 await db.rollback()
@@ -346,7 +352,7 @@ class Lottery(commands.Cog):
             description="\n".join(lines),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        embed.set_footer(text=f"{len(rows)}/{self.MAX_TICKETS_PER_USER} tickets • {self.TICKET_COST:,} Stardust each")
+        embed.set_footer(text=f"{len(lines)}/{self.MAX_TICKETS_PER_USER} tickets • {self.TICKET_COST:,} Stardust each")
         await ctx.send(embed=embed)
 
     @lottery.command(name="open", description="Open a new monthly lottery cycle. Staff only.")
@@ -415,7 +421,7 @@ class Lottery(commands.Cog):
                 """,
                 (cycle_id,),
             ) as cursor:
-                tickets = await cursor.fetchall()
+                tickets = list(await cursor.fetchall())
 
             winning_set = set(winning_numbers)
             payouts_by_user = defaultdict(int)
@@ -511,7 +517,8 @@ class Lottery(commands.Cog):
                 "SELECT COUNT(*) FROM lottery_tickets WHERE cycle_id = ?",
                 (cycle_id,),
             ) as cursor:
-                ticket_count = (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                ticket_count = row[0] if row else 0
 
             await db.execute(
                 "UPDATE lottery_cycles SET status = 'cancelled', drawn_by = ?, drawn_at = ? WHERE cycle_id = ?",

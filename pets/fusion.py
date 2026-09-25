@@ -96,7 +96,7 @@ class PetFusionMixin:
                 """,
                 (ctx.author.id, target_pet_id, pet_type, variant_id),
             ) as cursor:
-                duplicate_rows = await cursor.fetchall()
+                duplicate_rows = list(await cursor.fetchall())
 
             if len(duplicate_rows) < 5:
                 await db.rollback()

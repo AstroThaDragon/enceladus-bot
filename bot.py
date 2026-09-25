@@ -10,6 +10,7 @@ import aiohttp
 import asyncio
 import re
 import aiosqlite
+from aiohttp import ClientTimeout
 from datetime import datetime, time, timezone, timedelta
 import pytz
 from database import init_db
@@ -58,7 +59,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("seasonal_updates.halloween.ritual_table")
         await self.load_extension("profile")
         await self.load_extension("pets")
-        await self.load_extension("petcollection")
+        await self.load_extension("pets.petcollection")
         await self.load_extension("inventory")
         await self.load_extension("crafting")
         await self.load_extension("upgrades")
@@ -201,10 +202,14 @@ async def check_bump_timer():
             )
 
             try:
-                await channel.send(
-                    content=f"<@&{bump_role_id}>",
-                    embed=reminder_embed
-                )
+                # Check if the channel is a type that can actually receive messages
+                if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                    await channel.send(
+                        content=f"<@&{bump_role_id}>",
+                        embed=reminder_embed
+                    )
+                else:
+                    print(f"[BUMP LOOP ERROR]: Channel {channel.id} is not a text channel.")
 
                 print(f"[BUMP TIMER SENT]: channel={channel.id}")
 
@@ -244,7 +249,7 @@ async def stargazing_alert():
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as response:
+                async with session.get(url, timeout=ClientTimeout(total=10)) as response:
                     if response.status == 200:
                         data = await response.json()
                         item = data['items'][0]
@@ -260,14 +265,20 @@ async def stargazing_alert():
                         embed.set_thumbnail(url="https://i.imgur.com/83S8Z6H.png")
                         embed.set_footer(text="Source: In-The-Sky.org | Keep looking up, Stargazers! 🔭")
                         
-                        await channel.send(embed=embed)
+
+                        if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                            await channel.send(embed=embed)
+                        else:
+                            print(f"[STARGAZING ERROR]: Channel is not a sendable text channel.")
+                            
         except Exception as e:
             print(f"Error in stargazing_alert loop: {e}")
 
 # --- EVENTS ---
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    bot_name = bot.user.name if bot.user else "Bot"
+    print(f"Logged in as {bot_name}")
     await init_bump_db() 
     await init_fun_db() 
     
@@ -382,9 +393,11 @@ async def on_message(message):
         await message.channel.send(thanks_text)
 
         if user_obj:
-            leveling_cog = bot.get_cog('Leveling')
-            if leveling_cog:
-                await leveling_cog.add_xp(user_obj, 400)
+            leveling_cog = bot.get_cog("Leveling")
+            add_xp_func = getattr(leveling_cog, "add_xp", None)
+            
+            if add_xp_func:
+                await add_xp_func(user_obj, 400)
             else:
                 print("Leveling cog not found, couldn't award bump XP.")
 
@@ -436,7 +449,10 @@ async def on_member_join(member):
         embed.set_footer(text=f"You are our {ordinal_count} member! Congrats!")
         
         try:
-            await channel.send(content=content_text, embed=embed)
+            if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                await channel.send(content=content_text, embed=embed)
+            else:
+                print(f"[JOIN LOG ERROR]: Channel is not a sendable text channel.")
         except (discord.Forbidden, discord.HTTPException) as e:
             print(f"[JOIN LOG ERROR]: {e}")
 
@@ -468,7 +484,10 @@ async def on_member_remove(member):
         embed.set_footer(text=f"We now have {count} members.")
         
         try:
-            await channel.send(content=content_text, embed=embed)
+            if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                await channel.send(content=content_text, embed=embed)
+            else:
+                print(f"[LEAVE LOG ERROR]: Channel is not a sendable text channel.")
         except (discord.Forbidden, discord.HTTPException) as e:
             print(f"[LEAVE LOG ERROR]: {e}")
 
@@ -500,7 +519,11 @@ async def on_member_update(before, after):
             embed.set_author(name=f"{after.name}", icon_url=after.display_avatar.url)
             embed.set_footer(text=f"We only need {next_level} boosts till our next level!")
             
-            await channel.send(content=content_text, embed=embed)
+            if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                await channel.send(content=content_text, embed=embed)
+            else:
+                print(f"[BOOST LOG ERROR]: Channel is not a sendable text channel.")
+
 
 VAULT_CHANNEL_ID = 1496628909570265199
 VAULT_THRESHOLD = 5
@@ -516,15 +539,21 @@ async def on_raw_reaction_add(payload):
     if channel is None:
         try:
             channel = await bot.fetch_channel(payload.channel_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
-            print(f"[VAULT ERROR]: Could not access channel {payload.channel_id}: {e}")
+        except Exception as e:
+            print(f"[VAULT ERROR]: Could not fetch channel {payload.channel_id}: {e}")
             return
 
-    if not hasattr(channel, "is_nsfw"):
+    # Check if channel is an actual server text-based channel or thread
+    if not isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
         return
 
-    if channel.is_nsfw() or channel.id in EXCLUDED_CHANNELS or channel.category_id in EXCLUDED_CATEGORIES:
+    # Now it is completely safe to check server properties like NSFW and categories
+    is_nsfw = channel.is_nsfw() if hasattr(channel, "is_nsfw") else False
+    category_id = getattr(channel, "category_id", None)
+
+    if is_nsfw or channel.id in EXCLUDED_CHANNELS or category_id in EXCLUDED_CATEGORIES:
         return
+
 
     try:
         message = await channel.fetch_message(payload.message_id)
@@ -580,11 +609,16 @@ async def on_raw_reaction_add(payload):
             embed.set_footer(text=f"ID: {message.id} • The Vault")
 
             try:
-                await vault_channel.send(embed=embed)
+                if isinstance(vault_channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                    await vault_channel.send(embed=embed)
+                else:
+                    print(f"[VAULT ERROR]: Vault channel is not a sendable text channel.")
+                    
                 await db.execute(
                     "INSERT INTO vaulted_messages (message_id) VALUES (?)",
                     (message.id,)
                 )
+
                 await db.commit()
             except (discord.Forbidden, discord.HTTPException, aiosqlite.Error) as e:
                 await db.rollback()
@@ -599,7 +633,7 @@ async def nasa(interaction: discord.Interaction):
     url = f"https://api.nasa.gov/planetary/apod?api_key={api_key}"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=ClientTimeout(total=10)) as response:
             if response.status == 200:
                 data = await response.json()
                 title = data.get('title', 'Space Discovery')
@@ -620,7 +654,8 @@ async def nasa(interaction: discord.Interaction):
                 
                 if media_type == 'video':
                     if img_url:
-                        embed.description += f"\n\n**Watch the video here:**\n{img_url}"
+                        current_desc = embed.description or ""
+                        embed.description = current_desc + f"\n\n**Watch the video here:**\n{img_url}"
                 elif img_url:
                     embed.set_image(url=img_url)
                 
@@ -632,7 +667,7 @@ async def bing(interaction: discord.Interaction):
     url = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=ClientTimeout(total=10)) as response:
             if response.status == 200:
                 data = await response.json()
                 images = data.get('images') or []
@@ -669,7 +704,7 @@ async def moon(interaction: discord.Interaction):
     url = "https://wttr.in/?format=%m" 
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=ClientTimeout(total=10)) as response:
             if response.status == 200:
                 phase_emoji = await response.text()
                 await interaction.response.send_message(f"The current moon phase is: **{phase_emoji}**")
@@ -681,7 +716,7 @@ async def weather(interaction: discord.Interaction, city: str):
     url = f"https://wttr.in/{city}?format=3"
     
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=ClientTimeout(total=10)) as response:
             if response.status == 200:
                 weather_report = await response.text()
                 await interaction.response.send_message(f"**Current Weather:**\n{weather_report}")
@@ -695,7 +730,7 @@ async def iss(interaction: discord.Interaction):
     
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=10) as response:
+            async with session.get(url, timeout=ClientTimeout(total=10)) as response:
                 if response.status == 200:
                     data = await response.json()
                     lat = data.get('latitude')

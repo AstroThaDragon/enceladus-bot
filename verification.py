@@ -161,20 +161,29 @@ class VerificationReviewView(View):
             "Deny w/ Reason": custom_ids.get("deny_reason", f"verification_deny_reason:{member.id}:{application_key}"),
             "Cancel Application": custom_ids.get("cancel", f"verification_cancel:{member.id}:{application_key}"),
         }
+
         for child in self.children:
-            if getattr(child, "label", None) in button_ids:
+            if isinstance(child, discord.ui.Button) and child.label in button_ids:
                 child.custom_id = button_ids[child.label]
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.data and interaction.data.get("custom_id"):
-            custom_id = interaction.data["custom_id"]
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                "❌ This action can only be performed in a server.",
+                ephemeral=True
+            )
+            return False
 
-            if "cancel" in custom_id and interaction.user.id == self.member.id:
-                return True
+        custom_id = None
+        if isinstance(interaction.data, dict):
+            custom_id = interaction.data.get("custom_id")
+
+        if custom_id and "cancel" in custom_id and interaction.user.id == self.member.id:
+            return True
 
         allowed_roles = [
             VERIFICATION_TEAM_ROLE_ID,
-            ADMIN_ROLE_ID
+            ADMIN_ROLE_ID,
         ]
 
         if interaction.user.id == OWNER_ID:
@@ -185,7 +194,7 @@ class VerificationReviewView(View):
                 return True
 
         await interaction.response.send_message(
-            "❌ You are not allowed to use verification controls. Nice try, though! 😉",
+            "❌ You are not allowed to use verification controls. Nice try, though! 😏",
             ephemeral=True
         )
 
@@ -367,26 +376,37 @@ class VerificationDropdown(Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        lock = self.cog.get_application_lock(interaction.guild.id, interaction.user.id)
+        if not interaction.guild or not isinstance(interaction.user, discord.Member):
+            return await interaction.response.send_message(
+                "❌ This action can only be performed in a server.",
+                ephemeral=True
+            )
+
+        guild = interaction.guild
+        member = interaction.user
+
+        lock = self.cog.get_application_lock(guild.id, member.id)
         if lock.locked():
             return await interaction.response.send_message(
                 "⚠️ You already have a verification request being created. Please wait a moment.",
                 ephemeral=True
             )
+
         async with lock:
             try:
                 return await self._callback_locked(interaction)
             except Exception as e:
                 print(f"[VERIFICATION CREATE ERROR] {e}")
-                pending_role = interaction.guild.get_role(PENDING_VERIFICATION_ROLE_ID)
-                if pending_role and pending_role in interaction.user.roles:
+                pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
+                if pending_role and pending_role in member.roles:
                     try:
-                        await interaction.user.remove_roles(
+                        await member.remove_roles(
                             pending_role,
                             reason="Verification application creation failed"
                         )
                     except discord.HTTPException:
                         pass
+
                 if interaction.response.is_done():
                     await interaction.followup.send(
                         "❌ I couldn't create your verification request. No application was finalized; please try again in a moment.",
@@ -399,6 +419,11 @@ class VerificationDropdown(Select):
                     )
 
     async def _callback_locked(self, interaction: discord.Interaction):
+        if not interaction.guild or not isinstance(interaction.user, discord.Member):
+            return await interaction.response.send_message(
+                "❌ This action can only be performed in a server.",
+                ephemeral=True
+            )
 
         guild = interaction.guild
         member = interaction.user
@@ -415,7 +440,7 @@ class VerificationDropdown(Select):
             )
 
         level_10_role = guild.get_role(LEVEL_10_ROLE_ID)
-        
+
         # Check if user has Level 10 role or higher (defaults to True if role ID is missing/invalid)
         has_required_level = True if not level_10_role else False
         if level_10_role:
@@ -423,7 +448,7 @@ class VerificationDropdown(Select):
                 if role.position >= level_10_role.position:
                     has_required_level = True
                     break
-                    
+
         if not has_required_level:
             return await interaction.response.send_message(
                 "❌ You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.",
@@ -435,13 +460,13 @@ class VerificationDropdown(Select):
         pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
 
         if pending_role is None:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "⚠️ The verification system is missing its Pending Verification role. Please contact staff.",
                 ephemeral=True
             )
 
         if pending_role in member.roles:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "⚠️ You already have an active verification request. Please use your existing verification thread.",
                 ephemeral=True
             )
@@ -461,6 +486,13 @@ class VerificationDropdown(Select):
                     "⚠️ The verification channel could not be found or accessed. Please contact staff.",
                     ephemeral=True
                 )
+
+        if not isinstance(verification_channel, discord.TextChannel):
+            await member.remove_roles(pending_role, reason="Verification channel invalid")
+            return await interaction.followup.send(
+                "⚠️ The verification channel is not a text channel. Please contact staff.",
+                ephemeral=True
+            )
 
         request_message = await verification_channel.send(
             f"<@&{VERIFICATION_TEAM_ROLE_ID}> <@{OWNER_ID}> <@&{ADMIN_ROLE_ID}>\n"

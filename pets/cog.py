@@ -146,7 +146,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             """,
             (user_id,),
         ) as cursor:
-            return await cursor.fetchall()
+            return list(await cursor.fetchall())
 
 
     async def _incubator_row(self, db, user_id):
@@ -936,6 +936,9 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                     if channel is None:
                         # Keep the notification pending so a later checker run
                         # can try again if the channel becomes available.
+                        continue
+
+                    if not isinstance(channel, discord.abc.Messageable):
                         continue
 
                     try:
