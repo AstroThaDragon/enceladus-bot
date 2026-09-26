@@ -8,6 +8,8 @@ import asyncio
 import re
 import threading
 
+import aiosqlite
+
 COOLDOWN_FILE = "verification_cooldowns.json"
 
 VERIFICATION_CHANNEL_ID = 1297033393313288263
@@ -439,21 +441,41 @@ class VerificationDropdown(Select):
                 ephemeral=True
             )
 
-        level_10_role = guild.get_role(LEVEL_10_ROLE_ID)
+        application_key = self.values[0]
 
-        # Check if user has Level 10 role or higher (defaults to True if role ID is missing/invalid)
-        has_required_level = True if not level_10_role else False
-        if level_10_role:
-            for role in member.roles:
-                if role.position >= level_10_role.position:
-                    has_required_level = True
-                    break
+        # Only NSFW and NSFW+ applications require Level 10+.
+        # Read the actual level from the leveling system rather than relying on
+        # Discord role hierarchy, since level roles are milestone roles and
+        # their Discord positions are not the source of truth for a user's level.
+        if application_key in {"nsfw", "nsfw_plus"}:
+            leveling_cog = self.cog.bot.get_cog("Leveling")
+            level = None
 
-        if not has_required_level:
-            return await interaction.response.send_message(
-                "❌ You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.",
-                ephemeral=True
-            )
+            if leveling_cog is not None:
+                try:
+                    async with aiosqlite.connect(leveling_cog.db_path) as db:
+                        async with db.execute(
+                            "SELECT level FROM users WHERE user_id = ?",
+                            (member.id,)
+                        ) as cursor:
+                            row = await cursor.fetchone()
+
+                    if row is not None:
+                        level = int(row[0])
+                except (OSError, aiosqlite.Error, TypeError, ValueError) as e:
+                    print(f"[VERIFICATION LEVEL CHECK ERROR] Could not read level for {member.id}: {e}")
+
+            if level is None:
+                return await interaction.response.send_message(
+                    "⚠️ I couldn't verify your Enceladus level right now. Please try again in a moment.",
+                    ephemeral=True
+                )
+
+            if level < 10:
+                return await interaction.response.send_message(
+                    "❌ You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.",
+                    ephemeral=True
+                )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -473,7 +495,6 @@ class VerificationDropdown(Select):
 
         await member.add_roles(pending_role, reason="Started verification application")
 
-        application_key = self.values[0]
         application_name = APPLICATION_TYPES[application_key]["label"]
 
         verification_channel = guild.get_channel(VERIFICATION_CHANNEL_ID)
