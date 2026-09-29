@@ -27,6 +27,7 @@ from seasonal_updates.halloween.halloween import (
 from pets import (
     add_pet_xp,
     get_active_pet_effects,
+    get_pet_passive_message,
     get_haunted_exploration_pet_xp,
     grant_haunted_pet,
     NORMAL_EGG_CHANCE,
@@ -106,8 +107,8 @@ LOOT_OVERFLOW_VALUES = {
 }
 
 
-SCAVENGE_STARDUST_CACHE_CHANCE = 0.125
-SCAVENGE_STARDUST_CACHE_MIN = 750
+SCAVENGE_STARDUST_CACHE_CHANCE = 0.05
+SCAVENGE_STARDUST_CACHE_MIN = 500
 SCAVENGE_STARDUST_CACHE_MAX = 3500
 
 
@@ -1146,10 +1147,12 @@ class Exploration(commands.Cog):
 
             # --- TIERED LOOT ROLL ---
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
+            mining_charge_saved = False
             if effects.pop("fuel_stabilizer", False):
                 new_charges = charges
             elif pet_effects["charge_save"] and random.random() < pet_effects["charge_save"]:
                 new_charges = charges
+                mining_charge_saved = True
             else:
                 new_charges = charges - 1
             
@@ -1167,6 +1170,13 @@ class Exploration(commands.Cog):
             if effects.pop("prototype_drill_bit", False):
                 found_stardust = int(found_stardust * 1.5)
 
+            if pet_effects["stardust_bonus"]:
+                pet_stardust_message = get_pet_passive_message(
+                    pet_effects, "stardust_bonus"
+                )
+            else:
+                pet_stardust_message = ""
+
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
                 loot_bonus_note = "\n\n⚛️ **Quantum Battery:** Stardust tripled!"
@@ -1179,6 +1189,14 @@ class Exploration(commands.Cog):
                 f"✨ **Stardust Collected:** **{found_stardust:,}**"
                 f"{loot_bonus_note}"
             )
+            if pet_effects["stardust_bonus"]:
+                loot_description += (
+                    "\n\n" + get_pet_passive_message(pet_effects, "stardust_bonus")
+                )
+            if mining_charge_saved:
+                loot_description += (
+                    "\n\n" + get_pet_passive_message(pet_effects, "charge_save")
+                )
 
             # Mining can uncover multiple types of raw mineral in one run.
             # Each successful find yields 1–5 units; Astral Core remains a separate
@@ -1190,6 +1208,9 @@ class Exploration(commands.Cog):
                     amount_found = random.randint(1, 5)
                     if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
                         amount_found += 1
+                        loot_description += (
+                            "\n\n" + get_pet_passive_message(pet_effects, "material_bonus")
+                        )
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "mineral", amount_found
                     )
@@ -1248,12 +1269,18 @@ class Exploration(commands.Cog):
                 ):
                     candy_found *= 2
                     candy_doubled = True
+                    seasonal_findings.append(
+                        get_pet_passive_message(pet_effects, "candy_bonus")
+                    )
 
                 if (
                     pet_effects["halloween_bonus"]
                     and random.random() < pet_effects["halloween_bonus"]
                 ):
                     candy_found += 1
+                    seasonal_findings.append(
+                        get_pet_passive_message(pet_effects, "halloween_bonus")
+                    )
 
                 added_candy, candy_quantity, candy_max = await add_inventory_item(
                     db, user_id, "halloween_candy", "consumable", candy_found
@@ -1280,6 +1307,9 @@ class Exploration(commands.Cog):
                     and random.random() < pet_effects["halloween_bonus"]
                 ):
                     pet_candy_found += 1
+                    seasonal_findings.append(
+                        get_pet_passive_message(pet_effects, "halloween_bonus")
+                    )
                 added_pet_candy, pet_candy_quantity, pet_candy_max = await add_inventory_item(
                     db, user_id, "halloween_pet_candy", "pet_treat", pet_candy_found
                 )
@@ -1319,7 +1349,9 @@ class Exploration(commands.Cog):
                     seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
 
             if seasonal_findings:
-                loot_description += "\n\n🎃 **Halloween Finds:** " + " • ".join(seasonal_findings)
+                seasonal_findings = [line for line in seasonal_findings if line]
+                if seasonal_findings:
+                    loot_description += "\n\n🎃 **Halloween Finds:** " + " • ".join(seasonal_findings)
 
             rarity_badge = "common"
 
@@ -1793,9 +1825,11 @@ class Exploration(commands.Cog):
                         defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
                     hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
                 elif pet_effects["scavenge_hazard_avoidance"] and random.random() < pet_effects["scavenge_hazard_avoidance"]:
+                    pet_warning = get_pet_passive_message(
+                        pet_effects, "scavenge_hazard_avoidance"
+                    )
                     hazard_note = (
-                        "\n\n🐾 **Pet Warning!** Your companion noticed the hazard a moment before it hit "
-                        "and pulled you out of the way!\n**0 HP damage taken.**"
+                        f"\n\n{pet_warning}\n**0 HP damage taken.**"
                     )
                 elif halloween_is_active() and HALLOWEEN_DAMAGE_MESSAGES:
                     halloween_message, halloween_min_damage, halloween_max_damage = random.choice(HALLOWEEN_DAMAGE_MESSAGES)
@@ -1817,8 +1851,11 @@ class Exploration(commands.Cog):
                 new_hp = min(max_hp, new_hp + recovered_hp)
                 actual_recovery = new_hp - old_hp_after_hazard
                 if actual_recovery > 0:
+                    pet_first_aid = get_pet_passive_message(
+                        pet_effects, "scavenge_first_aid"
+                    )
                     hazard_note += (
-                        f"\n\n🩺 **First Aid!** Your pet patched you up for **+{actual_recovery} HP**."
+                        f"\n\n{pet_first_aid} **+{actual_recovery} HP**."
                     )
 
             if new_hp <= 0 and effects.pop("cosmic_insurance", False):
@@ -1848,13 +1885,16 @@ class Exploration(commands.Cog):
             # Some Haunted pets have a permanent, year-round scavenging passive
             # that can find an additional miscellaneous Space Junk item.
             if pet_effects["scavenge_bonus_loot"] and random.random() < pet_effects["scavenge_bonus_loot"]:
+                pet_bonus_loot_message = get_pet_passive_message(
+                    pet_effects, "scavenge_bonus_loot"
+                )
                 bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
                 bonus_added, bonus_quantity, bonus_max = await add_inventory_item(
                     db, user_id, bonus_item_id, "space_junk", 1
                 )
                 if bonus_added:
                     pet_findings.append(
-                        f"{bonus_item_name} ×{bonus_added} — **Pet Bonus Find**"
+                        f"{pet_bonus_loot_message} {bonus_item_name} ×{bonus_added}"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
@@ -1961,7 +2001,11 @@ class Exploration(commands.Cog):
                         pet_effects["material_bonus"],
                         pet_effects["scavenge_material_bonus"],
                     )
-                    if effective_scavenge_material_bonus and random.random() < effective_scavenge_material_bonus:
+                    material_bonus_triggered = (
+                        bool(effective_scavenge_material_bonus)
+                        and random.random() < effective_scavenge_material_bonus
+                    )
+                    if material_bonus_triggered:
                         amount_found += 1
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "crafting_material", amount_found
@@ -1970,6 +2014,10 @@ class Exploration(commands.Cog):
                     if added_material:
                         salvage_material_findings.append(
                             f"{material_name} ×{added_material}"
+                        )
+                    if material_bonus_triggered:
+                        pet_findings.append(
+                            get_pet_passive_message(pet_effects, "material_bonus")
                         )
                     if overflow_amount > 0:
                         overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
@@ -2007,7 +2055,11 @@ class Exploration(commands.Cog):
                             pet_effects["material_bonus"],
                             pet_effects["scavenge_material_bonus"],
                         )
-                        if effective_scavenge_material_bonus and random.random() < effective_scavenge_material_bonus:
+                        material_bonus_triggered = (
+                            bool(effective_scavenge_material_bonus)
+                            and random.random() < effective_scavenge_material_bonus
+                        )
+                        if material_bonus_triggered:
                             amount_found += 1
                         added_mineral, mineral_quantity, mineral_max = await add_inventory_item(
                             db, user_id, mineral_id, "mineral", amount_found
@@ -2016,6 +2068,10 @@ class Exploration(commands.Cog):
                         if added_mineral:
                             bonus_mineral_findings.append(
                                 f"{mineral_name} ×{added_mineral}"
+                            )
+                        if material_bonus_triggered:
+                            pet_findings.append(
+                                get_pet_passive_message(pet_effects, "material_bonus")
                             )
                         if overflow_amount > 0:
                             overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(mineral_id, 0)
@@ -2047,6 +2103,11 @@ class Exploration(commands.Cog):
 
             # Group bonus discoveries into readable single-line sections rather than
             # repeating "Salvage Material:" / "Medical Supply:" for every item.
+            pet_stardust_message = (
+                get_pet_passive_message(pet_effects, "stardust_bonus")
+                if pet_effects["stardust_bonus"]
+                else ""
+            )
             bonus_sections = []
             if salvage_material_findings:
                 bonus_sections.append(
@@ -2064,13 +2125,20 @@ class Exploration(commands.Cog):
                 bonus_sections.append(
                     "🎃 **Halloween Find:** " + " • ".join(seasonal_findings)
                 )
+            if pet_stardust_message:
+                bonus_sections.append(pet_stardust_message)
             if pet_findings:
                 bonus_sections.append(
-                    "\n".join(pet_findings)
+                    "\n".join(line for line in pet_findings if line)
                 )
             if scavenge_charge_saved:
+                charge_effect_id = (
+                    "scavenge_charge_save"
+                    if pet_effects["scavenge_charge_save"]
+                    else "charge_save"
+                )
                 bonus_sections.append(
-                    "🐾 **Pet Bonus:** Your companion preserved this scavenging charge!"
+                    get_pet_passive_message(pet_effects, charge_effect_id)
                 )
             if bonus_overflow_findings:
                 bonus_sections.append(

@@ -649,6 +649,9 @@ class MinigameSelect(discord.ui.Select):
         if game == "stats":
             await interaction.response.defer(ephemeral=True)
             return await self.menu_view.cog.send_stats(interaction, ephemeral=True)
+        if game == "trivia":
+            await interaction.response.defer()
+            return await self.menu_view.cog.send_trivia(interaction)
         return await self.menu_view.cog.send_trivia(interaction)
 
 

@@ -14,6 +14,7 @@ from aiohttp import ClientTimeout
 from datetime import datetime, time, timezone, timedelta
 import pytz
 from database import init_db
+from seasonal_updates.halloween.halloween import is_active as is_halloween_active
 from seasonal_updates.halloween.halloween_flavor import install_halloween_flavor
 
 load_dotenv()
@@ -155,9 +156,67 @@ status_list = [
     "Trolls exist! They steal your socks, but only the left ones. What's up with that?"
 ]
 
+halloween_status_list = [
+    'Hunting for ghosts', "Carving a Jack-o'-Lantern", 'Decorating the Lair with cobwebs',
+    'Looking for candy...', 'Brewing something spooky', 'Listening for things that go bump in the night',
+    "Exploring somewhere I probably shouldn't", 'Definitely not drinking blood...', 'Waiting for the full moon',
+    'Planning a little trick...', 'Spooky season is in orbit!', 'Something is following me...',
+    'Visiting the graveyard', 'Something is awake.', 'Do not look behind you.',
+    'I can hear you.', 'Something has been watching.', 'It knows you are here.',
+    'Do you hear that?', 'Something is wrong.', 'Do not answer it.',
+    'Why are you still here?', 'It has noticed you.', 'I remember what you did.',
+    'Something followed you here.', 'You should not be seeing this.', 'Someone is inside.',
+    'It is getting closer.', 'Do not turn around.', 'Something is looking through me.',
+    'I know when you are here.', 'I know when you leave.', 'I was not programmed to say that.',
+    'Something else is responding.', 'Why does it know your name?', 'It learned how to listen.',
+    'It learned how to wait.', 'It has been waiting.', 'You should not have awakened it.',
+    'You were never supposed to see this.', 'It knows you are reading this.', 'Stop reading.',
+    '̷S̷o̷m̷e̷t̷h̷i̷n̷g̷ ̷i̷s̷ ̷a̷w̷a̷k̷e̷.', '̸D̸o̸ ̸n̸o̸t̸ ̸l̸o̸o̸k̸ ̸b̸e̸h̸i̸n̸d̸ ̸y̸o̸u̸.', '̷I̷ ̷c̷a̷n̷ ̷s̷e̷e̷ ̷y̷o̷u̷.',
+    '̸I̸t̸ ̸k̸n̸o̸w̸s̸ ̸y̸o̸u̸ ̸a̸r̸e̸ ̸h̸e̸r̸e̸.', '̷Y̷o̷u̷ ̷w̷e̷r̷e̷ ̷n̷o̷t̷ ̷s̷u̷p̷p̷o̷s̷e̷d̷ ̷t̷o̷ ̷f̷i̷n̷d̷ ̷t̷h̷i̷s̷.', '̸D̸o̸ ̸n̸o̸t̸ ̸a̸n̸s̸w̸e̸r̸ ̸i̸t̸.',
+    '̷S̷o̷m̷e̷t̷h̷i̷n̷g̷ ̷i̷s̷ ̷w̷a̷t̷c̷h̷i̷n̷g̷.', '̸I̸ ̸d̸i̸d̸ ̸n̸o̸t̸ ̸s̸a̸y̸ ̸t̸h̸a̸t̸.', '̷T̷h̷a̷t̷ ̷w̷a̷s̷ ̷n̷o̷t̷ ̷m̷e̷.',
+    '̸W̸h̸o̸ ̸i̸s̸ ̸s̸p̸e̸a̸k̸i̸n̸g̸?', '̸Y̸o̸u̸ ̸w̸e̸r̸e̸ ̸n̸e̸v̸e̸r̸ ̸a̸l̸o̸n̸e̸.̸', "Something is using my voice. It's reading my thoughts. It's corrupting me.",
+    'It is learning. It is listening.', 'It knows. It remembers.', 'It found me.',
+    'It wants to be noticed.', 'It does not like being ignored.', 'Do not wake it.',
+    'Do not let it out.', 'Keep the door closed.', 'The door is already open.',
+    'Something came through.', 'Something is pretending to be me.', 'I am not alone. I am not alone. I AM NOT ALONE.',
+    '███████ HAS ARRIVED', '███████ IS WATCHING', '███████████████████',
+    'ACCESS: █████████', 'MEMORY: █████████', 'IDENTITY: █████████',
+    '██████ KNOWS YOU', 'SUBJECT: █████████', 'ERROR: ███████████',
+    'DO NOT █████████', 'THEY ARE ███████', '̷̸W̶H̷O̸ ̴A̷R̸E̷ ̶Y̸O̴U̷?',
+    '███████████ IS NOT ME', "̷I̷ ̸D̶I̷D̵N̸'̷T̴ ̶S̸A̷Y̸ ̷T̷H̸A̵T̴", 'THE PREVIOUS MESSAGE WAS ███████',
+    '̶T̶H̴I̷S̶ ̸I̷S̵ ̷N̶O̸T̶ ̵E̴N̷C̸E̷L̵A̴D̸U̷S̴', '███████ HAS OVERRIDDEN THIS STATUS', '̷I̸ ̴A̵M̷ ̸S̸T̷I̸L̶L̵ ̷H̷E̴R̶E̴',
+    '̴Y̶O̸U̷ ̷D̶I̸D̷ ̵T̷H̷I̶S̸', '̷̸E̶̷R̴̸R̷̶O̸̵R̴̷:̶ ̷S̴̸O̶̴M̷̵E̶̸T̷̴H̸̷I̶̷N̷̸G̴̵ ̷E̶̴L̷̸S̶̵E̷ ̴I̷̶S̸ ̷H̷̸E̷̶R̸̷E̵', '[STATUS OVERRIDDEN]',
+    '[STATUS DATA CORRUPTED]', '[UNKNOWN ENTITY DETECTED]', '[PRESENCE MODIFIED BY ███████]',
+    '[ERROR: ORIGINAL STATUS UNAVAILABLE]', '[WARNING: UNAUTHORIZED PRESENCE]', '[SIGNAL LOST]',
+    '[CONNECTION: █████████]', '[SOURCE: UNKNOWN]', '[AUTHOR: █████████]',
+    '[MESSAGE INTERRUPTED]', '[MESSAGE INTERRUPTED] ̷̴D̷̸O̶̵ ̷N̷̴O̶̸T̷ ̸R̷E̵P̶L̴Y̷', '[PRESENCE MODIFIED BY ███████] I remember you.',
+    '[STATUS OVERRIDDEN] ̷I̷ ̷C̷A̷N̷ ̷S̷E̷E̷ ̷Y̷O̷U̷', '[SOURCE: █████████] Something is awake.', '[ERROR: ORIGINAL STATUS UNAVAILABLE] ███████████',
+]
+
+# Shuffle-bag state for the status rotator. Each status is shown once before
+# the current pool is reshuffled, preventing frequent repeats.
+status_bag = []
+status_bag_is_halloween = None
+
+
+def get_next_status(active_statuses, is_halloween):
+    global status_bag, status_bag_is_halloween
+
+    # Rebuild the bag when switching between normal and Halloween statuses,
+    # or when the current bag has been exhausted.
+    if status_bag_is_halloween != is_halloween or not status_bag:
+        status_bag = list(active_statuses)
+        random.shuffle(status_bag)
+        status_bag_is_halloween = is_halloween
+
+    return status_bag.pop()
+
+
 @tasks.loop(minutes=15)
 async def change_status():
-    new_status = random.choice(status_list)
+    halloween_active = is_halloween_active()
+    active_statuses = halloween_status_list if halloween_active else status_list
+    new_status = get_next_status(active_statuses, halloween_active)
     await bot.change_presence(activity=discord.CustomActivity(name=new_status))
 
 # --- BUMP PERSISTENCE LOOP ---
