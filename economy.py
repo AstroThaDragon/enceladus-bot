@@ -1211,84 +1211,6 @@ class Economy(commands.Cog):
             f"You now have **{stardust + amount:,} Stardust** available to spend."
         )
 
-    async def shop_item_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str
-    ):
-        action = getattr(interaction.namespace, "action", None)
-
-        if action == "buy":
-            return await self.shop_buy_autocomplete(interaction, current)
-
-        if action == "sell":
-            return await self.shop_sell_autocomplete(interaction, current)
-
-        buy_choices = await self.shop_buy_autocomplete(interaction, current)
-        sell_choices = await self.shop_sell_autocomplete(interaction, current)
-
-        combined = []
-        seen = set()
-
-        for choice in [*buy_choices, *sell_choices]:
-            if choice.value in seen:
-                continue
-            combined.append(choice)
-            seen.add(choice.value)
-
-        return combined[:25]
-
-    @commands.hybrid_command(
-        name="shop",
-        description="Open the station shop, or buy and sell items."
-    )
-    @app_commands.describe(
-        action="Choose whether to buy or sell an item.",
-        item="Choose the item to buy or sell.",
-        quantity="How many to buy or sell (1-99).",
-    )
-    @app_commands.choices(
-        action=[
-            app_commands.Choice(name="Buy", value="buy"),
-            app_commands.Choice(name="Sell", value="sell"),
-        ]
-    )
-    @app_commands.autocomplete(item=shop_item_autocomplete)
-    async def shop(
-        self,
-        ctx: commands.Context,
-        action: str | None = None,
-        item: str | None = None,
-        quantity: int = 1,
-    ):
-        """Open the shop, purchase an item, or sell an item."""
-        if action:
-            action = action.lower().strip()
-
-        if action == "buy":
-            if not item:
-                return await ctx.send("❌ Choose an item to buy from the shop.")
-            return await self.buy(ctx, item, quantity)
-
-        if action == "sell":
-            if not item:
-                return await ctx.send("❌ Choose an item to sell from the shop.")
-            return await self.sell(ctx, item, quantity)
-
-        if action is not None:
-            return await ctx.send("❌ Choose **Buy** or **Sell** as the shop action.")
-
-        if item:
-            return await ctx.send("❌ Choose **Buy** or **Sell** when providing an item.")
-
-        view = ShopView(self, ctx.author.id)
-        embed = view.build_embed("healing")
-
-        await ctx.send(
-            embed=embed,
-            view=view
-        )
-
     async def shop_buy_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -1395,6 +1317,263 @@ class Economy(commands.Cog):
         available_items.sort(key=lambda choice: choice.name.lower())
 
         return available_items[:25]
+    async def shop_sell_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ):
+        """Show sellable items the user currently owns."""
+        user_id = interaction.user.id
+        current = current.lower().strip()
+
+        from inventory import ITEM_REGISTRY
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity, item_type
+                FROM inventory
+                WHERE user_id = ?
+                  AND quantity > 0
+                ORDER BY item_id
+                """,
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        # Application-command autocomplete does not reliably render Discord
+        # custom-emoji markup, so use normal Unicode fallbacks for sell choices.
+        sell_autocomplete_emojis = {
+            # Materials / ores
+            "iron_ore": "⛏️",
+            "copper_ore": "🟠",
+            "titanium_chunk": "⛏️",
+            "aluminum_ore": "⬜",
+            "circuit_board": "🟩",
+            "glue": "🧴",
+            "scrap_metal": "🔩",
+            "nuts_bolts": "🔧",
+            "wiring": "🧵",
+            "time_crystal": "💎",
+            # Haunted / seasonal materials
+            "haunted_circuit": "⚡",
+            "screaming_crystal": "💎",
+            # Space Junk
+            "space_pizza": "🍕",
+            "floppy_disk": "💾",
+            "meteorite": "☄️",
+            "rubber_duck": "🦆",
+            "rusty_gear": "⚙️",
+            "tape_deck": "📼",
+            "alien_artifact": "👽",
+            "space_boot": "🥾",
+            "holo_poster": "🖼️",
+            "broken_laser": "🔧",
+            "lost_logbook": "📓",
+            "left_sock": "🧦",
+            "warp_mug": "☕",
+            "space_pudding": "🍮",
+            "tangled_cables": "🪢",
+            "moon_cheese": "🧀",
+            "golden_spatula": "🥄",
+            "parking_ticket": "🎫",
+            "floating_plant": "🪴",
+            "tinted_visor": "🕶️",
+            "purring_lint": "🧶",
+            "pet_rock": "🪨",
+            "space_taco": "🌮",
+            "rusty_wrench": "🔧",
+            "alien_fossil": "🦴",
+            "big_red_button": "🔴",
+            "antique_compass": "🧭",
+            "broken_clock": "🕰️",
+            "perplexing_painting": "🖼️",
+            "cosmic_banana": "🍌",
+            "cosmic_coin": "🪙",
+        }
+
+        choices = []
+        sellable_rows = []
+
+        # Time Crystals are stored on the users table rather than the inventory
+        # table, so add them to the sell list separately.
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                time_crystal_row = await cursor.fetchone()
+
+        time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
+        if time_crystal_quantity > 0:
+            time_crystal_info = ITEM_REGISTRY.get("time_crystal", {})
+            display_name = time_crystal_info.get("name", "Dilated Time Crystal")
+            search_text = f"{display_name} time_crystal".lower()
+            if not current or current in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"💎 {display_name} (x{time_crystal_quantity})",
+                        value="time_crystal"
+                    )
+                )
+
+        for item_id, owned_quantity, item_type in rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+
+            # Space Junk can be sold using the existing normal buyback table
+            # or the Halloween-specific Stardust + Candy reward.
+            is_space_junk = str(item_type).lower() == "space_junk" or info.get("type") == "Space Junk"
+            is_material = bool(info.get("sell_price")) and info.get("type") in {
+                "Mineral",
+                "Crafting Material",
+                "Haunted Ingredient",
+            }
+            is_sellable_item = item_id in SELLABLE_ITEM_IDS and bool(info.get("sell_price"))
+
+            if not is_space_junk and not is_material and not is_sellable_item:
+                continue
+
+            if is_space_junk:
+                if (
+                    item_id not in self.JUNK_PRICES
+                    and get_halloween_sell_reward(item_id) is None
+                ):
+                    continue
+            elif not info.get("sell_price"):
+                continue
+
+            sellable_rows.append((item_id, owned_quantity, info, is_space_junk))
+
+        normal_junk_owned = any(
+            is_space_junk and item_id in self.JUNK_PRICES
+            for item_id, _quantity, _info, is_space_junk in sellable_rows
+        )
+        normal_material_owned = any(
+            item_id in NORMAL_SELL_ALL_MATERIAL_IDS
+            for item_id, _quantity, _info, _is_space_junk in sellable_rows
+        )
+
+        # Bulk options are deliberately separate so limited-time Halloween
+        # Space Junk and Haunted ingredients can never be swept up accidentally.
+        show_all = not current or "all" in current or "sell all" in current
+        show_junk_all = show_all or "junk" in current or "space junk" in current
+        show_material_all = show_all or "material" in current or "ore" in current
+
+        if normal_junk_owned and show_junk_all:
+            choices.append(
+                app_commands.Choice(
+                    name="🗑️ Sell All Space Junk",
+                    value="all_junk"
+                )
+            )
+
+        if normal_material_owned and show_material_all:
+            choices.append(
+                app_commands.Choice(
+                    name="🔧 Sell All Ores & Materials",
+                    value="all_materials"
+                )
+            )
+
+        for item_id, owned_quantity, info, _is_space_junk in sellable_rows:
+            display_name = info["name"]
+            search_text = f"{display_name} {item_id}".lower()
+
+            raw_emoji = str(info.get("emoji", ""))
+            if raw_emoji.startswith("<:") or raw_emoji.startswith("<a:"):
+                display_emoji = sell_autocomplete_emojis.get(item_id, "📦")
+            else:
+                display_emoji = raw_emoji or sell_autocomplete_emojis.get(item_id, "📦")
+            if current and current not in search_text:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{display_emoji} {display_name} (x{owned_quantity})",
+                    value=item_id
+                )
+            )
+
+        bulk_choices = [
+            choice for choice in choices
+            if choice.value in {"all_junk", "all_materials"}
+        ]
+        item_choices = [
+            choice for choice in choices
+            if choice.value not in {"all_junk", "all_materials"}
+        ]
+        item_choices.sort(key=lambda choice: choice.name.lower())
+
+        return (bulk_choices + item_choices)[:25]
+
+
+    @commands.hybrid_group(
+        name="shop",
+        description="Open the station shop or manage purchases and sales.",
+        invoke_without_command=True,  # type: ignore[call-arg]
+    )
+    async def shop(self, ctx: commands.Context):
+        """Open the main station shop."""
+        view = ShopView(self, ctx.author.id)
+        embed = view.build_embed("healing")
+
+        await ctx.send(
+            embed=embed,
+            view=view
+        )
+
+    @shop.command(
+        name="buy",
+        description="Buy an item from the station shop."
+    )
+    @app_commands.describe(
+        item="Choose the item to buy.",
+        quantity="How many to buy (default: 1, maximum: 99).",
+    )
+    @app_commands.autocomplete(item=shop_buy_autocomplete)
+    async def shop_buy(
+        self,
+        ctx: commands.Context,
+        item: str,
+        quantity: int = 1,
+    ):
+        """Buy a selected shop item."""
+        return await self.buy(ctx, item, quantity)
+
+    @shop.command(
+        name="rotating",
+        description="Show today's rotating station offers."
+    )
+    async def shop_rotating(self, ctx: commands.Context):
+        """Show today's rotating shop."""
+        view = ShopView(self, ctx.author.id)
+        embed = view.build_embed("daily")
+
+        await ctx.send(
+            embed=embed,
+            view=view
+        )
+
+    @shop.command(
+        name="sell",
+        description="Sell an item from your inventory."
+    )
+    @app_commands.describe(
+        item="Choose the item to sell, or select a Sell All option.",
+        quantity="How many to sell (default: 1, maximum: 99).",
+    )
+    @app_commands.autocomplete(item=shop_sell_autocomplete)
+    async def shop_sell(
+        self,
+        ctx: commands.Context,
+        item: str,
+        quantity: int = 1,
+    ):
+        """Sell a selected inventory item or a bulk Sell All option."""
+        return await self.sell(ctx, item, quantity)
+
 
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
         await ctx.defer()
@@ -2439,198 +2618,6 @@ class Economy(commands.Cog):
             text=f"Salvage Rig Level {salvage_upgrade.get('level', 0)}/5 • Base salvage is guaranteed"
         )
         await ctx.send(embed=embed)
-
-    async def shop_sell_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str
-    ):
-        """Show sellable items the user currently owns."""
-        user_id = interaction.user.id
-        current = current.lower().strip()
-
-        from inventory import ITEM_REGISTRY
-
-        async with aiosqlite.connect(self.get_db_path()) as db:
-            async with db.execute(
-                """
-                SELECT item_id, quantity, item_type
-                FROM inventory
-                WHERE user_id = ?
-                  AND quantity > 0
-                ORDER BY item_id
-                """,
-                (user_id,)
-            ) as cursor:
-                rows = await cursor.fetchall()
-
-        # Application-command autocomplete does not reliably render Discord
-        # custom-emoji markup, so use normal Unicode fallbacks for sell choices.
-        sell_autocomplete_emojis = {
-            # Materials / ores
-            "iron_ore": "⛏️",
-            "copper_ore": "🟠",
-            "titanium_chunk": "⛏️",
-            "aluminum_ore": "⬜",
-            "circuit_board": "🟩",
-            "glue": "🧴",
-            "scrap_metal": "🔩",
-            "nuts_bolts": "🔧",
-            "wiring": "🧵",
-            "time_crystal": "💎",
-            # Haunted / seasonal materials
-            "haunted_circuit": "⚡",
-            "screaming_crystal": "💎",
-            # Space Junk
-            "space_pizza": "🍕",
-            "floppy_disk": "💾",
-            "meteorite": "☄️",
-            "rubber_duck": "🦆",
-            "rusty_gear": "⚙️",
-            "tape_deck": "📼",
-            "alien_artifact": "👽",
-            "space_boot": "🥾",
-            "holo_poster": "🖼️",
-            "broken_laser": "🔧",
-            "lost_logbook": "📓",
-            "left_sock": "🧦",
-            "warp_mug": "☕",
-            "space_pudding": "🍮",
-            "tangled_cables": "🪢",
-            "moon_cheese": "🧀",
-            "golden_spatula": "🥄",
-            "parking_ticket": "🎫",
-            "floating_plant": "🪴",
-            "tinted_visor": "🕶️",
-            "purring_lint": "🧶",
-            "pet_rock": "🪨",
-            "space_taco": "🌮",
-            "rusty_wrench": "🔧",
-            "alien_fossil": "🦴",
-            "big_red_button": "🔴",
-            "antique_compass": "🧭",
-            "broken_clock": "🕰️",
-            "perplexing_painting": "🖼️",
-            "cosmic_banana": "🍌",
-            "cosmic_coin": "🪙",
-        }
-
-        choices = []
-        sellable_rows = []
-
-        # Time Crystals are stored on the users table rather than the inventory
-        # table, so add them to the sell list separately.
-        async with aiosqlite.connect(self.get_db_path()) as db:
-            async with db.execute(
-                "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
-                (user_id,)
-            ) as cursor:
-                time_crystal_row = await cursor.fetchone()
-
-        time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
-        if time_crystal_quantity > 0:
-            time_crystal_info = ITEM_REGISTRY.get("time_crystal", {})
-            display_name = time_crystal_info.get("name", "Dilated Time Crystal")
-            search_text = f"{display_name} time_crystal".lower()
-            if not current or current in search_text:
-                choices.append(
-                    app_commands.Choice(
-                        name=f"💎 {display_name} (x{time_crystal_quantity})",
-                        value="time_crystal"
-                    )
-                )
-
-        for item_id, owned_quantity, item_type in rows:
-            info = ITEM_REGISTRY.get(item_id)
-            if not info:
-                continue
-
-            # Space Junk can be sold using the existing normal buyback table
-            # or the Halloween-specific Stardust + Candy reward.
-            is_space_junk = str(item_type).lower() == "space_junk" or info.get("type") == "Space Junk"
-            is_material = bool(info.get("sell_price")) and info.get("type") in {
-                "Mineral",
-                "Crafting Material",
-                "Haunted Ingredient",
-            }
-            is_sellable_item = item_id in SELLABLE_ITEM_IDS and bool(info.get("sell_price"))
-
-            if not is_space_junk and not is_material and not is_sellable_item:
-                continue
-
-            if is_space_junk:
-                if (
-                    item_id not in self.JUNK_PRICES
-                    and get_halloween_sell_reward(item_id) is None
-                ):
-                    continue
-            elif not info.get("sell_price"):
-                continue
-
-            sellable_rows.append((item_id, owned_quantity, info, is_space_junk))
-
-        normal_junk_owned = any(
-            is_space_junk and item_id in self.JUNK_PRICES
-            for item_id, _quantity, _info, is_space_junk in sellable_rows
-        )
-        normal_material_owned = any(
-            item_id in NORMAL_SELL_ALL_MATERIAL_IDS
-            for item_id, _quantity, _info, _is_space_junk in sellable_rows
-        )
-
-        # Bulk options are deliberately separate so limited-time Halloween
-        # Space Junk and Haunted ingredients can never be swept up accidentally.
-        show_all = not current or "all" in current or "sell all" in current
-        show_junk_all = show_all or "junk" in current or "space junk" in current
-        show_material_all = show_all or "material" in current or "ore" in current
-
-        if normal_junk_owned and show_junk_all:
-            choices.append(
-                app_commands.Choice(
-                    name="🗑️ Sell All Space Junk",
-                    value="all_junk"
-                )
-            )
-
-        if normal_material_owned and show_material_all:
-            choices.append(
-                app_commands.Choice(
-                    name="🔧 Sell All Ores & Materials",
-                    value="all_materials"
-                )
-            )
-
-        for item_id, owned_quantity, info, _is_space_junk in sellable_rows:
-            display_name = info["name"]
-            search_text = f"{display_name} {item_id}".lower()
-
-            raw_emoji = str(info.get("emoji", ""))
-            if raw_emoji.startswith("<:") or raw_emoji.startswith("<a:"):
-                display_emoji = sell_autocomplete_emojis.get(item_id, "📦")
-            else:
-                display_emoji = raw_emoji or sell_autocomplete_emojis.get(item_id, "📦")
-            if current and current not in search_text:
-                continue
-
-            choices.append(
-                app_commands.Choice(
-                    name=f"{display_emoji} {display_name} (x{owned_quantity})",
-                    value=item_id
-                )
-            )
-
-        bulk_choices = [
-            choice for choice in choices
-            if choice.value in {"all_junk", "all_materials"}
-        ]
-        item_choices = [
-            choice for choice in choices
-            if choice.value not in {"all_junk", "all_materials"}
-        ]
-        item_choices.sort(key=lambda choice: choice.name.lower())
-
-        return (bulk_choices + item_choices)[:25]
-
 
     async def sell(
         self,

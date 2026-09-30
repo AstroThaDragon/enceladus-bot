@@ -598,7 +598,12 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             ) as cursor:
                 rows = await cursor.fetchall()
 
-        choices = []
+        choices = [
+            app_commands.Choice(
+                name="ℹ️ Fusion Info",
+                value="info",
+            )
+        ]
 
         for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite in rows:
             pet_type_id = pet_type or pet_stage
@@ -666,13 +671,86 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     @commands.hybrid_command(
         name="fusion",
-        description="Select a pet to receive a Fusion level using 5 matching duplicates.",
+        description="Fuse a pet using 5 matching duplicates, and use /fusion info for more details.",
     )
     @app_commands.describe(
-        pet="Choose the pet that will receive the Fusion level. You need 5 matching duplicates."
+        pet="Choose the pet to fuse, or type/select 'info' to learn how Fusion works."
     )
     @app_commands.autocomplete(pet=_pet_fuse_autocomplete)
-    async def pet_fuse(self, ctx: commands.Context, pet: str):
+    async def pet_fuse(self, ctx: commands.Context, pet: str | None = None):
+        if not pet or pet.lower().strip() == "info":
+            embed = discord.Embed(
+                title="🧬 Pet Fusion",
+                description=(
+                    "Fusion strengthens a pet by consuming **5 matching, non-favorited duplicates** "
+                    "of the same pet and variant. Each Fusion level increases that pet's passive strength."
+                ),
+                color=discord.Color.blurple(),
+            )
+
+            embed.add_field(
+                name="🔧 How Fusion Works",
+                value=(
+                    "• Choose the pet you want to keep.\n"
+                    "• You need **5 matching duplicates** of that pet.\n"
+                    "• The duplicates must have the **same variant** as the target.\n"
+                    "• Duplicates marked as **Favorite** cannot be consumed.\n"
+                    "• Haunted location pets are unique companions and cannot be fused."
+                ),
+                inline=False,
+            )
+
+            fusion_lines = []
+            for level, cost in FUSION_COSTS.items():
+                fusion_lines.append(
+                    f"**Fusion {level}/5** — Pet Level **{FUSION_LEVEL_GATES[level]}+** • "
+                    f"**{cost['stardust']:,}** Stardust • **{cost['essence']}** ✨ Essence • "
+                    f"Passive **+{level * 2}%**"
+                )
+
+            embed.add_field(
+                name="📈 Fusion Levels & Costs",
+                value="\n".join(fusion_lines),
+                inline=False,
+            )
+
+            embed.add_field(
+                name="✨ Rare Variant Discovery",
+                value=(
+                    "Every fusion also has a chance to discover a rare variant. "
+                    "The chance increases as the target's Fusion level rises:\n"
+                    "• Fusion 1 attempt: **3%**\n"
+                    "• Fusion 2 attempt: **3.5%**\n"
+                    "• Fusion 3 attempt: **4%**\n"
+                    "• Fusion 4 attempt: **4.5%**\n"
+                    "• Fusion 5 attempt: **5%**\n"
+                    "• Variant Hunt after Fusion 5: **7.5%**"
+                ),
+                inline=False,
+            )
+
+            embed.add_field(
+                name="🧬 Fusion 5+ — Variant Hunts",
+                value=(
+                    "Once a pet reaches **Fusion 5**, further attempts no longer increase its passive. "
+                    "They instead become **Variant Hunts**, costing **15,000 Stardust** and **3 Astral Essence** "
+                    "while consuming **5 matching duplicates**."
+                ),
+                inline=False,
+            )
+
+            embed.add_field(
+                name="🎉 If You Discover a Variant",
+                value=(
+                    "**Infuse** keeps the current pet's Level, XP, Fusion, and passive progression.\n"
+                    "**Keep Separate** creates the discovered variant as a fresh **Level 1** pet."
+                ),
+                inline=False,
+            )
+
+            embed.set_footer(text="Use /fusion and select a pet to perform a Fusion.")
+            return await ctx.send(embed=embed)
+
         await ctx.defer()
         try:
             target_pet_id = int(pet)
