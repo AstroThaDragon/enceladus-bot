@@ -1,14 +1,14 @@
 from emojis import EMOJIS
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 import aiosqlite
 import json
 import random
 from typing import Any
 import datetime
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 import pytz
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
 from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
@@ -109,14 +109,10 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
     "wiring",
 }
 
-# Inventory items that can be sold individually through /shop_sell.
+# Inventory items that can be sold individually through /shop.
 # Their Stardust values are defined by ITEM_REGISTRY in inventory.py.
-SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill',
-                     'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit','nanite_patch',
-                     'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
-                     'reinforced_laser_parts', 'drone_upgrade_kit', 'salvage_rig_kit', 'reinforced_laser_parts_1', 'reinforced_laser_parts_2', 'reinforced_laser_parts_3', 'reinforced_laser_parts_4', 'reinforced_laser_parts_5',
-                     'drone_upgrade_kit_1', 'drone_upgrade_kit_2', 'drone_upgrade_kit_3', 'drone_upgrade_kit_4', 'drone_upgrade_kit_5',
-                     'salvage_rig_kit_1', 'salvage_rig_kit_2', 'salvage_rig_kit_3', 'salvage_rig_kit_4', 'salvage_rig_kit_5', 'nanite_retrofit_kit'}
+SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
+                     }
 
 
 class ShopCategorySelect(discord.ui.Select):
@@ -349,7 +345,7 @@ class ShopView(discord.ui.View):
                 )
 
             embed.set_footer(
-                text="Use /shop_buy to purchase an item."
+                text="Use `/shop` to purchase an item."
             )
 
             return embed
@@ -377,12 +373,18 @@ class ShopView(discord.ui.View):
             )
 
         embed.set_footer(
-            text="Use /shop_buy to purchase an item."
+            text="Use `/shop` to purchase an item."
         )
 
         return embed
 
 class Economy(commands.Cog):
+    HP_REGEN_TIME = dt_time(
+        hour=0,
+        minute=0,
+        tzinfo=pytz.timezone("US/Eastern")
+    )
+
     def __init__(self, bot):
         self.bot = bot
         self.DEFAULT_VAULT_CAPACITY = 250_000
@@ -834,10 +836,214 @@ class Economy(commands.Cog):
         )
 
         
+    @tasks.loop(time=HP_REGEN_TIME)
+    async def midnight_hp_regeneration(self):
+        """Restore 50 HP to every user at midnight Eastern Time."""
+        db_path = self.get_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute(
+                """
+                UPDATE users
+                SET hp = CASE
+                    WHEN COALESCE(hp, 100) <= 0 THEN 50
+                    ELSE MIN(100, COALESCE(hp, 100) + 50)
+                END,
+                knocked_out_until = CASE
+                    WHEN COALESCE(hp, 100) <= 0 THEN ''
+                    ELSE knocked_out_until
+                END
+                """
+            )
+            await db.commit()
+
+    @midnight_hp_regeneration.before_loop
+    async def before_midnight_hp_regeneration(self):
+        await self.bot.wait_until_ready()
+
+    def cog_load(self):
+        if not self.midnight_hp_regeneration.is_running():
+            self.midnight_hp_regeneration.start()
+
+    def cog_unload(self):
+        self.midnight_hp_regeneration.cancel()
+
+    @commands.hybrid_command(
+        name="daily",
+        description="Claim your daily Stardust reward and build your streak! Rewards max out at 1,150 Stardust."
+    )
+    async def daily(self, ctx: commands.Context):
+        """Claim the daily Stardust reward and build a consecutive-day streak."""
+        user_id = ctx.author.id
+        db_path = self.get_db_path()
+        eastern = pytz.timezone("US/Eastern")
+        today = datetime.now(eastern).date()
+        today_str = today.isoformat()
+        yesterday_str = (today - timedelta(days=1)).isoformat()
+
+        async with aiosqlite.connect(db_path) as db:
+            await self.ensure_schema(db)
+
+            await db.execute(
+                """
+                INSERT OR IGNORE INTO users
+                    (user_id, stardust, vault_stardust, daily_streak, last_daily)
+                VALUES (?, 0, 0, 0, '')
+                """,
+                (user_id,)
+            )
+            await db.commit()
+
+            # Lock the row before checking/updating the claim so two nearly
+            # simultaneous interactions cannot award the daily twice.
+            await db.execute("BEGIN IMMEDIATE")
+
+            async with db.execute(
+                """
+                SELECT COALESCE(stardust, 0), COALESCE(daily_streak, 0),
+                    COALESCE(last_daily, '')
+                FROM users
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            stardust, streak, last_daily = row if row else (0, 0, "")
+
+            from pets import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, user_id)
+
+            # Already claimed today.
+            if last_daily == today_str:
+                await db.rollback()
+
+                daily_rewards = [500, 600, 700, 800, 900, 1000, 1150]
+                reward = daily_rewards[min(max(1, streak), len(daily_rewards)) - 1]
+
+                return await ctx.send(
+                    f"{ctx.author.mention} 📅 **Daily already claimed!**\n"
+                    f"You claimed **{reward:,} Stardust** today.\n"
+                    f"🔥 Current streak: **{streak} day{'s' if streak != 1 else ''}**.\n"
+                    "Come back tomorrow to keep your streak going!"
+                )
+
+            # Determine whether the previous streak was broken.
+            streak_was_reset = bool(
+                last_daily and last_daily != yesterday_str
+            )
+
+            # Solar Phoenix can automatically rescue one missed daily streak
+            # once per calendar month at passive level 5. The rescue happens
+            # before today's increment, so the player keeps the old streak.
+            streak_rescued = False
+            if (
+                streak_was_reset
+                and streak > 0
+                and pet_effects.get("streak_rescue")
+            ):
+                month_key = today.strftime("%Y-%m")
+                async with db.execute(
+                    "SELECT 1 FROM pet_effect_usage WHERE user_id = ? AND effect_id = ? AND period_key = ?",
+                    (user_id, "solar_phoenix_streak_rescue", month_key),
+                ) as cursor:
+                    rescue_used = await cursor.fetchone()
+
+                if not rescue_used:
+                    await db.execute(
+                        "INSERT INTO pet_effect_usage (user_id, effect_id, period_key) VALUES (?, ?, ?)",
+                        (user_id, "solar_phoenix_streak_rescue", month_key),
+                    )
+                    streak_rescued = True
+
+            # Continue the streak if yesterday was claimed, or if Solar Phoenix
+            # rescued the missed day.
+            if last_daily == yesterday_str or streak_rescued:
+                new_streak = max(1, streak) + 1
+            else:
+                new_streak = 1
+
+            # Use the displayed 1–7 day reward ladder. Streaks beyond day 7
+            # continue at the day-7 reward until the ladder is expanded.
+            daily_rewards = [500, 600, 700, 800, 900, 1000, 1150]
+            reward = daily_rewards[min(new_streak, len(daily_rewards)) - 1]
+
+            daily_bonus = float(pet_effects.get("daily_bonus", 0.0))
+            reward = int(reward * (1 + daily_bonus))
+
+            doubled = False
+            double_chance = float(pet_effects.get("daily_double", 0.0))
+            if double_chance and random.random() < double_chance:
+                reward *= 2
+                doubled = True
+
+            new_stardust = stardust + reward
+
+            await db.execute(
+                """
+                UPDATE users
+                SET stardust = ?, daily_streak = ?, last_daily = ?
+                WHERE user_id = ?
+                """,
+                (new_stardust, new_streak, today_str, user_id)
+            )
+            await db.commit()
+
+        # Build the 1–7 day streak ladder.
+        # We can expand this later when the economy gets larger.
+        streak_rows = []
+        rewards = [500, 600, 700, 800, 900, 1000, 1150]
+
+        for day, day_reward in enumerate(rewards, start=1):
+            mark = "✅" if new_streak >= day else "❌"
+            label = f"{day} day" if day == 1 else f"{day} days"
+
+            streak_rows.append(
+                f"{label:<7} {mark} **{day_reward:,} Stardust**"
+            )
+
+        reset_note = ""
+        if streak_rescued:
+            reset_note = (
+                "\n\n☀️ **Solar Phoenix rescued your daily streak!** "
+                "Your monthly streak rescue has been used."
+            )
+        elif streak_was_reset:
+            reset_note = (
+                "\n\n⚠️ **Your daily streak was reset** because you missed a day. "
+                "You're starting a new streak today!"
+            )
+        if doubled:
+            reset_note += "\n✨ **Solar Phoenix doubled today's payout!**"
+
+        embed = discord.Embed(
+            title="📅 Daily Stardust",
+            description=(
+                "Claim your daily reward and build your streak!\n\n"
+                + "\n".join(streak_rows)
+                + f"\n\n🔥 **Current Streak:** "
+                f"{new_streak} day{'s' if new_streak != 1 else ''}"
+                + f"\n💫 **Today's Reward:** {reward:,} Stardust"
+                + f"\n💰 **Available Stardust:** {new_stardust:,}"
+                + reset_note
+            ),
+            color=discord.Color.from_rgb(0, 229, 255)
+        )
+
+        embed.set_footer(
+            text="Come back tomorrow to keep your streak going!"
+        )
+
+        await ctx.send(
+            content=ctx.author.mention,
+            embed=embed
+        )
+
     @commands.hybrid_command(
         name="bank",
         aliases=["bal"],
-        description="View your pocketed and vaulted Stardust."
+        description="View your current Stardust balance and vaulted Stardust."
     )
     async def bank(self, ctx: commands.Context):
         """Show available Stardust and protected vault balance."""
@@ -1649,16 +1855,6 @@ class Economy(commands.Cog):
                     quantity
                 )
 
-                if item_id == "astral_essence":
-                    added_amount, new_quantity, max_quantity = await add_inventory_item(
-                        db,
-                        user_id,
-                        item_id,
-                        "special",
-                        quantity
-                    )
-
-
                 if added_amount != quantity:
                     await db.rollback()
                     return await ctx.send(
@@ -1682,6 +1878,39 @@ class Economy(commands.Cog):
                     f"{ctx.author.mention} 🧬 **Purchase Successful!** Added **{quantity}x {item['name']}** "
                     f"to your inventory for **{cost:,} Stardust**!"
                 )
+            if item_id == "astral_essence":
+                added_amount, new_quantity, max_quantity = await add_inventory_item(
+                    db,
+                    user_id,
+                    item_id,
+                    "special",
+                    quantity
+                )
+
+                if added_amount != quantity:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                        f"**{item['name']}**.\n"
+                        f"You currently have **{new_quantity}x**."
+                    )
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_stardust, user_id)
+                )
+
+                await self.record_shop_purchase(
+                    db, user_id, item_id, quantity
+                )
+
+                await db.commit()
+
+                return await ctx.send(
+                    f"{ctx.author.mention} ✨ **Purchase Successful!** Added **{quantity}x "
+                    f"{item['name']}** to your inventory for **{cost:,} Stardust**!"
+                )
+
             if item_id == "time_crystal":
                 max_stack = item_info.get("max_quantity", 10)
 
@@ -1892,6 +2121,46 @@ class Economy(commands.Cog):
                 )
             )
 
+        # Upgrade kits can also be salvaged for their exact crafting recipe.
+        from crafting import RECIPES
+        upgrade_kit_ids = {
+            recipe["result"]
+            for recipe in RECIPES.values()
+            if recipe["result"].startswith((
+                "reinforced_laser_parts_",
+                "drone_upgrade_kit_",
+                "salvage_rig_kit_",
+            ))
+            or recipe["result"] == "nanite_retrofit_kit"
+        }
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            placeholders = ", ".join("?" for _ in upgrade_kit_ids)
+            async with db.execute(
+                f"""
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ?
+                  AND item_id IN ({placeholders})
+                  AND quantity > 0
+                """,
+                (user_id, *upgrade_kit_ids),
+            ) as cursor:
+                kit_rows = await cursor.fetchall()
+
+        for item_id, quantity in kit_rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+            if current and current not in info["name"].lower():
+                continue
+            choices.append(
+                app_commands.Choice(
+                    name=f"🧰 {info['name']} (x{quantity})",
+                    value=item_id
+                )
+            )
+
         choices.sort(key=lambda choice: choice.name.lower())
         return choices[:25]
 
@@ -1920,7 +2189,14 @@ class Economy(commands.Cog):
         overflow_stardust = overflow * SALVAGE_OVERFLOW_VALUES.get(material_id, 0)
         return added, overflow, overflow_stardust
 
-    @commands.hybrid_command(name="salvage", description="Scrap Space Junk for crafting materials.")
+    async def inventory_row_exists(self, db, user_id, item_id):
+        async with db.execute(
+            "SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ? LIMIT 1",
+            (user_id, item_id),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+    @commands.hybrid_command(name="salvage", description="Salvage Space Junk or upgrade kits for materials.")
     @app_commands.describe(item="Choose Space Junk to salvage, or salvage all of it.")
     @app_commands.autocomplete(item=salvage_item_autocomplete)
     async def salvage(self, ctx: commands.Context, item: str):
@@ -1940,9 +2216,98 @@ class Economy(commands.Cog):
         bonus_chance = salvage_upgrade.get("bonus_chance", 0.0)
 
         from inventory import ITEM_REGISTRY
+        from crafting import RECIPES
+
+        upgrade_kit_recipes = {
+            recipe["result"]: recipe
+            for recipe in RECIPES.values()
+            if recipe["result"].startswith((
+                "reinforced_laser_parts_",
+                "drone_upgrade_kit_",
+                "salvage_rig_kit_",
+            ))
+            or recipe["result"] == "nanite_retrofit_kit"
+        }
 
         async with aiosqlite.connect(db_path) as db:
             await db.execute("BEGIN IMMEDIATE")
+
+            # Upgrade kits are salvaged back into their exact crafting recipe.
+            # This path intentionally does not apply Salvage Rig bonus rolls.
+            if target_item in upgrade_kit_recipes:
+                recipe = upgrade_kit_recipes[target_item]
+                async with db.execute(
+                    "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ? AND quantity > 0",
+                    (user_id, target_item),
+                ) as cursor:
+                    kit_row = await cursor.fetchone()
+
+                if not kit_row:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"{ctx.author.mention} ❌ You don't have **{ITEM_REGISTRY.get(target_item, {}).get('name', target_item)}** to salvage."
+                    )
+
+                # The kit is a single-use item. Make sure every returned material
+                # fits before changing anything so the recipe is returned in full.
+                capacity_missing = []
+                for material_id, amount in recipe["ingredients"].items():
+                    async with db.execute(
+                        "SELECT COALESCE(quantity, 0) FROM inventory WHERE user_id = ? AND item_id = ?",
+                        (user_id, material_id),
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    owned = row[0] if row else 0
+                    max_quantity = ITEM_REGISTRY.get(material_id, {}).get("max_quantity", 10)
+                    if owned + amount > max_quantity:
+                        icon, name = SALVAGE_MATERIAL_NAMES.get(material_id, ("📦", material_id))
+                        capacity_missing.append(
+                            f"{icon} {name}: {owned}/{max_quantity} (needs room for +{amount})"
+                        )
+
+                if capacity_missing:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"{ctx.author.mention} ❌ You don't have enough inventory space to salvage **{recipe['name']}** and receive all of its materials back.\n\n"
+                        + "\n".join(capacity_missing)
+                        + "\n\nFree up some material space and try again."
+                    )
+
+                await db.execute(
+                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 1",
+                    (user_id, target_item),
+                )
+
+                for material_id, amount in recipe["ingredients"].items():
+                    await db.execute(
+                        "UPDATE inventory SET quantity = quantity + ? WHERE user_id = ? AND item_id = ?",
+                        (amount, user_id, material_id),
+                    )
+                    if not await self.inventory_row_exists(db, user_id, material_id):
+                        await db.execute(
+                            "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, ?, 'crafting_material', ?)",
+                            (user_id, material_id, amount),
+                        )
+
+                await db.commit()
+
+                material_lines = []
+                for material_id, amount in recipe["ingredients"].items():
+                    icon, name = SALVAGE_MATERIAL_NAMES.get(material_id, ("📦", material_id))
+                    material_lines.append(f"{icon} **{name} ×{amount}**")
+
+                embed = discord.Embed(
+                    title="♻️ Upgrade Kit Salvaged!",
+                    description=(
+                        f"{ctx.author.mention}\n\n"
+                        f"You salvaged **{recipe['name']}** and recovered its full crafting recipe.\n\n"
+                        "🔧 **Materials Recovered:**\n"
+                        + "\n".join(material_lines)
+                    ),
+                    color=discord.Color.from_rgb(0, 229, 255),
+                )
+                await ctx.send(embed=embed)
+                return
 
             if target_item == "all":
                 async with db.execute(

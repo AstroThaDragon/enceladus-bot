@@ -45,7 +45,7 @@ PETS = {
             "id": "stardust_bonus",
             "name": "Lucky Paws",
             "description": "Finds a little extra Stardust during exploration.",
-            "levels": [0.03, 0.05, 0.08, 0.12, 0.15],
+            "levels": [0.05, 0.12, 0.18, 0.24, 0.30],
         },
     },
     "cosmic_fox": {
@@ -117,7 +117,7 @@ PETS = {
             "id": "stardust_bonus",
             "name": "Twinkle Twinkle Little Star",
             "description": "The little star seems rather fond of you! It will now give a chance to find extra Stardust!",
-            "levels": [0.03, 0.05, 0.08, 0.12, 0.15],
+            "levels": [0.10, 0.15, 0.25, 0.32, 0.40],
         },
     },
     "meteor": {
@@ -141,9 +141,7 @@ PETS = {
             "id": "extra_charges",
             "name": "Dragon's Magic",
             "description": "The large space dragon will now give you extra Stardust for Mining and Scavenging, and when maxed, will grant you 3 extra charges as well!",
-            # Levels 1-5 provide +3%, +6%, +10%, +14%, +18% Stardust.
-            # Level 5 additionally grants +3 maximum mining/scavenging charges.
-            "levels": [0.03, 0.06, 0.10, 0.14, 0.18],
+            "levels": [0.15, 0.25, 0.30, 0.35, 0.40],
         },
     },
     "ethereal_cloud": {
@@ -596,7 +594,7 @@ HAUNTED_PETS = {
         },
         "passive": {
             "id": "haunted_discovery_bonus",
-            "name": "Don’t Look Back",
+            "name": "Don't Look Back",
             "description": "The Watcher increases rare-discovery chances in the Silent Campground.",
             "levels": [0.02, 0.03, 0.04, 0.05, 0.07],
         },

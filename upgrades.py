@@ -351,8 +351,7 @@ class Upgrades(commands.Cog):
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
                     (amount, user_id, item_id),
                 )
-                # Fully consumed upgrade components should disappear from the
-                # inventory instead of leaving an odd 0-quantity entry behind.
+                # Remove the inventory row when the final component is consumed.
                 await db.execute(
                     "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
                     (user_id, item_id),

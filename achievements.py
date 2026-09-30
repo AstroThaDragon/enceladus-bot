@@ -816,106 +816,106 @@ class Achievements(commands.Cog):
                 row = await cursor.fetchone()
                 found = row[0] if row else 0
 
-        embed = discord.Embed(
-            title=f"🏆 {ctx.author.display_name}'s Achievements",
-            description="Complete seasonal milestones to earn permanent cosmetics.\n",
-            color=discord.Color.gold(),
-        )
-
-        half_needed = math.ceil(total * 0.5) if total else 0
-        for achievement_id, achievement in ACHIEVEMENTS.items():
-            is_unlocked = achievement_id in unlocked
-            if achievement_id == "halloween_half":
-                progress = f"Progress: **{found}/{total}** • Need **{half_needed}**"
-            elif achievement_id == "candy_background":
-                async with db.execute(
-                    """
-                    SELECT progress
-                    FROM achievement_progress
-                    WHERE user_id = ? AND achievement_id = 'candy_nommer'
-                    """,
-                    (user_id,),
-                ) as cursor:
-                    candy_row = await cursor.fetchone()
-                candy_progress = min(candy_row[0] if candy_row else 0, 100)
-                progress = f"Progress: **{candy_progress}/100**"
-            elif achievement_id == "candy_nommer":
-                async with db.execute(
-                    """
-                    SELECT progress
-                    FROM achievement_progress
-                    WHERE user_id = ? AND achievement_id = 'candy_nommer'
-                    """,
-                    (user_id,),
-                ) as cursor:
-                    candy_row = await cursor.fetchone()
-                candy_progress = min(candy_row[0] if candy_row else 0, 250)
-                progress = f"Progress: **{candy_progress}/250+**"
-            elif achievement_id == "halloween_bag_crafter":
-                async with db.execute(
-                    """
-                    SELECT progress
-                    FROM achievement_progress
-                    WHERE user_id = ? AND achievement_id = 'halloween_bag_crafter'
-                    """,
-                    (user_id,),
-                ) as cursor:
-                    bag_row = await cursor.fetchone()
-                bag_progress = min(bag_row[0] if bag_row else 0, 25)
-                progress = f"Progress: **{bag_progress}/25**"
-            elif achievement_id in {v[0] for v in HAUNTED_DISCOVERY_ACHIEVEMENTS.values()}:
-                location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
-                needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]
-                async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
-                    row = await c.fetchone()
-                    count = row if row else 0
-                progress = f"Progress: **{min(count, needed)}/{needed}**"
-            elif achievement_id == "haunted_all_discoveries":
-                async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
-                    row = await c.fetchone()
-                    count = row if row else 0
-                progress = f"Progress: **{min(count, 46)}/46**"
-            elif achievement_id in {"haunted_first_discovery", "haunted_impossible", "haunted_worth_it", "haunted_unwell", "haunted_other_side"}:
-                progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
-            elif achievement_id in {a for pair in HAUNTED_CRAFTING_ACHIEVEMENTS.values() for a, _, _ in pair}:
-                station, pair = next((st, p) for st, p in HAUNTED_CRAFTING_ACHIEVEMENTS.items() if any(a == achievement_id for a, _, _ in p))
-                progress_id = f"haunted_crafting_{station}"
-                threshold = next(t for a, t, _ in pair if a == achievement_id)
-                async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
-                    row = await c.fetchone()
-                progress = f"Progress: **{min(row[0] if row else 0, threshold)}/{threshold}**"
-            elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
-                # One-time special collectibles are binary achievements.
-                # Their permanent usage record is stored in used_collectibles.
-                collectible_id = achievement_id.removeprefix("halloween_")
-                try:
+            embed = discord.Embed(
+                title=f"🏆 {ctx.author.display_name}'s Achievements",
+                description="Complete seasonal milestones to earn permanent cosmetics.\n",
+                color=discord.Color.gold(),
+            )
+    
+            half_needed = math.ceil(total * 0.5) if total else 0
+            for achievement_id, achievement in ACHIEVEMENTS.items():
+                is_unlocked = achievement_id in unlocked
+                if achievement_id == "halloween_half":
+                    progress = f"Progress: **{found}/{total}** • Need **{half_needed}**"
+                elif achievement_id == "candy_background":
                     async with db.execute(
                         """
-                        SELECT 1
-                        FROM used_collectibles
-                        WHERE user_id = ? AND collectible_id = ?
+                        SELECT progress
+                        FROM achievement_progress
+                        WHERE user_id = ? AND achievement_id = 'candy_nommer'
                         """,
-                        (user_id, collectible_id),
+                        (user_id,),
                     ) as cursor:
-                        item_used = await cursor.fetchone()
-                    progress = "Progress: **1/1**" if item_used else "Progress: **0/1**"
-                except aiosqlite.Error:
-                    progress = "Progress: **0/1**"
-            else:
-                progress = f"Progress: **{found}/{total}**"
-            status = "✅ **Unlocked**" if is_unlocked else "🔒 **Locked**"
-            embed.add_field(
-                name=f"{achievement['emoji']} {achievement['name']} — {status}",
-                value=(
-                    f"{achievement['description']}\n"
-                    f"{progress}\n"
-                    f"🎁 Reward: **{achievement['reward']}**"
-                ),
-                inline=False,
-            )
-
-        embed.set_footer(text="Achievement rewards are permanent.")
-        await ctx.send(embed=embed)
+                        candy_row = await cursor.fetchone()
+                    candy_progress = min(candy_row[0] if candy_row else 0, 100)
+                    progress = f"Progress: **{candy_progress}/100**"
+                elif achievement_id == "candy_nommer":
+                    async with db.execute(
+                        """
+                        SELECT progress
+                        FROM achievement_progress
+                        WHERE user_id = ? AND achievement_id = 'candy_nommer'
+                        """,
+                        (user_id,),
+                    ) as cursor:
+                        candy_row = await cursor.fetchone()
+                    candy_progress = min(candy_row[0] if candy_row else 0, 250)
+                    progress = f"Progress: **{candy_progress}/250+**"
+                elif achievement_id == "halloween_bag_crafter":
+                    async with db.execute(
+                        """
+                        SELECT progress
+                        FROM achievement_progress
+                        WHERE user_id = ? AND achievement_id = 'halloween_bag_crafter'
+                        """,
+                        (user_id,),
+                    ) as cursor:
+                        bag_row = await cursor.fetchone()
+                    bag_progress = min(bag_row[0] if bag_row else 0, 25)
+                    progress = f"Progress: **{bag_progress}/25**"
+                elif achievement_id in {v[0] for v in HAUNTED_DISCOVERY_ACHIEVEMENTS.values()}:
+                    location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
+                    needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]
+                    async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
+                        row = await c.fetchone()
+                        count = row[0] if row else 0
+                    progress = f"Progress: **{min(count, needed)}/{needed}**"
+                elif achievement_id == "haunted_all_discoveries":
+                    async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
+                        row = await c.fetchone()
+                        count = row[0] if row else 0
+                    progress = f"Progress: **{min(count, 46)}/46**"
+                elif achievement_id in {"haunted_first_discovery", "haunted_impossible", "haunted_worth_it", "haunted_unwell", "haunted_other_side"}:
+                    progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
+                elif achievement_id in {a for pair in HAUNTED_CRAFTING_ACHIEVEMENTS.values() for a, _, _ in pair}:
+                    station, pair = next((st, p) for st, p in HAUNTED_CRAFTING_ACHIEVEMENTS.items() if any(a == achievement_id for a, _, _ in p))
+                    progress_id = f"haunted_crafting_{station}"
+                    threshold = next(t for a, t, _ in pair if a == achievement_id)
+                    async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
+                        row = await c.fetchone()
+                    progress = f"Progress: **{min(row[0] if row else 0, threshold)}/{threshold}**"
+                elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
+                    # One-time special collectibles are binary achievements.
+                    # Their permanent usage record is stored in used_collectibles.
+                    collectible_id = achievement_id.removeprefix("halloween_")
+                    try:
+                        async with db.execute(
+                            """
+                            SELECT 1
+                            FROM used_collectibles
+                            WHERE user_id = ? AND collectible_id = ?
+                            """,
+                            (user_id, collectible_id),
+                        ) as cursor:
+                            item_used = await cursor.fetchone()
+                        progress = "Progress: **1/1**" if item_used else "Progress: **0/1**"
+                    except aiosqlite.Error:
+                        progress = "Progress: **0/1**"
+                else:
+                    progress = f"Progress: **{found}/{total}**"
+                status = "✅ **Unlocked**" if is_unlocked else "🔒 **Locked**"
+                embed.add_field(
+                    name=f"{achievement['emoji']} {achievement['name']} — {status}",
+                    value=(
+                        f"{achievement['description']}\n"
+                        f"{progress}\n"
+                        f"🎁 Reward: **{achievement['reward']}**"
+                    ),
+                    inline=False,
+                )
+    
+            embed.set_footer(text="Achievement rewards are permanent.")
+            await ctx.send(embed=embed)
 
 
 async def setup(bot):
