@@ -881,8 +881,20 @@ class Achievements(commands.Cog):
             )
     
             half_needed = math.ceil(total * 0.5) if total else 0
+
+            # All current achievements belong to the Halloween event.
+            category_name = "🎃 Lair of Frights - Halloween Event"
+            category_fields = []
+
+            haunted_crafting_ids = {
+                achievement_id
+                for pairs in HAUNTED_CRAFTING_ACHIEVEMENTS.values()
+                for achievement_id, _, _ in pairs
+            }
+
             for achievement_id, achievement in ACHIEVEMENTS.items():
                 is_unlocked = achievement_id in unlocked
+
                 if achievement_id == "halloween_half":
                     progress = f"Progress: **{found}/{total}** • Need **{half_needed}**"
                 elif achievement_id == "candy_background":
@@ -924,22 +936,35 @@ class Achievements(commands.Cog):
                 elif achievement_id in {v[0] for v in HAUNTED_DISCOVERY_ACHIEVEMENTS.values()}:
                     location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
                     needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]
-                    async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?", (user_id, location_id)) as c:
+                    async with db.execute(
+                        "SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ? AND location_id = ?",
+                        (user_id, location_id),
+                    ) as c:
                         row = await c.fetchone()
                         count = row[0] if row else 0
                     progress = f"Progress: **{min(count, needed)}/{needed}**"
                 elif achievement_id == "haunted_all_discoveries":
-                    async with db.execute("SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?", (user_id,)) as c:
+                    async with db.execute(
+                        "SELECT COUNT(*) FROM haunted_discoveries WHERE user_id = ?",
+                        (user_id,),
+                    ) as c:
                         row = await c.fetchone()
                         count = row[0] if row else 0
                     progress = f"Progress: **{min(count, 46)}/46**"
                 elif achievement_id in {"haunted_first_discovery", "haunted_impossible", "haunted_worth_it", "haunted_unwell", "haunted_other_side"}:
                     progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
-                elif achievement_id in {a for pair in HAUNTED_CRAFTING_ACHIEVEMENTS.values() for a, _, _ in pair}:
-                    station, pair = next((st, p) for st, p in HAUNTED_CRAFTING_ACHIEVEMENTS.items() if any(a == achievement_id for a, _, _ in p))
+                elif achievement_id in haunted_crafting_ids:
+                    station, pair = next(
+                        (st, p)
+                        for st, p in HAUNTED_CRAFTING_ACHIEVEMENTS.items()
+                        if any(a == achievement_id for a, _, _ in p)
+                    )
                     progress_id = f"haunted_crafting_{station}"
                     threshold = next(t for a, t, _ in pair if a == achievement_id)
-                    async with db.execute("SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?", (user_id, progress_id)) as c:
+                    async with db.execute(
+                        "SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?",
+                        (user_id, progress_id),
+                    ) as c:
                         row = await c.fetchone()
                     progress = f"Progress: **{min(row[0] if row else 0, threshold)}/{threshold}**"
                 elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
@@ -961,42 +986,48 @@ class Achievements(commands.Cog):
                         progress = "Progress: **0/1**"
                 else:
                     progress = f"Progress: **{found}/{total}**"
+
                 status = "✅ **Unlocked**" if is_unlocked else "🔒 **Locked**"
-                embed.add_field(
-                    name=f"{achievement['emoji']} {achievement['name']} — {status}",
-                    value=(
+                field = {
+                    "name": f"{achievement['emoji']} {achievement['name']} — {status}",
+                    "value": (
                         f"{achievement['description']}\n"
                         f"{progress}\n"
                         f"🎁 Reward: **{achievement['reward']}**"
                     ),
-                    inline=False,
-                )
-    
-            # Discord allows at most 25 fields per embed. Build as many
-            # embeds as needed, then let the user scroll between them.
-            fields = list(embed.fields)
-            page_size = 25
-            pages = []
+                    "inline": False,
+                }
 
-            for page_start in range(0, len(fields), page_size):
-                page_fields = fields[page_start:page_start + page_size]
-                page_number = (page_start // page_size) + 1
-                page_count = (len(fields) + page_size - 1) // page_size
+                category_fields.append(field)
+
+            # Keep each page compact instead of filling an embed with 25 fields.
+            # Ten achievements per page gives the list some breathing room.
+            fields_per_page = 10
+            pages = []
+            page_count = (len(category_fields) + fields_per_page - 1) // fields_per_page
+
+            for page_start in range(0, len(category_fields), fields_per_page):
+                page_fields = category_fields[page_start:page_start + fields_per_page]
+                page_number = (page_start // fields_per_page) + 1
 
                 page_embed = discord.Embed(
-                    title=embed.title,
-                    description=embed.description,
-                    color=embed.color,
+                    title=f"🏆 {ctx.author.display_name}'s Achievements",
+                    description=(
+                        f"**{category_name}**\n"
+                        "Complete seasonal milestones to earn permanent cosmetics."
+                    ),
+                    color=discord.Color.gold(),
                 )
+
                 for field in page_fields:
                     page_embed.add_field(
-                        name=field.name,
-                        value=field.value,
-                        inline=field.inline,
+                        name=field["name"],
+                        value=field["value"],
+                        inline=field["inline"],
                     )
 
                 page_embed.set_footer(
-                    text=f"Achievement rewards are permanent. • Page {page_number}/{page_count}"
+                    text=f"{category_name} • Page {page_number}/{page_count}"
                 )
                 pages.append(page_embed)
 
