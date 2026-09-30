@@ -632,7 +632,8 @@ class InterestsView(discord.ui.View):
             ("Writer", INTEREST_ROLE_IDS["Writer"], "✍️"),
             ("3D Modeler", INTEREST_ROLE_IDS["3D Modeler"], "🧊"),
             ("Voice Acting", INTEREST_ROLE_IDS["Voice Acting"], "🎙️"),
-            ("Streamer", INTEREST_ROLE_IDS["Streamer"], "📺"),
+            ("Streamer", INTEREST_ROLE_IDS["Streamer"], "📡"),
+            ("Content Creator", INTEREST_ROLE_IDS["Content Creator"], "🎮"),
             ("Coder", INTEREST_ROLE_IDS["Coder"], "💻"),
         ]
 
