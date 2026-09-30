@@ -162,12 +162,6 @@ class ShopCategorySelect(discord.ui.Select):
                 value="backgrounds",
                 description="Profile background vouchers."
             ),
-            discord.SelectOption(
-                label="Daily Offers",
-                emoji="🔄",
-                value="daily",
-                description="Today's rotating station offers."
-            ),
         ]
 
         super().__init__(
@@ -1617,7 +1611,7 @@ class Economy(commands.Cog):
         """Display today's rotating shop."""
         view = ShopView(self, ctx.author.id)
         embed = view.build_embed("daily")
-        await ctx.send(embed=embed, view=view)
+        await ctx.send(embed=embed)
 
 
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
