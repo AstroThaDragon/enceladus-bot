@@ -498,19 +498,20 @@ async def on_member_join(member):
         embed = discord.Embed(
             title="Hey there! Welcome to The Cosmic Lair! <a:PurpleHearts:1109768355390431323> <a:RedHearts:1109768412382642266>",
             description=(
-                f"Before anything, please verify yourself over at <#1296962529989361685> "
+                f"Before doing anything, please verify yourself over at <#1296962529989361685> "
                 f"for full access to our server! Afterwards, please head over to <#593389789558865931> "
-                f"to read our rules if you haven't already, then maybe check out <#927536823746580570> "
-                f"for special roles while you're at it!\n\n"
+                f"to read our rules if you haven't already. Then maybe check out <#927536823746580570> "
+                f"for some roles while you're at it, including colors!\n\n"
                 f"We also highly recommend checking out <#1484487011933884509> for our server's unique features, roles, bots, and channels!\n\n"
                 f"Also, please be patient while our server grows; it may be a bit quiet at times!\n\n"
-                f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!"
+                f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!\n\n"
+                f"*(Remember to check Post-Join Questions over at 'Channels & Roles' option on the server channel menu at the very top to see more channels we have to offer!)*"
             ),
             color=discord.Color.from_rgb(114, 0, 225)
         )
         embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
         embed.set_thumbnail(url=DRAGON_IMAGE_URL)
-        embed.set_footer(text=f"You are our {ordinal_count} member! Congrats!")
+        embed.set_footer(text=f"You are our {ordinal_count} member! Congrats!! 💜")
         
         try:
             if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
@@ -537,10 +538,10 @@ async def on_member_remove(member):
         content_text = f"Sorry to see you go, {member.name}!"
         
         embed = discord.Embed(
-            title="We're sorry to see you go! :c",
+            title="We're sorry to see you go! 😔",
             description=(
                 f"It looks like {member.mention} has left the server. "
-                f"We hope to see you again soon, and please be safe!"
+                f"We hope to see you again soon, and please be safe out there!"
             ),
             color=discord.Color.from_rgb(114, 0, 225)
         )
@@ -590,7 +591,7 @@ async def on_member_update(before, after):
 
 
 VAULT_CHANNEL_ID = 1496628909570265199
-VAULT_THRESHOLD = 5
+VAULT_THRESHOLD = 3
 EXCLUDED_CHANNELS = [593389789558865931, 598883099987673088, 1484487011933884509, 1352415256584130590, 1306821711970435122, 935876805607444510, 1118027416443564042, 1491230190469120010, 1117412987788075038] 
 EXCLUDED_CATEGORIES = [1295664420294361179, 1353577090099712070, 593406939111751721, 593413698085978132, 1474514782605541537] 
 

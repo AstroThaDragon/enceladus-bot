@@ -355,19 +355,19 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
                 ephemeral=True
             )
 
+        if role in member.roles:
+            return await interaction.response.send_message(
+                f"⚠️ You already have the **{role.name}** role. Would you like to remove it?",
+                view=RoleRemovalConfirmView(member.id, role.id),
+                ephemeral=True
+            )
+
         try:
-            if role in member.roles:
-                await member.remove_roles(role)
-                await interaction.response.send_message(
-                    f"Removed **{role.name}** role.",
-                    ephemeral=True
-                )
-            else:
-                await member.add_roles(role)
-                await interaction.response.send_message(
-                    f"Added **{role.name}** role!",
-                    ephemeral=True
-                )
+            await member.add_roles(role)
+            await interaction.response.send_message(
+                f"Added **{role.name}** role!",
+                ephemeral=True
+            )
         except (discord.Forbidden, discord.HTTPException) as e:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
@@ -375,6 +375,82 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
                     ephemeral=True
                 )
             print(f"[ROLE ERROR] Failed to manage role {role_id} for {member}: {e}")
+
+
+class RoleRemovalConfirmView(discord.ui.View):
+    def __init__(self, user_id: int, role_id: int):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.role_id = role_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This confirmation belongs to someone else.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Remove Role", emoji="🗑️", style=discord.ButtonStyle.red)
+    async def remove_role(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if not interaction.guild or not isinstance(interaction.user, discord.Member):
+            return await interaction.response.edit_message(
+                content="This action can only be performed in a server.",
+                view=None
+            )
+
+        member = interaction.user
+        role = interaction.guild.get_role(self.role_id)
+
+        if role is None:
+            return await interaction.response.edit_message(
+                content="❌ That role no longer exists.",
+                view=None
+            )
+
+        if interaction.guild.me is None or interaction.guild.me.top_role <= role:
+            return await interaction.response.edit_message(
+                content=f"I can't remove the **{role.name}** role! Move my 'Enceladus' role higher in settings.",
+                view=None
+            )
+
+        async with _get_role_lock(member.id):
+            try:
+                if role not in member.roles:
+                    return await interaction.response.edit_message(
+                        content=f"You no longer have the **{role.name}** role.",
+                        view=None
+                    )
+
+                await member.remove_roles(role)
+                await interaction.response.edit_message(
+                    content=f"Removed **{role.name}** role.",
+                    view=None
+                )
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[ROLE ERROR] Failed to remove role {self.role_id} from {member}: {e}")
+                await interaction.response.edit_message(
+                    content="❌ I couldn't remove that role. Please try again.",
+                    view=None
+                )
+
+    @discord.ui.button(label="Keep Role", emoji="↩️", style=discord.ButtonStyle.gray)
+    async def keep_role(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        role = interaction.guild.get_role(self.role_id) if interaction.guild else None
+        role_name = role.name if role else "that"
+        await interaction.response.edit_message(
+            content=f"Kept **{role_name}** role. Nothing was changed.",
+            view=None
+        )
 
 
 # --- REUSABLE COMPONENTS ---
@@ -530,6 +606,40 @@ class PlatformView(discord.ui.View):
         self.add_item(RoleButton("Tabletop Gamer", 1036567825835380826, "🎲"))
         self.add_item(RoleButton("Card Gamer", 1512298993722331348, "🃏"))
 
+# Fill these placeholder IDs with the actual Discord role IDs.
+INTEREST_ROLE_IDS = {
+    "Artist": 1554773698936963173,
+    "Musical Artist": 1554773970861953055,
+    "Photographer": 1554776478619537520,
+    "Animator": 1554776299082485780,
+    "Writer": 1554776334281216000,
+    "3D Modeler": 1554773813210906766,
+    "Voice Acting": 1554776397829120112,
+    "Streamer": 1554773772454600714,
+    "Content Creator": 1554781936390504508,
+    "Coder": 1554773871196901448,
+}
+
+
+class InterestsView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        interests = [
+            ("Artist", INTEREST_ROLE_IDS["Artist"], "🎨"),
+            ("Musical Artist", INTEREST_ROLE_IDS["Musical Artist"], "🎵"),
+            ("Photographer", INTEREST_ROLE_IDS["Photographer"], "📷"),
+            ("Animator", INTEREST_ROLE_IDS["Animator"], "🎞️"),
+            ("Writer", INTEREST_ROLE_IDS["Writer"], "✍️"),
+            ("3D Modeler", INTEREST_ROLE_IDS["3D Modeler"], "🧊"),
+            ("Voice Acting", INTEREST_ROLE_IDS["Voice Acting"], "🎙️"),
+            ("Streamer", INTEREST_ROLE_IDS["Streamer"], "📺"),
+            ("Coder", INTEREST_ROLE_IDS["Coder"], "💻"),
+        ]
+
+        for label, role_id, emoji in interests:
+            self.add_item(RoleButton(label, role_id, emoji))
+
+
 class FandomView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -585,11 +695,15 @@ class RoleCog(commands.Cog):
         emb_fandom = discord.Embed(title="👾 Fandom Roles", description="What fandoms do you identify with?", color=0x6a0dad)
         await channel.send(embed=emb_fandom, view=FandomView())
 
-        # 9. Post Colors
+        # 9. Interests & Creative Roles
+        emb_interests = discord.Embed(title="🎨 Interests & Creative Roles", description="Select the roles that describe what you do or enjoy!", color=0x6a0dad)
+        await channel.send(embed=emb_interests, view=InterestsView())
+
+        # 10. Post Colors
         emb_color = discord.Embed(title="✨ Solid Color Roles", description="Pick a solid color for your name!", color=0x6a0dad)
         await channel.send(embed=emb_color, view=PersistentColorView())
 
-        # 10. Post Gradient Colors
+        # 11. Post Gradient Colors
         emb_gradient = discord.Embed(title="🌈 Gradient Color Roles", description="Pick a gradient color for your name! ✨\n\n🔒 Requires **Level 10 or higher**", color=0x6a0dad)
         await channel.send(embed=emb_gradient, view=GradientColorView())
 
