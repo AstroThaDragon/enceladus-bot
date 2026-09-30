@@ -16,7 +16,7 @@ VERIFICATION_CHANNEL_ID = 1297033393313288263
 VERIFICATION_LOG_CHANNEL_ID = 1352834838478061608
 PENDING_VERIFICATION_ROLE_ID = 1504001672576241665
 
-LEVEL_10_ROLE_ID = 1295861102483210260
+LEVEL_5_ROLE_ID = 1295861061995597844
 
 VERIFICATION_TEAM_ROLE_ID = 1502764416356319413
 OWNER_ID = 395453475284320268
@@ -443,7 +443,7 @@ class VerificationDropdown(Select):
 
         application_key = self.values[0]
 
-        # Only NSFW and NSFW+ applications require Level 10+.
+        # Only NSFW and NSFW+ applications require Level 5+.
         # Read the actual level from the leveling system rather than relying on
         # Discord role hierarchy, since level roles are milestone roles and
         # their Discord positions are not the source of truth for a user's level.
@@ -463,17 +463,17 @@ class VerificationDropdown(Select):
                     if row is not None:
                         level = int(row[0])
                 except (OSError, aiosqlite.Error, TypeError, ValueError) as e:
-                    print(f"[VERIFICATION LEVEL CHECK ERROR] Could not read level for {member.id}: {e}")
+                    print(f"[VERIFICATION LEVEL CHECK ERROR] Could not read level for {member.id}: {e}. Please contact staff.")
 
             if level is None:
                 return await interaction.response.send_message(
-                    "⚠️ I couldn't verify your Enceladus level right now. Please try again in a moment.",
+                    "⚠️ I couldn't verify your level right now. Please try again in a moment.",
                     ephemeral=True
                 )
 
-            if level < 10:
+            if level < 5:
                 return await interaction.response.send_message(
-                    "❌ You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.",
+                    "❌ You must be level 5 (Planetary Pioneer) or higher to apply for NSFW and NSFW+ access.",
                     ephemeral=True
                 )
 
@@ -556,26 +556,47 @@ class VerificationDropdown(Select):
             f"⚠️ **Cover sensitive information. Only DOB and photo should remain visible!**"
         )
 
-        questions = [
-            "1. Are you 18 years or older?",
-            "2. Have you read our server rules?",
-            (
-                "3. Please provide a valid form of ID for verification, such as an ID, driver's license, "
-                "passport, or another document that clearly shows your age and photo.\n\n"
-                "Make sure your DOB and photo are visible. Take a selfie holding the ID near your face, "
-                "and also hold a piece of paper with your current Discord username written on it. "
-                "This helps confirm the photo belongs to you and was not taken from somewhere online.\n\n"
-                "We do **NOT** allow ID numbers, addresses, or other sensitive details to be shown for your safety. "
-                "Please edit or cover those details before uploading.\n\n"
-                "-# *(The ID photo process is reviewed manually by staff for safety reasons. We do **not** keep photos on file; they are removed after acceptance or denial.)*"
-            ),
-            "4. Please upload your verification images here. These are reviewed by our staff team, not by a bot.",
-            "5. By applying for this application, you confirm that you understand the content in those channels may be explicit and is intended for **adults only.**",
-            "6. If you are applying for NSFW+ access, you are stating that you understand that the content is more explicit than the standard NSFW channels.",
-            "7. By applying for this application, you agree to follow all server rules and guidelines. Any violation may result in removal of NSFW access by gaining the `On Watchlist` role.",
-            "8. Please note that if you are applying on desktop, and later using an iOS device, that they restrict NSFW content by default, and our server is age-restricted. You will need to use a desktop or Android device to view NSFW content, or activate the option in settings to allow it by going to Settings > Messaging Permissions > Allow access to age-restricted servers on iOS.\n\n",
-            "If you do not agree to these conditions, please cancel the application now. You can reapply later if you change your mind."
-        ]
+        # 18+ applications use the same plain-text verification style,
+        # but do not include the NSFW/NSFW+ content questions.
+        if application_key == "18_plus":
+            questions = [
+                "1. Are you 18 years or older?",
+                "2. Have you read our server rules?",
+                (
+                    "3. Please provide a valid form of ID for verification, such as an ID, driver's license, "
+                    "passport, or another document that clearly shows your age and photo.\n\n"
+                    "Make sure your DOB and photo are visible. Take a selfie holding the ID near your face, "
+                    "and also hold a piece of paper with your current Discord username written on it. "
+                    "This helps confirm the photo belongs to you and was not taken from somewhere online.\n\n"
+                    "We do **NOT** allow ID numbers, addresses, or other sensitive details to be shown for your safety. "
+                    "Please edit or cover those details before uploading.\n\n"
+                    "-# *(The ID photo process is reviewed manually by staff for safety reasons. We do **not** keep photos on file; they are removed after acceptance or denial.)*"
+                ),
+                "4. Please upload your verification images here. These are reviewed by our staff team, not by a bot.",
+                "5. By applying for 18+ access, you confirm that you are 18 years or older and agree to follow all server rules and guidelines.",
+                "If you do not agree to these conditions, please cancel the application now. You can reapply later if you change your mind."
+            ]
+        else:
+            questions = [
+                "1. Are you 18 years or older?",
+                "2. Have you read our server rules?",
+                (
+                    "3. Please provide a valid form of ID for verification, such as an ID, driver's license, "
+                    "passport, or another document that clearly shows your age and photo.\n\n"
+                    "Make sure your DOB and photo are visible. Take a selfie holding the ID near your face, "
+                    "and also hold a piece of paper with your current Discord username written on it. "
+                    "This helps confirm the photo belongs to you and was not taken from somewhere online.\n\n"
+                    "We do **NOT** allow ID numbers, addresses, or other sensitive details to be shown for your safety. "
+                    "Please edit or cover those details before uploading.\n\n"
+                    "-# *(The ID photo process is reviewed manually by staff for safety reasons. We do **not** keep photos on file; they are removed after acceptance or denial.)*"
+                ),
+                "4. Please upload your verification images here. These are reviewed by our staff team, not by a bot.",
+                "5. By applying for this application, you confirm that you understand the content in those channels may be explicit and is intended for **adults only.**",
+                "6. If you are applying for NSFW+ access, you are stating that you understand that the content is more explicit than the standard NSFW channels.",
+                "7. By applying for this application, you agree to follow all server rules and guidelines. Any violation may result in removal of NSFW access by gaining the `On Watchlist` role.",
+                "8. Please note that if you are applying on desktop, and later using an iOS device, that they restrict NSFW content by default, and our server is age-restricted. You will need to use a desktop or Android device to view NSFW content, or activate the option in settings to allow it by going to Settings > Messaging Permissions > Allow access to age-restricted servers on iOS.\n\n",
+                "If you do not agree to these conditions, please cancel the application now. You can reapply later if you change your mind."
+            ]
 
         await thread.send("\n".join(questions))
 
@@ -691,7 +712,7 @@ class Verification(commands.Cog):
                 "Select the type of verification you want below.\n\n"
                 "Verification is manually reviewed by staff.\n"
                 "Please follow all instructions carefully!\n\n"
-                "**Please note: You must be level 10 (Stellar Specialist) or higher to apply for NSFW and NSFW+ access.**"
+                "**Please note: You must be level 5 (Planetary Pioneer) or higher to apply for NSFW and NSFW+ access.**"
             ),
             color=discord.Color.red()
         )
