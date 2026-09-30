@@ -1509,70 +1509,82 @@ class Economy(commands.Cog):
         return (bulk_choices + item_choices)[:25]
 
 
-    @commands.hybrid_group(
+    async def shop_item_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        """Route item autocomplete to the buy or sell picker."""
+        options = interaction.data.get("options", []) if interaction.data else []
+        action = next(
+            (
+                option.get("value")
+                for option in options
+                if option.get("name") == "action"
+            ),
+            "buy",
+        )
+
+        if action == "sell":
+            return await self.shop_sell_autocomplete(interaction, current)
+
+        return await self.shop_buy_autocomplete(interaction, current)
+
+    @commands.hybrid_command(
         name="shop",
-        description="Open the station shop or manage purchases and sales.",
-        invoke_without_command=True,  # type: ignore[call-arg]
-    )
-    async def shop(self, ctx: commands.Context):
-        """Open the main station shop."""
-        view = ShopView(self, ctx.author.id)
-        embed = view.build_embed("healing")
-
-        await ctx.send(
-            embed=embed,
-            view=view
-        )
-
-    @shop.command(
-        name="buy",
-        description="Buy an item from the station shop."
+        description="Open the station shop, buy, sell, or view rotating offers.",
     )
     @app_commands.describe(
-        item="Choose the item to buy.",
-        quantity="How many to buy (default: 1, maximum: 99).",
+        action="What you want to do. Leave blank to open the shop.",
+        item="Item to buy or sell.",
+        quantity="How many to buy or sell (default: 1, maximum: 99).",
     )
-    @app_commands.autocomplete(item=shop_buy_autocomplete)
-    async def shop_buy(
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="🛒 Buy", value="buy"),
+            app_commands.Choice(name="🔄 Rotating Shop", value="rotating"),
+            app_commands.Choice(name="💰 Sell", value="sell"),
+        ]
+    )
+    @app_commands.autocomplete(item=shop_item_autocomplete)
+    async def shop(
         self,
         ctx: commands.Context,
-        item: str,
+        action: str | None = None,
+        item: str | None = None,
         quantity: int = 1,
     ):
-        """Buy a selected shop item."""
-        return await self.buy(ctx, item, quantity)
+        """Open the shop or perform a shop action."""
+        action = action.lower().strip() if action else None
 
-    @shop.command(
-        name="rotating",
-        description="Show today's rotating station offers."
-    )
-    async def shop_rotating(self, ctx: commands.Context):
-        """Show today's rotating shop."""
-        view = ShopView(self, ctx.author.id)
-        embed = view.build_embed("daily")
+        if action is None:
+            view = ShopView(self, ctx.author.id)
+            embed = view.build_embed("healing")
+            return await ctx.send(embed=embed, view=view)
 
-        await ctx.send(
-            embed=embed,
-            view=view
+        if action == "rotating":
+            view = ShopView(self, ctx.author.id)
+            embed = view.build_embed("daily")
+            return await ctx.send(embed=embed, view=view)
+
+        if action == "buy":
+            if not item:
+                return await ctx.send(
+                    "❌ Choose an item to buy. Use `/shop` to view the shop first."
+                )
+            return await self.buy(ctx, item, quantity)
+
+        if action == "sell":
+            if not item:
+                return await ctx.send(
+                    "❌ Choose an item to sell. You can also select a **Sell All** option."
+                )
+            return await self.sell(ctx, item, quantity)
+
+        return await ctx.send(
+            "❌ Unknown shop action. Use `/shop` by itself, or choose **Buy**, "
+            "**Rotating Shop**, or **Sell**."
         )
-
-    @shop.command(
-        name="sell",
-        description="Sell an item from your inventory."
-    )
-    @app_commands.describe(
-        item="Choose the item to sell, or select a Sell All option.",
-        quantity="How many to sell (default: 1, maximum: 99).",
-    )
-    @app_commands.autocomplete(item=shop_sell_autocomplete)
-    async def shop_sell(
-        self,
-        ctx: commands.Context,
-        item: str,
-        quantity: int = 1,
-    ):
-        """Sell a selected inventory item or a bulk Sell All option."""
-        return await self.sell(ctx, item, quantity)
 
 
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):

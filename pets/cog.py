@@ -671,14 +671,14 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     @commands.hybrid_command(
         name="fusion",
-        description="Fuse a pet using 5 matching duplicates, and use /fusion info for more details.",
+        description="Fuse a pet using 5 matching duplicates, or use /fusion info for details.",
     )
     @app_commands.describe(
         pet="Choose the pet to fuse, or type/select 'info' to learn how Fusion works."
     )
     @app_commands.autocomplete(pet=_pet_fuse_autocomplete)
-    async def pet_fuse(self, ctx: commands.Context, pet: str | None = None):
-        if not pet or pet.lower().strip() == "info":
+    async def pet_fuse(self, ctx: commands.Context, pet: str):
+        if pet.lower().strip() == "info":
             embed = discord.Embed(
                 title="🧬 Pet Fusion",
                 description=(
