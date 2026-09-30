@@ -993,7 +993,8 @@ class Achievements(commands.Cog):
                     "value": (
                         f"{achievement['description']}\n"
                         f"{progress}\n"
-                        f"🎁 Reward: **{achievement['reward']}**"
+                        f"🎁 Reward: **{achievement['reward']}**\n"
+                        "\u200b"
                     ),
                     "inline": False,
                 }
