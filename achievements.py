@@ -257,6 +257,64 @@ async def ensure_achievement_tables(db):
     """)
 
 
+class AchievementPagination(discord.ui.View):
+    """Button-based pagination for the achievements list."""
+
+    def __init__(self, pages, author_id):
+        super().__init__(timeout=180)
+        self.pages = pages
+        self.author_id = author_id
+        self.current_page = 0
+        self.message: discord.Message | None = None
+        self._update_buttons()
+
+    def _update_buttons(self):
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                if item.custom_id == "achievement_previous":
+                    item.disabled = self.current_page <= 0
+                elif item.custom_id == "achievement_next":
+                    item.disabled = self.current_page >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Only the person who opened these achievements can use the page buttons.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except (discord.NotFound, discord.HTTPException):
+                pass
+
+    async def _show_page(self, interaction: discord.Interaction):
+        self._update_buttons()
+        await interaction.response.edit_message(
+            embed=self.pages[self.current_page],
+            view=self,
+        )
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, custom_id="achievement_previous")
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+        await self._show_page(interaction)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary, custom_id="achievement_next")
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < len(self.pages) - 1:
+            self.current_page += 1
+        await self._show_page(interaction)
+
+
 class Achievements(commands.Cog):
     """Permanent achievement tracking and rewards."""
 
@@ -914,8 +972,37 @@ class Achievements(commands.Cog):
                     inline=False,
                 )
     
-            embed.set_footer(text="Achievement rewards are permanent.")
-            await ctx.send(embed=embed)
+            # Discord allows at most 25 fields per embed. Build as many
+            # embeds as needed, then let the user scroll between them.
+            fields = list(embed.fields)
+            page_size = 25
+            pages = []
+
+            for page_start in range(0, len(fields), page_size):
+                page_fields = fields[page_start:page_start + page_size]
+                page_number = (page_start // page_size) + 1
+                page_count = (len(fields) + page_size - 1) // page_size
+
+                page_embed = discord.Embed(
+                    title=embed.title,
+                    description=embed.description,
+                    color=embed.color,
+                )
+                for field in page_fields:
+                    page_embed.add_field(
+                        name=field.name,
+                        value=field.value,
+                        inline=field.inline,
+                    )
+
+                page_embed.set_footer(
+                    text=f"Achievement rewards are permanent. • Page {page_number}/{page_count}"
+                )
+                pages.append(page_embed)
+
+        view = AchievementPagination(pages, ctx.author.id)
+        message = await ctx.send(embed=pages[0], view=view)
+        view.message = message
 
 
 async def setup(bot):
