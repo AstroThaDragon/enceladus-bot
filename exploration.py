@@ -448,9 +448,10 @@ class Exploration(commands.Cog):
         active = profile["active_location"]
 
         description = (
-            "Something is wrong with this part of Enceladus. The corridors are too quiet, "
-            "the shadows move when nobody is looking, and nobody can agree on where these places came from.\n\n"
-            "Choose somewhere to explore. Each run is made of multiple stages, and your choices can affect your Sanity."
+            "Enceladus opened a series of portals while searching for new places to explore for Halloween. "
+            "Something came back through one of them. Whatever happened next left the portals—and Enceladus himself—changed.\n\n"
+            "The destinations beyond these portals are waiting. Choose one below and step through. "
+            "Each location has its own encounters, dangers, and rewards."
         )
         if active in HAUNTED_LOCATIONS:
             description += (
@@ -464,6 +465,11 @@ class Exploration(commands.Cog):
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
+            name="👤 Explorer",
+            value=member.mention,
+            inline=True,
+        )
+        embed.add_field(
             name="🧠 Sanity",
             value=f"**{sanity}/100**\n{state}\nRegenerates continuously over time.",
             inline=True,
@@ -473,22 +479,42 @@ class Exploration(commands.Cog):
             value=f"**{profile['attempts']}/{HAUNTED_DAILY_ATTEMPTS}**",
             inline=True,
         )
-        embed.add_field(
-            name="📖 How it works",
-            value="Choose a location, face encounters, make choices, or run away. Completing a run awards location-specific ingredients, Candy, Stardust, and a rarity-based chance at Halloween collectibles.",
-            inline=False,
-        )
-        embed.set_footer(text=f"Explorer: {member.display_name} • Halloween event")
+        embed.set_footer(text="Choose a portal to enter • Halloween event")
         return embed
 
     def _haunted_info_embed(self):
         embed = discord.Embed(
             title="📖 Haunted Exploration — Field Guide",
             description=(
-                "Haunted Exploration is a multi-stage Halloween adventure. Pick a location and work your way "
-                "through encounters by choosing what to do."
+                "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
+                "Enceladus. Each portal leads somewhere new - and not everything that comes through them is supposed to be there."
             ),
             color=discord.Color.dark_purple(),
+        )
+        embed.add_field(
+            name="🌀 The Portals",
+            value=(
+                "Enceladus went searching for new locations for Halloween. While using portals to find new areas, "
+                "**something came back through one of them.** It attacked. He tried to fight back... but to no avail."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="💻 The Corruption",
+            value=(
+                "Whatever came through the portal entered Enceladus's system, past his coding, and **corrupted him**. "
+                "He comes and goes, sometimes able to fight through it—almost like he is possessed, but digitally. "
+                "There is nothing we can do... **for now.**"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="👁️ Sometimes...",
+            value=(
+                "There are moments when the corruption pushes through. Enceladus is not always entirely himself. "
+                "And sometimes... *something else comes out.*"
+            ),
+            inline=False,
         )
         embed.add_field(
             name="🧠 Sanity",
@@ -532,7 +558,12 @@ class Exploration(commands.Cog):
         )
         embed.add_field(
             name="👻 Haunted Content",
-            value="Phase 2 adds end-of-adventure rewards, location-specific ingredients, rarity, Candy, Stardust, and Haunted-only collectible discoveries. Phase 3 adds location-specific encounters, while universal encounters can still appear anywhere.",
+            value=(
+                "Phase 2 adds end-of-adventure rewards, location-specific ingredients, rarity, Candy, Stardust, and "
+                "Haunted-only collectible discoveries. Phase 3 adds location-specific encounters, while universal "
+                "encounters can still appear anywhere. The places beyond the portals are part of Enceladus's search for "
+                "new Halloween locations—and part of whatever followed him back."
+            ),
             inline=False,
         )
         return embed
@@ -559,21 +590,29 @@ class Exploration(commands.Cog):
 
                 total_stages = await start_run(db, user_id, location_id, profile["sanity"])
 
-            location = HAUNTED_LOCATIONS[location_id]
-            await interaction.response.edit_message(
-                content=f"{location['emoji']} **{location['name']}** selected.",
-                embed=None,
-                view=None,
-            )
-            await self._show_haunted_stage(interaction, location_id, 1, total_stages)
+        # The location-selection message becomes the actual adventure screen.
+        await self._show_haunted_stage(interaction, location_id, 1, total_stages)
 
-    async def _show_haunted_stage(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int):
+    async def _show_haunted_stage(
+        self,
+        interaction: discord.Interaction,
+        location_id: str,
+        stage: int,
+        total_stages: int,
+        result_text: str | None = None,
+    ):
         user_id = interaction.user.id
+        pet_discovery_message = None
+
         async with aiosqlite.connect(self.get_db_path()) as db:
             await self.ensure_schema(db)
             profile = await get_or_create_profile(db, user_id)
-            async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with db.execute(
+                "SELECT active_effects FROM users WHERE user_id = ?",
+                (user_id,),
+            ) as cursor:
                 effect_row = await cursor.fetchone()
+
             try:
                 effects = json.loads(effect_row[0] or "{}") if effect_row else {}
                 if not isinstance(effects, dict):
@@ -605,7 +644,11 @@ class Exploration(commands.Cog):
                 ]
                 if dangerous:
                     _, warned_choice = random.choice(dangerous)
-                    warned_label = warned_choice.get("label", "one of the choices") if isinstance(warned_choice, dict) else warned_choice[0]
+                    warned_label = (
+                        warned_choice.get("label", "one of the choices")
+                        if isinstance(warned_choice, dict)
+                        else warned_choice[0]
+                    )
                     malo_warning = warned_label
 
             if force_universal:
@@ -617,7 +660,24 @@ class Exploration(commands.Cog):
                     "UPDATE users SET active_effects = ? WHERE user_id = ?",
                     (json.dumps(effects), user_id),
                 )
-                await db.commit()
+
+            if encounter.get("discovery_id"):
+                discovery_id = encounter["discovery_id"]
+                achievements_cog = self.bot.get_cog("Achievements")
+                if achievements_cog:
+                    await achievements_cog.record_haunted_discovery(
+                        user_id,
+                        discovery_id,
+                        location_id,
+                        sanity=profile["sanity"],
+                        db=db,
+                    )
+
+                pet_result = await grant_haunted_pet(db, user_id, location_id)
+                if pet_result and pet_result.get("new"):
+                    pet_discovery_message = pet_result["message"]
+
+            await db.commit()
 
         location = HAUNTED_LOCATIONS[location_id]
         sanity = sanity_percent(profile["sanity"])
@@ -626,11 +686,16 @@ class Exploration(commands.Cog):
             encounter_text = "🩸 **INSANITY**\n\n" + encounter_text
         elif sanity <= 25:
             encounter_text = "🫥 **Your grip on reality is slipping.**\n\n" + encounter_text
+
+        if result_text:
+            encounter_text = f"⚡ **What happened**\n{result_text}\n\n{encounter_text}"
+
         embed = discord.Embed(
             title=f"{location['emoji']} {location['name']}",
             description=encounter_text,
             color=discord.Color.dark_red() if sanity <= 25 else discord.Color.dark_purple(),
         )
+        embed.add_field(name="👤 Explorer", value=interaction.user.mention, inline=True)
         embed.add_field(name="📍 Stage", value=f"**{stage}/{total_stages}**", inline=True)
         embed.add_field(name="🧠 Sanity", value=f"**{sanity}/100**", inline=True)
 
@@ -644,34 +709,20 @@ class Exploration(commands.Cog):
                 inline=False,
             )
 
-        pet_discovery_message = None
-        if encounter.get("discovery_id"):
-            discovery_id = encounter["discovery_id"]
-            achievements_cog = self.bot.get_cog("Achievements")
-            if achievements_cog:
-                await achievements_cog.record_haunted_discovery(
-                    user_id,
-                    discovery_id,
-                    location_id,
-                    sanity=profile["sanity"],
-                    db=db,
-                )
-
-            pet_result = await grant_haunted_pet(db, user_id, location_id)
-            if pet_result and pet_result.get("new"):
-                pet_discovery_message = pet_result["message"]
-
-            # Discovery records and pet rewards are part of the same stage setup.
-            await db.commit()
+        if pet_discovery_message:
+            embed.add_field(
+                name="🐾 Discovery",
+                value=pet_discovery_message,
+                inline=False,
+            )
 
         embed.set_footer(text="Choose carefully. Or run.")
 
-        await interaction.followup.send(
+        await interaction.response.edit_message(
+            content=None,
             embed=embed,
             view=HauntedEncounterView(self, location_id, stage, total_stages, encounter),
         )
-        if pet_discovery_message:
-            await interaction.followup.send(pet_discovery_message)
 
     async def _resolve_haunted_choice(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int, encounter, choice_index: int):
         user_id = interaction.user.id
@@ -775,8 +826,6 @@ class Exploration(commands.Cog):
                         haunted_pet_xp_amount,
                     )
 
-            await interaction.response.edit_message(view=None)
-
             if next_stage is None:
                 assert reward is not None
                 reward_lines = [
@@ -806,16 +855,52 @@ class Exploration(commands.Cog):
                         f"🎃 **Halloween Collectible Found:** {collectible[2]} **{collectible[1]}**"
                     )
 
-                await interaction.followup.send(
-                    f"✨ **Stage {stage} complete!**\n{result_text}\n\n"
-                    f"🏁 You made it through **{total_stages} stages** of {HAUNTED_LOCATIONS[location_id]['name']}!\n"
-                    f"🧠 Sanity: **{sanity_percent(new_sanity)}/100**\n\n"
-                    "🎁 **Adventure Rewards**\n" + "\n".join(reward_lines)
+                reward_embed = discord.Embed(
+                    title=f"{HAUNTED_LOCATIONS[location_id]['emoji']} {HAUNTED_LOCATIONS[location_id]['name']}",
+                    description=(
+                        f"**{interaction.user.mention} survived the {HAUNTED_LOCATIONS[location_id]['name']}.**\n\n"
+                        f"⚡ **What happened**\n{result_text}\n\n"
+                        f"🏁 **Adventure Complete**\n"
+                        f"You made it through **{total_stages} stages**."
+                    ),
+                    color=discord.Color.green(),
+                )
+                reward_embed.add_field(
+                    name="👤 Explorer",
+                    value=interaction.user.mention,
+                    inline=True,
+                )
+                reward_embed.add_field(
+                    name="📍 Stages Cleared",
+                    value=f"**{total_stages}/{total_stages}**",
+                    inline=True,
+                )
+                reward_embed.add_field(
+                    name="🧠 Final Sanity",
+                    value=f"**{sanity_percent(new_sanity)}/100**",
+                    inline=True,
+                )
+                reward_embed.add_field(
+                    name="🎁 Adventure Rewards",
+                    value="\n".join(reward_lines),
+                    inline=False,
+                )
+                reward_embed.set_footer(text="Adventure complete • The portals remain open...")
+
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=reward_embed,
+                    view=None,
                 )
                 return
 
-            await interaction.followup.send(f"{result_text}")
-            await self._show_haunted_stage(interaction, location_id, next_stage, total_stages)
+            await self._show_haunted_stage(
+                interaction,
+                location_id,
+                next_stage,
+                total_stages,
+                result_text=result_text,
+            )
 
     async def _run_away_haunted(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int):
         user_id = interaction.user.id
@@ -849,13 +934,31 @@ class Exploration(commands.Cog):
 
                 await clear_run(db, user_id)
 
-            await interaction.response.edit_message(view=None)
-            suffix = "\n\n⚠️ **Something happened while you escaped.**" if rare_escape else ""
-            await interaction.followup.send(
-                f"🏃 **You ran away.**\n{escape_text}{suffix}\n\n"
-                f"🧠 Sanity: **{sanity_percent(new_sanity)}/100**\n"
-                "No reward was earned from this run."
-            )
+        suffix = "\n\n⚠️ **Something happened while you escaped.**" if rare_escape else ""
+        location = HAUNTED_LOCATIONS[location_id]
+        escape_embed = discord.Embed(
+            title=f"{location['emoji']} {location['name']}",
+            description=(
+                f"**{interaction.user.mention} left the {location['name']}.**\n\n"
+                f"{escape_text}{suffix}"
+            ),
+            color=discord.Color.orange(),
+        )
+        escape_embed.add_field(name="👤 Explorer", value=interaction.user.mention, inline=True)
+        escape_embed.add_field(name="📍 Run Ended", value=f"Stage **{stage}/{total_stages}**", inline=True)
+        escape_embed.add_field(name="🧠 Sanity", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
+        escape_embed.add_field(
+            name="🎁 Rewards",
+            value="No reward was earned from this run.",
+            inline=False,
+        )
+        escape_embed.set_footer(text="You escaped. The portal remains behind you.")
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=escape_embed,
+            view=None,
+        )
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
