@@ -774,13 +774,13 @@ class Cauldron(commands.Cog):
     @seasonal.command(name="crafting", description="Open a seasonal crafting station.")
     @app_commands.describe(
         season="Choose the seasonal event.",
-        crafting="Choose the crafting station to open.",
+        bench="Choose the crafting station to open.",
     )
     @app_commands.choices(
         season=[
             app_commands.Choice(name="🎃 Halloween", value="halloween"),
         ],
-        crafting=[
+        bench=[
             app_commands.Choice(name="🧙 Witch's Cauldron", value="cauldron"),
             app_commands.Choice(name="🔧 Haunted Workshop", value="workshop"),
             app_commands.Choice(name="🕯️ Ritual Table", value="ritual"),
@@ -790,7 +790,7 @@ class Cauldron(commands.Cog):
         self,
         ctx: commands.Context,
         season: str,
-        crafting: str,
+        bench: str,
     ):
         if season != "halloween":
             await ctx.send("❌ That seasonal crafting event is not available.")
@@ -806,7 +806,7 @@ class Cauldron(commands.Cog):
             )
             return
 
-        if crafting == "cauldron":
+        if bench == "cauldron":
             await ctx.defer()
             embed = discord.Embed(
                 title="🧙 The Witch's Cauldron",
@@ -827,7 +827,7 @@ class Cauldron(commands.Cog):
             )
             return
 
-        if crafting == "workshop":
+        if bench == "workshop":
             workshop = self.bot.get_cog("Workshop")
             if workshop is None:
                 await ctx.send("❌ The Haunted Workshop is not loaded.")
@@ -848,7 +848,7 @@ class Cauldron(commands.Cog):
             )
             return
 
-        if crafting == "ritual":
+        if bench == "ritual":
             ritual = self.bot.get_cog("RitualTable")
             if ritual is None:
                 await ctx.send("❌ The Ritual Table is not loaded.")
