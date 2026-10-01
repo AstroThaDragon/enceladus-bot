@@ -105,7 +105,7 @@ class Collectibles(commands.Cog):
             )
             embed.set_footer(text="This discovery is permanent.")
 
-            return await ctx.send(embed=embed, ephemeral=True)
+            return await ctx.send(embed=embed)
 
         # /collectibles
         await ctx.defer()
