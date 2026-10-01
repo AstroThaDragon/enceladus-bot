@@ -1701,21 +1701,6 @@ class Exploration(commands.Cog):
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: {cooldown_text}")
-        mining_pet_charge_bonus = pet_effects.get("extra_charge_count", 0)
-        mining_pet_stardust_bonus = pet_effects.get("extra_charges", 0.0)
-        mining_pet_note = (
-            f" • 🐉 Space Dragon: **+{mining_pet_charge_bonus} Max Charges**"
-            if mining_pet_charge_bonus
-            else ""
-        )
-        embed.add_field(
-            name="🛠️ Mining Laser Upgrade",
-            value=(f"Tier **{mining_upgrade['level']}/5** • Max Charges: **{max_mining_charges}**\n"
-                   f"Stardust Bonus: **+{(mining_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{mining_upgrade['rare_bonus'] * 100:.1f}%**"
-                   f"\nPet Stardust Bonus: **+{mining_pet_stardust_bonus * 100:.0f}%**{mining_pet_note}"),
-            inline=False
-        )
-
         if pet_xp_result:
             pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
             if pet_xp_result["leveled_up"]:
@@ -2128,7 +2113,7 @@ class Exploration(commands.Cog):
             # Halloween resources are independent bonus rolls and never replace normal loot.
             candy_doubled = False
             if halloween_active and random.random() < HALLOWEEN_SCAVENGING_CANDY_CHANCE:
-                candy_found = random.randint(3, 20)
+                candy_found = random.randint(3, 15)
 
                 # Sam's Trick-or-Treating passive can double the base candy haul.
                 if pet_effects["candy_bonus"] and random.random() < pet_effects["candy_bonus"]:
@@ -2372,30 +2357,6 @@ class Exploration(commands.Cog):
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
-        scavenge_pet_charge_bonus = pet_effects.get("extra_charge_count", 0)
-        scavenge_pet_stardust_bonus = pet_effects.get("extra_charges", 0.0)
-        scavenge_pet_note = (
-            f" • 🐉 Space Dragon: **+{scavenge_pet_charge_bonus} Max Charges**"
-            if scavenge_pet_charge_bonus
-            else ""
-        )
-        embed.add_field(
-            name="🛠️ Scavenging Drone Upgrade",
-            value=(f"Tier **{scavenging_upgrade['level']}/5** • Max Charges: **{max_scavenge_charges}**\n"
-                   f"Stardust Bonus: **+{(scavenging_upgrade['stardust_mult'] - 1) * 100:.0f}%** • Rare Loot Bonus: **+{scavenging_upgrade['rare_bonus'] * 100:.1f}%**"
-                   f"\nPet Stardust Bonus: **+{scavenge_pet_stardust_bonus * 100:.0f}%**{scavenge_pet_note}"),
-            inline=False
-        )
-        embed.add_field(
-            name="♻️ Salvage Rig Upgrade",
-            value=(
-                f"Tier **{salvage_upgrade['level']}/5** • Relative loot chance: **+{salvage_bonus_chance * 100:.0f}%**\n"
-                "Applies to salvage materials, medical supplies, and bonus minerals.\n"
-                "*The 8% bonus-mineral discovery gate is unchanged.*"
-            ),
-            inline=False
-        )
-
         if pet_xp_result:
             pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
             if pet_xp_result["leveled_up"]:

@@ -20,7 +20,7 @@ from seasonal_updates.halloween.halloween import is_active as halloween_is_activ
 
 # Keep these uncommon. The per-user cooldown makes repeated command spam much
 # less likely to produce multiple corruption messages in a short window.
-HALLOWEEN_FLAVOR_CHANCE = 0.15
+HALLOWEEN_FLAVOR_CHANCE = 0.45
 HALLOWEEN_FLAVOR_COOLDOWN = 10 * 60
 
 

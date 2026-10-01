@@ -253,7 +253,13 @@ class FontPreviewSelect(discord.ui.Select):
             discord.SelectOption(label="Smokum", value="smokum"),
             discord.SelectOption(label="Ubuntu", value="ubuntu"),
         ]
-        super().__init__(placeholder="Choose a font to preview...", min_values=1, max_values=1, options=options)
+        super().__init__(
+            placeholder="Choose a font to preview...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="leveling_font_preview_select"
+        )
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -527,6 +533,7 @@ class Leveling(commands.Cog):
             await db.commit()
 
         self.cleanup_departed_users.start()  # type: ignore[reportAttributeAccessIssue]
+        self.bot.add_view(FontView(self))
 
     def cog_unload(self):
         self.cleanup_departed_users.cancel()  # type: ignore[reportAttributeAccessIssue]

@@ -5,6 +5,7 @@ from discord.ext import commands, tasks
 from discord.ui import View, Button
 import asyncio
 import aiosqlite
+import os
 from datetime import datetime, timedelta, timezone
 
 SPOILER_REQUIRED_CHANNELS = {
@@ -34,6 +35,13 @@ MOD_LOG_CHANNEL_ID = 1352095872812318760
 VERIFY_MESSAGE_EXEMPT_ROLE_IDS = [
     891356074689560626,  # Owner
 ]
+
+# Support ticket configuration.
+TICKET_CATEGORY_ID = 1555118409631531088
+TICKET_TRANSCRIPT_CHANNEL_ID = 1352412597147930826
+TICKET_MODERATOR_ROLE_ID = 1036583011405266974
+TICKET_ADMIN_ROLE_ID = 593718477831929858
+TICKET_OWNER_ROLE_ID = 891356074689560626
 
 VERIFICATION_DB_PATH = "/app/data/verification.db"
 
@@ -117,10 +125,48 @@ class VerifyView(View):
         )
 
 
+class SupportTicketView(View):
+    """Persistent button for opening a private support ticket."""
+
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(
+        label="Open Support Ticket",
+        style=discord.ButtonStyle.primary,
+        emoji="🎫",
+        custom_id="support_ticket_open",
+    )
+    async def open_ticket(self, interaction, button):
+        await self.cog.open_support_ticket(interaction)
+
+
+class SupportTicketCloseView(View):
+    """Persistent button for closing a support ticket."""
+
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(
+        label="Close Ticket",
+        style=discord.ButtonStyle.danger,
+        emoji="🔒",
+        custom_id="support_ticket_close",
+    )
+    async def close_ticket(self, interaction, button):
+        await self.cog.close_support_ticket(interaction)
+
+
+
+
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.add_view(VerifyView(self))
+        self.bot.add_view(SupportTicketView(self))
+        self.bot.add_view(SupportTicketCloseView(self))
         self.verification_lock = asyncio.Lock()
 
     async def cog_load(self):
@@ -197,6 +243,283 @@ class Moderation(commands.Cog):
             await db.commit()
 
         return row[0] if row else 1
+
+    async def _get_open_ticket(self, guild, user_id):
+        category = guild.get_channel(TICKET_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
+            return None
+
+        marker = f"support_ticket:{user_id}"
+        for channel in category.text_channels:
+            if channel.topic == marker:
+                return channel
+        return None
+
+    def _ticket_staff_overwrites(self, guild, member):
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+                embed_links=True,
+            ),
+        }
+
+        for role_id in (
+            TICKET_MODERATOR_ROLE_ID,
+            TICKET_ADMIN_ROLE_ID,
+            TICKET_OWNER_ROLE_ID,
+        ):
+            role = guild.get_role(role_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                    embed_links=True,
+                )
+
+        if guild.me:
+            overwrites[guild.me] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                manage_channels=True,
+                manage_messages=True,
+                attach_files=True,
+                embed_links=True,
+            )
+
+        return overwrites
+
+    async def open_support_ticket(self, interaction):
+        guild = interaction.guild
+        member = interaction.user
+
+        if not guild or not isinstance(member, discord.Member):
+            return await interaction.response.send_message(
+                "❌ Support tickets can only be opened inside the server.",
+                ephemeral=True,
+            )
+
+        category = guild.get_channel(TICKET_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
+            return await interaction.response.send_message(
+                "⚠️ The support ticket category could not be found. Please contact staff.",
+                ephemeral=True,
+            )
+
+        existing = await self._get_open_ticket(guild, member.id)
+        if existing:
+            return await interaction.response.send_message(
+                f"🎫 You already have an open support ticket: {existing.mention}",
+                ephemeral=True,
+            )
+
+        await interaction.response.defer(ephemeral=True)
+
+        safe_name = "".join(
+            char.lower() if char.isalnum() else "-"
+            for char in member.display_name
+        ).strip("-")
+        safe_name = safe_name[:40] or str(member.id)
+        channel_name = f"ticket-{safe_name}"
+
+        try:
+            channel = await guild.create_text_channel(
+                channel_name,
+                category=category,
+                topic=f"support_ticket:{member.id}",
+                overwrites=self._ticket_staff_overwrites(guild, member),
+                reason=f"Support ticket opened by {member} ({member.id})",
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(f"[TICKET CREATE ERROR] Could not create ticket for {member} ({member.id}): {exc}")
+            return await interaction.followup.send(
+                "⚠️ I couldn't create your support ticket. Please contact staff.",
+                ephemeral=True,
+            )
+
+        embed = discord.Embed(
+            title="🎫 Support Ticket",
+            description=(
+                f"Welcome, {member.mention}! Staff will be with you as soon as possible.\n\n"
+                "Please describe what you need help with and include any relevant details, "
+                "screenshots, or other information.\n\n"
+                "When your issue has been resolved, use the button below to close this ticket."
+            ),
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text=f"Ticket opened by {member}")
+
+        await channel.send(
+            content=member.mention,
+            embed=embed,
+            view=SupportTicketCloseView(self),
+        )
+
+        await interaction.followup.send(
+            f"🎫 Your support ticket has been created: {channel.mention}",
+            ephemeral=True,
+        )
+
+    async def create_ticket_transcript(self, channel):
+        messages = []
+
+        async for message in channel.history(limit=None, oldest_first=True):
+            content = message.content or ""
+
+            if message.embeds:
+                for embed in message.embeds:
+                    if embed.title:
+                        content += f"\n[Embed: {embed.title}]"
+                    if embed.description:
+                        content += f"\n{embed.description}"
+
+            if message.attachments:
+                attachments = "\n".join(a.url for a in message.attachments)
+                content += f"\n[Attachments]\n{attachments}"
+
+            messages.append(
+                f"[{message.created_at}] {message.author}: {content}"
+            )
+
+        transcript_text = "\n\n".join(messages)
+        file_name = f"transcript-{channel.id}.txt"
+
+        with open(file_name, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+
+        return file_name
+
+    async def close_support_ticket(self, interaction):
+        channel = interaction.channel
+        guild = interaction.guild
+
+        if not guild or not isinstance(channel, discord.TextChannel):
+            return await interaction.response.send_message(
+                "❌ This is not a support ticket channel.",
+                ephemeral=True,
+            )
+
+        if not channel.topic or not channel.topic.startswith("support_ticket:"):
+            return await interaction.response.send_message(
+                "❌ This channel is not a support ticket.",
+                ephemeral=True,
+            )
+
+        is_staff = any(
+            role.id in {
+                TICKET_MODERATOR_ROLE_ID,
+                TICKET_ADMIN_ROLE_ID,
+                TICKET_OWNER_ROLE_ID,
+            }
+            for role in getattr(interaction.user, "roles", [])
+        )
+        ticket_owner_id = int(channel.topic.split(":", 1)[1])
+
+        if interaction.user.id != ticket_owner_id and not is_staff:
+            return await interaction.response.send_message(
+                "❌ Only the ticket owner or staff can close this ticket.",
+                ephemeral=True,
+            )
+
+        await interaction.response.defer(ephemeral=True)
+
+        transcript_channel = self.bot.get_channel(TICKET_TRANSCRIPT_CHANNEL_ID)
+        if not transcript_channel:
+            try:
+                transcript_channel = await self.bot.fetch_channel(
+                    TICKET_TRANSCRIPT_CHANNEL_ID
+                )
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                transcript_channel = None
+
+        file_name = None
+        try:
+            file_name = await self.create_ticket_transcript(channel)
+
+            if transcript_channel:
+                transcript_embed = discord.Embed(
+                    title="🎫 Support Ticket Closed",
+                    color=discord.Color.orange(),
+                    timestamp=discord.utils.utcnow(),
+                )
+                transcript_embed.add_field(
+                    name="Ticket",
+                    value=channel.name,
+                    inline=True,
+                )
+                transcript_embed.add_field(
+                    name="Closed By",
+                    value=interaction.user.mention,
+                    inline=True,
+                )
+                transcript_embed.add_field(
+                    name="Ticket Owner",
+                    value=f"<@{ticket_owner_id}>",
+                    inline=True,
+                )
+
+                await transcript_channel.send(
+                    embed=transcript_embed,
+                    file=discord.File(file_name),
+                )
+
+            await channel.delete(
+                reason=f"Support ticket closed by {interaction.user} ({interaction.user.id})"
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(f"[TICKET CLOSE ERROR] Could not close {channel} ({channel.id}): {exc}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "⚠️ I couldn't finish closing this ticket.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "⚠️ I couldn't finish closing this ticket.",
+                    ephemeral=True,
+                )
+        finally:
+            if file_name:
+                try:
+                    os.remove(file_name)
+                except OSError:
+                    pass
+
+        if not interaction.response.is_done():
+            await interaction.response.send_message(
+                "✅ Ticket closed and its transcript was saved.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                "✅ Ticket closed and its transcript was saved.",
+                ephemeral=True,
+            )
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def sendsupportpanel(self, ctx):
+        """Post the support ticket panel."""
+        embed = discord.Embed(
+            title="🎫 Support Tickets",
+            description=(
+                "Need help, have a question, or need to contact staff?\n\n"
+                "Open a private support ticket below and our staff team will assist you."
+            ),
+            color=discord.Color.blurple(),
+        )
+
+        await ctx.send(
+            embed=embed,
+            view=SupportTicketView(self),
+        )
 
     @commands.command()
     async def qr(self, ctx, *, reason):

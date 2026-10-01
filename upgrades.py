@@ -199,11 +199,19 @@ class Upgrades(commands.Cog):
     async def build_embed(self, user_id):
         stardust, mining_level, scavenging_level, salvage_level = await self.get_levels(user_id)
         embed = discord.Embed(
-            title="⚙️ Exploration Upgrades",
-            description="Permanent upgrades for your mining laser, scavenging drone, and salvage rig.\n\nEach system has **5 levels**, and you must complete them **in order**. Every upgrade requires both **Stardust and materials**.",
+            title="⚙️ Your Exploration Upgrades",
+            description=(
+                "**These are the upgrades currently installed on your exploration equipment.**\n\n"
+                "Each system has **5 levels**, and you must complete them **in order**. "
+                "Every upgrade requires both **Stardust and materials**."
+            ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        for system, level in (("mining", mining_level), ("scavenging", scavenging_level), ("salvage", salvage_level)):
+        for index, (system, level) in enumerate(
+            (("mining", mining_level), ("scavenging", scavenging_level), ("salvage", salvage_level))
+        ):
+            if index:
+                embed.add_field(name="━━━━━━━━━━━━━━━━━━━━", value="\u200b", inline=False)
             info = UPGRADE_DATA[system]
             if level >= MAX_LEVEL:
                 data = info["levels"][MAX_LEVEL]
@@ -247,7 +255,7 @@ class Upgrades(commands.Cog):
                         f"{self.material_text(mats)}"
                         + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
                     )
-            embed.add_field(name=f"{info['emoji']} {info['name']}", value=value, inline=False)
+            embed.add_field(name=f"{info['emoji']} Your {info['name']}", value=value, inline=False)
         embed.set_footer(text=f"Available Stardust: {stardust:,} • Craft upgrade parts with /craft")
         return embed
 
