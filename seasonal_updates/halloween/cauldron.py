@@ -1,5 +1,6 @@
 import aiosqlite
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
@@ -765,102 +766,108 @@ class Cauldron(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.hybrid_group(name="seasonal crafting", description="Open seasonal systems.")
-    async def seasonal_crafting(self, ctx: commands.Context):
+    @commands.hybrid_group(name="seasonal", description="Open seasonal crafting systems.")
+    async def seasonal(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
-            await ctx.send("Use `/seasonal crafting halloween` to access Halloween seasonal crafting.")
+            await ctx.send("Use `/seasonal crafting` and choose a season and crafting station.")
 
-    @seasonal_crafting.group(name="halloween", description="Open Halloween crafting stations.")
-    async def halloween(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            await ctx.send("Choose a Halloween crafting station: cauldron, workshop, or ritual.")
+    @seasonal.command(name="crafting", description="Open a seasonal crafting station.")
+    @app_commands.describe(
+        season="Choose the seasonal event.",
+        crafting="Choose the crafting station to open.",
+    )
+    @app_commands.choices(
+        season=[
+            app_commands.Choice(name="🎃 Halloween", value="halloween"),
+        ],
+        crafting=[
+            app_commands.Choice(name="🧙 Witch's Cauldron", value="cauldron"),
+            app_commands.Choice(name="🔧 Haunted Workshop", value="workshop"),
+            app_commands.Choice(name="🕯️ Ritual Table", value="ritual"),
+        ],
+    )
+    async def seasonal_crafting(
+        self,
+        ctx: commands.Context,
+        season: str,
+        crafting: str,
+    ):
+        if season != "halloween":
+            await ctx.send("❌ That seasonal crafting event is not available.")
+            return
 
-    @halloween.command(name="cauldron", description="Open the Lair of Frights Witch's Cauldron.")
-    async def seasonal_cauldron(self, ctx: commands.Context):
         if not is_halloween_channel(ctx.channel):
             await ctx.send(halloween_channel_message())
             return
         if not halloween_is_active():
             await ctx.send(
-                "🎃 The Lair of Frights Witch's Cauldron is dormant right now. "
+                "🎃 Lair of Frights Seasonal Crafting is dormant right now. "
                 "Come back during the Halloween season."
             )
             return
 
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🧙 The Lair of Frights Witch's Cauldron",
-            description=(
-                "*Something bubbles ominously inside...*\n\n"
-                "Turn your Haunted Ingredients into strange brews and "
-                "ritual supplies.\n\n"
-                "🧪 **Brew** — Choose something to make\n"
-                "📖 **Recipes** — Browse every known recipe\n"
-                "🎒 **Ingredients** — Check your Haunted Ingredients"
-            ),
-            color=discord.Color.dark_purple(),
-        )
-        embed.set_footer(text="Halloween Seasonal System")
-        await ctx.send(
-            embed=embed,
-            view=CauldronView(self, ctx.author.id),
-        )
-
-    @halloween.command(name="workshop", description="Open the Lair of Frights Haunted Workshop.")
-    async def seasonal_workshop(self, ctx: commands.Context):
-        if not is_halloween_channel(ctx.channel):
-            await ctx.send(halloween_channel_message())
-            return
-        if not halloween_is_active():
-            await ctx.send("🎃 The Lair of Frights Haunted Workshop is dormant right now. ")
+        if crafting == "cauldron":
+            await ctx.defer()
+            embed = discord.Embed(
+                title="🧙 The Witch's Cauldron",
+                description=(
+                    "*Something bubbles ominously inside...*\n\n"
+                    "Turn your Haunted Ingredients into strange brews and "
+                    "ritual supplies.\n\n"
+                    "🧪 **Brew** — Choose something to make\n"
+                    "📖 **Recipes** — Browse every known recipe\n"
+                    "🎒 **Ingredients** — Check your Haunted Ingredients"
+                ),
+                color=discord.Color.dark_purple(),
+            )
+            embed.set_footer(text="Lair of Frights Seasonal System")
+            await ctx.send(
+                embed=embed,
+                view=CauldronView(self, ctx.author.id),
+            )
             return
 
-        workshop = self.bot.get_cog("Workshop")
-        if workshop is None:
-            await ctx.send("❌ The Lair of Frights Haunted Workshop is not loaded.")
+        if crafting == "workshop":
+            workshop = self.bot.get_cog("Workshop")
+            if workshop is None:
+                await ctx.send("❌ The Haunted Workshop is not loaded.")
+                return
+
+            await ctx.defer()
+            embed = discord.Embed(
+                title="🔧 Haunted Workshop",
+                description=(
+                    "A workbench covered in scavenged parts. Something here has definitely been assembled before.\n\n"
+                    "*Loose wires twitch as you approach. You swear that radio wasn't turned on a moment ago.*"
+                ),
+                color=discord.Color.dark_purple(),
+            )
+            await ctx.send(
+                embed=embed,
+                view=WorkshopView(workshop, ctx.author.id),
+            )
             return
 
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🔧 Lair of Frights Haunted Workshop",
-            description=(
-                "A workbench covered in scavenged parts. Something here has definitely been assembled before.\n\n"
-                "*Loose wires twitch as you approach. You swear that radio wasn't turned on a moment ago.*"
-            ),
-            color=discord.Color.dark_purple(),
-        )
-        await ctx.send(
-            embed=embed,
-            view=WorkshopView(workshop, ctx.author.id),
-        )
+        if crafting == "ritual":
+            ritual = self.bot.get_cog("RitualTable")
+            if ritual is None:
+                await ctx.send("❌ The Ritual Table is not loaded.")
+                return
 
-    @halloween.command(name="ritual", description="Open the Lair of Frights Ritual Table.")
-    async def seasonal_ritual(self, ctx: commands.Context):
-        if not is_halloween_channel(ctx.channel):
-            await ctx.send(halloween_channel_message())
-            return
-        if not halloween_is_active():
-            await ctx.send("🎃 The Lair of Frights Ritual Table is dormant right now.")
-            return
+            await ctx.defer()
+            embed = discord.Embed(
+                title="🕯️ Ritual Table",
+                description=(
+                    "A place for things that are too strange for a workshop and too solid for a cauldron.\n\n"
+                    "*The candles are already lit. You don't remember lighting them.*"
+                ),
+                color=discord.Color.dark_purple(),
+            )
+            await ctx.send(
+                embed=embed,
+                view=RitualView(ritual, ctx.author.id),
+            )
 
-        ritual = self.bot.get_cog("RitualTable")
-        if ritual is None:
-            await ctx.send("❌ The Lair of Frights Ritual Table is not loaded.")
-            return
-
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🕯️ Lair of Frights Ritual Table",
-            description=(
-                "A place for things that are too strange for a workshop and too solid for a cauldron.\n\n"
-                "*The candles are already lit. You don't remember lighting them.*"
-            ),
-            color=discord.Color.dark_purple(),
-        )
-        await ctx.send(
-            embed=embed,
-            view=RitualView(ritual, ctx.author.id),
-        )
 
 
 async def setup(bot):
