@@ -92,8 +92,8 @@ def _get_context_info(ctx=None, interaction=None):
     }
 
 
-def _format_traceback(error, limit=3500):
-    """Return a bounded traceback suitable for a Discord embed."""
+def _format_traceback(error, limit=1000):
+    """Return a bounded traceback suitable for a Discord embed field (max 1024 chars)."""
     try:
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     except Exception:
