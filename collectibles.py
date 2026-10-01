@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
+from inventory import HALLOWEEN_SPECIAL_USE_ITEMS
 
 async def ensure_collectible_tables(db):
     await db.execute("""
@@ -103,6 +104,50 @@ class Collectibles(commands.Cog):
                 name=f"{ctx.author.display_name}'s Collectible",
                 icon_url=ctx.author.display_avatar.url,
             )
+
+            # Halloween special collectibles can have a permanent one-time
+            # use state. Viewing this information is completely read-only.
+            use_config = HALLOWEEN_SPECIAL_USE_ITEMS.get(collectible)
+            if isinstance(use_config, dict) and use_config.get("enabled"):
+                # /use creates this table when a usable collectible is first
+                # used. Create it here too so info works before first use.
+                async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+                    await db.execute("""
+                        CREATE TABLE IF NOT EXISTS used_collectibles (
+                            user_id INTEGER NOT NULL,
+                            collectible_id TEXT NOT NULL,
+                            used_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (user_id, collectible_id)
+                        )
+                    """)
+                    async with db.execute(
+                        """
+                        SELECT 1
+                        FROM used_collectibles
+                        WHERE user_id = ? AND collectible_id = ?
+                        """,
+                        (user_id, collectible),
+                    ) as cursor:
+                        already_used = await cursor.fetchone() is not None
+
+                embed.add_field(
+                    name="🖐️ When Used",
+                    value=use_config.get("use_message", "???") if already_used else "???",
+                    inline=False,
+                )
+
+                # Do not reveal the repeat-use message until the collectible
+                # has actually been used.
+                if already_used:
+                    embed.add_field(
+                        name="🔁 Already Used",
+                        value=use_config.get(
+                            "already_used_message",
+                            "🚫 This item has already been used.",
+                        ),
+                        inline=False,
+                    )
+
             embed.set_footer(text="This discovery is permanent.")
 
             return await ctx.send(embed=embed)
