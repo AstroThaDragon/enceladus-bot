@@ -6,12 +6,10 @@ import datetime
 import asyncio
 import pytz
 import aiosqlite
-import aiohttp
 import discord
 
 from discord.ext import commands, tasks
 
-from error_handler import log_caught_error
 
 
 FORTUNE_RESET_CHANNEL_ID = 1306602160527507456
@@ -739,43 +737,30 @@ class Fortunes(commands.Cog):
         return None
 
     async def is_full_moon_today(self):
+        """Return whether today is within the full-moon event window.
+
+        This uses an offline lunar-cycle calculation instead of querying the
+        USNO API. The bot only needs a date-level full-moon check with a
+        one-day event window, so an average synodic month is sufficient and
+        avoids making the fortune system depend on an external HTTP service.
+        """
         et_timezone = pytz.timezone("US/Eastern")
         now_et = datetime.datetime.now(et_timezone)
         today = now_et.date()
 
-        url = f"https://aa.usno.navy.mil/api/moon/phases/year?year={now_et.year}"
+        # Known USNO full moon date used as the reference point. The full moon
+        # on 2026-09-26 is the anchor for the average lunar cycle calculation.
+        reference_full_moon = datetime.date(2026, 9, 26)
+        synodic_month = 29.530588853
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
+        days_since_reference = (today - reference_full_moon).days
+        cycle_number = round(days_since_reference / synodic_month)
+        estimated_full_moon = (
+            reference_full_moon
+            + datetime.timedelta(days=round(cycle_number * synodic_month))
+        )
 
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        return False
-
-                    data = await response.json()
-        except Exception as e:
-            await log_caught_error(self.bot, e, "Fortunes is_full_moon_today")
-            return False
-
-        phases = data.get("phasedata", [])
-
-        for phase in phases:
-            if phase.get("phase") != "Full Moon":
-                continue
-
-            phase_date = self.parse_usno_phase_date(phase)
-
-            if not phase_date:
-                continue
-
-            full_moon_start = phase_date - datetime.timedelta(days=1)
-            full_moon_end = phase_date + datetime.timedelta(days=1)
-
-            if full_moon_start <= today <= full_moon_end:
-                return True
-
-        return False
+        return abs((today - estimated_full_moon).days) <= 1
 
     @commands.hybrid_command(name="fortune", description="Open your daily cosmic fortune cookie!")
     async def fortune(self, ctx):
