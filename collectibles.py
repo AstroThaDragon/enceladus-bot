@@ -44,33 +44,21 @@ class Collectibles(commands.Cog):
         name="collectibles",
         description="View your permanent seasonal collectible collection.",
     )
-    @app_commands.choices(
-        action=[
-            app_commands.Choice(name="Info", value="info"),
-        ],
-    )
     @app_commands.describe(
-        action="Optional action to perform.",
-        collectible="A collectible you have permanently discovered.",
+        info="View a collectible you have permanently discovered.",
     )
     async def collectibles(
         self,
         ctx: commands.Context,
-        action: str | None = None,
-        collectible: str | None = None,
+        info: str | None = None,
     ):
         """View the permanent collection or inspect a discovered collectible."""
 
-        # /collectibles info <collectible>
-        if action == "info":
+        # /collectibles info:<collectible>
+        if info is not None:
             user_id = ctx.author.id
 
-            if not collectible:
-                return await ctx.send(
-                    "❌ **Choose a collectible to view.**\n"
-                    "Use the collectible picker after selecting **Info**.",
-                    ephemeral=True,
-                )
+            collectible = info
 
             async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
                 await ensure_collectible_tables(db)
@@ -207,8 +195,8 @@ class Collectibles(commands.Cog):
         view = CollectiblesView(user_id, pages)
         await ctx.send(embed=view.current_embed(), view=view)
 
-    @collectibles.autocomplete("collectible")
-    async def collectibles_collectible_autocomplete(
+    @collectibles.autocomplete("info")
+    async def collectibles_info_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str,
