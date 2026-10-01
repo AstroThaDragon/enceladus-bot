@@ -276,8 +276,6 @@ def format_recipe(recipe: dict, owned: dict[str, int] | None = None) -> str:
     owned = owned or {}
     lines = [
         f"{recipe['emoji']} **{recipe['name']}**",
-        recipe["description"],
-        "",
         "**Ingredients:**",
     ]
 
@@ -292,6 +290,7 @@ def format_recipe(recipe: dict, owned: dict[str, int] | None = None) -> str:
         [
             "",
             f"**Produces:** {recipe['emoji']} {recipe['name']} ×1",
+            f"🧪 **What it does:** {recipe['description']}",
         ]
     )
     return "\n".join(lines)
@@ -371,6 +370,60 @@ class CauldronView(discord.ui.View):
             if isinstance(child, (discord.ui.Button, discord.ui.Select)):
                 child.disabled = True
         await interaction.response.edit_message(view=self)
+
+
+class CauldronRecipeBookView(discord.ui.View):
+    def __init__(self, cog: "Cauldron", owner_id: int, pages: list[str], page: int = 0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.pages = pages
+        self.page = page
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.previous_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This recipe book belongs to someone else.", ephemeral=True
+            )
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message(
+                "🎃 The Cauldron is dormant outside the Halloween season.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def _show(self, interaction):
+        embed = discord.Embed(
+            title="📖 Cauldron Recipe Book",
+            description=self.pages[self.page],
+            color=discord.Color.dark_purple(),
+        )
+        embed.set_footer(text=f"Page {self.page + 1}/{len(self.pages)} • Halloween Seasonal System")
+        self._update_buttons()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page -= 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="Back", emoji="🧙", style=discord.ButtonStyle.primary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_cauldron_menu(interaction)
 
 
 class RecipeSelect(discord.ui.Select):
@@ -606,18 +659,18 @@ class Cauldron(commands.Cog):
             await self.ensure_inventory(db)
             owned = await self.owned(db, interaction.user.id)
 
-        pages = []
-        for recipe in CAULDRON_RECIPES.values():
-            pages.append(format_recipe(recipe, owned))
+        recipes = [format_recipe(recipe, owned) for recipe in CAULDRON_RECIPES.values()]
+        pages = ["\n\n──────────────\n\n".join(recipes[i:i + 3]) for i in range(0, len(recipes), 3)]
 
         embed = discord.Embed(
             title="📖 Cauldron Recipe Book",
-            description="\n\n".join(pages),
+            description=pages[0],
             color=discord.Color.dark_purple(),
         )
+        embed.set_footer(text=f"Page 1/{len(pages)} • Halloween Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
-            view=CauldronView(self, interaction.user.id),
+            view=CauldronRecipeBookView(self, interaction.user.id, pages),
         )
 
     async def show_ingredients(self, interaction: discord.Interaction):

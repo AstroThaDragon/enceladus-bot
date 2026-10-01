@@ -207,7 +207,7 @@ def ingredient_emoji(item_id):
 
 
 def format_recipe(recipe, owned):
-    lines = [f"{recipe['emoji']} **{recipe['name']}**", recipe["description"], "", "**Parts:**"]
+    lines = [f"{recipe['emoji']} **{recipe['name']}**", "**Parts:**"]
     for item_id, amount in recipe["ingredients"].items():
         have = owned.get(item_id, 0)
         mark = "✅" if have >= amount else "❌"
@@ -215,7 +215,10 @@ def format_recipe(recipe, owned):
             f"{mark} {ingredient_emoji(item_id)} {ingredient_name(item_id)} ×{amount} "
             f"*(you have {have})*"
         )
-    lines.append(f"\n**Produces:** {recipe['emoji']} {recipe['name']} ×1")
+    lines.extend([
+        f"\n**Produces:** {recipe['emoji']} {recipe['name']} ×1",
+        f"🔧 **What it does:** {recipe['description']}",
+    ])
     return "\n".join(lines)
 
 
@@ -240,6 +243,56 @@ class WorkshopSelect(discord.ui.Select):
             await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
             return
         await self.cog.assemble(interaction, self.values[0])
+
+
+class WorkshopRecipeBookView(discord.ui.View):
+    def __init__(self, cog, owner_id, pages, page=0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.pages = pages
+        self.page = page
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.previous_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ This recipe book belongs to someone else.", ephemeral=True)
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
+            return False
+        return True
+
+    async def _show(self, interaction):
+        embed = discord.Embed(
+            title="📖 Workshop Recipe Book",
+            description=self.pages[self.page],
+            color=discord.Color.dark_purple(),
+        )
+        embed.set_footer(text=f"Page {self.page + 1}/{len(self.pages)} • Halloween Seasonal System")
+        self._update_buttons()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page -= 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="Back", emoji="🔧", style=discord.ButtonStyle.primary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_menu(interaction)
 
 
 class WorkshopView(discord.ui.View):
@@ -269,6 +322,18 @@ class WorkshopView(discord.ui.View):
             )
             return False
         return True
+
+    @discord.ui.button(
+        label="Recipes",
+        emoji="📖",
+        style=discord.ButtonStyle.primary,
+    )
+    async def recipes_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        await self.cog.show_recipe_book(interaction)
 
     @discord.ui.button(
         label="Back",
@@ -325,6 +390,25 @@ class Workshop(commands.Cog):
             embed=embed,
             view=WorkshopView(self, interaction.user.id),
         )
+
+    async def show_recipe_book(self, interaction):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            owned = await self._owned(db, interaction.user.id)
+
+        recipes = [format_recipe(recipe, owned) for recipe in WORKSHOP_RECIPES.values()]
+        pages = ["\n\n──────────────\n\n".join(recipes[i:i + 3]) for i in range(0, len(recipes), 3)]
+
+        embed = discord.Embed(
+            title="📖 Workshop Recipe Book",
+            description=pages[0],
+            color=discord.Color.dark_purple(),
+        )
+        embed.set_footer(text=f"Page 1/{len(pages)} • Halloween Seasonal System")
+        await interaction.response.edit_message(
+            embed=embed,
+            view=WorkshopRecipeBookView(self, interaction.user.id, pages),
+        )
+
 
     async def assemble(self, interaction, recipe_id):
         recipe = WORKSHOP_RECIPES[recipe_id]
