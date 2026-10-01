@@ -40,7 +40,10 @@ class Collectibles(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="collectibles", description="View your permanent seasonal collectible collection.")
+    @commands.hybrid_group(
+        name="collectibles",
+        description="View your permanent seasonal collectible collection.",
+    )
     async def collectibles(self, ctx: commands.Context):
         await ctx.defer()
         user_id = ctx.author.id
@@ -128,6 +131,113 @@ class Collectibles(commands.Cog):
 
         view = CollectiblesView(user_id, pages)
         await ctx.send(embed=view.current_embed(), view=view)
+
+
+    collectibles.invoke_without_command = True
+
+    @collectibles.command(
+        name="info",
+        description="View the details of a collectible you have discovered.",
+    )
+    @app_commands.describe(collectible="A collectible you have permanently discovered")
+    async def collectibles_info(
+        self,
+        ctx: commands.Context,
+        collectible: str,
+    ):
+        """Show the full details of a permanently discovered collectible."""
+        user_id = ctx.author.id
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await ensure_collectible_tables(db)
+            async with db.execute(
+                """
+                SELECT collectible_id
+                FROM collectibles
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ) as cursor:
+                discovered = {row[0] for row in await cursor.fetchall()}
+
+        entries = get_halloween_collectibles()
+        collectible_map = {item_id: (name, emoji, desc) for item_id, name, emoji, desc in entries}
+
+        if collectible not in discovered:
+            return await ctx.send(
+                "❌ **You haven't discovered that collectible yet.**\n"
+                "Only collectibles you've found can be viewed here.",
+                ephemeral=True,
+            )
+
+        data = collectible_map.get(collectible)
+        if not data:
+            return await ctx.send(
+                "❌ **That collectible is no longer available in the current collection.**",
+                ephemeral=True,
+            )
+
+        name, emoji, description = data
+
+        embed = discord.Embed(
+            title=f"{emoji} {name}",
+            description=description,
+            color=discord.Color.dark_purple(),
+        )
+        embed.set_author(
+            name=f"{ctx.author.display_name}'s Collectible",
+            icon_url=ctx.author.display_avatar.url,
+        )
+        embed.set_footer(text="This discovery is permanent.")
+
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @collectibles_info.autocomplete("collectible")
+    async def collectibles_info_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        """Offer only collectibles this member has permanently discovered."""
+        user_id = interaction.user.id
+
+        try:
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+                await ensure_collectible_tables(db)
+                async with db.execute(
+                    """
+                    SELECT collectible_id
+                    FROM collectibles
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                ) as cursor:
+                    discovered = {row[0] for row in await cursor.fetchall()}
+        except Exception:
+            return []
+
+        current = (current or "").lower().strip()
+        choices = []
+
+        for item_id, name, emoji, _description in get_halloween_collectibles():
+            if item_id not in discovered:
+                continue
+
+            search_text = f"{name} {item_id}".lower()
+            if current and current not in search_text:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{emoji} {name}"[:100],
+                    value=item_id,
+                )
+            )
+
+            if len(choices) >= 25:
+                break
+
+        return choices
 
 
 async def setup(bot):

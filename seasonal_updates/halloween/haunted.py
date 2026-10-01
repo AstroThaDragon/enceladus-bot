@@ -251,10 +251,10 @@ HAUNTED_REWARD_RANGES = {
 # reward rarities make that discovery more likely, while keeping it separate
 # from the ordinary ingredient/currency roll.
 HAUNTED_COLLECTIBLE_CHANCES = {
-    "common": 0.10,
-    "uncommon": 0.15,
-    "rare": 0.20,
-    "legendary": 0.30,
+    "common": 0.08,
+    "uncommon": 0.12,
+    "rare": 0.15,
+    "legendary": 0.25,
     "void": 0.45,
 }
 

@@ -852,8 +852,10 @@ class Exploration(commands.Cog):
                     )
                 if reward['collectible_found'] and reward['collectible']:
                     collectible = reward['collectible']
+                    reward_lines.append("")
                     reward_lines.append(
-                        f"🎃 **Halloween Collectible Found:** {collectible[2]} **{collectible[1]}**"
+                        f"🎃 **Halloween Collectible Found:** {collectible[2]} **{collectible[1]}**\n"
+                        f"*{collectible[3]}*"
                     )
 
                 reward_embed = discord.Embed(
@@ -2070,7 +2072,7 @@ class Exploration(commands.Cog):
                     collectible_id,
                     collectible_name,
                     collectible_emoji,
-                    _collectible_desc,
+                    collectible_desc,
                     _collectible_stardust,
                     _collectible_candy,
                 ) = random.choice(HALLOWEEN_SPACE_JUNK)
@@ -2079,11 +2081,13 @@ class Exploration(commands.Cog):
                 )
                 if added_collectible:
                     seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}**"
+                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}**\n"
+                        f"*{collectible_desc}*"
                     )
                 else:
                     seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}** → Inventory Full"
+                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}** → Inventory Full\n"
+                        f"*{collectible_desc}*"
                     )
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
@@ -2302,7 +2306,7 @@ class Exploration(commands.Cog):
                 )
             if seasonal_findings:
                 bonus_sections.append(
-                    "🎃 **Halloween Find:** " + " • ".join(seasonal_findings)
+                        "🎃 **Halloween Find:** " + "\n\n".join(seasonal_findings)
                 )
             if pet_stardust_message:
                 bonus_sections.append(pet_stardust_message)
