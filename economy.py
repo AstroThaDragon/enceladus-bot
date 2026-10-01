@@ -1445,6 +1445,10 @@ class Economy(commands.Cog):
                             f"**{definition['emoji']} {pet_name}**!"
                         )
 
+                    if item is None:
+                        await db.rollback()
+                        return await ctx.send("❌ Choose a **pet** or an **item** to give.")
+
                     item_id = item.lower().strip()
                     info = ITEM_REGISTRY.get(item_id)
                     if not info or self._give_item_excluded(item_id, info):
