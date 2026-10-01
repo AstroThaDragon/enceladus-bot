@@ -282,11 +282,11 @@ ITEM_REGISTRY = {
     "normal_egg": {"name": "Pet Egg", "emoji": "🥚", "max_quantity": 10, "type": "Pet Egg", "desc": "A mysterious egg containing a normal station pet. Incubate for 12 hours."},
     "arcade_token": {"name": "Arcade Token", "emoji": EMOJIS["arcade_token"], "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": EMOJIS.get("time_crystal", "💎"), "max_quantity": 4, "sell_price": 1750, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
-    "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": EMOJIS.get("nanite_patch", "🩹"), "max_quantity": 50, "sell_price": 200, "type": "Consumable", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
-    "medkit": {"name": "Field Trauma Medkit", "emoji": EMOJIS.get("medkit", "🧰"), "max_quantity": 25, "sell_price": 375, "type": "Consumable", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
-    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": EMOJIS.get("makeshift_medkit", "🩹"), "max_quantity": 25, "sell_price": 250, "type": "Consumable", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
+    "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": EMOJIS.get("nanite_patch", "🩹"), "max_quantity": 50, "sell_price": 200, "type": "Healing", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
+    "medkit": {"name": "Field Trauma Medkit", "emoji": EMOJIS.get("medkit", "🧰"), "max_quantity": 25, "sell_price": 375, "type": "Healing", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
+    "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": EMOJIS.get("makeshift_medkit", "🩹"), "max_quantity": 25, "sell_price": 250, "type": "Healing", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
     "full_revive": {"name": "Emergency Full Revival", "emoji": EMOJIS.get("full_revive", "⚕️"), "max_quantity": 10, "sell_price": 400, "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
-    "revive_kit": {"name": "Emergency Revival Kit", "emoji": EMOJIS.get("revive_kit", "💉"), "max_quantity": 25, "sell_price": 750, "type": "Consumable", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
+    "revive_kit": {"name": "Emergency Revival Kit", "emoji": EMOJIS.get("revive_kit", "💉"), "max_quantity": 25, "sell_price": 750, "type": "Healing", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
     "revive": {"name": "Revival Kit", "emoji": EMOJIS.get("revive", "⚕️"), "max_quantity": 25, "sell_price": 175, "type": "Consumable", "desc": "A basic revival item"},
     "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": EMOJIS.get("fuel_stabilizer", "🛢️"), "max_quantity": 5, "sell_price": 400, "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
     "station_rations": {"name": "Station Rations", "emoji": EMOJIS.get("station_rations", "🥫"), "max_quantity": 99, "sell_price": 75, "type": "Consumable", "desc": "Restores 15 HP."},
@@ -775,9 +775,13 @@ class Inventory(commands.Cog):
                 cat = info.get("type", "Consumable")
                 categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({count}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
         for item_id, item_type, quantity in inv_rows:
+            # Do not display depleted inventory rows. Some consumed items remain
+            # in the database at quantity 0 for bookkeeping/legacy compatibility.
+            if not quantity or quantity <= 0:
+                continue
             info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."})
             cat = info.get("type", "Space Junk")
-            categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity or 0}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
+            categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
 
         names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Haunted Ingredient":"Haunted Ingredients","Voucher":"Vouchers","Currency":"Currencies"}
         pages=[]
