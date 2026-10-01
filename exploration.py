@@ -374,37 +374,73 @@ class Exploration(commands.Cog):
             f"to return now; otherwise you will recover at 50% HP on **{knocked_out_until}**."
         )
 
-    @commands.hybrid_group(
+    # Slash-command structure:
+    # /explore haunted start -> opens the Haunted Exploration location screen
+    # /explore haunted info  -> opens the Haunted Exploration field guide
+    #
+    # This is intentionally an app-command group rather than a hybrid group.
+    # Discord does not allow a slash-command group itself to be executable, so
+    # `haunted` must be a group with explicit `start` and `info` subcommands.
+    explore = app_commands.Group(
         name="explore",
         description="Explore Enceladus and its seasonal locations.",
     )
-    async def explore(self, ctx: commands.Context):
-        """Root for exploration subcommands."""
-        if ctx.invoked_subcommand is None:
-            await ctx.send("Use `/explore haunted` to enter the Haunted Exploration event!")
-
-    @explore.command(
+    haunted = app_commands.Group(
         name="haunted",
+        description="Haunted Exploration and its field guide.",
+    )
+    explore.add_command(haunted)
+
+    @haunted.command(
+        name="start",
         description="Enter Haunted Exploration and choose a location.",
     )
-    async def explore_haunted(self, ctx: commands.Context):
-        if not is_halloween_channel(ctx.channel):
-            return await ctx.send(halloween_channel_message())
+    async def explore_haunted_start(self, interaction: discord.Interaction):
+        if not is_halloween_channel(interaction.channel):
+            return await interaction.response.send_message(
+                halloween_channel_message(),
+                ephemeral=True,
+            )
         if not halloween_is_active():
-            return await ctx.send(
+            return await interaction.response.send_message(
                 "🎃 **Haunted Exploration is currently dormant.**\n"
-                "This event is only available during the Halloween event."
+                "This event is only available during the Halloween event.",
+                ephemeral=True,
             )
 
-        user_id = ctx.author.id
+        user_id = interaction.user.id
         lock = self._user_locks.setdefault(user_id, asyncio.Lock())
         async with lock:
             async with aiosqlite.connect(self.get_db_path()) as db:
                 await self.ensure_schema(db)
                 profile = await get_or_create_profile(db, user_id)
 
-            embed = self._haunted_location_embed(ctx.author, profile)
-            await ctx.send(embed=embed, view=HauntedLocationView(self))
+            embed = self._haunted_location_embed(interaction.user, profile)
+            await interaction.response.send_message(
+                embed=embed,
+                view=HauntedLocationView(self),
+            )
+
+    @haunted.command(
+        name="info",
+        description="Read the Haunted Exploration field guide.",
+    )
+    async def explore_haunted_info(self, interaction: discord.Interaction):
+        if not is_halloween_channel(interaction.channel):
+            return await interaction.response.send_message(
+                halloween_channel_message(),
+                ephemeral=True,
+            )
+        if not halloween_is_active():
+            return await interaction.response.send_message(
+                "🎃 **Haunted Exploration is currently dormant.",
+                ephemeral=True,
+            )
+
+        await interaction.response.send_message(
+            embed=self._haunted_info_embed(),
+            ephemeral=True,
+        )
 
     def _haunted_location_embed(self, member, profile):
         sanity = sanity_percent(profile["sanity"])
@@ -2521,6 +2557,9 @@ class HauntedLocationView(discord.ui.View):
         super().__init__(timeout=90)
         self.cog = cog
 
+        for index, (location_id, location) in enumerate(HAUNTED_LOCATIONS.items()):
+            self.add_item(HauntedLocationButton(self.cog, location_id, location, index))
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if not is_halloween_channel(interaction.channel):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
@@ -2529,10 +2568,6 @@ class HauntedLocationView(discord.ui.View):
             await interaction.response.send_message("🎃 Haunted Exploration is currently dormant.", ephemeral=True)
             return False
         return True
-
-        for index, (location_id, location) in enumerate(HAUNTED_LOCATIONS.items()):
-            self.add_item(HauntedLocationButton(self.cog, location_id, location, index))
-        self.add_item(HauntedInfoButton(self.cog))
 
 
 class HauntedLocationButton(discord.ui.Button):
