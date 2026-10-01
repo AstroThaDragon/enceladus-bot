@@ -11,6 +11,8 @@ import discord
 
 from discord.ext import commands, tasks
 
+from error_handler import log_caught_error
+
 
 FORTUNE_RESET_CHANNEL_ID = 1306602160527507456
 FORTUNE_PING_ROLE_ID = 1503642487586029568
@@ -752,7 +754,8 @@ class Fortunes(commands.Cog):
                         return False
 
                     data = await response.json()
-        except Exception:
+        except Exception as e:
+            await log_caught_error(self.bot, e, "Fortunes is_full_moon_today")
             return False
 
         phases = data.get("phasedata", [])

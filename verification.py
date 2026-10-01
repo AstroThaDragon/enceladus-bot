@@ -8,6 +8,8 @@ import asyncio
 import re
 import threading
 
+from error_handler import log_app_command_error, log_task_error, log_ui_error
+
 import aiosqlite
 
 COOLDOWN_FILE = "verification_cooldowns.json"
@@ -398,6 +400,7 @@ class VerificationDropdown(Select):
             try:
                 return await self._callback_locked(interaction)
             except Exception as e:
+                await log_ui_error(self.cog.bot, interaction, e, item=self, ui_type="Verification Create Button")
                 print(f"[VERIFICATION CREATE ERROR] {e}")
                 pending_role = guild.get_role(PENDING_VERIFICATION_ROLE_ID)
                 if pending_role and pending_role in member.roles:
@@ -548,6 +551,7 @@ class VerificationDropdown(Select):
                 ephemeral=True
             )
         except Exception as e:
+            await log_app_command_error(interaction.client, interaction, e)
             print(f"Verification DM failed: {e}")
 
         await thread.send(
@@ -701,7 +705,8 @@ class Verification(commands.Cog):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
                 print(f"[VERIFICATION] Could not restore thread {thread.id}: {e}")
             except Exception as e:
-                print(f"[VERIFICATION] Unexpected restore error for thread {thread.id}: {e}")
+                await log_task_error(self.bot, "verification restore_review_views", e, context=f"thread_id={thread.id}")
+                print(f"[VERIFICATION] Unexpected restore error for thread {thread.id}: {e}" )
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -895,6 +900,7 @@ async def setup(bot):
         except asyncio.CancelledError:
             raise
         except Exception as e:
+            await log_task_error(bot, "verification restore_after_ready", e)
             print(f"[VERIFICATION] Review-view restoration failed: {e}")
 
     # setup_hook runs before the bot is fully ready, so restoration must wait

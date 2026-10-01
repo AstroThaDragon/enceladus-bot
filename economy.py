@@ -15,6 +15,7 @@ from seasonal_updates.halloween.halloween import is_active as halloween_is_activ
 from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
 from inventory import ITEM_REGISTRY
 from pets.core import get_pet_definition
+from error_handler import log_task_error
 
 HALLOWEEN_SPACE_JUNK_IDS = {
     item_id for item_id, *_ in HALLOWEEN_SPACE_JUNK
@@ -859,6 +860,14 @@ class Economy(commands.Cog):
     @midnight_hp_regeneration.before_loop
     async def before_midnight_hp_regeneration(self):
         await self.bot.wait_until_ready()
+
+    @midnight_hp_regeneration.error
+    async def midnight_hp_regeneration_error(self, error):
+        await log_task_error(
+            self.bot,
+            "Economy.midnight_hp_regeneration",
+            error,
+        )
 
     def cog_load(self):
         if not self.midnight_hp_regeneration.is_running():

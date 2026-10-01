@@ -12,6 +12,8 @@ import io
 import aiohttp
 from PIL import Image
 
+from error_handler import log_command_error
+
 class ResetConfirm(discord.ui.View):
     def __init__(self, cog, member, admin_id):
         super().__init__(timeout=30)
@@ -1007,6 +1009,7 @@ class Leveling(commands.Cog):
 
             await ctx.send(file=discord.File(fp=background.image_bytes, filename="rank.png"))
         except Exception as e:
+            await log_command_error(self.bot, ctx, e)
             print(f"Error: {e}")
             await ctx.send("There was an error generating the rank card.")
 

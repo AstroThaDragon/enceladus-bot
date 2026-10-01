@@ -5,6 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from error_handler import log_app_command_error
+
 ALL_COLOR_ROLES = [
     941482022445125712, 941483503277719632, 941483971647246358, 941484130787557516, 941492061146869790, 941484563761352798, 941484658191917116, 941484797111439430,
     941484975180611614, 941495959731437598, 941485050212532284, 941485208962727966, 941485316584403046, 941485501133783091, 941485609317441576, 941487975420801125,
@@ -741,6 +743,7 @@ class RoleCog(commands.Cog):
         try:
             message = await channel.fetch_message(MESSAGE_ID)
         except Exception as e:
+            await log_app_command_error(self.bot, interaction, e)
             return await interaction.response.send_message(
                 f"Failed to fetch message: {e}",
                 ephemeral=True
@@ -792,6 +795,7 @@ class RoleCog(commands.Cog):
         try:
             message = await channel.fetch_message(MESSAGE_ID)
         except Exception as e:
+            await log_app_command_error(self.bot, interaction, e)
             return await interaction.response.send_message(
                 f"Failed to fetch message: {e}",
                 ephemeral=True

@@ -16,6 +16,7 @@ import discord
 from discord.ext import commands
 
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
+from error_handler import log_caught_error
 
 
 # Keep these uncommon. The per-user cooldown makes repeated command spam much
@@ -1714,7 +1715,14 @@ async def _send_flavor(
                 content,
                 allowed_mentions=allowed_mentions,
             )
-    except Exception:
+    except Exception as e:
+        await log_caught_error(
+            invocation.bot if isinstance(invocation, commands.Context) else invocation.client,
+            e,
+            "Halloween flavor send",
+            ctx=invocation if isinstance(invocation, commands.Context) else None,
+            interaction=invocation if isinstance(invocation, discord.Interaction) else None,
+        )
         # Halloween flavor is cosmetic. A Discord/API failure here must never
         # turn a successful command into a failed command.
         return

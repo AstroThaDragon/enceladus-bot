@@ -26,6 +26,7 @@ from seasonal_updates.halloween.halloween import (
     halloween_channel_message,
     is_halloween_channel,
 )
+from error_handler import log_caught_error, log_task_error
 from pets import (
     add_pet_xp,
     get_active_pet_effects,
@@ -235,7 +236,8 @@ class Exploration(commands.Cog):
                 ) as cursor:
                     row = await cursor.fetchone()
             return not row or row[0] != today
-        except Exception:
+        except Exception as e:
+            await log_caught_error(self.bot, e, "Exploration daily_unclaimed")
             # A reminder should never break a successful exploration result.
             return False
 
@@ -342,7 +344,8 @@ class Exploration(commands.Cog):
 
                 await db.commit()
 
-        except Exception:
+        except Exception as e:
+            await log_task_error(self.bot, "cooldown_alert_checker (caught error)", e)
             # Never let the background task die because of one unexpected error.
             pass
 

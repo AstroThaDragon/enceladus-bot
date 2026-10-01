@@ -10,6 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from error_handler import log_task_error
+
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
@@ -1022,7 +1024,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                             channel = await self.bot.fetch_channel(
                                 INCUBATOR_NOTIFICATION_CHANNEL_ID
                             )
-                        except Exception:
+                        except Exception as e:
+                            await log_task_error(self.bot, "incubator_checker / fetch channel", e, context=f"channel_id={INCUBATOR_NOTIFICATION_CHANNEL_ID}")
                             channel = None
 
                     if channel is None:
@@ -1043,7 +1046,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                             f"Your **{info['name']}** has finished incubating.\n\n"
                             f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}** to reveal your new companion! 🐣"
                         )
-                    except Exception:
+                    except Exception as e:
+                        await log_task_error(self.bot, "incubator_checker / send notification", e, context=f"user_id={user_id}, egg_id={egg_id}")
                         # Keep the notification pending if the channel/message
                         # cannot be sent right now.
                         continue
@@ -1054,7 +1058,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                     )
 
                 await db.commit()
-        except Exception:
+        except Exception as e:
+            await log_task_error(self.bot, "incubator_checker (caught error)", e)
             # The notification loop must never take the bot down.
             return
 

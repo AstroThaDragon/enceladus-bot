@@ -16,6 +16,13 @@ import pytz
 from database import init_db
 from seasonal_updates.halloween.halloween import is_active as is_halloween_active
 from seasonal_updates.halloween.halloween_flavor import install_halloween_flavor
+from error_handler import (
+    install_ui_error_handlers,
+    log_app_command_error,
+    log_command_error,
+    log_event_error,
+    log_task_error,
+)
 
 load_dotenv()
 
@@ -33,7 +40,22 @@ class Enceladus(commands.Bot):
             help_command=None # Replaces bot.remove_command('help')
         )
 
+    async def on_error(self, event_method, *args, **kwargs):
+        # discord.py calls this for uncaught event exceptions. The active
+        # exception is available through sys.exc_info() while this method runs.
+        import sys
+
+        _, error, _ = sys.exc_info()
+        if error is not None:
+            await log_event_error(self, event_method, error)
+        else:
+            print(f"[EVENT ERROR] Unhandled error in {event_method}")
+
     async def setup_hook(self):
+        # Install centralized Discord UI error handling before any cogs/views
+        # are loaded so every View and Modal is covered automatically.
+        install_ui_error_handlers()
+
         # 1. Initialize all databases FIRST
         await init_db()
         await init_bump_db()
@@ -94,6 +116,7 @@ class Enceladus(commands.Bot):
             print(f"🌌 {self.user} has successfully synced commands globally!")
         except Exception as e:
             print(f"Error syncing tree: {e}")
+            await log_task_error(self, "setup_hook / tree.sync", e)
 
 # Initialize the bot
 bot = Enceladus()
@@ -219,6 +242,12 @@ async def change_status():
     new_status = get_next_status(active_statuses, halloween_active)
     await bot.change_presence(activity=discord.CustomActivity(name=new_status))
 
+
+@change_status.error # type: ignore[reportArgumentType]
+async def change_status_error(error):
+    await log_task_error(bot, "change_status", error)
+
+
 # --- BUMP PERSISTENCE LOOP ---
 @tasks.loop(minutes=2)
 async def check_bump_timer():
@@ -244,6 +273,7 @@ async def check_bump_timer():
                 try:
                     channel = await bot.fetch_channel(row[1])
                 except Exception as e:
+                    await log_task_error(bot, "check_bump_timer / fetch channel", e, context=f"channel_id={row[1]}")
                     print(f"[BUMP LOOP ERROR]: Could not fetch channel {row[1]}: {e}")
                     return
 
@@ -290,12 +320,20 @@ async def check_bump_timer():
                     print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
                     
             except Exception as e:
+                await log_task_error(bot, "check_bump_timer / send", e)
                 print(f"[BUMP SEND ERROR]: {type(e).__name__}: {e}")
                 return
 
     except Exception as e:
         print(f"[BUMP LOOP ERROR]: {e}")
+        await log_task_error(bot, "check_bump_timer", e)
         await asyncio.sleep(60)
+
+
+@check_bump_timer.error # type: ignore[reportArgumentType]
+async def check_bump_timer_error(error):
+    await log_task_error(bot, "check_bump_timer (task callback)", error)
+
 
 # --- STARGAZING ALERTS SETUP ---
 eastern = pytz.timezone("US/Eastern")
@@ -335,6 +373,13 @@ async def stargazing_alert():
                             
         except Exception as e:
             print(f"Error in stargazing_alert loop: {e}")
+            await log_task_error(bot, "stargazing_alert", e)
+
+
+@stargazing_alert.error # type: ignore[reportArgumentType]
+async def stargazing_alert_error(error):
+    await log_task_error(bot, "stargazing_alert (task callback)", error)
+
 
 # --- EVENTS ---
 @bot.event
@@ -505,6 +550,7 @@ async def on_member_join(member):
                 level = int(progress_row[0] or 0)
                 xp = int(progress_row[1] or 0)
         except Exception as e:
+            await log_event_error(bot, "on_member_join / leveling lookup", e, context=f"member_id={member.id}")
             print(f"[LEAVE XP LOG ERROR]: Could not read leveling data for {member.id}: {e}")
 
         embed = discord.Embed(
@@ -583,6 +629,7 @@ async def on_raw_reaction_add(payload):
         try:
             channel = await bot.fetch_channel(payload.channel_id)
         except Exception as e:
+            await log_event_error(bot, "on_raw_reaction_add / fetch channel", e, context=f"channel_id={payload.channel_id}")
             print(f"[VAULT ERROR]: Could not fetch channel {payload.channel_id}: {e}")
             return
 
@@ -1050,11 +1097,11 @@ async def help_command(ctx):
 
 @bot.event
 async def on_command_error(ctx, error):
-    print(f"COMMAND ERROR: {error}")
+    await log_command_error(bot, ctx, error)
 
 @bot.tree.error
 async def on_app_command_error(interaction, error):
-    print(f"APP COMMAND ERROR: {error}")
+    await log_app_command_error(bot, interaction, error)
 
 async def main():
     async with bot:

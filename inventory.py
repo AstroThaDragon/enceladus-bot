@@ -11,6 +11,7 @@ import random
 from emojis import EMOJIS
 from seasonal_updates.halloween import halloween as halloween_season
 from seasonal_updates.halloween.halloween import halloween_channel_message, is_halloween_channel
+from error_handler import log_command_error
 
 
 # ---------------------------------------------------------------------------
@@ -922,11 +923,8 @@ class Inventory(commands.Cog):
         try:
             async with lock:
                 return await self._use_item_impl(ctx, item_id)
-        except Exception:
-            # Keep /use from silently timing out if an unexpected item/database
-            # error occurs. The traceback still goes to the bot's error logger.
-            import logging
-            logging.getLogger(__name__).exception("Error while using item")
+        except Exception as e:
+            await log_command_error(self.bot, ctx, e)
             return await ctx.send(
                 "❌ Something went wrong while using that item. Please try again."
             )

@@ -11,6 +11,8 @@ import pytz
 import aiosqlite
 from typing import Optional, cast
 
+from error_handler import log_app_command_error, log_command_error
+
 class Fun(commands.Cog):
     def __init__(self, bot: commands.Bot, db_path: str):
         self.bot = bot
@@ -336,6 +338,7 @@ class Fun(commands.Cog):
                         print(f"API Error Status: {response.status}")
                         await ctx.send("📡 The API uplink rejected our key or is down.")
         except Exception as e:
+            await log_command_error(self.bot, ctx, e)
             print(f"Space Error: {e}")
             await ctx.send("🌌 Something went wrong in the asteroid belt.")
     
@@ -671,6 +674,7 @@ class Fun(commands.Cog):
                     else:
                         await interaction.followup.send(f"The cosmic vibrations are distorted. (Status: {response.status})")
         except Exception as e:
+            await log_app_command_error(self.bot, interaction, e)
             await interaction.followup.send("The cosmic connection failed. Please try again later.")
 
 async def setup(bot: commands.Bot):

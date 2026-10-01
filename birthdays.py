@@ -5,6 +5,8 @@ import aiosqlite
 from datetime import datetime, date
 import pytz
 
+from error_handler import log_task_error
+
 eastern = pytz.timezone("US/Eastern")
 
 
@@ -167,6 +169,7 @@ class BirthdayCog(commands.Cog):
                     reason="Birthday day ended."
                 )
             except Exception as e:
+                await log_task_error(self.bot, "check_birthdays / remove old role", e, context=f"member_id={member.id}")
                 print(f"[BIRTHDAY ROLE REMOVE ERROR]: {member.id} - {e}")
 
         birthday_members = []
@@ -187,6 +190,7 @@ class BirthdayCog(commands.Cog):
                             )
                             birthday_members.append(member.mention)
                         except Exception as e:
+                            await log_task_error(self.bot, "check_birthdays / add role", e, context=f"user_id={user_id}")
                             print(f"[BIRTHDAY ROLE ADD ERROR]: {user_id} - {e}")
 
         if birthday_members:
@@ -218,6 +222,7 @@ class BirthdayCog(commands.Cog):
                         embed=shoutout_embed
                     )
                 except Exception as e:
+                    await log_task_error(self.bot, "check_birthdays / announcement", e)
                     print(f"[BIRTHDAY ANNOUNCEMENT ERROR]: {e}")
 
         self.last_birthday_run = today
