@@ -95,6 +95,11 @@ class Collectibles(commands.Cog):
 
             name, emoji, description = data
 
+            # Some seasonal collectible text is stored with literal ``\\n``
+            # sequences. Normalize those into real Discord line breaks so
+            # they never appear as ``\n`` in the displayed embed.
+            description = description.replace("\\n", "\n")
+
             embed = discord.Embed(
                 title=f"{emoji} {name}",
                 description=description,
@@ -130,9 +135,13 @@ class Collectibles(commands.Cog):
                     ) as cursor:
                         already_used = await cursor.fetchone() is not None
 
+                use_message = use_config.get("use_message", "???")
+                if isinstance(use_message, str):
+                    use_message = use_message.replace("\\n", "\n")
+
                 embed.add_field(
                     name="🖐️ When Used",
-                    value=use_config.get("use_message", "???") if already_used else "???",
+                    value=use_message if already_used else "???",
                     inline=False,
                 )
 
@@ -141,9 +150,11 @@ class Collectibles(commands.Cog):
                 if already_used:
                     embed.add_field(
                         name="🔁 Already Used",
-                        value=use_config.get(
-                            "already_used_message",
-                            "🚫 This item has already been used.",
+                        value=(
+                            use_config.get(
+                                "already_used_message",
+                                "🚫 This item has already been used.",
+                            ).replace("\\n", "\n")
                         ),
                         inline=False,
                     )
