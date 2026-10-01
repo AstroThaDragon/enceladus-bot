@@ -2,16 +2,19 @@ from emojis import EMOJIS
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+import asyncio
 import aiosqlite
 import json
 import random
-from typing import Any
+from typing import Any, Optional
 import datetime
 import time
 from datetime import datetime, timedelta, time as dt_time
 import pytz
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
 from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
+from inventory import ITEM_REGISTRY
+from pets.core import get_pet_definition
 
 HALLOWEEN_SPACE_JUNK_IDS = {
     item_id for item_id, *_ in HALLOWEEN_SPACE_JUNK
@@ -383,6 +386,7 @@ class Economy(commands.Cog):
         self.bot = bot
         self.DEFAULT_VAULT_CAPACITY = 250_000
         self.MAX_VAULT_CAPACITY = 500_000
+        self._give_locks = {}
         
         # Define shop catalog
         self.SHOP_ITEMS = {
@@ -1204,6 +1208,328 @@ class Economy(commands.Cog):
             f"{ctx.author.mention} 💫 Withdrew **{amount:,} Stardust** from your vault. "
             f"You now have **{stardust + amount:,} Stardust** available to spend."
         )
+
+    async def give_item_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        """Show transferable items the giver currently owns."""
+        current = (current or "").lower().strip()
+        user_id = interaction.user.id
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity
+                FROM inventory
+                WHERE user_id = ? AND quantity > 0
+                ORDER BY item_id
+                """,
+                (user_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+        for item_id, quantity in rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info or self._give_item_excluded(item_id, info):
+                continue
+
+            display_name = info.get("name", item_id)
+            search_text = f"{display_name} {item_id}".lower()
+            if current and current not in search_text:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{info.get('emoji', '📦')} {display_name} (x{quantity})",
+                    value=item_id,
+                )
+            )
+
+        return choices[:25]
+
+    async def give_pet_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        """Show the giver's owned non-egg pets."""
+        current = (current or "").lower().strip()
+        user_id = interaction.user.id
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level
+                FROM pets
+                WHERE user_id = ? AND COALESCE(pet_type, pet_stage) != 'egg'
+                ORDER BY pet_id
+                """,
+                (user_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        choices = []
+        pet_counts = {}
+
+        for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level in rows:
+            pet_type_id = pet_type or pet_stage
+            definition = get_pet_definition(pet_type_id, variant_id)
+            if not definition:
+                continue
+
+            pet_counts[pet_type_id] = pet_counts.get(pet_type_id, 0) + 1
+            duplicate_number = pet_counts[pet_type_id]
+            display_name = nickname or definition["name"]
+            search_text = (
+                f"{display_name} {definition['name']} {pet_type_id} "
+                f"{pet_id} {duplicate_number} {level} {fusion_level}"
+            ).lower()
+
+            if current and current not in search_text:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=(
+                        f"{definition['emoji']} {display_name} "
+                        f"• Lv. {level} • #{duplicate_number}"
+                    ),
+                    value=str(pet_id),
+                )
+            )
+
+        return choices[:25]
+
+    @staticmethod
+    def _give_item_excluded(item_id, info):
+        """Return whether an inventory item is intentionally non-transferable."""
+        item_type = str(info.get("type", "")).lower()
+        name = str(info.get("name", "")).lower()
+        item_id = str(item_id).lower()
+
+        excluded_types = {
+            "voucher",
+            "title",
+            "background",
+            "collectible",
+        }
+
+        if item_type in excluded_types:
+            return True
+
+        # Upgrade components/kits and any future upgrade inventory entries.
+        if "upgrade" in item_type or "upgrade" in item_id or "upgrade" in name:
+            return True
+
+        # Halloween Space Junk collectibles are registered as Space Junk rather
+        # than as a separate Collectible type, so exclude their known IDs too.
+        if item_id in HALLOWEEN_SPACE_JUNK_IDS:
+            return True
+
+        return False
+
+    def _get_give_lock(self, user_id):
+        return self._give_locks.setdefault(user_id, asyncio.Lock())
+
+    @commands.hybrid_command(
+        name="give",
+        description="Give another member one of your pets or transferable items.",
+    )
+    @app_commands.describe(
+        member="The member you want to give something to.",
+        pet="An owned pet to transfer. Leave blank when giving an item.",
+        item="An owned transferable item to give. Leave blank when giving a pet.",
+        quantity="How many of the selected item to give (default: 1).",
+    )
+    @app_commands.autocomplete(pet=give_pet_autocomplete, item=give_item_autocomplete)
+    async def give(
+        self,
+        ctx: commands.Context,
+        member: discord.Member,
+        pet: Optional[str] = None,
+        item: Optional[str] = None,
+        quantity: int = 1,
+    ):
+        """Transfer an owned pet or transferable inventory item to another member."""
+        if member.id == ctx.author.id:
+            return await ctx.send("❌ You cannot give something to yourself.")
+
+        if member.bot:
+            return await ctx.send("❌ You cannot give items or pets to bots.")
+
+        if pet and item:
+            return await ctx.send("❌ Choose **either a pet or an item**, not both.")
+
+        if not pet and not item:
+            return await ctx.send("❌ Choose a **pet** or an **item** to give.")
+
+        if quantity < 1 or quantity > 99:
+            return await ctx.send("❌ Quantity must be between **1 and 99**.")
+
+        giver_id = ctx.author.id
+        recipient_id = member.id
+        lock_ids = sorted({giver_id, recipient_id})
+        locks = [self._get_give_lock(user_id) for user_id in lock_ids]
+
+        await ctx.defer()
+
+        async with locks[0]:
+            async with locks[1]:
+                async with aiosqlite.connect(self.get_db_path()) as db:
+                    await self.ensure_schema(db)
+                    await db.execute(
+                        "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                        (giver_id,),
+                    )
+                    await db.execute(
+                        "INSERT OR IGNORE INTO users (user_id, stardust, vault_stardust) VALUES (?, 0, 0)",
+                        (recipient_id,),
+                    )
+                    await db.commit()
+
+                    await db.execute("BEGIN IMMEDIATE")
+
+                    if pet:
+                        try:
+                            pet_id = int(pet)
+                        except (TypeError, ValueError):
+                            await db.rollback()
+                            return await ctx.send("❌ That pet selection is invalid.")
+
+                        async with db.execute(
+                            """
+                            SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level
+                            FROM pets
+                            WHERE user_id = ? AND pet_id = ?
+                              AND COALESCE(pet_type, pet_stage) != 'egg'
+                            LIMIT 1
+                            """,
+                            (giver_id, pet_id),
+                        ) as cursor:
+                            pet_row = await cursor.fetchone()
+
+                        if not pet_row:
+                            await db.rollback()
+                            return await ctx.send("❌ You do not own that pet.")
+
+                        _, pet_type, pet_stage, nickname, level, variant_id, fusion_level = pet_row
+                        pet_type_id = pet_type or pet_stage
+                        definition = get_pet_definition(pet_type_id, variant_id)
+                        if not definition:
+                            await db.rollback()
+                            return await ctx.send("❌ That pet can no longer be transferred because its definition is unavailable.")
+
+                        pet_name = nickname or definition["name"]
+
+                        cursor = await db.execute(
+                            """
+                            UPDATE pets
+                            SET user_id = ?, is_active = 0
+                            WHERE user_id = ? AND pet_id = ?
+                              AND COALESCE(pet_type, pet_stage) != 'egg'
+                            """,
+                            (recipient_id, giver_id, pet_id),
+                        )
+
+                        if cursor.rowcount != 1:
+                            await db.rollback()
+                            return await ctx.send("❌ That pet could not be transferred. Please try again.")
+
+                        await db.commit()
+
+                        return await ctx.send(
+                            f"{ctx.author.mention} 🎁 gave {member.mention} "
+                            f"**{definition['emoji']} {pet_name}**!"
+                        )
+
+                    item_id = item.lower().strip()
+                    info = ITEM_REGISTRY.get(item_id)
+                    if not info or self._give_item_excluded(item_id, info):
+                        await db.rollback()
+                        return await ctx.send("❌ That item cannot be given to another member.")
+
+                    async with db.execute(
+                        """
+                        SELECT quantity, item_type
+                        FROM inventory
+                        WHERE user_id = ? AND item_id = ?
+                        LIMIT 1
+                        """,
+                        (giver_id, item_id),
+                    ) as cursor:
+                        giver_row = await cursor.fetchone()
+
+                    if not giver_row or (giver_row[0] or 0) < quantity:
+                        await db.rollback()
+                        return await ctx.send(
+                            f"❌ You do not have **{quantity}x {info['name']}** to give."
+                        )
+
+                    max_quantity = int(info.get("max_quantity", 10))
+                    async with db.execute(
+                        """
+                        SELECT quantity
+                        FROM inventory
+                        WHERE user_id = ? AND item_id = ?
+                        LIMIT 1
+                        """,
+                        (recipient_id, item_id),
+                    ) as cursor:
+                        recipient_row = await cursor.fetchone()
+
+                    recipient_quantity = (recipient_row[0] or 0) if recipient_row else 0
+                    if recipient_quantity + quantity > max_quantity:
+                        available_space = max(0, max_quantity - recipient_quantity)
+                        await db.rollback()
+                        return await ctx.send(
+                            f"❌ {member.mention} can only hold **{available_space}x** more "
+                            f"**{info['name']}** (max **{max_quantity}x**)."
+                        )
+
+                    remaining = giver_row[0] - quantity
+                    if remaining > 0:
+                        await db.execute(
+                            """
+                            UPDATE inventory
+                            SET quantity = ?
+                            WHERE user_id = ? AND item_id = ?
+                            """,
+                            (remaining, giver_id, item_id),
+                        )
+                    else:
+                        await db.execute(
+                            "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                            (giver_id, item_id),
+                        )
+
+                    if recipient_row:
+                        await db.execute(
+                            """
+                            UPDATE inventory
+                            SET quantity = quantity + ?
+                            WHERE user_id = ? AND item_id = ?
+                            """,
+                            (quantity, recipient_id, item_id),
+                        )
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (recipient_id, item_id, giver_row[1] or info.get("type", "Item"), quantity),
+                        )
+
+                    await db.commit()
+
+                    return await ctx.send(
+                        f"{ctx.author.mention} 🎁 gave {member.mention} "
+                        f"**{quantity}x {info.get('emoji', '📦')} {info['name']}**!"
+                    )
+
 
     async def shop_buy_autocomplete(
         self,

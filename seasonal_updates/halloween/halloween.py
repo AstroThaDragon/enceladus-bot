@@ -34,15 +34,17 @@ def halloween_channel_message() -> str:
 
 # Chance that a scavenging run also finds one Halloween Space Junk item.
 # This is an independent bonus roll, so normal scavenging loot is unaffected.
-BONUS_ROLL_CHANCE = 0.15
+BONUS_ROLL_CHANCE = 0.25
 
 # Independent seasonal bonus rolls during the active event.
-CANDY_CHANCE = 0.30
-PLASTIC_CHANCE = 0.20
-TRICK_OR_TREAT_BAG_CHANCE = 0.10
+CANDY_CHANCE = 0.85
+MINING_CANDY_CHANCE = CANDY_CHANCE
+SCAVENGING_CANDY_CHANCE = CANDY_CHANCE
+PLASTIC_CHANCE = 0.45
+TRICK_OR_TREAT_BAG_CHANCE = 0.18
 # Independent pet egg roll. This only runs while Halloween is active.
-HALLOWEEN_PET_EGG_CHANCE = 1 / 35
-HALLOWEEN_PET_CANDY_CHANCE = 0.12
+HALLOWEEN_PET_EGG_CHANCE = 1 / 20
+HALLOWEEN_PET_CANDY_CHANCE = 0.25
 PLASTIC_MIN = 4
 PLASTIC_MAX = 10
 

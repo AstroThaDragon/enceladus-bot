@@ -11,7 +11,8 @@ import pytz
 from emojis import EMOJIS
 from inventory import add_inventory_item, ITEM_REGISTRY
 from seasonal_updates.halloween.halloween import (
-    CANDY_CHANCE as HALLOWEEN_CANDY_CHANCE,
+    MINING_CANDY_CHANCE as HALLOWEEN_MINING_CANDY_CHANCE,
+    SCAVENGING_CANDY_CHANCE as HALLOWEEN_SCAVENGING_CANDY_CHANCE,
     PLASTIC_CHANCE as HALLOWEEN_PLASTIC_CHANCE,
     TRICK_OR_TREAT_BAG_CHANCE as HALLOWEEN_BAG_CHANCE,
     PLASTIC_MIN as HALLOWEEN_PLASTIC_MIN,
@@ -21,6 +22,7 @@ from seasonal_updates.halloween.halloween import (
     is_active as halloween_is_active,
     HALLOWEEN_PET_EGG_CHANCE,
     HALLOWEEN_PET_CANDY_CHANCE,
+    HALLOWEEN_SPACE_JUNK,
     halloween_channel_message,
     is_halloween_channel,
 )
@@ -54,6 +56,11 @@ from seasonal_updates.halloween.haunted import (
 )
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
+
+# Halloween Space Junk collectibles can very rarely be found while scavenging.
+# This is intentionally much rarer than the normal Haunted Exploration
+# collectible discovery chance.
+SCAVENGE_HALLOWEEN_COLLECTIBLE_CHANCE = 0.040
 
 MINING_MATERIALS = [
     ("iron_ore", "Iron Ore", 0.22),
@@ -374,73 +381,67 @@ class Exploration(commands.Cog):
             f"to return now; otherwise you will recover at 50% HP on **{knocked_out_until}**."
         )
 
-    # Slash-command structure:
-    # /explore haunted start -> opens the Haunted Exploration location screen
-    # /explore haunted info  -> opens the Haunted Exploration field guide
-    #
-    # This is intentionally an app-command group rather than a hybrid group.
-    # Discord does not allow a slash-command group itself to be executable, so
-    # `haunted` must be a group with explicit `start` and `info` subcommands.
-    explore = app_commands.Group(
+    @app_commands.command(
         name="explore",
         description="Explore Enceladus and its seasonal locations.",
     )
-    haunted = app_commands.Group(
-        name="haunted",
-        description="Haunted Exploration and its field guide.",
+    @app_commands.choices(
+        event=[
+            app_commands.Choice(name="Haunted", value="haunted"),
+        ],
+        action=[
+            app_commands.Choice(name="Info", value="info"),
+        ],
     )
-    explore.add_command(haunted)
+    async def explore(
+        self,
+        interaction: discord.Interaction,
+        event: str,
+        action: str | None = None,
+    ):
+        if event == "haunted" and action == "info":
+            if not is_halloween_channel(interaction.channel):
+                return await interaction.response.send_message(
+                    halloween_channel_message(),
+                    ephemeral=True,
+                )
+            if not halloween_is_active():
+                return await interaction.response.send_message(
+                    "🎃 **Haunted Exploration is currently dormant.",
+                    ephemeral=True,
+                )
 
-    @haunted.command(
-        name="start",
-        description="Enter Haunted Exploration and choose a location.",
-    )
-    async def explore_haunted_start(self, interaction: discord.Interaction):
-        if not is_halloween_channel(interaction.channel):
-            return await interaction.response.send_message(
-                halloween_channel_message(),
-                ephemeral=True,
-            )
-        if not halloween_is_active():
-            return await interaction.response.send_message(
-                "🎃 **Haunted Exploration is currently dormant.**\n"
-                "This event is only available during the Halloween event.",
-                ephemeral=True,
-            )
-
-        user_id = interaction.user.id
-        lock = self._user_locks.setdefault(user_id, asyncio.Lock())
-        async with lock:
-            async with aiosqlite.connect(self.get_db_path()) as db:
-                await self.ensure_schema(db)
-                profile = await get_or_create_profile(db, user_id)
-
-            embed = self._haunted_location_embed(interaction.user, profile)
             await interaction.response.send_message(
-                embed=embed,
-                view=HauntedLocationView(self),
-            )
-
-    @haunted.command(
-        name="info",
-        description="Read the Haunted Exploration field guide.",
-    )
-    async def explore_haunted_info(self, interaction: discord.Interaction):
-        if not is_halloween_channel(interaction.channel):
-            return await interaction.response.send_message(
-                halloween_channel_message(),
+                embed=self._haunted_info_embed(),
                 ephemeral=True,
             )
-        if not halloween_is_active():
-            return await interaction.response.send_message(
-                "🎃 **Haunted Exploration is currently dormant.",
-                ephemeral=True,
-            )
+            return
 
-        await interaction.response.send_message(
-            embed=self._haunted_info_embed(),
-            ephemeral=True,
-        )
+        if event == "haunted":
+            if not is_halloween_channel(interaction.channel):
+                return await interaction.response.send_message(
+                    halloween_channel_message(),
+                    ephemeral=True,
+                )
+            if not halloween_is_active():
+                return await interaction.response.send_message(
+                    "🎃 **Haunted Exploration is currently dormant.**\n"
+                    "This event is only available during the Halloween event.",
+                    ephemeral=True,
+                )
+
+            user_id = interaction.user.id
+            lock = self._user_locks.setdefault(user_id, asyncio.Lock())
+            async with lock:
+                async with aiosqlite.connect(self.get_db_path()) as db:
+                    await self.ensure_schema(db)
+                    profile = await get_or_create_profile(db, user_id)
+
+                embed = self._haunted_location_embed(interaction.user, profile)
+                await interaction.response.send_message(
+                    embed=embed,
+                    view=HauntedLocationView(self),
+                )
 
     def _haunted_location_embed(self, member, profile):
         sanity = sanity_percent(profile["sanity"])
@@ -1397,7 +1398,7 @@ class Exploration(commands.Cog):
             # Halloween bonus resources are independent rolls during the active event.
             halloween_active = halloween_is_active()
             seasonal_findings = []
-            if halloween_active and random.random() < HALLOWEEN_CANDY_CHANCE:
+            if halloween_active and random.random() < HALLOWEEN_MINING_CANDY_CHANCE:
                 candy_found = 1
                 candy_doubled = False
 
@@ -1473,6 +1474,35 @@ class Exploration(commands.Cog):
                         seasonal_findings.append(
                             f"📦 Pet Treat Inventory Full: {remaining_overflow} overflow "
                             f"could not be stored (cap {normal_treat_max})"
+                        )
+
+            # Halloween Pet Candy is an independent seasonal bonus roll, matching Mining.
+            if halloween_active and random.random() < HALLOWEEN_PET_CANDY_CHANCE:
+                pet_candy_found = random.randint(1, 4)
+
+                if (
+                    pet_effects["halloween_bonus"]
+                    and random.random() < pet_effects["halloween_bonus"]
+                ):
+                    pet_candy_found += 1
+
+                added_pet_candy, pet_candy_quantity, pet_candy_max = await add_inventory_item(
+                    db, user_id, "halloween_pet_candy", "pet_treat", pet_candy_found
+                )
+                if added_pet_candy:
+                    seasonal_findings.append(
+                        f"🍬 Halloween Pet Candy ×{added_pet_candy}"
+                    )
+
+                overflow_pet_candy = pet_candy_found - added_pet_candy
+                if overflow_pet_candy:
+                    added_normal_treat, _, _ = await add_inventory_item(
+                        db, user_id, "pet_snack", "pet_treat", overflow_pet_candy
+                    )
+                    remaining_overflow = overflow_pet_candy - added_normal_treat
+                    if remaining_overflow:
+                        seasonal_findings.append(
+                            f"📦 Halloween Pet Candy Overflow ×{remaining_overflow} → Inventory Full"
                         )
 
             if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
@@ -1871,8 +1901,9 @@ class Exploration(commands.Cog):
                 loot_rarity_note = ""
 
             else:
-                # Halloween collectibles are exclusive to Haunted Exploration.
-                # Scavenge keeps its normal Space Junk pool during the event.
+                # Normal scavenging keeps its existing Space Junk pool.
+                # Halloween collectibles are handled separately as an independent
+                # seasonal bonus roll below.
                 item_id, item_name = random.choice(list(junk_items.items()))
                 item_type = "space_junk"
                 loot_rarity_note = ""
@@ -2042,9 +2073,33 @@ class Exploration(commands.Cog):
                         f"{bonus_item_name} → Inventory Full (+{overflow_stardust:,} Stardust)"
                     )
 
-            # Seasonal non-collectible resources remain available during Halloween.
-            # Halloween collectibles themselves are exclusive to Haunted Exploration.
+            # Seasonal Halloween resources are independent bonus rolls and never
+            # replace the normal scavenging loot.
             halloween_active = halloween_is_active()
+
+            # Halloween Space Junk collectibles can very rarely be uncovered while
+            # scavenging. This is independent of the normal loot roll and is much
+            # rarer than finding collectibles through Haunted Exploration.
+            if halloween_active and random.random() < SCAVENGE_HALLOWEEN_COLLECTIBLE_CHANCE:
+                (
+                    collectible_id,
+                    collectible_name,
+                    collectible_emoji,
+                    _collectible_desc,
+                    _collectible_stardust,
+                    _collectible_candy,
+                ) = random.choice(HALLOWEEN_SPACE_JUNK)
+                added_collectible, collectible_quantity, collectible_max = await add_inventory_item(
+                    db, user_id, collectible_id, "space_junk", 1
+                )
+                if added_collectible:
+                    seasonal_findings.append(
+                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}**"
+                    )
+                else:
+                    seasonal_findings.append(
+                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}** → Inventory Full"
+                    )
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
             # Halloween and normal eggs each get their own roll, so both can be
@@ -2072,8 +2127,8 @@ class Exploration(commands.Cog):
 
             # Halloween resources are independent bonus rolls and never replace normal loot.
             candy_doubled = False
-            if halloween_active and random.random() < HALLOWEEN_CANDY_CHANCE:
-                candy_found = 1
+            if halloween_active and random.random() < HALLOWEEN_SCAVENGING_CANDY_CHANCE:
+                candy_found = random.randint(3, 20)
 
                 # Sam's Trick-or-Treating passive can double the base candy haul.
                 if pet_effects["candy_bonus"] and random.random() < pet_effects["candy_bonus"]:

@@ -3,7 +3,7 @@
 Phase 1 deliberately focuses on the exploration framework itself:
 - Halloween event gating
 - five selectable locations
-- 20 daily attempts
+- 35 daily attempts
 - persistent Sanity with continuous regeneration
 - an Insane state at 0 Sanity
 - multi-stage runs with choice buttons
@@ -27,7 +27,7 @@ from collectibles import record_collectible
 from seasonal_updates.halloween import halloween as halloween_season
 from pets import get_active_pet_effects
 
-HAUNTED_DAILY_ATTEMPTS = 20
+HAUNTED_DAILY_ATTEMPTS = 35
 SANITY_MAX = 100
 SANITY_REGEN_SECONDS = 6 * 60 * 60  # 100 Sanity over six hours.
 
@@ -211,31 +211,31 @@ HAUNTED_INGREDIENT_POOLS = {
 # Stardust granted when a location-specific Haunted ingredient cannot fit in inventory.
 # Kept at the same 10-Stardust baseline used by existing Haunted ingredients.
 HAUNTED_INGREDIENT_OVERFLOW_VALUES = {
-    "yellow_wallpaper_scrap": 10,
-    "damp_carpet_fiber": 10,
-    "frayed_electrical_wire": 10,
-    "unmarked_key": 10,
-    "strange_fluorescent_tube": 10,
-    "yellow_hall_light_cover": 10,
-    "rusted_road_sign": 10,
-    "damaged_payphone_part": 10,
-    "old_road_map": 10,
-    "contaminated_fuel_can": 10,
-    "rusty_car_part": 10,
-    "motel_key": 10,
+    "yellow_wallpaper_scrap": 100,
+    "damp_carpet_fiber": 165,
+    "frayed_electrical_wire": 45,
+    "unmarked_key": 80,
+    "strange_fluorescent_tube": 125,
+    "yellow_hall_light_cover": 145,
+    "rusted_road_sign": 100,
+    "damaged_payphone_part": 75,
+    "old_road_map": 45,
+    "contaminated_fuel_can": 85,
+    "rusty_car_part": 120,
+    "motel_key": 50,
     "waterlogged_transit_ticket": 10,
     "corroded_train_part": 10,
-    "flooded_flashlight": 10,
-    "damaged_conductor": 10,
-    "contaminated_water_sample": 10,
-    "submerged_key": 10,
-    "static_damaged_radio": 10,
-    "distorted_photograph": 10,
-    "strange_notebook_page": 10,
-    "corrupted_video_tape": 10,
-    "damaged_antenna": 10,
-    "blackened_tree_bark": 10,
-    "unidentified_black_tendril": 10,
+    "flooded_flashlight": 95,
+    "damaged_conductor": 75,
+    "contaminated_water_sample": 55,
+    "submerged_key": 25,
+    "static_damaged_radio": 35,
+    "distorted_photograph": 25,
+    "strange_notebook_page": 20,
+    "corrupted_video_tape": 20,
+    "damaged_antenna": 45,
+    "blackened_tree_bark": 40,
+    "unidentified_black_tendril": 200,
 }
 
 
@@ -251,11 +251,11 @@ HAUNTED_REWARD_RANGES = {
 # reward rarities make that discovery more likely, while keeping it separate
 # from the ordinary ingredient/currency roll.
 HAUNTED_COLLECTIBLE_CHANCES = {
-    "common": 0.00,
-    "uncommon": 0.04,
-    "rare": 0.12,
-    "legendary": 0.28,
-    "void": 0.50,
+    "common": 0.10,
+    "uncommon": 0.15,
+    "rare": 0.20,
+    "legendary": 0.30,
+    "void": 0.45,
 }
 
 
@@ -1485,10 +1485,9 @@ LOCATION_ENCOUNTERS = {
 
 # ---------------------------------------------------------------------------
 
-# Rare Haunted discoveries: permanent, replayable, and intentionally creepy.
-HAUNTED_DISCOVERY_CHANCE = 0.03
-HAUNTED_DISCOVERY_LOW_SANITY_CHANCE = 0.05
-HAUNTED_DISCOVERY_INSANE_CHANCE = 0.09
+HAUNTED_DISCOVERY_CHANCE = 0.005
+HAUNTED_DISCOVERY_LOW_SANITY_CHANCE = 0.02
+HAUNTED_DISCOVERY_INSANE_CHANCE = 0.03
 
 def _make_discovery(discovery_id, title, text, choices):
     return {"discovery_id": discovery_id, "discovery_title": title, "text": text, "choices": [q for q in choices]}
