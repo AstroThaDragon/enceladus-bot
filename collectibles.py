@@ -40,11 +40,86 @@ class Collectibles(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_group(
+    @commands.hybrid_command(
         name="collectibles",
         description="View your permanent seasonal collectible collection.",
     )
-    async def collectibles(self, ctx: commands.Context):
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="Info", value="info"),
+        ],
+    )
+    @app_commands.describe(
+        action="Optional action to perform.",
+        collectible="A collectible you have permanently discovered.",
+    )
+    async def collectibles(
+        self,
+        ctx: commands.Context,
+        action: str | None = None,
+        collectible: str | None = None,
+    ):
+        """View the permanent collection or inspect a discovered collectible."""
+
+        # /collectibles info <collectible>
+        if action == "info":
+            user_id = ctx.author.id
+
+            if not collectible:
+                return await ctx.send(
+                    "❌ **Choose a collectible to view.**\n"
+                    "Use the collectible picker after selecting **Info**.",
+                    ephemeral=True,
+                )
+
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+                await ensure_collectible_tables(db)
+                async with db.execute(
+                    """
+                    SELECT collectible_id
+                    FROM collectibles
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                ) as cursor:
+                    discovered = {row[0] for row in await cursor.fetchall()}
+
+            entries = get_halloween_collectibles()
+            collectible_map = {
+                item_id: (name, emoji, desc)
+                for item_id, name, emoji, desc in entries
+            }
+
+            if collectible not in discovered:
+                return await ctx.send(
+                    "❌ **You haven't discovered that collectible yet.**\n"
+                    "Only collectibles you've found can be viewed here.",
+                    ephemeral=True,
+                )
+
+            data = collectible_map.get(collectible)
+            if not data:
+                return await ctx.send(
+                    "❌ **That collectible is no longer available in the current collection.**",
+                    ephemeral=True,
+                )
+
+            name, emoji, description = data
+
+            embed = discord.Embed(
+                title=f"{emoji} {name}",
+                description=description,
+                color=discord.Color.dark_purple(),
+            )
+            embed.set_author(
+                name=f"{ctx.author.display_name}'s Collectible",
+                icon_url=ctx.author.display_avatar.url,
+            )
+            embed.set_footer(text="This discovery is permanent.")
+
+            return await ctx.send(embed=embed, ephemeral=True)
+
+        # /collectibles
         await ctx.defer()
         user_id = ctx.author.id
 
@@ -132,68 +207,8 @@ class Collectibles(commands.Cog):
         view = CollectiblesView(user_id, pages)
         await ctx.send(embed=view.current_embed(), view=view)
 
-
-    collectibles.invoke_without_command = True
-
-    @collectibles.command(
-        name="info",
-        description="View the details of a collectible you have discovered.",
-    )
-    @app_commands.describe(collectible="A collectible you have permanently discovered")
-    async def collectibles_info(
-        self,
-        ctx: commands.Context,
-        collectible: str,
-    ):
-        """Show the full details of a permanently discovered collectible."""
-        user_id = ctx.author.id
-
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await ensure_collectible_tables(db)
-            async with db.execute(
-                """
-                SELECT collectible_id
-                FROM collectibles
-                WHERE user_id = ?
-                """,
-                (user_id,),
-            ) as cursor:
-                discovered = {row[0] for row in await cursor.fetchall()}
-
-        entries = get_halloween_collectibles()
-        collectible_map = {item_id: (name, emoji, desc) for item_id, name, emoji, desc in entries}
-
-        if collectible not in discovered:
-            return await ctx.send(
-                "❌ **You haven't discovered that collectible yet.**\n"
-                "Only collectibles you've found can be viewed here.",
-                ephemeral=True,
-            )
-
-        data = collectible_map.get(collectible)
-        if not data:
-            return await ctx.send(
-                "❌ **That collectible is no longer available in the current collection.**",
-                ephemeral=True,
-            )
-
-        name, emoji, description = data
-
-        embed = discord.Embed(
-            title=f"{emoji} {name}",
-            description=description,
-            color=discord.Color.dark_purple(),
-        )
-        embed.set_author(
-            name=f"{ctx.author.display_name}'s Collectible",
-            icon_url=ctx.author.display_avatar.url,
-        )
-        embed.set_footer(text="This discovery is permanent.")
-
-        await ctx.send(embed=embed, ephemeral=True)
-
-    @collectibles_info.autocomplete("collectible")
-    async def collectibles_info_autocomplete(
+    @collectibles.autocomplete("collectible")
+    async def collectibles_collectible_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str,
