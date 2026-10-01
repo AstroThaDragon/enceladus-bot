@@ -765,17 +765,12 @@ class Cauldron(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.hybrid_group(name="seasonal", description="Open seasonal systems.")
-    async def seasonal(self, ctx: commands.Context):
+    @commands.hybrid_group(name="seasonal crafting", description="Open seasonal systems.")
+    async def seasonal_crafting(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send("Use `/seasonal crafting halloween` to access Halloween seasonal crafting.")
 
-    @seasonal.group(name="crafting", description="Open seasonal crafting.")
-    async def crafting(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            await ctx.send("Choose a seasonal crafting event, such as `/seasonal crafting halloween`.")
-
-    @crafting.group(name="halloween", description="Open Halloween crafting stations.")
+    @seasonal_crafting.group(name="halloween", description="Open Halloween crafting stations.")
     async def halloween(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send("Choose a Halloween crafting station: cauldron, workshop, or ritual.")
