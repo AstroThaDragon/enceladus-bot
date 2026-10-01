@@ -22,6 +22,7 @@ from error_handler import (
     log_command_error,
     log_event_error,
     log_task_error,
+    send_member_error_message,
 )
 
 load_dotenv()
@@ -1097,11 +1098,13 @@ async def help_command(ctx):
 
 @bot.event
 async def on_command_error(ctx, error):
-    await log_command_error(bot, ctx, error)
+    error_id = await log_command_error(bot, ctx, error)
+    await send_member_error_message(ctx, error_id)
 
 @bot.tree.error
 async def on_app_command_error(interaction, error):
-    await log_app_command_error(bot, interaction, error)
+    error_id = await log_app_command_error(bot, interaction, error)
+    await send_member_error_message(interaction, error_id)
 
 async def main():
     async with bot:
