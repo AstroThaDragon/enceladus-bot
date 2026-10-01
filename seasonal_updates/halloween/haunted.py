@@ -1486,9 +1486,9 @@ LOCATION_ENCOUNTERS = {
 # ---------------------------------------------------------------------------
 
 # Rare Haunted discoveries: permanent, replayable, and intentionally creepy.
-HAUNTED_DISCOVERY_CHANCE = 0.06
-HAUNTED_DISCOVERY_LOW_SANITY_CHANCE = 0.10
-HAUNTED_DISCOVERY_INSANE_CHANCE = 0.14
+HAUNTED_DISCOVERY_CHANCE = 0.03
+HAUNTED_DISCOVERY_LOW_SANITY_CHANCE = 0.05
+HAUNTED_DISCOVERY_INSANE_CHANCE = 0.09
 
 def _make_discovery(discovery_id, title, text, choices):
     return {"discovery_id": discovery_id, "discovery_title": title, "text": text, "choices": [q for q in choices]}
