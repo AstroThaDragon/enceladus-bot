@@ -380,24 +380,6 @@ class Workshop(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(name="workshop", description="Open the Halloween Haunted Workshop.")
-    async def workshop(self, ctx):
-        if not is_halloween_channel(ctx.channel):
-            await ctx.send(halloween_channel_message())
-            return
-        if not halloween_is_active():
-            await ctx.send("🎃 The Haunted Workshop is dormant right now.")
-            return
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🔧 Haunted Workshop",
-            description="A workbench covered in scavenged parts. Something here has definitely been assembled before.\n\n*Loose wires twitch as you approach. You swear that radio wasn't turned on a moment ago.*",
-            color=discord.Color.dark_purple(),
-        )
-        await ctx.send(
-            embed=embed,
-            view=WorkshopView(self, ctx.author.id),
-        )
 
 
 async def setup(bot):

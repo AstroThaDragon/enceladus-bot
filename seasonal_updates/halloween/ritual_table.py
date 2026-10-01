@@ -284,21 +284,6 @@ class RitualTable(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(name="ritual_table", description="Open the Halloween Ritual Table.")
-    async def ritual_table(self, ctx):
-        if not is_halloween_channel(ctx.channel):
-            await ctx.send(halloween_channel_message())
-            return
-        if not halloween_is_active():
-            await ctx.send("🎃 The Ritual Table is dormant right now.")
-            return
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🕯️ Ritual Table",
-            description="A place for things that are too strange for a workshop and too solid for a cauldron.\n\n*The candles are already lit. You don't remember lighting them.*",
-            color=discord.Color.dark_purple(),
-        )
-        await ctx.send(embed=embed, view=RitualView(self, ctx.author.id))
 
 
 async def setup(bot):

@@ -4,6 +4,8 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from inventory import ITEM_REGISTRY, add_inventory_item
+from seasonal_updates.halloween.workshop import WorkshopView
+from seasonal_updates.halloween.ritual_table import RitualView
 from seasonal_updates.halloween.halloween import (
     halloween_channel_message,
     is_active as halloween_is_active,
@@ -763,56 +765,36 @@ class Cauldron(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
-        name="seasonal_crafting",
-        description="Open the Halloween Seasonal Crafting hub.",
-    )
-    async def seasonal_crafting(self, ctx: commands.Context):
+    @commands.hybrid_group(name="seasonal", description="Open seasonal systems.")
+    async def seasonal(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Use `/seasonal crafting halloween` to access Halloween seasonal crafting.")
+
+    @seasonal.group(name="crafting", description="Open seasonal crafting.")
+    async def crafting(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Choose a seasonal crafting event, such as `/seasonal crafting halloween`.")
+
+    @crafting.group(name="halloween", description="Open Halloween crafting stations.")
+    async def halloween(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Choose a Halloween crafting station: cauldron, workshop, or ritual.")
+
+    @halloween.command(name="cauldron", description="Open the Lair of Frights Witch's Cauldron.")
+    async def seasonal_cauldron(self, ctx: commands.Context):
         if not is_halloween_channel(ctx.channel):
             await ctx.send(halloween_channel_message())
             return
         if not halloween_is_active():
             await ctx.send(
-                "🎃 Seasonal Crafting is dormant right now. "
-                "Come back during the Halloween event."
-            )
-            return
-
-        await ctx.defer()
-        embed = discord.Embed(
-            title="🎃 Seasonal Crafting",
-            description=(
-                "The Halloween crafting stations are all gathered in one place.\n\n"
-                "🧙 **Witch's Cauldron** — Brew strange mixtures.\n"
-                "🔧 **Haunted Workshop** — Assemble salvaged devices and tools.\n"
-                "🕯️ **Ritual Table** — Create wards, charms, and occult objects."
-            ),
-            color=discord.Color.dark_purple(),
-        )
-        embed.set_footer(text="Halloween Seasonal System")
-        await ctx.send(
-            embed=embed,
-            view=SeasonalCraftingView(self, ctx.author.id),
-        )
-
-    @commands.hybrid_command(
-        name="cauldron",
-        description="Open the Halloween Witch's Cauldron.",
-    )
-    async def cauldron(self, ctx: commands.Context):
-        if not is_halloween_channel(ctx.channel):
-            await ctx.send(halloween_channel_message())
-            return
-        if not halloween_is_active():
-            await ctx.send(
-                "🎃 The Witch's Cauldron is dormant right now. "
+                "🎃 The Lair of Frights Witch's Cauldron is dormant right now. "
                 "Come back during the Halloween season."
             )
             return
 
         await ctx.defer()
         embed = discord.Embed(
-            title="🧙 The Witch's Cauldron",
+            title="🧙 The Lair of Frights Witch's Cauldron",
             description=(
                 "*Something bubbles ominously inside...*\n\n"
                 "Turn your Haunted Ingredients into strange brews and "
@@ -827,6 +809,62 @@ class Cauldron(commands.Cog):
         await ctx.send(
             embed=embed,
             view=CauldronView(self, ctx.author.id),
+        )
+
+    @halloween.command(name="workshop", description="Open the Lair of Frights Haunted Workshop.")
+    async def seasonal_workshop(self, ctx: commands.Context):
+        if not is_halloween_channel(ctx.channel):
+            await ctx.send(halloween_channel_message())
+            return
+        if not halloween_is_active():
+            await ctx.send("🎃 The Lair of Frights Haunted Workshop is dormant right now. ")
+            return
+
+        workshop = self.bot.get_cog("Workshop")
+        if workshop is None:
+            await ctx.send("❌ The Lair of Frights Haunted Workshop is not loaded.")
+            return
+
+        await ctx.defer()
+        embed = discord.Embed(
+            title="🔧 Lair of Frights Haunted Workshop",
+            description=(
+                "A workbench covered in scavenged parts. Something here has definitely been assembled before.\n\n"
+                "*Loose wires twitch as you approach. You swear that radio wasn't turned on a moment ago.*"
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await ctx.send(
+            embed=embed,
+            view=WorkshopView(workshop, ctx.author.id),
+        )
+
+    @halloween.command(name="ritual", description="Open the Lair of Frights Ritual Table.")
+    async def seasonal_ritual(self, ctx: commands.Context):
+        if not is_halloween_channel(ctx.channel):
+            await ctx.send(halloween_channel_message())
+            return
+        if not halloween_is_active():
+            await ctx.send("🎃 The Lair of Frights Ritual Table is dormant right now.")
+            return
+
+        ritual = self.bot.get_cog("RitualTable")
+        if ritual is None:
+            await ctx.send("❌ The Lair of Frights Ritual Table is not loaded.")
+            return
+
+        await ctx.defer()
+        embed = discord.Embed(
+            title="🕯️ Lair of Frights Ritual Table",
+            description=(
+                "A place for things that are too strange for a workshop and too solid for a cauldron.\n\n"
+                "*The candles are already lit. You don't remember lighting them.*"
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await ctx.send(
+            embed=embed,
+            view=RitualView(ritual, ctx.author.id),
         )
 
 
