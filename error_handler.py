@@ -60,6 +60,14 @@ def _safe_text(value, limit=1000):
     return text
 
 
+def _safe_embed_field(value, limit=1024):
+    """Return text guaranteed not to exceed Discord's embed field-value limit."""
+    text = str(value) if value is not None else "Unknown"
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
 def _get_context_info(ctx=None, interaction=None):
     """Collect command/user/server/channel information without assuming it exists."""
     source = interaction or ctx
@@ -92,8 +100,8 @@ def _get_context_info(ctx=None, interaction=None):
     }
 
 
-def _format_traceback(error, limit=1000):
-    """Return a bounded traceback suitable for a Discord embed field (max 1024 chars)."""
+def _format_traceback(error, limit=900):
+    """Return a bounded traceback with room for Discord code-fence formatting."""
     try:
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     except Exception:
@@ -252,27 +260,27 @@ async def send_error_log(
             value=f"`{_safe_text(info['command'], 256)}`",
             inline=False,
         )
-        embed.add_field(name="User", value=_safe_text(info["user"], 1024), inline=True)
-        embed.add_field(name="Server", value=_safe_text(info["server"], 1024), inline=True)
-        embed.add_field(name="Channel", value=_safe_text(info["channel"], 1024), inline=True)
+        embed.add_field(name="User", value=_safe_embed_field(_safe_text(info["user"], 1000)), inline=True)
+        embed.add_field(name="Server", value=_safe_embed_field(_safe_text(info["server"], 1000)), inline=True)
+        embed.add_field(name="Channel", value=_safe_embed_field(_safe_text(info["channel"], 1000)), inline=True)
         embed.add_field(name="Source", value=f"`{_safe_text(source, 256)}`", inline=True)
         embed.add_field(name="Error Type", value=f"`{_safe_text(error_type, 256)}`", inline=True)
         embed.add_field(
             name="Error",
-            value=f"```text\n{error_message[:1000]}\n```",
+            value=_safe_embed_field(f"```text\\n{error_message[:900]}\\n```"),
             inline=False,
         )
 
         if context:
             embed.add_field(
                 name="Context",
-                value=_safe_text(context, 1000),
+                value=_safe_embed_field(_safe_text(context, 1000)),
                 inline=False,
             )
 
         embed.add_field(
             name="Traceback",
-            value=f"```py\n{traceback_text}\n```",
+            value=_safe_embed_field(f"```py\\n{traceback_text}\\n```"),
             inline=False,
         )
         embed.set_footer(text="Centralized Enceladus error logging")
