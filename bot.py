@@ -255,12 +255,10 @@ async def check_bump_timer():
 
             reminder_embed = discord.Embed(
                 description=(
-                    f"# *Sniffsniff..*\n\n"
-                    f"*Sniff!!*\n"
-                    f"It's time to bump once again! Please bump our server by typing /bump! "
-                    f"It helps us a lot by gaining more members! "
-                    f"<a:RedHearts:1109768412382642266> <:AstroHeart:927518108745343026> "
-                    f"<a:PurpleHearts:1109768355390431323>"
+                    f"# It's time to bump!\n\n"
+                    f"Two hours have passed since the last bump! You may now bump our server by typing `/bump`! "
+                    f"It helps us a lot by gaining more noticability! "
+                    f"<a:RedHearts:1109768412382642266> <a:PurpleHearts:1109768355390431323> "
                 ),
                 color=discord.Color.from_rgb(114, 0, 225)
             )
