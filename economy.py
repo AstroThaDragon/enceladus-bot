@@ -601,11 +601,18 @@ class ShopTransactionView(discord.ui.View):
         if self.search_query:
             page_text += f" • Search: `{self.search_query}`"
 
-        description = (
-            f"Choose an item to {'buy' if self.mode == 'buy' else 'sell'}.\n\n"
-            f"**{page_text}**\n"
-            f"{len(entries):,} item{'s' if len(entries) != 1 else ''} available."
-        )
+        if self.mode == "sell" and self.category == "sell_all":
+            description = (
+                "Choose a bulk-sale action.\n\n"
+                f"**{page_text}**\n"
+                f"{len(entries):,} bulk action{'s' if len(entries) != 1 else ''} available."
+            )
+        else:
+            description = (
+                f"Choose an item to {'buy' if self.mode == 'buy' else 'sell'}.\n\n"
+                f"**{page_text}**\n"
+                f"{len(entries):,} item{'s' if len(entries) != 1 else ''} available."
+            )
 
         embed = discord.Embed(
             title=f"{title} — {self._category_title()}",
@@ -631,17 +638,20 @@ class ShopTransactionView(discord.ui.View):
                     if info.get("desc"):
                         detail += f"\n📖 {info['desc']}"
                 else:
-                    owned = int(entry.get("owned", 0) or 0)
-                    stored_type = entry.get("stored_type") or info.get("type")
-                    if str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk":
-                        payout, candy = self.cog.get_junk_sell_reward(entry["id"])
-                        price_line = f"💰 **{int(payout):,} Stardust each**"
-                        if candy:
-                            price_line += f" + 🍬 **{int(candy)} Candy**"
+                    if self.category == "sell_all":
+                        detail = "🧹 **Bulk-sale action**\nSell all eligible items covered by this option."
                     else:
-                        payout = int(info.get("sell_price", 0) or 0)
-                        price_line = f"💰 **{payout:,} Stardust each**"
-                    detail = f"📦 You own: **{owned:,}**\n{price_line}"
+                        owned = int(entry.get("owned", 0) or 0)
+                        stored_type = entry.get("stored_type") or info.get("type")
+                        if str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk":
+                            payout, candy = self.cog.get_junk_sell_reward(entry["id"])
+                            price_line = f"💰 **{int(payout):,} Stardust each**"
+                            if candy:
+                                price_line += f" + 🍬 **{int(candy)} Candy**"
+                        else:
+                            payout = int(info.get("sell_price", 0) or 0)
+                            price_line = f"💰 **{payout:,} Stardust each**"
+                        detail = f"📦 You own: **{owned:,}**\n{price_line}"
 
                 embed.add_field(
                     name=item_name,
@@ -820,14 +830,19 @@ class ShopTransactionView(discord.ui.View):
         if len(lines) > 12:
             preview += f"\n…and {len(lines) - 12} more."
         candy_preview = f"\n🍬 **Halloween Candy:** +{total_candy}" if total_candy else ""
+        collection_note = (
+            "\n\n📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. "
+            "Selling the physical items does **not** remove them from your collection."
+            if self.selected_item == "all_halloween"
+            else ""
+        )
         embed = discord.Embed(
             title="⚠️ Confirm Bulk Sale",
             description=(
                 f"You are about to sell **{item_count} items** for approximately "
                 f"✨ **{total_stardust:,} Stardust**.{candy_preview}\n\n"
-                f"**Items included:**\n{preview}\n\n"
-                "📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. "
-                "Selling the physical items does **not** remove them from your collection.\n\n"
+                f"**Items included:**\n{preview}"
+                f"{collection_note}\n\n"
                 "This cannot be undone. Choose **Yes, Sell All** or **Cancel**."
             ),
             color=discord.Color.orange(),
@@ -3829,7 +3844,7 @@ class Economy(commands.Cog):
                 f"**Items Sold:**\n{preview}"
             ),
             embed=None,
-            view=view,
+            view=None,
         )
 
 
@@ -3873,13 +3888,20 @@ class Economy(commands.Cog):
             if len(lines) > 12:
                 preview += f"\n…and {len(lines) - 12} more."
             candy_preview = f"\n🍬 **Halloween Candy:** +{total_candy}" if total_candy else ""
+            collection_note = (
+                "\n\n📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. "
+                "Selling the physical items does **not** remove them from your collection."
+                if target_item == "all_halloween"
+                else ""
+            )
             embed = discord.Embed(
                 title="⚠️ Confirm Bulk Sale",
                 description=(
                     f"You are about to sell **{item_count} items** for approximately "
                     f"✨ **{total_stardust:,} Stardust**.{candy_preview}\n\n"
-                    f"**Items included:**\n{preview}\n\n"
-                    "📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. Selling the physical items does **not** remove them from your collection.\n\nThis cannot be undone. Choose **Yes, Sell All** or **Cancel**."
+                    f"**Items included:**\n{preview}"
+                    f"{collection_note}\n\n"
+                    "This cannot be undone. Choose **Yes, Sell All** or **Cancel**."
                 ),
                 color=discord.Color.orange(),
             )
