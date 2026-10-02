@@ -716,7 +716,6 @@ class Workshop(commands.Cog):
             f"🔧 **Assembly complete!** You built **{recipe['emoji']} {recipe['name']} ×{craftable}**."
             + (f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**." if craftable < quantity else "")
             + discovery_note,
-            ephemeral=True,
         )
 
 

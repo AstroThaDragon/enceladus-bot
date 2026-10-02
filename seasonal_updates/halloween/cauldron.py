@@ -843,7 +843,7 @@ class Cauldron(commands.Cog):
             description=description,
             color=discord.Color.dark_purple(),
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
     @commands.hybrid_group(name="seasonal", description="Open seasonal crafting systems.")

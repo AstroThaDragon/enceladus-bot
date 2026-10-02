@@ -490,7 +490,6 @@ class RitualTable(commands.Cog):
                 if craftable < quantity else ""
             )
             + f"\n\n*{recipe['description']}*",
-            ephemeral=True,
         )
 
 
