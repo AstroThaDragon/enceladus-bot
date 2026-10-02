@@ -1732,20 +1732,22 @@ class Economy(commands.Cog):
 
         time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
 
+        def is_halloween_collectible(item_id):
+            return item_id in HALLOWEEN_COLLECTIBLE_IDS or item_id in LOCATION_BASED_COLLECTIBLES
+
         def is_halloween_item(item_id, info, stored_type):
             item_type = str(info.get("type", ""))
             return (
                 item_id in HALLOWEEN_SPACE_JUNK_IDS
-                or item_id in LOCATION_BASED_COLLECTIBLES
+                or is_halloween_collectible(item_id)
                 or item_type == "Haunted Ingredient"
                 or item_id == "plasma_cutter"
             )
 
-        def is_collectible(item_id, info, stored_type):
+        def is_normal_collectible(item_id, info):
             return (
-                item_id in HALLOWEEN_SPACE_JUNK_IDS
-                or item_id in LOCATION_BASED_COLLECTIBLES
-                or str(info.get("type", "")).lower() == "collectible"
+                str(info.get("type", "")).lower() == "collectible"
+                and not is_halloween_collectible(item_id)
             )
 
         def is_space_junk(info, stored_type):
@@ -1775,36 +1777,16 @@ class Economy(commands.Cog):
 
         choices = []
 
-        # Bulk options are always first when the Sell All category is selected.
+        # The Sell All category always exposes every bulk action. Whether the
+        # user currently owns matching items is checked when the option is used.
+        # This keeps the command's category/options stable instead of making
+        # choices appear and disappear based on inventory state.
         if category == "sell_all":
-            normal_junk_owned = any(
-                (str(stored_type).lower() == "space_junk" or (ITEM_REGISTRY.get(item_id, {}).get("type") == "Space Junk"))
-                and item_id in self.JUNK_PRICES
-                and item_id not in HALLOWEEN_SPACE_JUNK_IDS
-                for item_id, _quantity, stored_type in rows
-            )
-            normal_material_owned = any(
-                item_id in NORMAL_SELL_ALL_MATERIAL_IDS
-                and int((ITEM_REGISTRY.get(item_id) or {}).get("sell_price", 0) or 0) > 0
-                for item_id, _quantity, _stored_type in rows
-            )
-            halloween_owned = any(
-                is_sellable(item_id, ITEM_REGISTRY.get(item_id), stored_type)
-                and (
-                    item_id in HALLOWEEN_COLLECTIBLE_IDS
-                    or item_id in LOCATION_BASED_COLLECTIBLES
-                )
-                for item_id, _quantity, stored_type in rows
-            )
-
-            bulk = []
-            if normal_junk_owned:
-                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_junk"], value="all_junk"))
-            if normal_material_owned:
-                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_materials"], value="all_materials"))
-            if halloween_owned:
-                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_halloween"], value="all_halloween"))
-
+            bulk = [
+                app_commands.Choice(name=BULK_SELL_OPTIONS["all_junk"], value="all_junk"),
+                app_commands.Choice(name=BULK_SELL_OPTIONS["all_materials"], value="all_materials"),
+                app_commands.Choice(name=BULK_SELL_OPTIONS["all_halloween"], value="all_halloween"),
+            ]
             for choice in bulk:
                 if not current or current in choice.name.lower():
                     choices.append(choice)
@@ -1822,19 +1804,29 @@ class Economy(commands.Cog):
                     continue
 
                 junk = is_space_junk(info, stored_type)
-                collectible = is_collectible(item_id, info, stored_type)
+                normal_collectible = is_normal_collectible(item_id, info)
                 halloween = is_halloween_item(item_id, info, stored_type)
+                halloween_collectible = is_halloween_collectible(item_id)
                 item_type = str(info.get("type", ""))
 
                 if category == "space_junk" and not junk:
                     continue
-                if category == "collectibles" and not collectible:
+                if category == "collectibles" and not normal_collectible:
                     continue
                 if category == "halloween" and not halloween:
                     continue
-                if category == "materials" and item_type not in {"Mineral", "Crafting Material", "Haunted Ingredient"}:
+                if category == "materials" and (
+                    item_type not in {"Mineral", "Crafting Material"}
+                    or halloween_collectible
+                    or item_id in HALLOWEEN_SPACE_JUNK_IDS
+                ):
                     continue
-                if category == "other" and (junk or collectible or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient"}):
+                if category == "other" and (
+                    junk
+                    or normal_collectible
+                    or halloween
+                    or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                ):
                     continue
 
                 display = display_choice(item_id, owned_quantity, info)
