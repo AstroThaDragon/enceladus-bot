@@ -4,6 +4,7 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from inventory import ITEM_REGISTRY, add_inventory_item
+from collectibles import LOCATION_BASED_COLLECTIBLES, record_collectible
 from seasonal_updates.halloween.halloween import (
     halloween_channel_message,
     is_active as halloween_is_active,
@@ -142,6 +143,24 @@ WORKSHOP_RECIPES = {
     },
 }
 
+# Location-based collectibles are crafted exclusively here, in their own
+# Workshop category. Their discovery is permanent even if the physical item
+# is later sold.
+LOCATION_COLLECTIBLE_RECIPES = {
+    item_id: {
+        "name": data["name"],
+        "emoji": data["emoji"],
+        "ingredients": data["ingredients"],
+        "result": item_id,
+        "result_type": "Location-Based Collectible",
+        "description": data["description"],
+        "location": data["location"],
+        "sell_price": data["sell_price"],
+        "location_collectible": True,
+    }
+    for item_id, data in LOCATION_BASED_COLLECTIBLES.items()
+}
+
 for _recipe in WORKSHOP_RECIPES.values():
     ITEM_REGISTRY.setdefault(
         _recipe["result"],
@@ -215,10 +234,19 @@ def format_recipe(recipe, owned):
             f"{mark} {ingredient_emoji(item_id)} {ingredient_name(item_id)} ×{amount} "
             f"*(you have {have})*"
         )
-    lines.extend([
-        f"\n**Produces:** {recipe['emoji']} {recipe['name']} ×1",
-        f"🔧 **What it does:** {recipe['description']}",
-    ])
+
+    if recipe.get("location_collectible"):
+        lines.extend([
+            f"\n📍 **Recovered From:** {recipe['location']}",
+            f"📚 **Description:** {recipe['description']}",
+            f"💰 **Sell Value:** {recipe['sell_price']:,} Stardust",
+            "🔒 **Discovery:** Crafting this permanently records the collectible in your collection.",
+        ])
+    else:
+        lines.extend([
+            f"\n**Produces:** {recipe['emoji']} {recipe['name']} ×1",
+            f"🔧 **What it does:** {recipe['description']}",
+        ])
     return "\n".join(lines)
 
 
@@ -271,6 +299,57 @@ class WorkshopSelect(discord.ui.Select):
         await interaction.response.send_modal(WorkshopQuantityModal(self.cog, self.owner_id, recipe_id, recipe["name"]))
 
 
+class LocationCollectibleSelect(discord.ui.Select):
+    def __init__(self, cog, owner_id):
+        self.cog = cog
+        self.owner_id = owner_id
+        options = [
+            discord.SelectOption(
+                label=data["name"],
+                value=item_id,
+                emoji=data["emoji"],
+                description=data["location"][:100],
+            )
+            for item_id, data in LOCATION_BASED_COLLECTIBLES.items()
+        ]
+        super().__init__(placeholder="Choose a location-based collectible...", options=options)
+
+    async def callback(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ This workshop belongs to someone else.", ephemeral=True)
+            return
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
+            return
+        recipe_id = self.values[0]
+        recipe = LOCATION_COLLECTIBLE_RECIPES[recipe_id]
+        await interaction.response.send_modal(WorkshopQuantityModal(self.cog, self.owner_id, recipe_id, recipe["name"]))
+
+
+class WorkshopDeviceView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.add_item(WorkshopSelect(cog, owner_id))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ This workshop belongs to someone else.", ephemeral=True)
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Back", emoji="🔧", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_assembly_categories(interaction)
+
+
 class WorkshopRecipeBookView(discord.ui.View):
     def __init__(self, cog, owner_id, pages, page=0):
         super().__init__(timeout=300)
@@ -321,12 +400,66 @@ class WorkshopRecipeBookView(discord.ui.View):
         await self.cog.show_menu(interaction)
 
 
+class WorkshopCategoryView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ This workshop belongs to someone else.", ephemeral=True)
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Haunted Devices", emoji="🔧", style=discord.ButtonStyle.primary)
+    async def devices_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_device_assembler(interaction)
+
+    @discord.ui.button(label="Location Collectibles", emoji="📚", style=discord.ButtonStyle.primary)
+    async def collectibles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_location_collectibles(interaction)
+
+    @discord.ui.button(label="Back", emoji="🔧", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_menu(interaction)
+
+
+class LocationCollectibleView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.add_item(LocationCollectibleSelect(cog, owner_id))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ This workshop belongs to someone else.", ephemeral=True)
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Back", emoji="📚", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_assembly_categories(interaction)
+
+
 class WorkshopView(discord.ui.View):
     def __init__(self, cog, owner_id):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.add_item(WorkshopSelect(cog, owner_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -348,6 +481,18 @@ class WorkshopView(discord.ui.View):
             )
             return False
         return True
+
+    @discord.ui.button(
+        label="Assemble",
+        emoji="🔧",
+        style=discord.ButtonStyle.primary,
+    )
+    async def assemble_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        await self.cog.show_assembly_categories(interaction)
 
     @discord.ui.button(
         label="Recipes",
@@ -417,6 +562,42 @@ class Workshop(commands.Cog):
             view=WorkshopView(self, interaction.user.id),
         )
 
+    async def show_assembly_categories(self, interaction):
+        embed = discord.Embed(
+            title="🔧 Haunted Workshop — Assemble",
+            description=(
+                "Choose what kind of blueprint you want to assemble.\n\n"
+                "🔧 **Haunted Devices** — tools and equipment with run-specific effects.\n"
+                "📚 **Location Collectibles** — handcrafted keepsakes recovered from each Haunted location. "
+                "Crafting one permanently records its discovery, even if you later sell the item."
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await interaction.response.edit_message(embed=embed, view=WorkshopCategoryView(self, interaction.user.id))
+
+    async def show_device_assembler(self, interaction):
+        embed = discord.Embed(
+            title="🔧 Haunted Workshop — Devices",
+            description=(
+                "Select a device to assemble. You can choose a quantity from **1–10** after selecting a blueprint.\n\n"
+                + "\n".join(f"{r['emoji']} **{r['name']}**" for r in WORKSHOP_RECIPES.values())
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await interaction.response.edit_message(embed=embed, view=WorkshopDeviceView(self, interaction.user.id))
+
+    async def show_location_collectibles(self, interaction):
+        embed = discord.Embed(
+            title="📚 Haunted Workshop — Location Collectibles",
+            description=(
+                "These **23** collectibles are crafted exclusively here.\n"
+                "Crafting one permanently records the discovery in `/collectibles`, while the physical item remains a normal inventory item that can be sold.\n\n"
+                "Select a collectible to see its materials and choose how many to craft."
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await interaction.response.edit_message(embed=embed, view=LocationCollectibleView(self, interaction.user.id))
+
     async def show_recipe_book(self, interaction):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             owned = await self._owned(db, interaction.user.id)
@@ -437,7 +618,10 @@ class Workshop(commands.Cog):
 
 
     async def assemble(self, interaction, recipe_id, quantity: int = 1):
-        recipe = WORKSHOP_RECIPES[recipe_id]
+        if recipe_id in LOCATION_COLLECTIBLE_RECIPES:
+            recipe = LOCATION_COLLECTIBLE_RECIPES[recipe_id]
+        else:
+            recipe = WORKSHOP_RECIPES[recipe_id]
         quantity = max(1, min(10, int(quantity)))
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("BEGIN IMMEDIATE")
@@ -484,6 +668,12 @@ class Workshop(commands.Cog):
                     )
                 craftable = added
 
+            newly_discovered = False
+            if recipe.get("location_collectible") and craftable > 0:
+                newly_discovered = await record_collectible(
+                    db, self.bot, interaction.user.id, recipe["result"], category="Halloween"
+                )
+
             await db.commit()
 
         if craftable < 1:
@@ -500,10 +690,12 @@ class Workshop(commands.Cog):
 
         import random
         flavor = random.choice(WORKSHOP_FLAVOR_TEXT.get(recipe_id, ["The finished device gives an unsettling little hum as it comes to life."]))
+        discovery_note = "\n\n✨ **Permanent discovery recorded!** This collectible is now part of your `/collectibles` collection." if newly_discovered else ""
         await interaction.response.send_message(
             f"*{flavor}*\n\n"
             f"🔧 **Assembly complete!** You built **{recipe['emoji']} {recipe['name']} ×{craftable}**."
-            + (f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**." if craftable < quantity else ""),
+            + (f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**." if craftable < quantity else "")
+            + discovery_note,
             ephemeral=True,
         )
 
