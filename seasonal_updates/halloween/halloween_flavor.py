@@ -1685,8 +1685,15 @@ def _user_id(invocation: commands.Context | discord.Interaction) -> int | None:
 
 
 def _render_flavor(text: str) -> str:
-    """Give the flavor a quiet, corrupted-system presentation."""
-    return "\n".join(f"> *{line}*" if line else ">" for line in text.splitlines())
+    """Render flavor text with normal Discord line breaks and no blockquotes."""
+    # Some flavor entries contain literal ``\\n`` sequences rather than
+    # actual newline characters. Normalize both forms before sending.
+    text = text.replace("\\n", "\n")
+
+    # Do not prefix lines with ``>``; Discord renders those as blockquotes
+    # with the gray vertical bar. Keep the corruption flavor italicized while
+    # allowing blank lines to remain normal spacing.
+    return "\n".join(f"*{line}*" if line else "" for line in text.splitlines())
 
 
 async def _send_flavor(
