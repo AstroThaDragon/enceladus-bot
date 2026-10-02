@@ -221,6 +221,91 @@ class Lottery(commands.Cog):
     async def lottery_status(self, ctx: commands.Context):
         await self.send_status(ctx)
 
+    async def purchase_ticket(self, user_id, numbers):
+        """Purchase a normalized lottery ticket for a user.
+
+        Returns ``(success, message)`` so both the slash/hybrid command and the
+        interactive shop can use the exact same lottery accounting logic.
+        """
+        now = self.eastern_now().isoformat()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+
+            cycle = await self.get_active_cycle(db)
+            if not cycle:
+                await db.rollback()
+                return False, "🎟️ **There isn't an open lottery right now.**"
+
+            cycle_id = cycle[0]
+            async with db.execute(
+                "SELECT COUNT(*) FROM lottery_tickets WHERE cycle_id = ? AND user_id = ?",
+                (cycle_id, user_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+                ticket_count = row[0] if row else 0
+
+            if ticket_count >= self.MAX_TICKETS_PER_USER:
+                await db.rollback()
+                return False, (
+                    f"📦 **Ticket limit reached!** You can only have **{self.MAX_TICKETS_PER_USER}** active tickets in a cycle."
+                )
+
+            async with db.execute(
+                "SELECT stardust FROM users WHERE user_id = ?",
+                (user_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if not row:
+                await db.rollback()
+                return False, (
+                    "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge`, or `/mine` first!"
+                )
+
+            stardust = row[0] or 0
+            if stardust < self.TICKET_COST:
+                await db.rollback()
+                return False, (
+                    f"💸 **Not enough Stardust!** A lottery ticket costs **{self.TICKET_COST:,}**, "
+                    f"but you only have **{stardust:,}**."
+                )
+
+            try:
+                await db.execute(
+                    """
+                    INSERT INTO lottery_tickets
+                        (cycle_id, user_id, n1, n2, n3, n4, n5, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (cycle_id, user_id, *numbers, now),
+                )
+            except aiosqlite.IntegrityError:
+                await db.rollback()
+                return False, (
+                    "⚠️ You already own a ticket with that exact number combination in this cycle. "
+                    "Pick a different combination!"
+                )
+
+            await db.execute(
+                "UPDATE users SET stardust = stardust - ? WHERE user_id = ?",
+                (self.TICKET_COST, user_id),
+            )
+            await db.execute(
+                "UPDATE lottery_cycles SET tickets_sold = tickets_sold + 1 WHERE cycle_id = ?",
+                (cycle_id,),
+            )
+            await db.commit()
+
+        return True, (
+            f"🎟️ **Lottery Ticket Purchased!**\n\n"
+            f"Numbers: {self.format_numbers(numbers)}\n"
+            f"💰 Cost: **{self.TICKET_COST:,} Stardust**\n"
+            f"📦 Tickets owned this cycle: **{ticket_count + 1}/{self.MAX_TICKETS_PER_USER}**\n\n"
+            "Good luck, explorer! 🌌"
+        )
+
     @lottery.command(name="buy", description="Buy one lottery ticket with five unique numbers.")
     async def lottery_buy(
         self,
@@ -237,85 +322,8 @@ class Lottery(commands.Cog):
                 "❌ Your ticket must contain **5 different whole numbers from 1 to 99**."
             )
 
-        user_id = ctx.author.id
-        now = self.eastern_now().isoformat()
-
-        async with aiosqlite.connect(self.db_path) as db:
-            await self.ensure_schema(db)
-            await db.execute("BEGIN IMMEDIATE")
-
-            cycle = await self.get_active_cycle(db)
-            if not cycle:
-                await db.rollback()
-                return await ctx.send("🎟️ **There isn't an open lottery right now.**")
-
-            cycle_id = cycle[0]
-            async with db.execute(
-                "SELECT COUNT(*) FROM lottery_tickets WHERE cycle_id = ? AND user_id = ?",
-                (cycle_id, user_id),
-            ) as cursor:
-                    row = await cursor.fetchone()
-                    ticket_count = row[0] if row else 0
-
-            if ticket_count >= self.MAX_TICKETS_PER_USER:
-                await db.rollback()
-                return await ctx.send(
-                    f"📦 **Ticket limit reached!** You can only have **{self.MAX_TICKETS_PER_USER}** active tickets in a cycle."
-                )
-
-            async with db.execute(
-                "SELECT stardust FROM users WHERE user_id = ?",
-                (user_id,),
-            ) as cursor:
-                row = await cursor.fetchone()
-
-            if not row:
-                await db.rollback()
-                return await ctx.send(
-                    "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge`, or `/mine` first!"
-                )
-
-            stardust = row[0] or 0
-            if stardust < self.TICKET_COST:
-                await db.rollback()
-                return await ctx.send(
-                    f"💸 **Not enough Stardust!** A lottery ticket costs **{self.TICKET_COST:,}**, "
-                    f"but you only have **{stardust:,}**."
-                )
-
-            try:
-                await db.execute(
-                    """
-                    INSERT INTO lottery_tickets
-                        (cycle_id, user_id, n1, n2, n3, n4, n5, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (cycle_id, user_id, *numbers, now),
-                )
-            except aiosqlite.IntegrityError:
-                await db.rollback()
-                return await ctx.send(
-                    "⚠️ You already own a ticket with that exact number combination in this cycle. "
-                    "Pick a different combination!"
-                )
-
-            await db.execute(
-                "UPDATE users SET stardust = stardust - ? WHERE user_id = ?",
-                (self.TICKET_COST, user_id),
-            )
-            await db.execute(
-                "UPDATE lottery_cycles SET tickets_sold = tickets_sold + 1 WHERE cycle_id = ?",
-                (cycle_id,),
-            )
-            await db.commit()
-
-        await ctx.send(
-            f"🎟️ **Lottery Ticket Purchased!**\n\n"
-            f"Numbers: {self.format_numbers(numbers)}\n"
-            f"💰 Cost: **{self.TICKET_COST:,} Stardust**\n"
-            f"📦 Tickets owned this cycle: **{ticket_count + 1}/{self.MAX_TICKETS_PER_USER}**\n\n"
-            "Good luck, explorer! 🌌"
-        )
+        _success, message = await self.purchase_ticket(ctx.author.id, numbers)
+        await ctx.send(message)
 
     @lottery.command(name="tickets", description="View your active lottery tickets for the current cycle.")
     async def lottery_tickets(self, ctx: commands.Context):
