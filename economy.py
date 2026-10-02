@@ -1702,15 +1702,26 @@ class Economy(commands.Cog):
         """Show owned sellable items filtered by the selected sell category."""
         user_id = interaction.user.id
         current = (current or "").lower().strip()
-        category = getattr(interaction.namespace, "category", None)
-
-        if not category and interaction.data:
+        # Read the category from the raw interaction payload first. Discord's
+        # autocomplete namespace can lag behind what the user just changed,
+        # especially on mobile. The raw option payload is the authoritative
+        # value for the current autocomplete request.
+        category = None
+        if interaction.data:
             for option in interaction.data.get("options", []):
                 if option.get("name") == "category":
                     category = option.get("value")
                     break
 
-        category = category or "sell_all"
+        # Fall back to the namespace only when the payload did not include the
+        # category at all. Never default to a Sell All category: when the user
+        # clears the category, the item picker should clear too rather than
+        # showing stale Sell All choices.
+        if category is None:
+            category = getattr(interaction.namespace, "category", None)
+
+        if not category:
+            return []
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
