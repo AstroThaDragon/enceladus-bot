@@ -430,19 +430,19 @@ def _choice_outcomes(label, key, risk, flavor, base_delta=None):
     # hurt, but no single outcome can drain an enormous chunk at once.
     if base_delta >= 0:
         outcomes = [
-            (40, max(0, base_delta), f"{flavor} Nothing immediately goes wrong."),
-            (25, min(3, base_delta + 2), f"{flavor} You feel unexpectedly steady."),
-            (20, min(2, base_delta + 1), f"{flavor} The moment leaves you feeling a little more grounded."),
-            (10, -1, f"{flavor} Something about the moment feels wrong."),
-            (5, -2, "The room seems to notice that you made the choice."),
+            (40, max(0, base_delta), flavor),
+            (25, min(3, base_delta + 2), flavor),
+            (20, min(2, base_delta + 1), flavor),
+            (10, -1, flavor),
+            (5, -2, flavor),
         ]
     else:
         magnitude = min(abs(base_delta), 20)
         outcomes = [
-            (20, min(2, max(1, magnitude // 3)), f"{flavor} For once, the danger passes and you feel a little calmer."),
+            (20, min(2, max(1, magnitude // 3)), flavor),
             (45, -magnitude, flavor),
-            (25, -max(1, magnitude // 2), f"{flavor} The moment is more draining than expected."),
-            (10, -max(3, magnitude), "Something impossible happens. For a second, the world seems to forget what shape it is supposed to have."),
+            (25, -max(1, magnitude // 2), flavor),
+            (10, -max(3, magnitude), flavor),
         ]
     return {"label": label, "key": key, "risk": risk, "risk_label": risk.title(),
             "outcomes": [{"weight": w, "sanity": d, "text": t} for w, d, t in outcomes]}
