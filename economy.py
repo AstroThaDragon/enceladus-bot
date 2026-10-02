@@ -159,7 +159,6 @@ SHOP_SELL_CATEGORY_CHOICES = [
     ("🔧 Ores & Materials", "materials"),
     ("🎃 Collectibles", "collectibles"),
     ("👻 Halloween", "halloween"),
-    ("📦 Other Sellables", "other"),
 ]
 
 BULK_SELL_OPTIONS = {
@@ -198,7 +197,6 @@ SHOP_CATEGORY_INFO = {
     "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
     "collectibles": ("🎃", "Collectibles", "Sell discovered collectible items."),
     "halloween": ("👻", "Halloween", "Sell eligible seasonal items."),
-    "other": ("📦", "Other Sellables", "Other individually sellable inventory items."),
 }
 
 
@@ -2279,19 +2277,6 @@ class Economy(commands.Cog):
                 })
             return entries
 
-        if category == "other" and time_crystal_quantity > 0:
-            entries.append({
-                "id": "time_crystal",
-                "name": f"💎 Dilated Time Crystal",
-                "description": f"You own {time_crystal_quantity:,}.",
-                "search": "time_crystal dilated time crystal",
-                "info": ITEM_REGISTRY.get("time_crystal", {
-                    "name": "💎 Dilated Time Crystal", "sell_price": 0
-                }),
-                "owned": time_crystal_quantity,
-                "stored_type": "special",
-            })
-
         for item_id, owned_quantity, stored_type in rows:
             info = ITEM_REGISTRY.get(item_id)
             if not is_sellable(item_id, info, stored_type):
@@ -2315,14 +2300,6 @@ class Economy(commands.Cog):
                 or item_id in HALLOWEEN_SPACE_JUNK_IDS
             ):
                 continue
-            if category == "other" and (
-                junk
-                or normal_collectible
-                or halloween
-                or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
-            ):
-                continue
-
             display_name = info.get("name", item_id)
             entries.append({
                 "id": item_id,
@@ -2508,12 +2485,7 @@ class Economy(commands.Cog):
                     choices.append(choice)
             return choices[:25]
 
-        if category == "other" and time_crystal_quantity > 0:
-            crystal_display = f"💎 Dilated Time Crystal (x{time_crystal_quantity})"
-            if not current or current in crystal_display.lower() or "time_crystal" in current:
-                choices.append(app_commands.Choice(name=crystal_display[:100], value="time_crystal"))
-
-        if category in {"space_junk", "collectibles", "halloween", "other", "materials"}:
+        if category in {"space_junk", "collectibles", "halloween", "materials"}:
             for item_id, owned_quantity, stored_type in rows:
                 info = ITEM_REGISTRY.get(item_id)
                 if not is_sellable(item_id, info, stored_type):
@@ -2537,14 +2509,6 @@ class Economy(commands.Cog):
                     or item_id in HALLOWEEN_SPACE_JUNK_IDS
                 ):
                     continue
-                if category == "other" and (
-                    junk
-                    or normal_collectible
-                    or halloween
-                    or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
-                ):
-                    continue
-
                 display = display_choice(item_id, owned_quantity, info)
                 search_text = f"{display} {item_id}".lower()
                 if current and current not in search_text:
