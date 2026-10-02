@@ -233,15 +233,30 @@ class Crafting(commands.Cog):
         await ctx.send(embed=pages[0], view=view)
 
     @commands.hybrid_command(name="craft", description="Craft components used for permanent exploration upgrades.")
-    @app_commands.describe(recipe="Choose an upgrade component to craft.")
+    @app_commands.describe(
+        recipe="Choose a recipe to craft.",
+        quantity="How many to craft (1–10). Upgrade components are limited to ×1.",
+    )
     @app_commands.choices(recipe=CHOICES)
-    async def craft(self, ctx, recipe: str):
+    async def craft(self, ctx, recipe: str, quantity: int = 1):
         await ctx.defer()
         data = RECIPES.get(recipe)
         if not data:
             return await ctx.send("❌ That recipe does not exist.")
 
+        if quantity < 1 or quantity > 10:
+            return await ctx.send("❌ Crafting quantity must be between **1 and 10**.")
+
+        # Upgrade components are intentionally single-craft items.
         progression_system, progression_tier = get_tiered_recipe_progression(data)
+        is_upgrade_component = (
+            progression_system is not None
+            or data["result"] in {"nanite_retrofit_kit", "astral_power_core"}
+        )
+        if is_upgrade_component and quantity != 1:
+            return await ctx.send(
+                f"❌ **{data['name']}** can only be crafted **×1 at a time**."
+            )
 
         if progression_system and isinstance(progression_tier, int) and progression_tier > 1:
             async with aiosqlite.connect(ECONOMY_DB_NAME) as progress_db:
@@ -281,27 +296,46 @@ class Crafting(commands.Cog):
             await self.ensure_inventory(db)
             await db.execute("BEGIN IMMEDIATE")
             owned = await self.owned(db, ctx.author.id)
-            missing = []
+
+            craftable = quantity
             for item_id, amount in data["ingredients"].items():
-                if owned.get(item_id, 0) < amount:
-                    icon, name = MATERIAL_NAMES[item_id]
-                    missing.append(f"{icon} {name} ×{amount - owned.get(item_id, 0)}")
-            if missing:
+                craftable = min(craftable, owned.get(item_id, 0) // amount)
+
+            if craftable < 1:
+                missing = []
+                for item_id, amount in data["ingredients"].items():
+                    required = amount * quantity
+                    have = owned.get(item_id, 0)
+                    if have < required:
+                        icon, name = MATERIAL_NAMES[item_id]
+                        missing.append(f"{icon} {name} ×{required - have}")
                 await db.rollback()
-                return await ctx.send(f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing))
+                return await ctx.send(
+                    f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing)
+                )
 
             for item_id, amount in data["ingredients"].items():
-                await db.execute("UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?", (amount, ctx.author.id, item_id))
+                await db.execute(
+                    "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
+                    (amount * craftable, ctx.author.id, item_id),
+                )
+
             await db.execute(
-                "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, ?, 'upgrade_component', 1) ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + 1",
-                (ctx.author.id, data["result"]),
+                "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, ?, 'upgrade_component', ?) "
+                "ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + ?",
+                (ctx.author.id, data["result"], craftable, craftable),
             )
             await db.commit()
 
         embed = discord.Embed(
             title="🔨 Crafting Complete!",
             description=(
-                f"{ctx.author.mention}\n\nYou crafted **{data['emoji']} {data['name']} ×1**!\n\n"
+                f"{ctx.author.mention}\n\nYou crafted **{data['emoji']} {data['name']} ×{craftable}**!"
+                + (
+                    f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
+                    if craftable < quantity else ""
+                )
+                + "\n\n"
                 + ("Use `/heal` when you want to chow down on your Halloween treats!" if data["result"] == "trick_or_treat_bag" else "Use `/heal` to patch yourself up when needed." if data["result"] == "makeshift_medkit" else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade.")
             ),
             color=discord.Color.from_rgb(0, 229, 255),
