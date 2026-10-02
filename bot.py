@@ -529,31 +529,33 @@ async def on_member_join(member):
     recent_joins.add(member.id)
 
     channel = bot.get_channel(1117377155496673330)
+    log_channel = bot.get_channel(1352095872812318760)
+    count = member.guild.member_count
+    content_text = f"Sorry to see you go, {member.name}!"
+
+    # Snapshot the user's leveling progress at the moment they leave.
+    # This is logged before the 14-day departure cleanup can remove their data.
+    level = 0
+    xp = 0
+    leveling_db_path = "/app/data/levels.db" if os.path.exists("/app/data") else "levels.db"
+
+    try:
+        async with aiosqlite.connect(leveling_db_path) as db:
+            async with db.execute(
+                "SELECT level, xp FROM users WHERE user_id = ?",
+                (member.id,),
+            ) as cursor:
+                progress_row = await cursor.fetchone()
+
+        if progress_row:
+            level = int(progress_row[0] or 0)
+            xp = int(progress_row[1] or 0)
+    except Exception as e:
+        await log_event_error(bot, "on_member_join / leveling lookup", e, context=f"member_id={member.id}")
+        print(f"[LEAVE XP LOG ERROR]: Could not read leveling data for {member.id}: {e}")
+
+    # Public goodbye message — keep the leveling snapshot out of the public channel.
     if channel:
-        count = member.guild.member_count
-        content_text = f"Sorry to see you go, {member.name}!"
-
-        # Snapshot the user's leveling progress at the moment they leave.
-        # This is logged before the 14-day departure cleanup can remove their data.
-        level = 0
-        xp = 0
-        leveling_db_path = "/app/data/levels.db" if os.path.exists("/app/data") else "levels.db"
-
-        try:
-            async with aiosqlite.connect(leveling_db_path) as db:
-                async with db.execute(
-                    "SELECT level, xp FROM users WHERE user_id = ?",
-                    (member.id,),
-                ) as cursor:
-                    progress_row = await cursor.fetchone()
-
-            if progress_row:
-                level = int(progress_row[0] or 0)
-                xp = int(progress_row[1] or 0)
-        except Exception as e:
-            await log_event_error(bot, "on_member_join / leveling lookup", e, context=f"member_id={member.id}")
-            print(f"[LEAVE XP LOG ERROR]: Could not read leveling data for {member.id}: {e}")
-
         embed = discord.Embed(
             title="We're sorry to see you go! 😔",
             description=(
@@ -563,14 +565,6 @@ async def on_member_join(member):
             color=discord.Color.from_rgb(114, 0, 225)
         )
         embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
-        embed.add_field(
-            name="📊 Leveling Snapshot",
-            value=(
-                f"**Level:** {level:,}\n"
-                f"**XP:** {xp:,}"
-            ),
-            inline=False
-        )
         embed.set_footer(text=f"We now have {count} members.")
         
         try:
@@ -580,6 +574,34 @@ async def on_member_join(member):
                 print(f"[LEAVE LOG ERROR]: Channel is not a sendable text channel.")
         except (discord.Forbidden, discord.HTTPException) as e:
             print(f"[LEAVE LOG ERROR]: {e}")
+
+    # Internal log — keep the leveling snapshot here so it is preserved for staff.
+    if log_channel:
+        snapshot_embed = discord.Embed(
+            title="📊 Member Leveling Snapshot",
+            description=f"**{member.name}** ({member.mention}) has left the server.",
+            color=discord.Color.from_rgb(114, 0, 225)
+        )
+        snapshot_embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
+        snapshot_embed.add_field(
+            name="Level",
+            value=f"**{level:,}**",
+            inline=True
+        )
+        snapshot_embed.add_field(
+            name="XP",
+            value=f"**{xp:,}**",
+            inline=True
+        )
+        snapshot_embed.set_footer(text=f"Member count: {count} • User ID: {member.id}")
+
+        try:
+            if isinstance(log_channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                await log_channel.send(embed=snapshot_embed)
+            else:
+                print(f"[LEAVE XP LOG ERROR]: Channel is not a sendable text channel.")
+        except (discord.Forbidden, discord.HTTPException) as e:
+            print(f"[LEAVE XP LOG ERROR]: Could not send leveling snapshot: {e}")
 
     try:
         await asyncio.sleep(10)
