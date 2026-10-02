@@ -167,161 +167,632 @@ BULK_SELL_OPTIONS = {
 }
 
 
+class ShopInteractionContext:
+    """Small adapter that lets the existing buy/sell methods reply to an interaction."""
+
+    def __init__(self, interaction: discord.Interaction):
+        self.interaction = interaction
+        self.author = interaction.user
+
+    async def defer(self):
+        if not self.interaction.response.is_done():
+            await self.interaction.response.defer()
+
+    async def send(self, *args, **kwargs):
+        return await self.interaction.followup.send(*args, wait=True, **kwargs)
+
+
+SHOP_CATEGORY_INFO = {
+    "healing": ("❤️", "Healing", "Medical supplies and revival items."),
+    "recharge": ("🔋", "Recharge", "Mining laser and scavenging drone power."),
+    "upgrades": ("🛠️", "Upgrades", "Permanent equipment and station expansions."),
+    "pet_items": ("🐾", "Pet Items", "Items for your station companion."),
+    "special": ("✨", "Special", "Rare and unusual station items."),
+    "backgrounds": ("🖼️", "Backgrounds", "Profile background vouchers."),
+    "daily": ("🔄", "Daily Offers", "Today's rotating station offers."),
+    "sell_all": ("🧹", "Sell All", "Bulk-sale actions for eligible inventory."),
+    "space_junk": ("🗑️", "Space Junk", "Sell normal space junk for Stardust."),
+    "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
+    "collectibles": ("🎃", "Collectibles", "Sell discovered collectible items."),
+    "halloween": ("👻", "Halloween", "Sell eligible seasonal items."),
+    "other": ("📦", "Other Sellables", "Other individually sellable inventory items."),
+}
+
+
 class ShopCategorySelect(discord.ui.Select):
     def __init__(self, shop_view):
         self.shop_view = shop_view
+        if shop_view.mode == "buy":
+            categories = SHOP_BUY_CATEGORY_CHOICES
+        else:
+            categories = SHOP_SELL_CATEGORY_CHOICES
 
-        options = [
-            discord.SelectOption(
-                label="Healing",
-                emoji="❤️",
-                value="healing",
-                description="Nanite patches, medkits, and revival items."
-            ),
-            discord.SelectOption(
-                label="Recharge",
-                emoji="🔋",
-                value="recharge",
-                description="Mining laser and scavenging drone recharge items."
-            ),
-            discord.SelectOption(
-                label="Upgrades",
-                emoji="🛠️",
-                value="upgrades",
-                description="Temporary equipment and exploration upgrades."
-            ),
-            discord.SelectOption(
-                label="Pet Items",
-                emoji="🐾",
-                value="pet_items",
-                description="Items for your station pet."
-            ),
-            discord.SelectOption(
-                label="Special",
-                emoji="✨",
-                value="special",
-                description="Rare and unusual station items."
-            ),
-            discord.SelectOption(
-                label="Lottery",
-                emoji="🎟️",
-                value="lottery",
-                description="Monthly Stardust lottery tickets."
-            ),
-            discord.SelectOption(
-                label="Backgrounds",
-                emoji="🖼️",
-                value="backgrounds",
-                description="Profile background vouchers."
-            ),
-        ]
+        options = []
+        for name, value in categories:
+            emoji, label, description = SHOP_CATEGORY_INFO.get(
+                value, (None, name, "Shop category")
+            )
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    emoji=emoji,
+                    value=value,
+                    description=description[:100],
+                )
+            )
 
         super().__init__(
-            placeholder="📂 Select a shop category...",
+            placeholder="📂 Choose a category...",
             min_values=1,
             max_values=1,
-            options=options
+            options=options,
+            row=0,
         )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.shop_view.check_owner(interaction):
+            return
+        self.shop_view.category = self.values[0]
+        self.shop_view.page = 0
+        self.shop_view.search_query = ""
+        self.shop_view.selected_item = None
+        self.shop_view.quantity = 1
+        await self.shop_view.show_item_picker(interaction)
+
+
+class ShopItemSelect(discord.ui.Select):
+    def __init__(self, shop_view, options):
+        self.shop_view = shop_view
+        super().__init__(
+            placeholder="🛒 Choose an item...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.shop_view.check_owner(interaction):
+            return
+        self.shop_view.selected_item = self.values[0]
+        self.shop_view.quantity = 1
+        self.shop_view.quantity_input = "1"
+
+        if self.shop_view.mode == "sell" and self.values[0] in BULK_SELL_OPTIONS:
+            return await self.shop_view.show_bulk_sale(interaction)
+
+        await self.shop_view.show_quantity(interaction)
+
+
+class ShopSearchModal(discord.ui.Modal, title="🔎 Search Shop Items"):
+    search = discord.ui.TextInput(
+        label="Search",
+        placeholder="Type an item name or keyword...",
+        required=False,
+        max_length=100,
+    )
+
+    def __init__(self, shop_view):
+        super().__init__()
+        self.shop_view = shop_view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.shop_view.check_owner(interaction):
+            return
+        self.shop_view.search_query = str(self.search.value or "").strip().lower()
+        self.shop_view.page = 0
+        await self.shop_view.show_item_picker(interaction)
+
+
+class ShopQuantityModal(discord.ui.Modal, title="🔢 Custom Quantity"):
+    quantity = discord.ui.TextInput(
+        label="Quantity",
+        placeholder="Enter a number...",
+        required=True,
+        min_length=1,
+        max_length=4,
+    )
+
+    def __init__(self, shop_view):
+        super().__init__()
+        self.shop_view = shop_view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.shop_view.check_owner(interaction):
+            return
+
+        raw = str(self.quantity.value).strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            return await interaction.response.send_message(
+                "❌ Quantity must be a whole number.",
+                ephemeral=True,
+            )
+
+        if value < 1 or value > 99:
+            return await interaction.response.send_message(
+                "❌ Quantity must be between **1 and 99**.",
+                ephemeral=True,
+            )
+
+        if self.shop_view.mode == "sell":
+            owned = self.shop_view.get_selected_owned_quantity()
+            if owned is not None and value > owned:
+                return await interaction.response.send_message(
+                    f"❌ You only own **{owned:,}** of that item.",
+                    ephemeral=True,
+                )
+
+        self.shop_view.quantity = value
+        self.shop_view.quantity_input = str(value)
+        await self.shop_view.show_quantity(interaction)
+
+
+class ShopQuantityButton(discord.ui.Button):
+    def __init__(self, shop_view, label, value, emoji=None, style=discord.ButtonStyle.secondary):
+        super().__init__(label=label, emoji=emoji, style=style, row=0)
+        self.shop_view = shop_view
+        self.value = value
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.shop_view.check_owner(interaction):
+            return
+
+        if self.value == "custom":
+            return await interaction.response.send_modal(ShopQuantityModal(self.shop_view))
+
+        if self.value == "max":
+            owned = self.shop_view.get_selected_owned_quantity()
+            if not owned:
+                return await interaction.response.send_message(
+                    "❌ You don't own any of that item.", ephemeral=True
+                )
+            self.shop_view.quantity = owned
+            self.shop_view.quantity_input = "max"
+        else:
+            value = int(self.value)
+            if self.shop_view.mode == "sell":
+                owned = self.shop_view.get_selected_owned_quantity()
+                if owned is not None and value > owned:
+                    return await interaction.response.send_message(
+                        f"❌ You only own **{owned:,}** of that item.", ephemeral=True
+                    )
+            self.shop_view.quantity = value
+            self.shop_view.quantity_input = str(value)
+
+        await self.shop_view.show_quantity(interaction)
+
+
+class ShopTransactionView(discord.ui.View):
+    """Reusable Category → Item → Quantity → Confirm shop flow."""
+
+    PAGE_SIZE = 25
+
+    def __init__(self, cog, user_id, mode):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.mode = mode
+        self.category = None
+        self.page = 0
+        self.search_query = ""
+        self.selected_item = None
+        self.quantity = 1
+        self.quantity_input = "1"
+        self.item_entries = []
+        self.finished = False
+        self.message = None
+        self._build_category_view()
+
+    async def check_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "⚠️ This shop menu belongs to the person who opened it.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    def _build_category_view(self):
+        self.clear_items()
+        self.add_item(ShopCategorySelect(self))
+
+    def _category_title(self):
+        emoji, label, _ = SHOP_CATEGORY_INFO.get(
+            self.category, ("📂", "Shop", "")
+        )
+        return f"{emoji} {label}"
+
+    def _get_buy_items(self):
+        if self.category == "daily":
+            return list(self.cog.daily_rotation())
+        return list(SHOP_BUY_CATEGORY_ITEMS.get(self.category, []))
+
+    async def _get_sell_items(self):
+        return await self.cog.get_shop_sell_items(self.user_id, self.category)
+
+    def _filter_entries(self, entries):
+        query = self.search_query
+        if not query:
+            return entries
+        return [
+            entry for entry in entries
+            if query in str(entry["search"]).lower()
+        ]
+
+    async def _get_entries(self):
+        if self.mode == "buy":
+            entries = []
+            for item_id in self._get_buy_items():
+                info = self.cog.SHOP_ITEMS.get(item_id) or self.cog.ROTATING_ITEMS.get(item_id)
+                if not info:
+                    continue
+                entries.append({
+                    "id": item_id,
+                    "name": info.get("name", item_id),
+                    "description": info.get("desc", ""),
+                    "search": f"{item_id} {info.get('name', '')}",
+                    "info": info,
+                    "owned": None,
+                })
+        else:
+            entries = await self._get_sell_items()
+        return self._filter_entries(entries)
+
+    def _entry_for_item(self, item_id):
+        for entry in self.item_entries:
+            if entry["id"] == item_id:
+                return entry
+        return None
+
+    def get_selected_owned_quantity(self):
+        entry = self._entry_for_item(self.selected_item)
+        return entry.get("owned") if entry else None
+
+    @staticmethod
+    def _strip_emoji_name(name):
+        return str(name or "📦 Item")
+
+    def _build_category_embed(self):
+        title = "🛒 Buy Items" if self.mode == "buy" else "🛒 Sell Items"
+        description = "Choose a category to continue."
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        if self.mode == "sell":
+            embed.set_footer(text="Choose a category to browse your sellable inventory.")
+        else:
+            embed.set_footer(text="Choose a category to browse the station shop.")
+        return embed
+
+    async def show_category(self, interaction):
+        self.category = None
+        self.page = 0
+        self.search_query = ""
+        self.selected_item = None
+        self.quantity = 1
+        self.quantity_input = "1"
+        self._build_category_view()
+        await interaction.response.edit_message(
+            embed=self._build_category_embed(),
+            view=self,
+        )
+
+    async def show_item_picker(self, interaction):
+        self.clear_items()
+        entries = await self._get_entries()
+        self.item_entries = entries
+
+        total_pages = max(1, (len(entries) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+        self.page = min(max(self.page, 0), total_pages - 1)
+        start = self.page * self.PAGE_SIZE
+        page_entries = entries[start:start + self.PAGE_SIZE]
+
+        if page_entries:
+            options = []
+            for entry in page_entries:
+                label = self._strip_emoji_name(entry["name"])
+                if self.mode == "sell" and entry.get("owned") is not None:
+                    label = f"{label} (x{entry['owned']:,})"
+                options.append(
+                    discord.SelectOption(
+                        label=label[:100],
+                        value=entry["id"],
+                        description=entry.get("description", "")[:100] or None,
+                    )
+                )
+            self.add_item(ShopItemSelect(self, options))
+
+        previous = discord.ui.Button(
+            label="Previous",
+            emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page <= 0,
+            row=1,
+        )
+        next_button = discord.ui.Button(
+            label="Next",
+            emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page >= total_pages - 1,
+            row=1,
+        )
+        search = discord.ui.Button(
+            label="Search",
+            emoji="🔎",
+            style=discord.ButtonStyle.primary,
+            row=1,
+        )
+        categories = discord.ui.Button(
+            label="Categories",
+            emoji="↩️",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+
+        async def previous_callback(i):
+            if not await self.check_owner(i):
+                return
+            self.page -= 1
+            await self.show_item_picker(i)
+
+        async def next_callback(i):
+            if not await self.check_owner(i):
+                return
+            self.page += 1
+            await self.show_item_picker(i)
+
+        async def search_callback(i):
+            if not await self.check_owner(i):
+                return
+            await i.response.send_modal(ShopSearchModal(self))
+
+        async def categories_callback(i):
+            if not await self.check_owner(i):
+                return
+            await self.show_category(i)
+
+        previous.callback = previous_callback
+        next_button.callback = next_callback
+        search.callback = search_callback
+        categories.callback = categories_callback
+        self.add_item(previous)
+        self.add_item(next_button)
+        self.add_item(search)
+        self.add_item(categories)
+
+        title = "🛒 Buy Items" if self.mode == "buy" else "🛒 Sell Items"
+        page_text = f"Page {self.page + 1}/{total_pages}"
+        if self.search_query:
+            page_text += f" • Search: `{self.search_query}`"
+
+        embed = discord.Embed(
+            title=f"{title} — {self._category_title()}",
+            description=(
+                f"Choose an item to {'buy' if self.mode == 'buy' else 'sell'}.\n\n"
+                f"**{page_text}**\n"
+                f"{len(entries):,} item{'s' if len(entries) != 1 else ''} available."
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        if not page_entries:
+            embed.description += "\n\n❌ No items match that search."
+        embed.set_footer(text="Use Search for large categories, or Categories to go back.")
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    def _get_selected_info(self):
+        entry = self._entry_for_item(self.selected_item)
+        if entry:
+            return entry["info"]
+        return self.cog.SHOP_ITEMS.get(self.selected_item) or self.cog.ROTATING_ITEMS.get(self.selected_item) or ITEM_REGISTRY.get(self.selected_item)
+
+    def _buy_unit_price(self):
+        info = self._get_selected_info() or {}
+        price = int(info.get("cost", 0) or 0)
+        if self.selected_item in self.cog.SHOP_ITEMS and self.selected_item in self.cog.daily_rotation():
+            price = int(price * 0.85)
+        return price
+
+    def _sell_unit_price(self):
+        info = self._get_selected_info() or {}
+        entry = self._entry_for_item(self.selected_item)
+        stored_type = entry.get("stored_type") if entry else info.get("type")
+        if str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk":
+            payout, _ = self.cog.get_junk_sell_reward(self.selected_item)
+            return int(payout)
+        return int(info.get("sell_price", 0) or 0)
+
+    async def show_quantity(self, interaction):
+        self.clear_items()
+        info = self._get_selected_info() or {}
+        entry = self._entry_for_item(self.selected_item) or {}
+        name = info.get("name", self.selected_item)
+
+        if self.mode == "buy":
+            unit_price = self._buy_unit_price()
+            total = unit_price * self.quantity
+            lines = [
+                f"💰 Price: **{unit_price:,} Stardust each**",
+                f"🧮 Quantity: **{self.quantity:,}**",
+                f"💸 Total: **{total:,} Stardust**",
+            ]
+            if self.selected_item in self.cog.SHOP_ITEMS and self.selected_item in self.cog.daily_rotation():
+                lines.insert(1, "🏷️ **15% Daily Discount**")
+        else:
+            unit_price = self._sell_unit_price()
+            owned = entry.get("owned", 0)
+            total = unit_price * self.quantity
+            lines = [
+                f"📦 You own: **{owned:,}**",
+                f"💰 Sell price: **{unit_price:,} Stardust each**",
+                f"🧮 Quantity: **{self.quantity:,}**",
+                f"💸 Total: **{total:,} Stardust**",
+            ]
+
+        embed = discord.Embed(
+            title=f"{name}",
+            description="\n".join(lines) + "\n\nChoose a quantity, then confirm the transaction.",
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.set_footer(text="Custom lets you enter a quantity up to 99.")
+
+        presets = [("1", "1", "1️⃣"), ("10", "10", "🔟")]
+        if self.mode == "buy":
+            presets.append(("25", "25", "2️⃣5️⃣"))
+        else:
+            presets.append(("Max", "max", "📦"))
+        for label, value, emoji in presets:
+            self.add_item(ShopQuantityButton(self, label, value, emoji=emoji))
+        self.add_item(ShopQuantityButton(self, "Custom", "custom", emoji="🔢"))
+
+        back = discord.ui.Button(label="Back", emoji="◀️", style=discord.ButtonStyle.secondary, row=1)
+        confirm = discord.ui.Button(label="Confirm", emoji="✅", style=discord.ButtonStyle.success, row=1)
+
+        async def back_callback(i):
+            if not await self.check_owner(i):
+                return
+            await self.show_item_picker(i)
+
+        async def confirm_callback(i):
+            if not await self.check_owner(i):
+                return
+            await self.confirm_transaction(i)
+
+        back.callback = back_callback
+        confirm.callback = confirm_callback
+        self.add_item(back)
+        self.add_item(confirm)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def show_bulk_sale(self, interaction):
+        rows, total_stardust, total_candy, item_count, lines = await self.cog._bulk_sale_preview(
+            self.user_id, self.selected_item
+        )
+        if not rows:
+            return await interaction.response.edit_message(
+                content="❌ **Nothing to sell!** You don't currently have any items covered by this Sell All option.",
+                embed=None,
+                view=self,
+            )
+
+        preview = "\n".join(lines[:12])
+        if len(lines) > 12:
+            preview += f"\n…and {len(lines) - 12} more."
+        candy_preview = f"\n🍬 **Halloween Candy:** +{total_candy}" if total_candy else ""
+        embed = discord.Embed(
+            title="⚠️ Confirm Bulk Sale",
+            description=(
+                f"You are about to sell **{item_count} items** for approximately "
+                f"✨ **{total_stardust:,} Stardust**.{candy_preview}\n\n"
+                f"**Items included:**\n{preview}\n\n"
+                "📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. "
+                "Selling the physical items does **not** remove them from your collection.\n\n"
+                "This cannot be undone. Choose **Yes, Sell All** or **Cancel**."
+            ),
+            color=discord.Color.orange(),
+        )
+        view = SellAllConfirmView(self.cog, self.user_id, self.selected_item)
+        await interaction.response.edit_message(embed=embed, content=None, view=view)
+
+    async def confirm_transaction(self, interaction):
+        if self.finished:
+            return await interaction.response.send_message(
+                "⚠️ This transaction has already been submitted.", ephemeral=True
+            )
+        if not self.selected_item:
+            return await interaction.response.send_message("❌ No item selected.", ephemeral=True)
+
+        self.finished = True
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        # The existing transaction methods contain the full purchase/sale
+        # accounting logic. The adapter lets them respond to this interaction
+        # without duplicating that logic in the UI.
+        ctx = ShopInteractionContext(interaction)
+        if self.mode == "buy":
+            await self.cog.buy(ctx, self.selected_item, self.quantity)
+        else:
+            await self.cog.sell(ctx, self.selected_item, self.quantity_input)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+
+
+class ShopListCategorySelect(discord.ui.Select):
+    def __init__(self, shop_view):
+        self.shop_view = shop_view
+        options = [
+            discord.SelectOption(label="Healing", emoji="❤️", value="healing"),
+            discord.SelectOption(label="Recharge", emoji="🔋", value="recharge"),
+            discord.SelectOption(label="Upgrades", emoji="🛠️", value="upgrades"),
+            discord.SelectOption(label="Pet Items", emoji="🐾", value="pet_items"),
+            discord.SelectOption(label="Special", emoji="✨", value="special"),
+            discord.SelectOption(label="Lottery", emoji="🎟️", value="lottery"),
+            discord.SelectOption(label="Backgrounds", emoji="🖼️", value="backgrounds"),
+            discord.SelectOption(label="Daily Offers", emoji="🔄", value="daily"),
+        ]
+        super().__init__(placeholder="📂 Select a shop category...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.shop_view.user_id:
             return await interaction.response.send_message(
-                "⚠️ This shop menu belongs to the person who opened it.",
-                ephemeral=True
+                "⚠️ This shop menu belongs to the person who opened it.", ephemeral=True
             )
-
         category = self.values[0]
-
-        embed = self.shop_view.build_embed(category)
-
         await interaction.response.edit_message(
-            embed=embed,
-            view=self.shop_view
+            embed=self.shop_view.build_embed(category), view=self.shop_view
         )
 
 
 class ShopView(discord.ui.View):
+    """Legacy read-only /shop list view."""
+
     def __init__(self, cog, user_id):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
-
-        self.add_item(ShopCategorySelect(self))
+        self.add_item(ShopListCategorySelect(self))
 
     def build_embed(self, category):
+        # Preserve the existing /shop list catalog behavior while the new
+        # transaction UI handles /shop buy and /shop sell.
         cog = self.cog
-
         embed = discord.Embed(
             title="🛒 Enceladus Station Trading Post",
             color=discord.Color.from_rgb(0, 229, 255)
         )
-
-        if category == "healing":
+        if category == "daily":
             embed.description = (
-                "❤️ **Medical Supplies**\n"
-                "Keep yourself alive out there, explorer."
+                "🔄 **Daily Rotating Offers**\n"
+                f"Today's station market — **{cog.rotation_date()}**\n\n"
+                "These offers rotate at midnight Eastern time."
             )
+            for item_id in cog.daily_rotation():
+                item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
+                if not item:
+                    continue
+                is_permanent = item_id in cog.SHOP_ITEMS
+                daily_cost = int(item["cost"] * 0.85) if is_permanent else item["cost"]
+                price_text = (
+                    f"💰 ~~{item['cost']:,}~~ → **{daily_cost:,} Stardust** 🔥\n🏷️ **15% Daily Discount**"
+                    if is_permanent else f"💰 Price: **{daily_cost:,} Stardust**"
+                )
+                limit_text = cog.shop_limit_text(item_id)
+                embed.add_field(
+                    name=item["name"],
+                    value=f"{price_text}\n📖 {item['desc']}\n📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}",
+                    inline=False,
+                )
+            return embed
 
-            item_ids = [
-                "nanite_patch",
-                "medkit",
-                "revive",
-                "full_revive",
-            ]
-
-        elif category == "recharge":
-            embed.description = (
-                "🔋 **Power & Recharge Supplies**\n"
-                "Restore charges to your mining laser or scavenging drone."
-            )
-
-            item_ids = [
-                "laser_charge_cell",
-                "laser_power_cell",
-                "fuel_refill",
-                "drone_battery",
-                "drone_power_cell",
-                "drone_quantum_battery",
-            ]
-
-        elif category == "upgrades":
-            embed.description = (
-                "🛠️ **Station Upgrades**\n"
-                "Permanent equipment and station expansions."
-            )
-
-            item_ids = [
-                "incubator_2",
-                "incubator_3",
-                "vault_expansion",
-                "fuel_stabilizer",
-                "hazard_shield",
-                "lucky_scanner",
-                "prototype_drill_bit",
-            ]
-
-        elif category == "pet_items":
-            embed.description = (
-                "🐾 **Pet Supplies**\n"
-                "Because even station companions need snacks."
-            )
-
-            item_ids = [
-                "pet_snack",
-            ]
-
-        elif category == "special":
-            embed.description = (
-                "✨ **Special Items**\n"
-                "Unusual technology with unusual consequences."
-            )
-
-            item_ids = [
-                "time_crystal",
-                "astral_essence",
-            ]
-
-        elif category == "lottery":
+        if category == "lottery":
             embed.description = (
                 "🎟️ **Monthly Lottery**\n"
                 "Choose your own five numbers from 1–99 and enter the monthly drawing."
@@ -341,88 +812,28 @@ class ShopView(discord.ui.View):
             embed.set_footer(text="Use /lottery to view the current drawing and your tickets.")
             return embed
 
-        elif category == "backgrounds":
-            embed.description = (
-                "🖼️ **Profile Backgrounds**\n"
-                "Customize the look of your station profile."
-            )
-
-            item_ids = [
-                "neon_grid",
-                "deep_void",
-                "solaris_ring",
-            ]
-
-        elif category == "daily":
-            embed.description = (
-                "🔄 **Daily Rotating Offers**\n"
-                f"Today's station market — **{cog.rotation_date()}**\n\n"
-                "These offers rotate at midnight Eastern time."
-            )
-
-            for item_id in cog.daily_rotation():
-                item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
-                if not item:
-                    continue
-
-                is_permanent = item_id in cog.SHOP_ITEMS
-
-                if is_permanent:
-                    daily_cost = int(item["cost"] * 0.85)
-                    price_text = (
-                        f"💰 ~~{item['cost']:,}~~ → **{daily_cost:,} Stardust** 🔥\n"
-                        "🏷️ **15% Daily Discount**"
-                    )
-                else:
-                    daily_cost = item["cost"]
-                    price_text = f"💰 Price: **{daily_cost:,} Stardust**"
-
-                limit_text = cog.shop_limit_text(item_id)
-
-                embed.add_field(
-                    name=item["name"],
-                    value=(
-                        f"{price_text}\n"
-                        f"📖 {item['desc']}\n"
-                        f"📦 **Purchase Limit:** "
-                        f"{limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
-                    ),
-                    inline=False
-                )
-
-            embed.set_footer(
-                text="Use `/shop` to purchase an item."
-            )
-
-            return embed
-
-        else:
-            item_ids = []
-
+        item_ids = list(SHOP_BUY_CATEGORY_ITEMS.get(category, []))
+        descriptions = {
+            "healing": "❤️ **Medical Supplies**\nKeep yourself alive out there, explorer.",
+            "recharge": "🔋 **Power & Recharge Supplies**\nRestore charges to your mining laser or scavenging drone.",
+            "upgrades": "🛠️ **Station Upgrades**\nPermanent equipment and station expansions.",
+            "pet_items": "🐾 **Pet Supplies**\nBecause even station companions need snacks.",
+            "special": "✨ **Special Items**\nUnusual technology with unusual consequences.",
+            "backgrounds": "🖼️ **Profile Backgrounds**\nCustomize the look of your station profile.",
+        }
+        embed.description = descriptions.get(category, "Choose a shop category.")
         for item_id in item_ids:
             item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
-
             if not item:
                 continue
-
             limit_text = cog.shop_limit_text(item_id)
-
             embed.add_field(
                 name=item["name"],
-                value=(
-                    f"💰 Price: **{item['cost']:,} Stardust**\n"
-                    f"📖 {item['desc']}\n"
-                    f"📦 **Purchase Limit:** "
-                    f"{limit_text.lstrip(' • Limit: ') if limit_text else 'None'}"
-                ),
-                inline=False
+                value=f"💰 Price: **{item['cost']:,} Stardust**\n📖 {item['desc']}\n📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}",
+                inline=False,
             )
-
-        embed.set_footer(
-            text="Use `/shop` to purchase an item."
-        )
-
         return embed
+
 
 class SellAllConfirmView(discord.ui.View):
     """Confirmation controls for bulk inventory sales."""
@@ -1640,6 +2051,137 @@ class Economy(commands.Cog):
                     )
 
 
+    async def get_shop_sell_items(self, user_id, category):
+        """Return owned sellable items for the interactive /shop sell UI."""
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            async with db.execute(
+                """
+                SELECT item_id, quantity, item_type
+                FROM inventory
+                WHERE user_id = ? AND quantity > 0
+                ORDER BY item_id
+                """,
+                (user_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+            async with db.execute(
+                "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                (user_id,),
+            ) as cursor:
+                time_crystal_row = await cursor.fetchone()
+
+        time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
+
+        def is_halloween_collectible(item_id):
+            return item_id in HALLOWEEN_COLLECTIBLE_IDS or item_id in LOCATION_BASED_COLLECTIBLES
+
+        def is_halloween_item(item_id, info, stored_type):
+            item_type = str(info.get("type", ""))
+            return (
+                item_id in HALLOWEEN_SPACE_JUNK_IDS
+                or is_halloween_collectible(item_id)
+                or item_type == "Haunted Ingredient"
+                or item_id == "plasma_cutter"
+            )
+
+        def is_normal_collectible(item_id, info):
+            return (
+                str(info.get("type", "")).lower() == "collectible"
+                and not is_halloween_collectible(item_id)
+            )
+
+        def is_space_junk(info, stored_type):
+            return str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk"
+
+        def is_sellable(item_id, info, stored_type):
+            if not info:
+                return False
+            junk = is_space_junk(info, stored_type)
+            if junk:
+                return item_id in self.JUNK_PRICES or get_halloween_sell_reward(item_id) is not None
+            unit_price = int(info.get("sell_price", 0) or 0)
+            if unit_price <= 0:
+                return False
+            item_type = str(info.get("type", ""))
+            return (
+                item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                or item_id in SELLABLE_ITEM_IDS
+            )
+
+        entries = []
+
+        if category == "sell_all":
+            for item_id, label in BULK_SELL_OPTIONS.items():
+                entries.append({
+                    "id": item_id,
+                    "name": label,
+                    "description": "Open the confirmation screen for this bulk sale.",
+                    "search": f"{item_id} {label}",
+                    "info": {},
+                    "owned": None,
+                    "stored_type": None,
+                })
+            return entries
+
+        if category == "other" and time_crystal_quantity > 0:
+            entries.append({
+                "id": "time_crystal",
+                "name": f"💎 Dilated Time Crystal",
+                "description": f"You own {time_crystal_quantity:,}.",
+                "search": "time_crystal dilated time crystal",
+                "info": ITEM_REGISTRY.get("time_crystal", {
+                    "name": "💎 Dilated Time Crystal", "sell_price": 0
+                }),
+                "owned": time_crystal_quantity,
+                "stored_type": "special",
+            })
+
+        for item_id, owned_quantity, stored_type in rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not is_sellable(item_id, info, stored_type):
+                continue
+
+            junk = is_space_junk(info, stored_type)
+            normal_collectible = is_normal_collectible(item_id, info)
+            halloween = is_halloween_item(item_id, info, stored_type)
+            halloween_collectible = is_halloween_collectible(item_id)
+            item_type = str(info.get("type", ""))
+
+            if category == "space_junk" and not junk:
+                continue
+            if category == "collectibles" and not normal_collectible:
+                continue
+            if category == "halloween" and not halloween:
+                continue
+            if category == "materials" and (
+                item_type not in {"Mineral", "Crafting Material"}
+                or halloween_collectible
+                or item_id in HALLOWEEN_SPACE_JUNK_IDS
+            ):
+                continue
+            if category == "other" and (
+                junk
+                or normal_collectible
+                or halloween
+                or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+            ):
+                continue
+
+            display_name = info.get("name", item_id)
+            entries.append({
+                "id": item_id,
+                "name": display_name,
+                "description": f"You own {owned_quantity:,}.",
+                "search": f"{item_id} {display_name}",
+                "info": info,
+                "owned": owned_quantity,
+                "stored_type": stored_type,
+            })
+
+        entries.sort(key=lambda entry: entry["name"].lower())
+        return entries
+
     async def shop_buy_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -1904,58 +2446,24 @@ class Economy(commands.Cog):
 
     @shop.command(
         name="buy",
-        description="Buy an item from the shop.",
+        description="Open the interactive shop and buy an item.",
     )
-    @app_commands.describe(
-        category="Choose a shop category first.",
-        item="Choose the item to buy.",
-        quantity="How many to buy (default: 1, maximum: 99).",
-    )
-    @app_commands.choices(category=[
-        app_commands.Choice(name=name, value=value)
-        for name, value in SHOP_BUY_CATEGORY_CHOICES
-    ])
-    @app_commands.autocomplete(item=shop_buy_autocomplete)
-    async def shop_buy(
-        self,
-        ctx: commands.Context,
-        category: str,
-        item: str,
-        quantity: int = 1,
-    ):
-        """Buy a selected shop item after choosing its category."""
-        if category == "daily" and item not in self.daily_rotation():
-            return await ctx.send("❌ That item is not in today's rotating offers.")
-        return await self.buy(ctx, item, quantity)
+    async def shop_buy(self, ctx: commands.Context):
+        """Open the interactive Category → Item → Quantity → Confirm buy flow."""
+        view = ShopTransactionView(self, ctx.author.id, "buy")
+        embed = view._build_category_embed()
+        await ctx.send(embed=embed, view=view)
 
 
     @shop.command(
         name="sell",
-        description="Sell an item from your inventory.",
+        description="Open the interactive inventory shop and sell an item.",
     )
-    @app_commands.describe(
-        category="Choose what kind of inventory item to sell.",
-        item="Choose the item to sell, or a Sell All option.",
-        quantity="How many to sell (default: 1, maximum: 99), or max to sell all you own. Ignored for Sell All.",
-    )
-    @app_commands.choices(category=[
-        app_commands.Choice(name=name, value=value)
-        for name, value in SHOP_SELL_CATEGORY_CHOICES
-    ])
-    @app_commands.autocomplete(item=shop_sell_autocomplete)
-    async def shop_sell(
-        self,
-        ctx: commands.Context,
-        category: str,
-        item: str,
-        quantity: str = "1",
-    ):
-        """Sell a selected inventory item or a confirmed bulk sale."""
-        if category == "sell_all" and item not in BULK_SELL_OPTIONS:
-            return await ctx.send("❌ Choose one of the available **Sell All** options.")
-        if category != "sell_all" and item in BULK_SELL_OPTIONS:
-            return await ctx.send("❌ Sell All options are only available in the **🧹 Sell All** category.")
-        return await self.sell(ctx, item, quantity)
+    async def shop_sell(self, ctx: commands.Context):
+        """Open the interactive Category → Item → Quantity → Confirm sell flow."""
+        view = ShopTransactionView(self, ctx.author.id, "sell")
+        embed = view._build_category_embed()
+        await ctx.send(embed=embed, view=view)
 
 
     @shop.command(
