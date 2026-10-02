@@ -606,7 +606,7 @@ class Exploration(commands.Cog):
             run = await get_active_run(db, user_id)
             if not run or run["location_id"] != location_id or run["stage"] != stage:
                 return await interaction.followup.send(
-                    "⚠️ This Haunted story is no longer active. Start a new Haunted Exploration run.",
+                    "⚠️ **This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
                     ephemeral=True,
                 )
 
@@ -677,7 +677,14 @@ class Exploration(commands.Cog):
         await interaction.edit_original_response(
             content=None,
             embed=embed,
-            view=HauntedStoryView(self, location_id, stage, total_stages, run["current_scene"]),
+            view=HauntedStoryView(
+                self,
+                user_id,
+                location_id,
+                stage,
+                total_stages,
+                run["current_scene"],
+            ),
         )
 
     async def _resolve_haunted_choice(
@@ -703,7 +710,7 @@ class Exploration(commands.Cog):
                     or run["total_stages"] != total_stages
                 ):
                     return await interaction.followup.send(
-                        "⚠️ This story scene is no longer active. Start a new Haunted Exploration run.",
+                        "⚠️ **This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
                         ephemeral=True,
                     )
 
@@ -884,7 +891,7 @@ class Exploration(commands.Cog):
                 run = await get_active_run(db, user_id)
                 if not run or run["location_id"] != location_id or run["stage"] != stage or run["total_stages"] != total_stages:
                     return await interaction.followup.send(
-                        "⚠️ This story is no longer active. Start a new Haunted Exploration run.",
+                        "⚠️ **This Haunted Exploration is no longer available.**\n""The run may have expired or already been ended. Start a new Haunted Exploration run if needed.",
                         ephemeral=True,
                     )
 
@@ -2693,8 +2700,9 @@ class HauntedInfoButton(discord.ui.Button):
 
 class HauntedStoryView(discord.ui.View):
     def __init__(self, cog, location_id, stage, total_stages, scene_id):
-        super().__init__(timeout=120)
+        super().__init__(timeout=600)
         self.cog = cog
+        self.owner_id = owner_id
         self.location_id = location_id
         self.stage = stage
         self.total_stages = total_stages
@@ -2723,6 +2731,14 @@ class HauntedStoryView(discord.ui.View):
         self.add_item(HauntedRunButton(self.cog, self.location_id, self.stage, self.total_stages, self.scene_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+            return False
+
         if not is_halloween_channel(interaction.channel):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
