@@ -303,11 +303,10 @@ def format_recipe(recipe: dict, owned: dict[str, int] | None = None) -> str:
 
 
 class CauldronView(discord.ui.View):
-    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
+    def __init__(self, cog: "Cauldron", owner_id: int):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -337,7 +336,7 @@ class CauldronView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        await self.cog.show_brew_menu(interaction, self.quantity)
+        await self.cog.show_brew_menu(interaction)
 
     @discord.ui.button(
         label="Recipes",
@@ -361,7 +360,7 @@ class CauldronView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        await self.cog.show_ingredients(interaction, self.quantity)
+        await self.cog.show_ingredients(interaction)
 
     @discord.ui.button(
         label="Close",
@@ -433,11 +432,38 @@ class CauldronRecipeBookView(discord.ui.View):
         await self.cog.show_cauldron_menu(interaction)
 
 
-class RecipeSelect(discord.ui.Select):
-    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
+class CauldronQuantityModal(discord.ui.Modal):
+    def __init__(self, cog: "Cauldron", owner_id: int, recipe_id: str, recipe_name: str):
+        super().__init__(title=f"Brew {recipe_name}")
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
+        self.recipe_id = recipe_id
+        self.quantity = discord.ui.TextInput(
+            label="Quantity",
+            placeholder="Enter a quantity from 1 to 10",
+            default="1",
+            min_length=1,
+            max_length=2,
+            required=True,
+        )
+        self.add_item(self.quantity)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            quantity = int(self.quantity.value)
+        except ValueError:
+            await interaction.response.send_message("❌ Quantity must be a whole number from **1 to 10**.", ephemeral=True)
+            return
+        if not 1 <= quantity <= 10:
+            await interaction.response.send_message("❌ Quantity must be between **1 and 10**.", ephemeral=True)
+            return
+        await self.cog.brew(interaction, self.recipe_id, quantity)
+
+
+class RecipeSelect(discord.ui.Select):
+    def __init__(self, cog: "Cauldron", owner_id: int):
+        self.cog = cog
+        self.owner_id = owner_id
 
         options = [
             discord.SelectOption(
@@ -472,16 +498,18 @@ class RecipeSelect(discord.ui.Select):
             return
 
         recipe_id = self.values[0]
-        await self.cog.brew(interaction, recipe_id, self.quantity)
+        recipe = CAULDRON_RECIPES[recipe_id]
+        await interaction.response.send_modal(
+            CauldronQuantityModal(self.cog, self.owner_id, recipe_id, recipe["name"])
+        )
 
 
 class RecipeSelectView(discord.ui.View):
-    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
+    def __init__(self, cog: "Cauldron", owner_id: int):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
-        self.add_item(RecipeSelect(cog, owner_id, self.quantity))
+        self.add_item(RecipeSelect(cog, owner_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -497,11 +525,10 @@ class RecipeSelectView(discord.ui.View):
 
 
 class SeasonalCraftingView(discord.ui.View):
-    def __init__(self, cauldron, owner_id: int, quantity: int = 1):
+    def __init__(self, cauldron, owner_id: int):
         super().__init__(timeout=300)
         self.cauldron = cauldron
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -523,13 +550,13 @@ class SeasonalCraftingView(discord.ui.View):
 
     @discord.ui.button(label="Witch's Cauldron", emoji="🧙", style=discord.ButtonStyle.primary, row=0)
     async def cauldron_button(self, interaction, button):
-        await self.cauldron.show_cauldron_menu(interaction, self.quantity)
+        await self.cauldron.show_cauldron_menu(interaction)
 
     @discord.ui.button(label="Haunted Workshop", emoji="🔧", style=discord.ButtonStyle.secondary, row=0)
     async def workshop_button(self, interaction, button):
         cog = self.cauldron.bot.get_cog("Workshop")
         if cog:
-            await cog.show_menu(interaction, self.quantity)
+            await cog.show_menu(interaction)
         else:
             await interaction.response.send_message("❌ The Haunted Workshop is not loaded.", ephemeral=True)
 
@@ -537,7 +564,7 @@ class SeasonalCraftingView(discord.ui.View):
     async def ritual_button(self, interaction, button):
         cog = self.cauldron.bot.get_cog("RitualTable")
         if cog:
-            await cog.show_menu(interaction, self.quantity)
+            await cog.show_menu(interaction)
         else:
             await interaction.response.send_message("❌ The Ritual Table is not loaded.", ephemeral=True)
 
@@ -555,7 +582,7 @@ class Cauldron(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def show_seasonal_hub(self, interaction, quantity: int = 1):
+    async def show_seasonal_hub(self, interaction):
         embed = discord.Embed(
             title="🎃 Seasonal Crafting",
             description=(
@@ -567,13 +594,13 @@ class Cauldron(commands.Cog):
             color=discord.Color.dark_purple(),
         )
         embed.set_footer(text="Halloween Seasonal System")
-        view = SeasonalCraftingView(self, interaction.user.id, quantity)
+        view = SeasonalCraftingView(self, interaction.user.id)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
         else:
             await interaction.response.send_message(embed=embed, view=view)
 
-    async def show_cauldron_menu(self, interaction, quantity: int = 1):
+    async def show_cauldron_menu(self, interaction):
         embed = discord.Embed(
             title="🧙 The Witch's Cauldron",
             description=(
@@ -585,7 +612,7 @@ class Cauldron(commands.Cog):
         embed.set_footer(text="Halloween Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
-            view=CauldronView(self, interaction.user.id, quantity),
+            view=CauldronView(self, interaction.user.id),
         )
 
     async def ensure_inventory(self, db):
@@ -650,18 +677,18 @@ class Cauldron(commands.Cog):
                 ephemeral=ephemeral,
             )
 
-    async def show_brew_menu(self, interaction: discord.Interaction, quantity: int = 1):
+    async def show_brew_menu(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="🧪 Brew at the Cauldron",
             description=(
                 "*The liquid inside bubbles without any heat.*\n\n"
-                f"Choose a recipe below. This batch will attempt to craft **×{quantity}**. Your ingredients are checked again "
+                "Choose a recipe below. You will choose the quantity after selecting a recipe. Your ingredients are checked again "
                 "when you brew, so you cannot spend the same ingredients twice."
             ),
             color=discord.Color.dark_purple(),
         )
 
-        view = RecipeSelectView(self, interaction.user.id, quantity)
+        view = RecipeSelectView(self, interaction.user.id)
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_recipe_book(self, interaction: discord.Interaction):
@@ -683,7 +710,7 @@ class Cauldron(commands.Cog):
             view=CauldronRecipeBookView(self, interaction.user.id, pages),
         )
 
-    async def show_ingredients(self, interaction: discord.Interaction, quantity: int = 1):
+    async def show_ingredients(self, interaction: discord.Interaction):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)
             owned = await self.owned(db, interaction.user.id)
@@ -721,7 +748,7 @@ class Cauldron(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=CauldronView(self, interaction.user.id, quantity),
+            view=CauldronView(self, interaction.user.id),
         )
 
     async def brew(self, interaction: discord.Interaction, recipe_id: str, quantity: int = 1):
@@ -834,7 +861,6 @@ class Cauldron(commands.Cog):
     @app_commands.describe(
         season="Choose the seasonal event.",
         bench="Choose the crafting station to open.",
-        quantity="How many of the selected recipe to craft (1–10).",
     )
     @app_commands.choices(
         season=[
@@ -851,12 +877,7 @@ class Cauldron(commands.Cog):
         ctx: commands.Context,
         season: str,
         bench: str,
-        quantity: int = 1,
     ):
-        if quantity < 1 or quantity > 10:
-            await ctx.send("❌ Seasonal crafting quantity must be between **1 and 10**.")
-            return
-
         if season != "halloween":
             await ctx.send("❌ That seasonal crafting event is not available.")
             return
@@ -888,7 +909,7 @@ class Cauldron(commands.Cog):
             embed.set_footer(text="Lair of Frights Seasonal System")
             await ctx.send(
                 embed=embed,
-                view=CauldronView(self, ctx.author.id, quantity),
+                view=CauldronView(self, ctx.author.id),
             )
             return
 
@@ -909,7 +930,7 @@ class Cauldron(commands.Cog):
             )
             await ctx.send(
                 embed=embed,
-                view=WorkshopView(workshop, ctx.author.id, quantity),
+                view=WorkshopView(workshop, ctx.author.id),
             )
             return
 
@@ -930,7 +951,7 @@ class Cauldron(commands.Cog):
             )
             await ctx.send(
                 embed=embed,
-                view=RitualView(ritual, ctx.author.id, quantity),
+                view=RitualView(ritual, ctx.author.id),
             )
 
 

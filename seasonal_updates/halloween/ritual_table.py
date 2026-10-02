@@ -150,11 +150,34 @@ def format_recipe(recipe, owned):
     return "\n".join(lines)
 
 
-class RitualSelect(discord.ui.Select):
-    def __init__(self, cog, owner_id, quantity: int = 1):
+class RitualQuantityModal(discord.ui.Modal):
+    def __init__(self, cog: "RitualTable", owner_id: int, recipe_id: str, recipe_name: str):
+        super().__init__(title=f"Perform {recipe_name}")
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
+        self.recipe_id = recipe_id
+        self.quantity = discord.ui.TextInput(
+            label="Quantity", placeholder="Enter a quantity from 1 to 10",
+            default="1", min_length=1, max_length=2, required=True,
+        )
+        self.add_item(self.quantity)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            quantity = int(self.quantity.value)
+        except ValueError:
+            await interaction.response.send_message("❌ Quantity must be a whole number from **1 to 10**.", ephemeral=True)
+            return
+        if not 1 <= quantity <= 10:
+            await interaction.response.send_message("❌ Quantity must be between **1 and 10**.", ephemeral=True)
+            return
+        await self.cog.perform(interaction, self.recipe_id, quantity)
+
+
+class RitualSelect(discord.ui.Select):
+    def __init__(self, cog, owner_id):
+        self.cog = cog
+        self.owner_id = owner_id
         options = [
             discord.SelectOption(label=r["name"], value=rid, emoji=r["emoji"], description="Perform this ritual")
             for rid, r in RITUAL_RECIPES.items()
@@ -168,7 +191,9 @@ class RitualSelect(discord.ui.Select):
         if not halloween_is_active():
             await interaction.response.send_message("🎃 The Ritual Table is dormant outside Halloween.", ephemeral=True)
             return
-        await self.cog.perform(interaction, self.values[0], self.quantity)
+        recipe_id = self.values[0]
+        recipe = RITUAL_RECIPES[recipe_id]
+        await interaction.response.send_modal(RitualQuantityModal(self.cog, self.owner_id, recipe_id, recipe["name"]))
 
 
 class RitualRecipeBookView(discord.ui.View):
@@ -222,12 +247,11 @@ class RitualRecipeBookView(discord.ui.View):
 
 
 class RitualView(discord.ui.View):
-    def __init__(self, cog, owner_id, quantity: int = 1):
+    def __init__(self, cog, owner_id):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
-        self.add_item(RitualSelect(cog, owner_id, self.quantity))
+        self.add_item(RitualSelect(cog, owner_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -293,13 +317,13 @@ class RitualTable(commands.Cog):
         ) as cursor:
             return {row[0]: row[1] for row in await cursor.fetchall()}
 
-    async def show_menu(self, interaction, quantity: int = 1):
+    async def show_menu(self, interaction):
         embed = discord.Embed(
             title="🕯️ Ritual Table",
             description=(
                 "The surface is covered in chalk marks, candle wax, and diagrams you do not remember drawing.\n"
                 "*The candles are already lit. You don't remember lighting them.*\n\n"
-                f"Choose a ritual to perform. Batch size: **×{quantity}**."
+                "Choose a ritual to perform. Select a ritual to choose how many to craft."
             ),
             color=discord.Color.dark_purple(),
         )
@@ -310,7 +334,7 @@ class RitualTable(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=RitualView(self, interaction.user.id, quantity),
+            view=RitualView(self, interaction.user.id),
         )
 
     async def show_recipe_book(self, interaction):

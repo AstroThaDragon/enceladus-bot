@@ -222,11 +222,34 @@ def format_recipe(recipe, owned):
     return "\n".join(lines)
 
 
-class WorkshopSelect(discord.ui.Select):
-    def __init__(self, cog, owner_id, quantity: int = 1):
+class WorkshopQuantityModal(discord.ui.Modal):
+    def __init__(self, cog: "Workshop", owner_id: int, recipe_id: str, recipe_name: str):
+        super().__init__(title=f"Assemble {recipe_name}")
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
+        self.recipe_id = recipe_id
+        self.quantity = discord.ui.TextInput(
+            label="Quantity", placeholder="Enter a quantity from 1 to 10",
+            default="1", min_length=1, max_length=2, required=True,
+        )
+        self.add_item(self.quantity)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            quantity = int(self.quantity.value)
+        except ValueError:
+            await interaction.response.send_message("❌ Quantity must be a whole number from **1 to 10**.", ephemeral=True)
+            return
+        if not 1 <= quantity <= 10:
+            await interaction.response.send_message("❌ Quantity must be between **1 and 10**.", ephemeral=True)
+            return
+        await self.cog.assemble(interaction, self.recipe_id, quantity)
+
+
+class WorkshopSelect(discord.ui.Select):
+    def __init__(self, cog, owner_id):
+        self.cog = cog
+        self.owner_id = owner_id
         options = [
             discord.SelectOption(
                 label=r["name"], value=rid, emoji=r["emoji"],
@@ -243,7 +266,9 @@ class WorkshopSelect(discord.ui.Select):
         if not halloween_is_active():
             await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
             return
-        await self.cog.assemble(interaction, self.values[0], self.quantity)
+        recipe_id = self.values[0]
+        recipe = WORKSHOP_RECIPES[recipe_id]
+        await interaction.response.send_modal(WorkshopQuantityModal(self.cog, self.owner_id, recipe_id, recipe["name"]))
 
 
 class WorkshopRecipeBookView(discord.ui.View):
@@ -297,12 +322,11 @@ class WorkshopRecipeBookView(discord.ui.View):
 
 
 class WorkshopView(discord.ui.View):
-    def __init__(self, cog, owner_id, quantity: int = 1):
+    def __init__(self, cog, owner_id):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.quantity = max(1, min(10, int(quantity)))
-        self.add_item(WorkshopSelect(cog, owner_id, self.quantity))
+        self.add_item(WorkshopSelect(cog, owner_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -368,7 +392,7 @@ class Workshop(commands.Cog):
         ) as cursor:
             return {row[0]: row[1] for row in await cursor.fetchall()}
 
-    async def show_menu(self, interaction, quantity: int = 1):
+    async def show_menu(self, interaction):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             owned = await self._owned(db, interaction.user.id)
         embed = discord.Embed(
@@ -376,7 +400,7 @@ class Workshop(commands.Cog):
             description=(
                 "Bolts, wires, dead electronics, and things that definitely should not be plugged in.\n"
                 "*Something in the static clicks when you get close.*\n\n"
-                f"Choose something to assemble below. Batch size: **×{craftable}**."
+                "Choose something to assemble below. Select a blueprint to choose how many to craft."
             ),
             color=discord.Color.dark_purple(),
         )
@@ -390,7 +414,7 @@ class Workshop(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=WorkshopView(self, interaction.user.id, quantity),
+            view=WorkshopView(self, interaction.user.id),
         )
 
     async def show_recipe_book(self, interaction):
