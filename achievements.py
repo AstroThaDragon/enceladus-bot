@@ -327,6 +327,34 @@ class Achievements(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def _notify_achievement_unlocks(self, user_id, achievement_ids):
+        """Send a consistent unlock alert for every newly unlocked achievement."""
+        if not achievement_ids:
+            return
+        try:
+            user = self.bot.get_user(int(user_id))
+            if user is None:
+                user = await self.bot.fetch_user(int(user_id))
+        except (discord.NotFound, discord.HTTPException, ValueError, TypeError):
+            return
+        for achievement_id in achievement_ids:
+            achievement = ACHIEVEMENTS.get(achievement_id)
+            if not achievement:
+                continue
+            embed = discord.Embed(
+                title="🏆 Achievement Unlocked!",
+                description=(
+                    f"{achievement['emoji']} **{achievement['name']}**\n"
+                    f"*{achievement['description']}*\n\n"
+                    f"🎁 Reward: **{achievement['reward']}**"
+                ),
+                color=discord.Color.gold(),
+            )
+            try:
+                await user.send(embed=embed)
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
     async def add_candy_progress(self, user_id, amount, db=None):
         """Track Halloween candy consumption and unlock cosmetic rewards at 100 and 250+ pieces."""
         owns_db = db is None
@@ -336,6 +364,7 @@ class Achievements(commands.Cog):
 
         try:
             await ensure_achievement_tables(db)
+            newly_unlocked = []
 
             await db.execute(
                 """
@@ -379,6 +408,7 @@ class Achievements(commands.Cog):
                         """,
                         (user_id,),
                     )
+                    newly_unlocked.append("candy_background")
 
                 async with db.execute(
                     "SELECT unlocked_backgrounds FROM users WHERE user_id = ?",
@@ -426,6 +456,7 @@ class Achievements(commands.Cog):
                         """,
                         (user_id,),
                     )
+                    newly_unlocked.append("candy_nommer")
 
                     await db.execute(
                         """
@@ -440,6 +471,7 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.commit()
 
+            await self._notify_achievement_unlocks(user_id, newly_unlocked)
             return progress >= 250, progress
 
         finally:
@@ -506,6 +538,7 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.commit()
 
+            await self._notify_achievement_unlocks(user_id, ["halloween_hatch"])
             return True
         finally:
             if owns_db:
@@ -593,6 +626,7 @@ class Achievements(commands.Cog):
                     if owns_db:
                         await db.commit()
 
+                    await self._notify_achievement_unlocks(user_id, ["halloween_bag_crafter"])
                     return True, progress
 
             if owns_db:
@@ -638,6 +672,8 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.commit()
 
+            if not already_unlocked:
+                await self._notify_achievement_unlocks(user_id, [achievement_id])
             return not already_unlocked
         finally:
             if owns_db:
@@ -726,6 +762,7 @@ class Achievements(commands.Cog):
 
             if owns_db:
                 await db.commit()
+            await self._notify_achievement_unlocks(user_id, unlocked)
             return newly_discovered, unlocked
         finally:
             if owns_db:
@@ -753,6 +790,7 @@ class Achievements(commands.Cog):
                     unlocked.append(achievement_id)
             if owns_db:
                 await db.commit()
+            await self._notify_achievement_unlocks(user_id, unlocked)
             return unlocked
         finally:
             if owns_db:
@@ -772,6 +810,7 @@ class Achievements(commands.Cog):
                 unlocked.append("haunted_unwell")
             if owns_db:
                 await db.commit()
+            await self._notify_achievement_unlocks(user_id, unlocked)
             return unlocked
         finally:
             if owns_db:
@@ -872,6 +911,7 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.close()
 
+        await self._notify_achievement_unlocks(user_id, newly_unlocked)
         return newly_unlocked
 
     @commands.hybrid_command(name="achievements", description="View available achievements and how to unlock them.")
