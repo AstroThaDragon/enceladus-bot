@@ -233,26 +233,15 @@ class Crafting(commands.Cog):
         await ctx.send(embed=pages[0], view=view)
 
     @commands.hybrid_command(name="craft", description="Craft components used for permanent exploration upgrades.")
-    @app_commands.describe(
-        recipe="Choose an item to craft.",
-        quantity="How many to craft (1–10). Upgrade components are limited to ×1.",
-    )
+    @app_commands.describe(recipe="Choose an upgrade component to craft.")
     @app_commands.choices(recipe=CHOICES)
-    async def craft(self, ctx, recipe: str, quantity: int = 1):
+    async def craft(self, ctx, recipe: str):
         await ctx.defer()
         data = RECIPES.get(recipe)
         if not data:
             return await ctx.send("❌ That recipe does not exist.")
 
-        if quantity < 1 or quantity > 10:
-            return await ctx.send("❌ Crafting quantity must be between **1 and 10**.")
-
         progression_system, progression_tier = get_tiered_recipe_progression(data)
-        is_upgrade_component = data["result"] not in {"makeshift_medkit", "trick_or_treat_bag"}
-        if is_upgrade_component and quantity != 1:
-            return await ctx.send(
-                f"❌ **{data['name']}** can only be crafted one at a time because it is an upgrade component."
-            )
 
         if progression_system and isinstance(progression_tier, int) and progression_tier > 1:
             async with aiosqlite.connect(ECONOMY_DB_NAME) as progress_db:
@@ -265,10 +254,12 @@ class Crafting(commands.Cog):
 
             current_level = row[0] if row else 0
             required_level = progression_tier - 1
+
             if current_level < required_level:
                 info = UPGRADE_DATA[progression_system]
                 prefix = next(
-                    prefix for prefix in TIERED_RECIPE_PROGRESSIONS
+                    prefix
+                    for prefix in TIERED_RECIPE_PROGRESSIONS
                     if data["result"].startswith(prefix)
                 )
                 previous_display = {
@@ -277,6 +268,7 @@ class Crafting(commands.Cog):
                     "salvage_rig_kit_": "Salvage Rig Kit",
                 }[prefix]
                 previous_display = f"{previous_display} {required_level}"
+
                 return await ctx.send(
                     f"{ctx.author.mention} 🚫 **Upgrade progression locked!**\n\n"
                     f"You must **craft and use {previous_display}** before you can "
@@ -289,55 +281,33 @@ class Crafting(commands.Cog):
             await self.ensure_inventory(db)
             await db.execute("BEGIN IMMEDIATE")
             owned = await self.owned(db, ctx.author.id)
-
             missing = []
-            craftable = quantity
             for item_id, amount in data["ingredients"].items():
-                have = owned.get(item_id, 0)
-                craftable = min(craftable, have // amount)
-                if have < amount * quantity:
+                if owned.get(item_id, 0) < amount:
                     icon, name = MATERIAL_NAMES[item_id]
-                    missing.append(f"{icon} {name} ×{amount * quantity - have}")
-
-            if craftable < 1:
+                    missing.append(f"{icon} {name} ×{amount - owned.get(item_id, 0)}")
+            if missing:
                 await db.rollback()
-                return await ctx.send(
-                    f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing)
-                )
+                return await ctx.send(f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing))
 
             for item_id, amount in data["ingredients"].items():
-                await db.execute(
-                    "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
-                    (amount * craftable, ctx.author.id, item_id),
-                )
-
+                await db.execute("UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?", (amount, ctx.author.id, item_id))
             await db.execute(
-                "INSERT INTO inventory (user_id, item_id, item_type, quantity) "
-                "VALUES (?, ?, 'upgrade_component', ?) "
-                "ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + excluded.quantity",
-                (ctx.author.id, data["result"], craftable),
+                "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, ?, 'upgrade_component', 1) ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + 1",
+                (ctx.author.id, data["result"]),
             )
             await db.commit()
 
         embed = discord.Embed(
             title="🔨 Crafting Complete!",
             description=(
-                f"{ctx.author.mention}\n\n"
-                f"You crafted **{data['emoji']} {data['name']} ×{craftable}**!"
-                + (
-                    f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
-                    if craftable < quantity else ""
-                )
-                + "\n\n"
-                + (
-                    "Use `/heal` when you want to chow down on your Halloween treats!"
-                    if data["result"] == "trick_or_treat_bag"
-                    else "Use `/heal` to patch yourself up when needed."
-                    if data["result"] == "makeshift_medkit"
-                    else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade."
-                )
+                f"{ctx.author.mention}\n\nYou crafted **{data['emoji']} {data['name']} ×1**!\n\n"
+                + ("Use `/heal` when you want to chow down on your Halloween treats!" if data["result"] == "trick_or_treat_bag" else "Use `/heal` to patch yourself up when needed." if data["result"] == "makeshift_medkit" else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade.")
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
         await ctx.send(embed=embed)
 
+
+async def setup(bot):
+    await bot.add_cog(Crafting(bot))
