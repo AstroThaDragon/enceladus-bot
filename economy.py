@@ -240,6 +240,7 @@ SHOP_CATEGORY_INFO = {
     "lottery": ("🎟️", "Lottery", "Monthly Stardust lottery tickets."),
     "backgrounds": ("🖼️", "Backgrounds", "Profile background vouchers."),
     "__search__": ("🔎", "Search Results", "Search across the available shop items."),
+    "__rotating__": ("🔄️", "Daily Offers", "Today's rotating station offers."),
     "sell_all": ("🧹", "Sell All", "Bulk-sale actions for eligible inventory."),
     "space_junk": ("🗑️", "Space Junk", "Sell normal space junk for Stardust."),
     "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
@@ -534,6 +535,8 @@ class ShopTransactionView(discord.ui.View):
         return f"{emoji} {label}"
 
     def _get_buy_items(self):
+        if self.category == "__rotating__":
+            return list(self.cog.daily_rotation())
         if self.category == "__search__":
             item_ids = []
             for category, category_items in SHOP_BUY_CATEGORY_ITEMS.items():
@@ -971,14 +974,79 @@ class ShopListCategorySelect(discord.ui.Select):
         )
 
 
-class ShopView(discord.ui.View):
-    """Legacy read-only /shop list view."""
+class RotatingShopBuyButton(discord.ui.Button):
+    """Buy button for one of today's rotating offers."""
 
-    def __init__(self, cog, user_id):
+    def __init__(self, cog, user_id, item_id, item, row=1):
+        self.cog = cog
+        self.user_id = user_id
+        self.item_id = item_id
+        self.item = item
+
+        label = re.sub(r"<a?:[A-Za-z0-9_~]+:\d+>\\s*", "", str(item.get("name", item_id)))
+        label = label.strip() or item_id
+        label = f"Buy {label}"
+
+        super().__init__(
+            label=label[:80],
+            style=discord.ButtonStyle.success,
+            row=row,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "⚠️ This rotating shop belongs to the person who opened it.",
+                ephemeral=True,
+            )
+
+        # Reuse the normal transaction flow so rotating purchases get the same
+        # quantity selection, purchase-limit checks, balance checks, and
+        # confirmation behavior as /shop buy.
+        view = ShopTransactionView(self.cog, self.user_id, "buy")
+        view.category = "__rotating__"
+        view.selected_item = self.item_id
+        view.quantity = 1
+        view.quantity_input = "1"
+        view.item_entries = [{
+            "id": self.item_id,
+            "name": self.item.get("name", self.item_id),
+            "description": self.item.get("desc", ""),
+            "search": f"{self.item_id} {self.item.get('name', '')}",
+            "info": self.item,
+            "owned": None,
+        }]
+        await view.show_quantity(interaction)
+
+
+class ShopView(discord.ui.View):
+    """Legacy /shop catalog view plus the interactive daily rotating shop."""
+
+    def __init__(self, cog, user_id, category=None):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
-        self.add_item(ShopListCategorySelect(self))
+        self.category = category
+
+        if category == "daily":
+            self._add_daily_buttons()
+        else:
+            self.add_item(ShopListCategorySelect(self))
+
+    def _add_daily_buttons(self):
+        for item_id in self.cog.daily_rotation():
+            item = self.cog.ROTATING_ITEMS.get(item_id)
+            if not item:
+                continue
+            self.add_item(
+                RotatingShopBuyButton(
+                    self.cog,
+                    self.user_id,
+                    item_id,
+                    item,
+                    row=1,
+                )
+            )
 
     def build_embed(self, category):
         # Preserve the existing /shop list catalog behavior while the new
@@ -1361,23 +1429,25 @@ class Economy(commands.Cog):
         return datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
 
     def daily_rotation(self):
-        """Return the same three distinct offers for every user on a given day.
+        """Return the same three distinct rotating offers for every user on a given day.
 
-        Daily Offers feature permanent shop items or rotation-only items, but exclude
-        backgrounds and titles. Rotation-only items receive no permanent-item discount.
+        The daily market is drawn exclusively from ROTATING_ITEMS. Permanent shop
+        inventory is intentionally not part of this pool. The result is deterministic
+        for the current Eastern-time date, so every user sees the same three offers
+        throughout the day and the set changes at midnight Eastern time.
         """
         excluded_types = {"background_voucher", "title", "station_upgrade"}
         eligible_items = []
 
-        for item_id, item in self.SHOP_ITEMS.items():
-            if item.get("type") not in excluded_types:
-                eligible_items.append(item_id)
-
         for item_id, item in self.ROTATING_ITEMS.items():
             if item.get("halloween_only") and not halloween_is_active():
                 continue
-            if item.get("type") not in excluded_types and item_id not in eligible_items:
-                eligible_items.append(item_id)
+            if item.get("type") in excluded_types:
+                continue
+            eligible_items.append(item_id)
+
+        if len(eligible_items) < 3:
+            return eligible_items
 
         generator = random.Random(f"enceladus-rotation-{self.rotation_date()}")
         return generator.sample(eligible_items, k=3)
@@ -2742,10 +2812,11 @@ class Economy(commands.Cog):
         description="View today's rotating shop offers.",
     )
     async def shop_rotating(self, ctx: commands.Context):
-        """Display today's rotating shop."""
-        view = ShopView(self, ctx.author.id)
+        """Display today's rotating shop with direct purchase buttons."""
+        view = ShopView(self, ctx.author.id, category="daily")
         embed = view.build_embed("daily")
-        await ctx.send(embed=embed)
+        embed.set_footer(text="Choose an offer below to buy it • Offers rotate at midnight Eastern time.")
+        await ctx.send(embed=embed, view=view)
 
 
     async def buy(self, ctx: commands.Context, item_id: str, quantity: int = 1):
