@@ -112,7 +112,28 @@ def resolve_choice(location_id, scene_id, state, choice_index):
             discovery_text = (
                 f"🔐 **{discovery['title']}**\n{discovery['text']}"
             )
-            outcome["text"] = f"{discovery_text}\n\n{outcome.get('text', '')}".strip()
+            outcome_text = str(outcome.get("text", "") or "").strip()
+
+            # Some authored discovery choices repeat the discovery description
+            # as their outcome text. Avoid rendering that same prose twice while
+            # preserving any genuinely additional outcome text.
+            def _normalize_narrative(value: str) -> str:
+                return " ".join(
+                    value.replace("**", "")
+                    .replace("*", "")
+                    .replace("`", "")
+                    .replace("“", '"')
+                    .replace("”", '"')
+                    .replace("’", "'")
+                    .split()
+                ).strip().lower()
+
+            if outcome_text and _normalize_narrative(outcome_text) == _normalize_narrative(discovery["text"]):
+                outcome["text"] = discovery_text
+            elif outcome_text:
+                outcome["text"] = f"{discovery_text}\n\n{outcome_text}"
+            else:
+                outcome["text"] = discovery_text
 
     if outcome.get("pet_discovery"):
         new_state["pet_opportunity_taken"] = True
