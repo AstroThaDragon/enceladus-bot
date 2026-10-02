@@ -1240,12 +1240,11 @@ class Inventory(commands.Cog):
                 effect_type = str(potion_effect.get("type") or "")
                 amount = int(potion_effect.get("amount", 1) or 1)
 
-                if effect_type == "sanity_restore":
-                    # Calming/Restorative potions apply immediately.  Refresh
-                    # continuous Sanity regeneration first, then add the potion
-                    # amount and cap at 100.  The small schema bootstrap keeps
-                    # the potion usable even before the user has entered Haunted
-                    # Exploration for the first time.
+                if effect_type in {"sanity_restore", "sanity_reduce"}:
+                    # Immediate Sanity potions refresh continuous regeneration
+                    # first, then apply their configured change and clamp to
+                    # 0-100.  This keeps restorative and risky brews consistent
+                    # with the normal Haunted Sanity system.
                     await db.execute(
                         """
                         CREATE TABLE IF NOT EXISTS haunted_profiles (
@@ -1276,8 +1275,17 @@ class Inventory(commands.Cog):
                     else:
                         current_sanity = 100.0
 
-                    restored = max(0.0, min(100.0, current_sanity + float(amount)) - current_sanity)
-                    new_sanity = min(100.0, current_sanity + float(amount))
+                    if effect_type == "sanity_restore":
+                        change = float(amount)
+                        change_label = "Restored"
+                        change_prefix = "+"
+                    else:
+                        change = -float(amount)
+                        change_label = "Lost"
+                        change_prefix = "-"
+
+                    new_sanity = max(0.0, min(100.0, current_sanity + change))
+                    applied_amount = abs(new_sanity - current_sanity)
 
                     if sanity_row:
                         await db.execute(
@@ -1305,11 +1313,99 @@ class Inventory(commands.Cog):
                             (user_id, item_id),
                         )
 
+                    # Secondary Haunted effects (such as collectible bonuses)
+                    # are still prepared even when the potion's primary effect
+                    # is an immediate Sanity change.
+                    secondary_effects = {}
+                    collectible_bonus = float(potion_effect.get("collectible_bonus", 0.0) or 0.0)
+                    if collectible_bonus > 0:
+                        secondary_effects["haunted_potion_collectible_bonus"] = (
+                            float(effects.get("haunted_potion_collectible_bonus", 0.0))
+                            + collectible_bonus
+                        )
+
+                    if secondary_effects:
+                        effects.update(secondary_effects)
+                        await db.execute(
+                            "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                            (json.dumps(effects), user_id),
+                        )
+
+                    if row[0] > 1:
+                        await db.execute(
+                            "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+                    else:
+                        await db.execute(
+                            "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                            (user_id, item_id),
+                        )
+
                     await db.commit()
+                    if effect_type == "sanity_restore":
+                        sanity_text = f"🧠 {change_label} **{change_prefix}{applied_amount:.0f} Sanity**"
+                    else:
+                        sanity_text = f"🧠 {change_label} **{change_prefix}{applied_amount:.0f} Sanity**"
+                    bonus_text = (
+                        f"\n🎃 Collectible chance: **+{collectible_bonus * 100:.0f} percentage points** on your next Haunted run."
+                        if collectible_bonus > 0 else ""
+                    )
                     return await ctx.send(
                         f"{ctx.author.mention} {potion_info['emoji']} **{potion_info['name']} consumed!**\n"
-                        f"🧠 Restored **+{restored:.0f} Sanity** — now at **{new_sanity:.0f}/100**."
+                        f"{sanity_text} — now at **{new_sanity:.0f}/100**.{bonus_text}"
                     )
+
+                # Some run-scoped potions also carry an immediate Sanity cost
+                # (for example Nightmare Nectar). Apply that cost now while
+                # keeping the potion's primary effect prepared for the next run.
+                secondary_sanity_loss = float(potion_effect.get("sanity_loss", 0.0) or 0.0)
+                if secondary_sanity_loss > 0:
+                    await db.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS haunted_profiles (
+                            user_id INTEGER PRIMARY KEY,
+                            sanity REAL NOT NULL DEFAULT 100,
+                            sanity_updated_at REAL NOT NULL DEFAULT 0,
+                            haunted_attempts INTEGER NOT NULL DEFAULT 20,
+                            attempts_date TEXT NOT NULL DEFAULT '',
+                            active_location TEXT DEFAULT '',
+                            active_stage INTEGER NOT NULL DEFAULT 0,
+                            active_total_stages INTEGER NOT NULL DEFAULT 0,
+                            active_started_at REAL NOT NULL DEFAULT 0
+                        )
+                        """
+                    )
+                    now = time.time()
+                    async with db.execute(
+                        "SELECT sanity, sanity_updated_at FROM haunted_profiles WHERE user_id = ?",
+                        (user_id,),
+                    ) as cursor:
+                        sanity_row = await cursor.fetchone()
+
+                    if sanity_row:
+                        current_sanity = max(0.0, min(100.0, float(sanity_row[0])))
+                        updated_at = float(sanity_row[1] or now)
+                        elapsed = max(0.0, now - updated_at)
+                        current_sanity = min(100.0, current_sanity + elapsed * 100.0 / (6 * 60 * 60))
+                    else:
+                        current_sanity = 100.0
+
+                    new_sanity = max(0.0, current_sanity - secondary_sanity_loss)
+                    if sanity_row:
+                        await db.execute(
+                            "UPDATE haunted_profiles SET sanity = ?, sanity_updated_at = ? WHERE user_id = ?",
+                            (new_sanity, now, user_id),
+                        )
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO haunted_profiles
+                                (user_id, sanity, sanity_updated_at, haunted_attempts, attempts_date)
+                            VALUES (?, ?, ?, 20, '')
+                            """,
+                            (user_id, new_sanity, now),
+                        )
 
                 effect_keys = {
                     "run_protection": "haunted_potion_run_protection",
@@ -1326,6 +1422,11 @@ class Inventory(commands.Cog):
                         )
 
                     effects[effect_key] = amount
+                    collectible_bonus = float(potion_effect.get("collectible_bonus", 0.0) or 0.0)
+                    if collectible_bonus > 0:
+                        effects["haunted_potion_collectible_bonus"] = float(
+                            effects.get("haunted_potion_collectible_bonus", 0.0)
+                        ) + collectible_bonus
                     await db.execute(
                         "UPDATE users SET active_effects = ? WHERE user_id = ?",
                         (json.dumps(effects), user_id),
