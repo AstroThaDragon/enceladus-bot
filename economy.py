@@ -861,7 +861,9 @@ class ShopTransactionView(discord.ui.View):
 
         presets = [("1", "1", "1️⃣"), ("10", "10", "🔟")]
         if self.mode == "buy":
-            presets.append(("25", "25", "2️⃣5️⃣"))
+            # "2️⃣5️⃣" is two emoji sequences combined, which Discord rejects
+            # as a single button emoji (error 50035 / Invalid emoji).
+            presets.append(("25", "25", None))
         else:
             presets.append(("Max", "max", "📦"))
         for label, value, emoji in presets:
