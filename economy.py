@@ -157,9 +157,57 @@ SHOP_SELL_CATEGORY_CHOICES = [
     ("🧹 Sell All", "sell_all"),
     ("🗑️ Space Junk", "space_junk"),
     ("🔧 Ores & Materials", "materials"),
+    ("❤️ Healing", "healing"),
+    ("🧪 Consumables", "consumables"),
+    ("🛠️ Upgrade Kits", "upgrade_kits"),
+    ("🛡️ Defense Weapons", "defense_weapons"),
     ("🎃 Collectibles", "collectibles"),
     ("👻 Halloween", "halloween"),
+    ("✨ Special Items", "special"),
 ]
+
+# Individually sellable inventory is grouped by what the item actually does,
+# rather than dumping uncategorized items into a generic "Other" bucket.
+SELL_ITEM_CATEGORY_IDS = {
+    "healing": {
+        "nanite_patch", "medkit", "revive", "revive_kit", "full_revive",
+        "makeshift_medkit", "station_rations",
+    },
+    "consumables": {
+        "laser_charge_cell", "laser_power_cell", "fuel_refill",
+        "drone_battery", "drone_power_cell", "drone_quantum_battery",
+        # Temporary utility items are consumables, not upgrade kits.
+        "fuel_stabilizer", "hazard_shield", "lucky_scanner", "ore_magnet",
+        "prototype_drill_bit", "cosmic_insurance", "fate_anchor",
+    },
+    "upgrade_kits": set(),  # Populated dynamically from crafting recipes below.
+    "defense_weapons": {
+        "stop_sign", "stick", "wooden_sword", "wooden_shield",
+        "wooden_spoon", "heavy_wrench", "plasma_cutter",
+    },
+    "special": {
+        "time_crystal",
+    },
+}
+
+def get_upgrade_kit_ids():
+    """Return the actual craftable upgrade-kit item IDs."""
+    try:
+        from crafting import RECIPES
+    except ImportError:
+        return set()
+
+    return {
+        recipe["result"]
+        for recipe in RECIPES.values()
+        if recipe.get("result", "").startswith((
+            "reinforced_laser_parts_",
+            "drone_upgrade_kit_",
+            "salvage_rig_kit_",
+        ))
+        or recipe.get("result") == "nanite_retrofit_kit"
+    }
+
 
 BULK_SELL_OPTIONS = {
     "all_junk": "🗑️ Sell All Space Junk",
@@ -197,6 +245,11 @@ SHOP_CATEGORY_INFO = {
     "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
     "collectibles": ("🎃", "Collectibles", "Sell discovered collectible items."),
     "halloween": ("👻", "Halloween", "Sell eligible seasonal items."),
+    "healing": ("❤️", "Healing", "Medical supplies and revival items."),
+    "consumables": ("🧪", "Consumables", "Usable supplies for exploration and station equipment."),
+    "upgrade_kits": ("🛠️", "Upgrade Kits", "Actual crafted kits used for permanent upgrades."),
+    "defense_weapons": ("🛡️", "Defense Weapons", "Items that can help protect you from scavenging hazards."),
+    "special": ("✨", "Special Items", "Rare or unusual individually sellable items."),
 }
 
 
@@ -2250,15 +2303,32 @@ class Economy(commands.Cog):
         def is_sellable(item_id, info, stored_type):
             if not info:
                 return False
+
+            # Permanent unlocks are never inventory sale items, even if a future
+            # registry entry accidentally receives a sell_price.
+            item_type = str(info.get("type", ""))
+            if item_type in {"title", "background_voucher", "station_upgrade"}:
+                return False
+
             junk = is_space_junk(info, stored_type)
             if junk:
                 return item_id in self.JUNK_PRICES or get_halloween_sell_reward(item_id) is not None
+
             unit_price = int(info.get("sell_price", 0) or 0)
             if unit_price <= 0:
                 return False
-            item_type = str(info.get("type", ""))
+
+            # Normal materials/collectibles are sellable by type. Upgrade
+            # components are restricted to the actual craftable upgrade kits so
+            # permanent station upgrades cannot leak into the sell UI.
+            if item_type == "Upgrade Component":
+                return item_id in get_upgrade_kit_ids()
+
             return (
-                item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                item_type in {
+                    "Mineral", "Crafting Material", "Haunted Ingredient",
+                    "Location-Based Collectible", "Collectible"
+                }
                 or item_id in SELLABLE_ITEM_IDS
             )
 
@@ -2276,6 +2346,19 @@ class Economy(commands.Cog):
                     "stored_type": None,
                 })
             return entries
+
+        if category == "special" and time_crystal_quantity > 0:
+            entries.append({
+                "id": "time_crystal",
+                "name": f"💎 Dilated Time Crystal",
+                "description": f"You own {time_crystal_quantity:,}.",
+                "search": "time_crystal dilated time crystal",
+                "info": ITEM_REGISTRY.get("time_crystal", {
+                    "name": "💎 Dilated Time Crystal", "sell_price": 0
+                }),
+                "owned": time_crystal_quantity,
+                "stored_type": "special",
+            })
 
         for item_id, owned_quantity, stored_type in rows:
             info = ITEM_REGISTRY.get(item_id)
@@ -2300,6 +2383,13 @@ class Economy(commands.Cog):
                 or item_id in HALLOWEEN_SPACE_JUNK_IDS
             ):
                 continue
+            if category in SELL_ITEM_CATEGORY_IDS:
+                allowed_ids = SELL_ITEM_CATEGORY_IDS[category]
+                if category == "upgrade_kits":
+                    allowed_ids = get_upgrade_kit_ids()
+                if item_id not in allowed_ids:
+                    continue
+
             display_name = info.get("name", item_id)
             entries.append({
                 "id": item_id,
@@ -2449,15 +2539,32 @@ class Economy(commands.Cog):
         def is_sellable(item_id, info, stored_type):
             if not info:
                 return False
+
+            # Permanent unlocks are never inventory sale items, even if a future
+            # registry entry accidentally receives a sell_price.
+            item_type = str(info.get("type", ""))
+            if item_type in {"title", "background_voucher", "station_upgrade"}:
+                return False
+
             junk = is_space_junk(info, stored_type)
             if junk:
                 return item_id in self.JUNK_PRICES or get_halloween_sell_reward(item_id) is not None
+
             unit_price = int(info.get("sell_price", 0) or 0)
             if unit_price <= 0:
                 return False
-            item_type = str(info.get("type", ""))
+
+            # Normal materials/collectibles are sellable by type. Upgrade
+            # components are restricted to the actual craftable upgrade kits so
+            # permanent station upgrades cannot leak into the sell UI.
+            if item_type == "Upgrade Component":
+                return item_id in get_upgrade_kit_ids()
+
             return (
-                item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                item_type in {
+                    "Mineral", "Crafting Material", "Haunted Ingredient",
+                    "Location-Based Collectible", "Collectible"
+                }
                 or item_id in SELLABLE_ITEM_IDS
             )
 
@@ -2485,7 +2592,12 @@ class Economy(commands.Cog):
                     choices.append(choice)
             return choices[:25]
 
-        if category in {"space_junk", "collectibles", "halloween", "materials"}:
+        if category == "special" and time_crystal_quantity > 0:
+            crystal_display = f"💎 Dilated Time Crystal (x{time_crystal_quantity})"
+            if not current or current in crystal_display.lower() or "time_crystal" in current:
+                choices.append(app_commands.Choice(name=crystal_display[:100], value="time_crystal"))
+
+        if category in {"space_junk", "collectibles", "halloween", "materials", *SELL_ITEM_CATEGORY_IDS.keys()}:
             for item_id, owned_quantity, stored_type in rows:
                 info = ITEM_REGISTRY.get(item_id)
                 if not is_sellable(item_id, info, stored_type):
@@ -2509,6 +2621,13 @@ class Economy(commands.Cog):
                     or item_id in HALLOWEEN_SPACE_JUNK_IDS
                 ):
                     continue
+                if category in SELL_ITEM_CATEGORY_IDS:
+                    allowed_ids = SELL_ITEM_CATEGORY_IDS[category]
+                    if category == "upgrade_kits":
+                        allowed_ids = get_upgrade_kit_ids()
+                    if item_id not in allowed_ids:
+                        continue
+
                 display = display_choice(item_id, owned_quantity, info)
                 search_text = f"{display} {item_id}".lower()
                 if current and current not in search_text:
@@ -4077,14 +4196,21 @@ class Economy(commands.Cog):
             else:
                 unit_payout = int(info.get("sell_price", 0) or 0)
                 unit_candy_reward = 0
-                if unit_payout <= 0 or (
-                    info.get("type") not in {
+                item_type = str(info.get("type", ""))
+                is_non_sellable_unlock = item_type in {
+                    "title", "background_voucher", "station_upgrade"
+                }
+                is_upgrade_kit = item_type == "Upgrade Component" and target_item in get_upgrade_kit_ids()
+
+                if unit_payout <= 0 or is_non_sellable_unlock or (
+                    item_type not in {
                         "Mineral",
                         "Crafting Material",
                         "Haunted Ingredient",
                         "Location-Based Collectible",
                         "Collectible",
                     }
+                    and not is_upgrade_kit
                     and target_item not in SELLABLE_ITEM_IDS
                 ):
                     await db.rollback()
