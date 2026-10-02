@@ -529,12 +529,57 @@ async def on_member_join(member):
     recent_joins.add(member.id)
 
     channel = bot.get_channel(1117377155496673330)
+    if channel:
+        count = member.guild.member_count
+        if 11 <= (count % 100) <= 13:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(count % 10, 'th')
+        ordinal_count = f"{count}{suffix}"
+
+        content_text = f"Welcome to The Cosmic Lair, {member.mention}!! 💜"
+
+        embed = discord.Embed(
+            title="Hey there! Welcome to The Cosmic Lair! <a:PurpleHearts:1109768355390431323> <a:RedHearts:1109768412382642266>",
+            description=(
+                f"Before anything, please verify yourself over at <#1296962529989361685> "
+                f"for full access to our server! Afterwards, please head over to <#593389789558865931> "
+                f"to read our rules if you haven't already, then maybe check out <#927536823746580570> "
+                f"for special roles while you're at it!\n\n"
+                f"We also highly recommend checking out <#1484487011933884509> for our server's unique features, roles, bots, and channels!\n\n"
+                f"Also, please be patient while our server grows; it may be a bit quiet at times!\n\n"
+                f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!"
+            ),
+            color=discord.Color.from_rgb(114, 0, 225)
+        )
+        embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=DRAGON_IMAGE_URL)
+        embed.set_footer(text=f"You are our {ordinal_count} member! Congrats!")
+
+        try:
+            if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+                await channel.send(content=content_text, embed=embed)
+            else:
+                print(f"[JOIN LOG ERROR]: Channel is not a sendable text channel.")
+        except (discord.Forbidden, discord.HTTPException) as e:
+            print(f"[JOIN LOG ERROR]: {e}")
+
+    try:
+        await asyncio.sleep(10)
+    finally:
+        recent_joins.discard(member.id)
+
+@bot.event
+async def on_member_remove(member):
+    if member.id in recent_leaves:
+        return
+    recent_leaves.add(member.id)
+
+    channel = bot.get_channel(1117377155496673330)
     log_channel = bot.get_channel(1352095872812318760)
     count = member.guild.member_count
-    content_text = f"Sorry to see you go, {member.name}!"
 
-    # Snapshot the user's leveling progress at the moment they leave.
-    # This is logged before the 14-day departure cleanup can remove their data.
+    # Snapshot the user's leveling progress before departure cleanup can remove it.
     level = 0
     xp = 0
     leveling_db_path = "/app/data/levels.db" if os.path.exists("/app/data") else "levels.db"
@@ -551,11 +596,12 @@ async def on_member_join(member):
             level = int(progress_row[0] or 0)
             xp = int(progress_row[1] or 0)
     except Exception as e:
-        await log_event_error(bot, "on_member_join / leveling lookup", e, context=f"member_id={member.id}")
+        await log_event_error(bot, "on_member_remove / leveling lookup", e, context=f"member_id={member.id}")
         print(f"[LEAVE XP LOG ERROR]: Could not read leveling data for {member.id}: {e}")
 
     # Public goodbye message — keep the leveling snapshot out of the public channel.
     if channel:
+        content_text = f"Sorry to see you go, {member.name}!"
         embed = discord.Embed(
             title="We're sorry to see you go! 😔",
             description=(
@@ -566,7 +612,7 @@ async def on_member_join(member):
         )
         embed.set_author(name=f"{member.name}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"We now have {count} members.")
-        
+
         try:
             if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
                 await channel.send(content=content_text, embed=embed)
