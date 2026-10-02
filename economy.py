@@ -983,8 +983,12 @@ class RotatingShopBuyButton(discord.ui.Button):
         self.item_id = item_id
         self.item = item
 
-        label = re.sub(r"<a?:[A-Za-z0-9_~]+:\d+>\\s*", "", str(item.get("name", item_id)))
-        label = label.strip() or item_id
+        # Button labels cannot safely contain Discord custom-emoji markup.
+        # Reuse the shop's normal name cleaner so custom emojis are removed
+        # while ordinary Unicode emoji remain valid.
+        label = ShopTransactionView._strip_emoji_name(
+            item.get("name", item_id)
+        )
         label = f"Buy {label}"
 
         super().__init__(
@@ -2925,7 +2929,14 @@ class Economy(commands.Cog):
             # All critical reads and writes now share one atomic snapshot.
             await db.execute("BEGIN IMMEDIATE")
 
-            if item["type"] == "station_upgrade":
+            # Some rotation-only catalog entries do not carry their own
+            # type metadata. Fall back to the master inventory definition
+            # instead of indexing the key directly and raising KeyError.
+            item_type = item.get("type")
+            if item_type is None and item_info is not None:
+                item_type = item_info.get("type")
+
+            if item_type == "station_upgrade":
                 if quantity != 1:
                     await db.rollback()
                     return await ctx.send(
