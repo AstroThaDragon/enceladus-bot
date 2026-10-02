@@ -13,7 +13,14 @@ from datetime import datetime, timedelta, time as dt_time
 import pytz
 from seasonal_updates.halloween.halloween import is_active as halloween_is_active
 from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK, get_sell_reward as get_halloween_sell_reward
+from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
 from inventory import ITEM_REGISTRY
+from collectibles import LOCATION_BASED_COLLECTIBLES
+
+HALLOWEEN_COLLECTIBLE_IDS = {
+    item_id for item_id, *_ in get_halloween_collectibles()
+}
+
 from pets.core import get_pet_definition
 from error_handler import log_task_error
 
@@ -117,6 +124,47 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
 # Their Stardust values are defined by ITEM_REGISTRY in inventory.py.
 SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
                      }
+
+
+SHOP_BUY_CATEGORY_ITEMS = {
+    "healing": ["nanite_patch", "medkit", "revive", "full_revive"],
+    "recharge": [
+        "laser_charge_cell", "laser_power_cell", "fuel_refill",
+        "drone_battery", "drone_power_cell", "drone_quantum_battery",
+    ],
+    "upgrades": [
+        "incubator_2", "incubator_3", "vault_expansion",
+        "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
+    ],
+    "pet_items": ["pet_snack"],
+    "special": ["time_crystal", "astral_essence"],
+    "backgrounds": ["neon_grid", "deep_void", "solaris_ring"],
+}
+
+SHOP_BUY_CATEGORY_CHOICES = [
+    ("❤️ Healing", "healing"),
+    ("🔋 Recharge", "recharge"),
+    ("🛠️ Upgrades", "upgrades"),
+    ("🐾 Pet Items", "pet_items"),
+    ("✨ Special", "special"),
+    ("🖼️ Backgrounds", "backgrounds"),
+    ("🔄 Daily Offers", "daily"),
+]
+
+SHOP_SELL_CATEGORY_CHOICES = [
+    ("🧹 Sell All", "sell_all"),
+    ("🗑️ Space Junk", "space_junk"),
+    ("🔧 Ores & Materials", "materials"),
+    ("🎃 Collectibles", "collectibles"),
+    ("👻 Halloween", "halloween"),
+    ("📦 Other Sellables", "other"),
+]
+
+BULK_SELL_OPTIONS = {
+    "all_junk": "🗑️ Sell All Space Junk",
+    "all_materials": "🔧 Sell All Ores & Materials",
+    "all_halloween": "🎃 Sell All Halloween Collectibles",
+}
 
 
 class ShopCategorySelect(discord.ui.Select):
@@ -375,6 +423,54 @@ class ShopView(discord.ui.View):
         )
 
         return embed
+
+class SellAllConfirmView(discord.ui.View):
+    """Confirmation controls for bulk inventory sales."""
+
+    def __init__(self, cog, owner_id, sale_kind):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.sale_kind = sale_kind
+        self.finished = False
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ This sale confirmation belongs to someone else.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.finished:
+            return
+        for child in self.children:
+            child.disabled = True
+
+    @discord.ui.button(label="Yes, Sell All", emoji="✅", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.finished:
+            return
+        self.finished = True
+        for child in self.children:
+            child.disabled = True
+        await self.cog._confirm_bulk_sale(interaction, self.sale_kind, self)
+
+    @discord.ui.button(label="Cancel", emoji="❌", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.finished:
+            return
+        self.finished = True
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(
+            content="❌ **Sale cancelled.** Nothing was sold.",
+            embed=None,
+            view=self,
+        )
+
 
 class Economy(commands.Cog):
     HP_REGEN_TIME = dt_time(
@@ -1549,318 +1645,217 @@ class Economy(commands.Cog):
         interaction: discord.Interaction,
         current: str
     ):
-        """Show items currently available in the station shop."""
-        current = current.lower().strip()
+        """Show shop items filtered by the selected buy category."""
+        current = (current or "").lower().strip()
+        category = getattr(interaction.namespace, "category", None)
 
-        # Application-command autocomplete choices do not render Discord's
-        # custom-emoji markup, so use normal Unicode emojis for the picker.
+        # Hybrid-command autocomplete can expose the raw command payload instead
+        # of a populated namespace in some clients. Fall back to the option data.
+        if not category and interaction.data:
+            for option in interaction.data.get("options", []):
+                if option.get("name") == "category":
+                    category = option.get("value")
+                    break
+
+        category = category or "healing"
+
+        item_ids = list(SHOP_BUY_CATEGORY_ITEMS.get(category, []))
+        if category == "daily":
+            item_ids = list(self.daily_rotation())
+
         autocomplete_emojis = {
-            "nanite_patch": "🩹",
-            "medkit": "🧰",
-            "revive": "⚕️",
-            "full_revive": "💉",
-            "laser_charge_cell": "🔋",
-            "laser_power_cell": "⚡",
-            "fuel_refill": "⚛️",
-            "drone_battery": "🔋",
-            "drone_power_cell": "⚡",
-            "drone_quantum_battery": "⚛️",
-            "pet_snack": "🍪",
-            "time_crystal": "💎",
-            "astral_essence": "✨",
-            "neon_grid": "🌆",
-            "deep_void": "🌌",
-            "solaris_ring": "💫",
-            "fuel_stabilizer": "🛢️",
-            "hazard_shield": "🛡️",
-            "lucky_scanner": "📡",
+            "nanite_patch": "🩹", "medkit": "🧰", "revive": "⚕️", "full_revive": "⚕️",
+            "laser_charge_cell": "🔋", "laser_power_cell": "⚡", "fuel_refill": "⚛️",
+            "drone_battery": "🔋", "drone_power_cell": "⚡", "drone_quantum_battery": "⚛️",
+            "pet_snack": "🍪", "time_crystal": "💎", "astral_essence": "✨",
+            "neon_grid": "🌆", "deep_void": "🌌", "solaris_ring": "💫",
+            "fuel_stabilizer": "🛢️", "hazard_shield": "🛡️", "lucky_scanner": "📡",
             "prototype_drill_bit": "⚙️",
-            "station_rations": "🥫",
-            "ore_magnet": "🧲",
-            "cosmic_insurance": "📋",
-            "fate_anchor": "⚓",
-            "revive_kit": "💉",
-            "stop_sign": "🛑",
-            "stick": "🪵",
-            "wooden_sword": "🗡️",
-            "wooden_shield": "🛡️",
-            "wooden_spoon": "🥄",
-            "heavy_wrench": "🔧",
-            "plasma_cutter": "🔫",
-            "title_outer_rim_wanderer": "🏷️",
-            "title_starborn": "🏷️",
-            "title_voidfarer": "🏷️",
         }
 
-        def autocomplete_name(item_id, info):
-            raw_name = info["name"]
-            fallback_emoji = autocomplete_emojis.get(item_id, "📦")
-
-            # The catalog's display names may contain custom Discord emoji
-            # markup. For autocomplete, strip that markup and prepend a
-            # renderable Unicode emoji instead.
-            if raw_name.startswith("<:") or raw_name.startswith("<a:"):
-                closing = raw_name.find(">")
-
-                if closing != -1:
-                    raw_name = raw_name[closing + 1:].lstrip()
-
-            return f"{fallback_emoji} {raw_name}"
-
-        available_items = []
-        seen_items = set()
-
-        # Permanent shop items.
-        for item_id, info in self.SHOP_ITEMS.items():
-            display_name = autocomplete_name(item_id, info)
-
-            if current and current not in display_name.lower():
+        choices = []
+        seen = set()
+        for item_id in item_ids:
+            if item_id in seen:
                 continue
-
-            available_items.append(
-                app_commands.Choice(
-                    name=display_name,
-                    value=item_id
-                )
-            )
-            seen_items.add(item_id)
-
-        # Today's rotating-only items.
-        for item_id in self.daily_rotation():
-            if item_id in seen_items:
-                continue
-
-            info = self.ROTATING_ITEMS.get(item_id)
+            info = self.SHOP_ITEMS.get(item_id) or self.ROTATING_ITEMS.get(item_id)
             if not info:
                 continue
-
-            display_name = autocomplete_name(item_id, info)
-
-            if current and current not in display_name.lower():
+            name = info.get("name", item_id)
+            if name.startswith("<:") or name.startswith("<a:"):
+                closing = name.find(">")
+                if closing != -1:
+                    name = name[closing + 1:].lstrip()
+            display = f"{autocomplete_emojis.get(item_id, '📦')} {name}"
+            if current and current not in display.lower() and current not in item_id.lower():
                 continue
+            choices.append(app_commands.Choice(name=display[:100], value=item_id))
+            seen.add(item_id)
 
-            available_items.append(
-                app_commands.Choice(
-                    name=display_name,
-                    value=item_id
-                )
-            )
-            seen_items.add(item_id)
+        return choices[:25]
 
-        available_items.sort(key=lambda choice: choice.name.lower())
-
-        return available_items[:25]
     async def shop_sell_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str
     ):
-        """Show sellable items the user currently owns."""
+        """Show owned sellable items filtered by the selected sell category."""
         user_id = interaction.user.id
-        current = current.lower().strip()
+        current = (current or "").lower().strip()
+        category = getattr(interaction.namespace, "category", None)
 
-        from inventory import ITEM_REGISTRY
+        if not category and interaction.data:
+            for option in interaction.data.get("options", []):
+                if option.get("name") == "category":
+                    category = option.get("value")
+                    break
+
+        category = category or "sell_all"
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
                 """
                 SELECT item_id, quantity, item_type
                 FROM inventory
-                WHERE user_id = ?
-                  AND quantity > 0
+                WHERE user_id = ? AND quantity > 0
                 ORDER BY item_id
                 """,
-                (user_id,)
+                (user_id,),
             ) as cursor:
                 rows = await cursor.fetchall()
 
-        # Application-command autocomplete does not reliably render Discord
-        # custom-emoji markup, so use normal Unicode fallbacks for sell choices.
-        sell_autocomplete_emojis = {
-            # Materials / ores
-            "iron_ore": "⛏️",
-            "copper_ore": "🟠",
-            "titanium_chunk": "⛏️",
-            "aluminum_ore": "⬜",
-            "circuit_board": "🟩",
-            "glue": "🧴",
-            "scrap_metal": "🔩",
-            "nuts_bolts": "🔧",
-            "wiring": "🧵",
-            "time_crystal": "💎",
-            # Haunted / seasonal materials
-            "haunted_circuit": "⚡",
-            "screaming_crystal": "💎",
-            # Space Junk
-            "space_pizza": "🍕",
-            "floppy_disk": "💾",
-            "meteorite": "☄️",
-            "rubber_duck": "🦆",
-            "rusty_gear": "⚙️",
-            "tape_deck": "📼",
-            "alien_artifact": "👽",
-            "space_boot": "🥾",
-            "holo_poster": "🖼️",
-            "broken_laser": "🔧",
-            "lost_logbook": "📓",
-            "left_sock": "🧦",
-            "warp_mug": "☕",
-            "space_pudding": "🍮",
-            "tangled_cables": "🪢",
-            "moon_cheese": "🧀",
-            "golden_spatula": "🥄",
-            "parking_ticket": "🎫",
-            "floating_plant": "🪴",
-            "tinted_visor": "🕶️",
-            "purring_lint": "🧶",
-            "pet_rock": "🪨",
-            "space_taco": "🌮",
-            "rusty_wrench": "🔧",
-            "alien_fossil": "🦴",
-            "big_red_button": "🔴",
-            "antique_compass": "🧭",
-            "broken_clock": "🕰️",
-            "perplexing_painting": "🖼️",
-            "cosmic_banana": "🍌",
-            "cosmic_coin": "🪙",
-        }
-
-        choices = []
-        sellable_rows = []
-
-        # Time Crystals are stored on the users table rather than the inventory
-        # table, so add them to the sell list separately.
-        async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
                 "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
-                (user_id,)
+                (user_id,),
             ) as cursor:
                 time_crystal_row = await cursor.fetchone()
 
         time_crystal_quantity = time_crystal_row[0] if time_crystal_row else 0
-        if time_crystal_quantity > 0:
-            time_crystal_info = ITEM_REGISTRY.get("time_crystal", {})
-            display_name = time_crystal_info.get("name", "Dilated Time Crystal")
-            search_text = f"{display_name} time_crystal".lower()
-            if not current or current in search_text:
-                choices.append(
-                    app_commands.Choice(
-                        name=f"💎 {display_name} (x{time_crystal_quantity})",
-                        value="time_crystal"
-                    )
-                )
 
-        for item_id, owned_quantity, item_type in rows:
-            info = ITEM_REGISTRY.get(item_id)
+        def is_halloween_item(item_id, info, stored_type):
+            item_type = str(info.get("type", ""))
+            return (
+                item_id in HALLOWEEN_SPACE_JUNK_IDS
+                or item_id in LOCATION_BASED_COLLECTIBLES
+                or item_type == "Haunted Ingredient"
+                or item_id == "plasma_cutter"
+            )
+
+        def is_collectible(item_id, info, stored_type):
+            return (
+                item_id in HALLOWEEN_SPACE_JUNK_IDS
+                or item_id in LOCATION_BASED_COLLECTIBLES
+                or str(info.get("type", "")).lower() == "collectible"
+            )
+
+        def is_space_junk(info, stored_type):
+            return str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk"
+
+        def is_sellable(item_id, info, stored_type):
             if not info:
-                continue
-
-            # Space Junk can be sold using the existing normal buyback table
-            # or the Halloween-specific Stardust + Candy reward.
-            is_space_junk = str(item_type).lower() == "space_junk" or info.get("type") == "Space Junk"
-            is_material = bool(info.get("sell_price")) and info.get("type") in {
-                "Mineral",
-                "Crafting Material",
-                "Haunted Ingredient",
-            }
-            is_sellable_item = item_id in SELLABLE_ITEM_IDS and bool(info.get("sell_price"))
-
-            if not is_space_junk and not is_material and not is_sellable_item:
-                continue
-
-            if is_space_junk:
-                if (
-                    item_id not in self.JUNK_PRICES
-                    and get_halloween_sell_reward(item_id) is None
-                ):
-                    continue
-            elif not info.get("sell_price"):
-                continue
-
-            sellable_rows.append((item_id, owned_quantity, info, is_space_junk))
-
-        normal_junk_owned = any(
-            is_space_junk and item_id in self.JUNK_PRICES
-            for item_id, _quantity, _info, is_space_junk in sellable_rows
-        )
-        normal_material_owned = any(
-            item_id in NORMAL_SELL_ALL_MATERIAL_IDS
-            for item_id, _quantity, _info, _is_space_junk in sellable_rows
-        )
-
-        # Bulk options are deliberately separate so limited-time Halloween
-        # Space Junk and Haunted ingredients can never be swept up accidentally.
-        show_all = not current or "all" in current or "sell all" in current
-        show_junk_all = show_all or "junk" in current or "space junk" in current
-        show_material_all = show_all or "material" in current or "ore" in current
-
-        if normal_junk_owned and show_junk_all:
-            choices.append(
-                app_commands.Choice(
-                    name="🗑️ Sell All Space Junk",
-                    value="all_junk"
-                )
+                return False
+            junk = is_space_junk(info, stored_type)
+            if junk:
+                return item_id in self.JUNK_PRICES or get_halloween_sell_reward(item_id) is not None
+            unit_price = int(info.get("sell_price", 0) or 0)
+            if unit_price <= 0:
+                return False
+            item_type = str(info.get("type", ""))
+            return (
+                item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                or item_id in SELLABLE_ITEM_IDS
             )
 
-        if normal_material_owned and show_material_all:
-            choices.append(
-                app_commands.Choice(
-                    name="🔧 Sell All Ores & Materials",
-                    value="all_materials"
-                )
-            )
-
-        for item_id, owned_quantity, info, _is_space_junk in sellable_rows:
-            display_name = info["name"]
-            search_text = f"{display_name} {item_id}".lower()
-
+        def display_choice(item_id, quantity, info):
             raw_emoji = str(info.get("emoji", ""))
             if raw_emoji.startswith("<:") or raw_emoji.startswith("<a:"):
-                display_emoji = sell_autocomplete_emojis.get(item_id, "📦")
-            else:
-                display_emoji = raw_emoji or sell_autocomplete_emojis.get(item_id, "📦")
-            if current and current not in search_text:
-                continue
+                raw_emoji = "📦"
+            emoji = raw_emoji or ("🎃" if is_halloween_item(item_id, info, info.get("type")) else "📦")
+            return f"{emoji} {info.get('name', item_id)} (x{quantity})"
 
-            choices.append(
-                app_commands.Choice(
-                    name=f"{display_emoji} {display_name} (x{owned_quantity})",
-                    value=item_id
+        choices = []
+
+        # Bulk options are always first when the Sell All category is selected.
+        if category == "sell_all":
+            normal_junk_owned = any(
+                (str(stored_type).lower() == "space_junk" or (ITEM_REGISTRY.get(item_id, {}).get("type") == "Space Junk"))
+                and item_id in self.JUNK_PRICES
+                and item_id not in HALLOWEEN_SPACE_JUNK_IDS
+                for item_id, _quantity, stored_type in rows
+            )
+            normal_material_owned = any(
+                item_id in NORMAL_SELL_ALL_MATERIAL_IDS
+                and int((ITEM_REGISTRY.get(item_id) or {}).get("sell_price", 0) or 0) > 0
+                for item_id, _quantity, _stored_type in rows
+            )
+            halloween_owned = any(
+                is_sellable(item_id, ITEM_REGISTRY.get(item_id), stored_type)
+                and (
+                    item_id in HALLOWEEN_COLLECTIBLE_IDS
+                    or item_id in LOCATION_BASED_COLLECTIBLES
                 )
+                for item_id, _quantity, stored_type in rows
             )
 
-        bulk_choices = [
-            choice for choice in choices
-            if choice.value in {"all_junk", "all_materials"}
-        ]
-        item_choices = [
-            choice for choice in choices
-            if choice.value not in {"all_junk", "all_materials"}
-        ]
-        item_choices.sort(key=lambda choice: choice.name.lower())
+            bulk = []
+            if normal_junk_owned:
+                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_junk"], value="all_junk"))
+            if normal_material_owned:
+                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_materials"], value="all_materials"))
+            if halloween_owned:
+                bulk.append(app_commands.Choice(name=BULK_SELL_OPTIONS["all_halloween"], value="all_halloween"))
 
-        return (bulk_choices + item_choices)[:25]
+            for choice in bulk:
+                if not current or current in choice.name.lower():
+                    choices.append(choice)
+            return choices[:25]
 
+        if category == "other" and time_crystal_quantity > 0:
+            crystal_display = f"💎 Dilated Time Crystal (x{time_crystal_quantity})"
+            if not current or current in crystal_display.lower() or "time_crystal" in current:
+                choices.append(app_commands.Choice(name=crystal_display[:100], value="time_crystal"))
+
+        if category in {"space_junk", "collectibles", "halloween", "other", "materials"}:
+            for item_id, owned_quantity, stored_type in rows:
+                info = ITEM_REGISTRY.get(item_id)
+                if not is_sellable(item_id, info, stored_type):
+                    continue
+
+                junk = is_space_junk(info, stored_type)
+                collectible = is_collectible(item_id, info, stored_type)
+                halloween = is_halloween_item(item_id, info, stored_type)
+                item_type = str(info.get("type", ""))
+
+                if category == "space_junk" and not junk:
+                    continue
+                if category == "collectibles" and not collectible:
+                    continue
+                if category == "halloween" and not halloween:
+                    continue
+                if category == "materials" and item_type not in {"Mineral", "Crafting Material", "Haunted Ingredient"}:
+                    continue
+                if category == "other" and (junk or collectible or item_type in {"Mineral", "Crafting Material", "Haunted Ingredient"}):
+                    continue
+
+                display = display_choice(item_id, owned_quantity, info)
+                search_text = f"{display} {item_id}".lower()
+                if current and current not in search_text:
+                    continue
+                choices.append(app_commands.Choice(name=display[:100], value=item_id))
+
+        choices.sort(key=lambda choice: choice.name.lower())
+        return choices[:25]
 
     async def shop_item_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str,
     ):
-        """Route item autocomplete to the buy or sell picker."""
+        """Compatibility router for older command registrations."""
         options = interaction.data.get("options", []) if interaction.data else []
-        action = next(
-            (
-                option.get("value")
-                for option in options
-                if option.get("name") == "action"
-            ),
-            "buy",
-        )
-
+        action = next((o.get("value") for o in options if o.get("name") == "action"), "buy")
         if action == "sell":
             return await self.shop_sell_autocomplete(interaction, current)
-
         return await self.shop_buy_autocomplete(interaction, current)
 
     @commands.hybrid_group(
@@ -1909,17 +1904,25 @@ class Economy(commands.Cog):
         description="Buy an item from the shop.",
     )
     @app_commands.describe(
+        category="Choose a shop category first.",
         item="Choose the item to buy.",
         quantity="How many to buy (default: 1, maximum: 99).",
     )
+    @app_commands.choices(category=[
+        app_commands.Choice(name=name, value=value)
+        for name, value in SHOP_BUY_CATEGORY_CHOICES
+    ])
     @app_commands.autocomplete(item=shop_buy_autocomplete)
     async def shop_buy(
         self,
         ctx: commands.Context,
+        category: str,
         item: str,
         quantity: int = 1,
     ):
-        """Buy a selected shop item."""
+        """Buy a selected shop item after choosing its category."""
+        if category == "daily" and item not in self.daily_rotation():
+            return await ctx.send("❌ That item is not in today's rotating offers.")
         return await self.buy(ctx, item, quantity)
 
 
@@ -1928,17 +1931,27 @@ class Economy(commands.Cog):
         description="Sell an item from your inventory.",
     )
     @app_commands.describe(
-        item="Choose the item to sell, or select a Sell All option.",
-        quantity="How many to sell (default: 1, maximum: 99).",
+        category="Choose what kind of inventory item to sell.",
+        item="Choose the item to sell, or a Sell All option.",
+        quantity="How many to sell (default: 1, maximum: 99), or max to sell all you own. Ignored for Sell All.",
     )
+    @app_commands.choices(category=[
+        app_commands.Choice(name=name, value=value)
+        for name, value in SHOP_SELL_CATEGORY_CHOICES
+    ])
     @app_commands.autocomplete(item=shop_sell_autocomplete)
     async def shop_sell(
         self,
         ctx: commands.Context,
+        category: str,
         item: str,
-        quantity: int = 1,
+        quantity: str = "1",
     ):
-        """Sell a selected inventory item or a bulk Sell All option."""
+        """Sell a selected inventory item or a confirmed bulk sale."""
+        if category == "sell_all" and item not in BULK_SELL_OPTIONS:
+            return await ctx.send("❌ Choose one of the available **Sell All** options.")
+        if category != "sell_all" and item in BULK_SELL_OPTIONS:
+            return await ctx.send("❌ Sell All options are only available in the **🧹 Sell All** category.")
         return await self.sell(ctx, item, quantity)
 
 
@@ -2997,11 +3010,168 @@ class Economy(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    async def _get_bulk_sale_rows(self, db, user_id, sale_kind):
+        """Return sellable inventory rows for a bulk sale kind."""
+        async with db.execute(
+            "SELECT item_id, quantity, item_type FROM inventory WHERE user_id = ? AND quantity > 0 ORDER BY item_id",
+            (user_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        def is_junk(item_id, info, stored_type):
+            return str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk"
+
+        def is_halloween_collectible(item_id, info):
+            # Bulk Halloween sales are intentionally limited to collectible
+            # items only. Halloween materials, candy, bags, and seasonal
+            # equipment must never be swept into this option.
+            return (
+                item_id in LOCATION_BASED_COLLECTIBLES
+                or item_id in HALLOWEEN_COLLECTIBLE_IDS
+            )
+
+        result = []
+        for item_id, quantity, stored_type in rows:
+            info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
+            junk = is_junk(item_id, info, stored_type)
+            halloween_collectible = is_halloween_collectible(item_id, info)
+            collectible = (item_id in HALLOWEEN_COLLECTIBLE_IDS or item_id in LOCATION_BASED_COLLECTIBLES
+                           or str(info.get("type", "")).lower() == "collectible")
+            item_type = str(info.get("type", ""))
+
+            if junk:
+                sellable = item_id in self.JUNK_PRICES or get_halloween_sell_reward(item_id) is not None
+            else:
+                sellable = bool(int(info.get("sell_price", 0) or 0)) and (
+                    item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
+                    or item_id in SELLABLE_ITEM_IDS
+                )
+            if not sellable:
+                continue
+
+            if sale_kind == "all_junk":
+                if not junk or item_id in HALLOWEEN_SPACE_JUNK_IDS or item_id not in self.JUNK_PRICES:
+                    continue
+            elif sale_kind == "all_materials":
+                if item_id not in NORMAL_SELL_ALL_MATERIAL_IDS:
+                    continue
+            elif sale_kind == "all_halloween":
+                if not halloween_collectible:
+                    continue
+            else:
+                continue
+
+            result.append((item_id, quantity, info, stored_type))
+        return result
+
+    async def _bulk_sale_preview(self, user_id, sale_kind):
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            rows = await self._get_bulk_sale_rows(db, user_id, sale_kind)
+
+        total_stardust = 0
+        total_candy = 0
+        item_count = 0
+        lines = []
+        for item_id, quantity, info, stored_type in rows:
+            if str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk":
+                payout, candy = self.get_junk_sell_reward(item_id)
+            else:
+                payout, candy = int(info.get("sell_price", 0) or 0), 0
+            total_stardust += payout * quantity
+            total_candy += candy * quantity
+            item_count += quantity
+            lines.append(f"{info.get('emoji', '📦')} **{info.get('name', item_id)} ×{quantity}**")
+
+        return rows, total_stardust, total_candy, item_count, lines
+
+    async def _confirm_bulk_sale(self, interaction, sale_kind, view):
+        """Execute a previously confirmed bulk sale using a fresh DB snapshot."""
+        user_id = interaction.user.id
+        db_path = self.get_db_path()
+
+        await interaction.response.defer()
+
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            rows = await self._get_bulk_sale_rows(db, user_id, sale_kind)
+            if not rows:
+                await db.rollback()
+                return await interaction.edit_original_response(
+                    content="❌ **Nothing to sell.** Your inventory changed before the confirmation was completed.",
+                    embed=None,
+                    view=view,
+                )
+
+            total_stardust = 0
+            total_candy = 0
+            item_count = 0
+            sold_lines = []
+            for item_id, quantity, info, stored_type in rows:
+                if str(stored_type).lower() == "space_junk" or info.get("type") == "Space Junk":
+                    payout, candy = self.get_junk_sell_reward(item_id)
+                else:
+                    payout, candy = int(info.get("sell_price", 0) or 0), 0
+                total_stardust += payout * quantity
+                total_candy += candy * quantity
+                item_count += quantity
+                sold_lines.append(f"{info.get('emoji', '📦')} {info.get('name', item_id)} ×{quantity}")
+
+            for item_id, _quantity, _info, _stored_type in rows:
+                await db.execute(
+                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+                    (user_id, item_id),
+                )
+
+            await db.execute(
+                "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
+                (total_stardust, user_id),
+            )
+
+            candy_added = 0
+            candy_overflow = 0
+            if total_candy > 0:
+                from inventory import add_inventory_item
+                candy_added, _, _ = await add_inventory_item(
+                    db, user_id, "halloween_candy", "consumable", total_candy
+                )
+                candy_overflow = total_candy - candy_added
+                if candy_overflow > 0:
+                    overflow_payout = candy_overflow * 5
+                    total_stardust += overflow_payout
+                    await db.execute(
+                        "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
+                        (overflow_payout, user_id),
+                    )
+
+            await db.commit()
+
+        preview = "\n".join(sold_lines[:12])
+        if len(sold_lines) > 12:
+            preview += f"\n…and {len(sold_lines) - 12} more."
+
+        candy_text = f"\n🍬 **Halloween Candy:** +{candy_added}" if candy_added else ""
+        overflow_text = (
+            f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
+            if candy_overflow else ""
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"{interaction.user.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
+                f"for ✨ **{total_stardust:,} Stardust**!{candy_text}{overflow_text}\n\n"
+                f"**Items Sold:**\n{preview}"
+            ),
+            embed=None,
+            view=view,
+        )
+
+
     async def sell(
         self,
         ctx: commands.Context,
         item: str,
-        quantity: int = 1
+        quantity: str = "1"
     ):
         await ctx.defer()
 
@@ -3009,8 +3179,46 @@ class Economy(commands.Cog):
         target_item = item.lower().strip()
         db_path = self.get_db_path()
 
-        if quantity < 1 or quantity > 99:
-            return await ctx.send("❌ Quantity must be between **1 and 99**.")
+        # Regular sales accept either a number (1–99) or `max`, which means
+        # sell the entire quantity currently owned of the selected item.
+        quantity_input = str(quantity).strip().lower()
+        if quantity_input == "max":
+            quantity_is_max = True
+            quantity = None
+        else:
+            try:
+                quantity = int(quantity_input)
+            except (TypeError, ValueError):
+                return await ctx.send(
+                    "❌ Quantity must be a number between **1 and 99**, or **`max`** to sell all you own."
+                )
+            quantity_is_max = False
+            if quantity < 1 or quantity > 99:
+                return await ctx.send(
+                    "❌ Quantity must be between **1 and 99**, or **`max`** to sell all you own."
+                )
+
+        if target_item in BULK_SELL_OPTIONS:
+            rows, total_stardust, total_candy, item_count, lines = await self._bulk_sale_preview(user_id, target_item)
+            if not rows:
+                return await ctx.send("🎒 **Nothing to sell!** You don't currently have any items covered by that Sell All option.")
+
+            preview = "\n".join(lines[:12])
+            if len(lines) > 12:
+                preview += f"\n…and {len(lines) - 12} more."
+            candy_preview = f"\n🍬 **Halloween Candy:** +{total_candy}" if total_candy else ""
+            embed = discord.Embed(
+                title="⚠️ Confirm Bulk Sale",
+                description=(
+                    f"You are about to sell **{item_count} items** for approximately "
+                    f"✨ **{total_stardust:,} Stardust**.{candy_preview}\n\n"
+                    f"**Items included:**\n{preview}\n\n"
+                    "📚 **Collection Note:** Collectibles are permanently recorded in your collection once discovered. Selling the physical items does **not** remove them from your collection.\n\nThis cannot be undone. Choose **Yes, Sell All** or **Cancel**."
+                ),
+                color=discord.Color.orange(),
+            )
+            view = SellAllConfirmView(self, user_id, target_item)
+            return await ctx.send(embed=embed, view=view)
 
         from inventory import ITEM_REGISTRY, add_inventory_item
 
@@ -3165,7 +3373,9 @@ class Economy(commands.Cog):
                     await db.rollback()
                     return await ctx.send("❌ You don't have any **Dilated Time Crystals** to sell.")
 
-                if quantity > owned_quantity:
+                if quantity_is_max:
+                    quantity = owned_quantity
+                elif quantity > owned_quantity:
                     await db.rollback()
                     return await ctx.send(
                         f"❌ You only have **{owned_quantity}x** **Dilated Time Crystals** in your inventory."
@@ -3235,13 +3445,17 @@ class Economy(commands.Cog):
                         "Mineral",
                         "Crafting Material",
                         "Haunted Ingredient",
+                        "Location-Based Collectible",
+                        "Collectible",
                     }
                     and target_item not in SELLABLE_ITEM_IDS
                 ):
                     await db.rollback()
                     return await ctx.send("❌ That item cannot be sold.")
 
-            if quantity > owned_quantity:
+            if quantity_is_max:
+                quantity = owned_quantity
+            elif quantity > owned_quantity:
                 await db.rollback()
                 return await ctx.send(
                     f"❌ You only have **{owned_quantity}x** of **{info['name']}** in your inventory."
