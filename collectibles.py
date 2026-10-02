@@ -5,7 +5,186 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
-from inventory import HALLOWEEN_SPECIAL_USE_ITEMS
+from inventory import HALLOWEEN_SPECIAL_USE_ITEMS, ITEM_REGISTRY
+
+# ---------------------------------------------------------------------------
+# Halloween Location-Based Collectibles
+# ---------------------------------------------------------------------------
+# These are permanent discoveries crafted exclusively at the Haunted
+# Workshop. The physical inventory item may be sold, but discovery remains
+# permanently recorded in the collectibles table.
+# ---------------------------------------------------------------------------
+
+LOCATION_BASED_COLLECTIBLES = {
+    "bloodied_patient_file": {
+        "name": "Bloodied Patient File", "emoji": "🩸",
+        "description": "The patient's name has been scrubbed away. The medical notes haven't. Whatever happened here was still being documented long after treatment should have stopped.",
+        "location": "Abandoned Asylum",
+        "ingredients": {"bloodstained_gauze": 2, "cracked_syringe": 1}, "sell_price": 1100,
+    },
+    "last_treatment": {
+        "name": "The Last Treatment", "emoji": "🧠",
+        "description": "A sealed syringe recovered from a room that no longer exists on the asylum's floor plan.",
+        "location": "Abandoned Asylum",
+        "ingredients": {"bloodstained_gauze": 1, "cracked_syringe": 2}, "sell_price": 1300,
+    },
+    "gravekeepers_bloom": {
+        "name": "Gravekeeper's Bloom", "emoji": "🌹",
+        "description": "A flower that should have crumbled decades ago. It remains strangely soft, and faintly warm, when held.",
+        "location": "Forgotten Graveyard",
+        "ingredients": {"wilted_bloom": 3}, "sell_price": 950,
+    },
+    "broken_guest": {
+        "name": "The Broken Guest", "emoji": "🧸",
+        "description": "Three pieces of the same doll, each recovered from a different room. They fit together perfectly. Nobody remembers what the doll looked like before it was broken.",
+        "location": "Haunted House",
+        "ingredients": {"broken_doll_piece": 3}, "sell_price": 1000,
+    },
+    "empty_vial": {
+        "name": "The Empty Vial", "emoji": "✝️",
+        "description": "The vial still bears the markings of a consecrated blessing. Whatever was inside was emptied long before you found it.",
+        "location": "Abandoned Church",
+        "ingredients": {"cracked_holy_water_vial": 3}, "sell_price": 1000,
+    },
+    "witchs_heartwood": {
+        "name": "Witch's Heartwood", "emoji": "🌲",
+        "description": "A piece of ancient wood grown around something that should not have been buried beneath the Witch's Woods. The roots still twitch when exposed to moonlight.",
+        "location": "Witch's Woods",
+        "ingredients": {"witchroot": 2, "mooncap_mushroom": 1, "glowmoss": 2}, "sell_price": 1400,
+    },
+    "mascots_spare_parts": {
+        "name": "The Mascot's Spare Parts", "emoji": "🍕",
+        "description": "A handful of replacement parts from the pizzeria's long-dead mascot. The manufacturer's logo has been scratched away.",
+        "location": "Dilapidated Pizzeria",
+        "ingredients": {"nuts_bolts": 2, "glue": 2}, "sell_price": 1100,
+    },
+    "employee_prize_token": {
+        "name": "Employee Prize Token", "emoji": "🎟️",
+        "description": "A cheap prize token from the arcade machines. It shouldn't be worth anything. Somehow, it feels important.",
+        "location": "Dilapidated Pizzeria",
+        "ingredients": {"nuts_bolts": 1, "glue": 3}, "sell_price": 1250,
+    },
+    "unfinished_toy": {
+        "name": "The Unfinished Toy", "emoji": "🧸",
+        "description": "The toy was never finished. Someone painted its face anyway.",
+        "location": "Abandoned Toy Workshop",
+        "ingredients": {"stuffing": 2, "bent_toy_parts": 1, "faded_paint": 1}, "sell_price": 1250,
+    },
+    "painted_smile": {
+        "name": "The Painted Smile", "emoji": "🎨",
+        "description": "The paint is faded almost completely away. The smile underneath it isn't.",
+        "location": "Abandoned Toy Workshop",
+        "ingredients": {"bent_toy_parts": 2, "faded_paint": 2, "stuffing": 1}, "sell_price": 1450,
+    },
+    "dead_air_transmitter": {
+        "name": "Dead-Air Transmitter", "emoji": "📻",
+        "description": "The transmitter doesn't broadcast anything. It only receives.",
+        "location": "Broadcast Station",
+        "ingredients": {"burnt_capacitor": 2, "nuts_bolts": 2}, "sell_price": 1350,
+    },
+    "stationmasters_log": {
+        "name": "Stationmaster's Log", "emoji": "📼",
+        "description": "A scorched piece of broadcasting equipment with a handwritten frequency scratched into its casing.",
+        "location": "Broadcast Station",
+        "ingredients": {"burnt_capacitor": 1, "nuts_bolts": 3}, "sell_price": 1500,
+    },
+    "room_that_wasnt_there": {
+        "name": "Room That Wasn't There", "emoji": "🏨",
+        "description": "A piece of carpet from a hotel room that doesn't appear on any floor plan. The pattern changes when you stop looking at it.",
+        "location": "Endless Hotel",
+        "ingredients": {"hotel_carpet_thread": 2, "dusty_cleaning_rag": 1}, "sell_price": 1300,
+    },
+    "housekeepings_last_rag": {
+        "name": "Housekeeping's Last Rag", "emoji": "🧽",
+        "description": "The tag reads \"Room Service.\" The hotel's housekeeping department closed thirty years ago.",
+        "location": "Endless Hotel",
+        "ingredients": {"hotel_carpet_thread": 1, "dusty_cleaning_rag": 2}, "sell_price": 1450,
+    },
+    "town_that_remained": {
+        "name": "The Town That Remained", "emoji": "🏚️",
+        "description": "A fragment of a building from Fogbound Town. Nobody can agree on which building it came from.",
+        "location": "Fogbound Town",
+        "ingredients": {"rusty_pipe": 1, "cracked_brick": 2}, "sell_price": 1150,
+    },
+    "fogbound_street_marker": {
+        "name": "Fogbound Street Marker", "emoji": "🪧",
+        "description": "The lettering has almost completely eroded away. What remains is enough to tell you that the street no longer exists.",
+        "location": "Fogbound Town",
+        "ingredients": {"rusty_pipe": 2, "cracked_brick": 1}, "sell_price": 1300,
+    },
+    "unstable_sample": {
+        "name": "Unstable Sample", "emoji": "🧪",
+        "description": "The label is unreadable. The sample continues reacting to light despite being sealed.",
+        "location": "Derelict Research Facility",
+        "ingredients": {"chemical_sample": 2, "broken_lab_glass": 1}, "sell_price": 1600,
+    },
+    "researchers_final_kit": {
+        "name": "Researcher's Final Kit", "emoji": "🧤",
+        "description": "A battered collection of laboratory equipment recovered from a desk that was abandoned mid-experiment.",
+        "location": "Derelict Research Facility",
+        "ingredients": {"contaminated_gloves": 1, "broken_lab_glass": 1, "nuts_bolts": 2}, "sell_price": 1700,
+    },
+    "unmarked_door": {
+        "name": "The Unmarked Door", "emoji": "🗝️",
+        "description": "A key with no number, no label, and no obvious lock to belong to. The carpet fibers stuck to it are still warm.",
+        "location": "Yellow Halls",
+        "ingredients": {"unmarked_key": 1, "damp_carpet_fiber": 1, "yellow_hall_light_cover": 1}, "sell_price": 1200,
+    },
+    "room_zero": {
+        "name": "Room 0", "emoji": "🏨",
+        "description": "The sign points toward a motel that doesn't appear on any map. The key is labeled \"0.\" There is no room 0.",
+        "location": "Dead-End Highway",
+        "ingredients": {"rusted_road_sign": 1, "contaminated_fuel_can": 1, "motel_key": 1}, "sell_price": 1400,
+    },
+    "last_departure": {
+        "name": "The Last Departure", "emoji": "🎟️",
+        "description": "A transit ticket swollen with water. The printed departure time is tomorrow, yesterday, and a date that doesn't exist.",
+        "location": "Drowned Station",
+        "ingredients": {"waterlogged_transit_ticket": 1, "contaminated_water_sample": 1, "submerged_key": 1}, "sell_price": 1500,
+    },
+    "black_notebook": {
+        "name": "The Black Notebook", "emoji": "📓",
+        "description": "The pages describe things that happened at the campground. The final entry describes the person who will eventually read it.",
+        "location": "Silent Campground",
+        "ingredients": {"distorted_photograph": 1, "strange_notebook_page": 1, "blackened_tree_bark": 1, "unidentified_black_tendril": 1},
+        "sell_price": 1800,
+    },
+    "photograph_that_changed": {
+        "name": "The Photograph That Changed", "emoji": "📷",
+        "description": "The people in the photograph are impossible to identify. Every time you look at it, there seems to be one more person standing among them.",
+        "location": "Silent Campground",
+        "ingredients": {"distorted_photograph": 2, "blackened_tree_bark": 1, "unidentified_black_tendril": 1},
+        "sell_price": 2000,
+    },
+}
+
+LOCATION_BASED_COLLECTIBLE_TITLE = "Haunted Item Collector"
+LOCATION_BASED_COLLECTIBLE_COMPLETION_REWARD = 50000
+
+LOCATION_BASED_COLLECTIBLE_ENTRIES = [
+    (item_id, data["name"], data["emoji"], data["description"])
+    for item_id, data in LOCATION_BASED_COLLECTIBLES.items()
+]
+
+# Register these as ordinary inventory items. Selling one does not erase
+# permanent discovery progress.
+for _item_id, _data in LOCATION_BASED_COLLECTIBLES.items():
+    ITEM_REGISTRY.setdefault(
+        _item_id,
+        {
+            "name": _data["name"],
+            "emoji": _data["emoji"],
+            "max_quantity": 10,
+            "type": "Location-Based Collectible",
+            "desc": _data["description"],
+            "sell_price": _data["sell_price"],
+        },
+    )
+
+
+def get_all_halloween_collectibles():
+    return get_halloween_collectibles() + LOCATION_BASED_COLLECTIBLE_ENTRIES
+
 
 async def ensure_collectible_tables(db):
     await db.execute("""
@@ -73,7 +252,7 @@ class Collectibles(commands.Cog):
                 ) as cursor:
                     discovered = {row[0] for row in await cursor.fetchall()}
 
-            entries = get_halloween_collectibles()
+            entries = get_all_halloween_collectibles()
             collectible_map = {
                 item_id: (name, emoji, desc)
                 for item_id, name, emoji, desc in entries
@@ -177,6 +356,7 @@ class Collectibles(commands.Cog):
 
         categories = {
             "🎃 Halloween - Lair of Frights Items": get_halloween_collectibles(),
+            "🔧 Halloween - Location-Based Collectibles": LOCATION_BASED_COLLECTIBLE_ENTRIES,
         }
 
         pages = []
@@ -278,7 +458,7 @@ class Collectibles(commands.Cog):
         current = (current or "").lower().strip()
         choices = []
 
-        for item_id, name, emoji, _description in get_halloween_collectibles():
+        for item_id, name, emoji, _description in get_all_halloween_collectibles():
             if item_id not in discovered:
                 continue
 

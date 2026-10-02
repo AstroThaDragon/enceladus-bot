@@ -444,6 +444,7 @@ ITEM_REGISTRY = {
     "title_haunted_handyman": {"name": "Haunted Handyman", "emoji": "🛠️", "max_quantity": 1, "type": "Title", "desc": "A title for assembling five Haunted Workshop items."},
     "title_occult_hobbyist": {"name": "Occult Hobbyist", "emoji": "🕯️", "max_quantity": 1, "type": "Title", "desc": "A title for performing your first Haunted ritual."},
     "title_occultist": {"name": "Occultist", "emoji": "🕯️", "max_quantity": 1, "type": "Title", "desc": "A title for performing five Haunted rituals."},
+    "title_haunted_item_collector": {"name": "Haunted Item Collector", "emoji": "🔧", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by crafting every location-based Haunted collectible."},
     "title_horror_enthusiast": {"name": "Horror Enthusiast", "emoji": "👻", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting every Halloween Space Junk collectible."},
     "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."},
     "title_seal_breaker": {"name": "Seal Breaker", "emoji": "🍷", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by breaking the seal on the Cursed Wine Cabinet."},

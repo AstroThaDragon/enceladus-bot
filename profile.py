@@ -30,6 +30,7 @@ BACKGROUND_ARTISTS = {
     "background_fogbound": "KoolShooters on Pexels",
     "background_dead_end": "Rebecca Johnsen on Unsplash",
     "background_watched_from_the_trees": "Ben Griffiths on Unsplash",
+    "background_haunted_item_collector": None,
 }
 
 class Profile(commands.Cog):
@@ -408,6 +409,7 @@ class Profile(commands.Cog):
             "background_fogbound": "Fogbound",
             "background_dead_end": "Dead-End",
             "background_watched_from_the_trees": "Watched From the Trees",
+            "background_haunted_item_collector": "Haunted Item Collector",
         }
 
 
@@ -461,6 +463,7 @@ class Profile(commands.Cog):
                 "background_fogbound": "🌫️",
                 "background_dead_end": "🛣️",
                 "background_watched_from_the_trees": "🌲",
+                "background_haunted_item_collector": "🔧",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -501,7 +504,8 @@ class Profile(commands.Cog):
             "background_dead_air": "Dead Air",
             "background_fogbound": "Fogbound",
             "background_dead_end": "Dead-End",
-            "background_watched_from_the_trees": "Watched From the Trees"
+            "background_watched_from_the_trees": "Watched From the Trees",
+            "background_haunted_item_collector": "Haunted Item Collector"
         }
 
         if background not in valid_backgrounds:

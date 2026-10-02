@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
+from collectibles import LOCATION_BASED_COLLECTIBLES
 from seasonal_updates.halloween.haunted import HAUNTED_IMPOSSIBLE_DISCOVERIES
 
 ACHIEVEMENTS = {
@@ -88,6 +89,7 @@ ACHIEVEMENTS = {
     "haunted_workshop_five": {"name": "I Can Fix It", "emoji": "🛠️", "description": "Craft 5 items using the Haunted Workshop.", "reward": "Permanent profile title: Haunted Handyman"},
     "haunted_ritual_first": {"name": "Something Answered", "emoji": "🕯️", "description": "Craft your first item using the Ritual Table.", "reward": "Permanent profile title: Occult Hobbyist"},
     "haunted_ritual_five": {"name": "Occultist", "emoji": "🕯️", "description": "Craft 5 items using the Ritual Table.", "reward": "Permanent profile title: Occultist"},
+    "haunted_item_collector": {"name": "Haunted Item Collector", "emoji": "🔧", "description": "Craft all 23 location-based Haunted collectibles.", "reward": "Permanent profile title: Haunted Item Collector + 50,000 Stardust + exclusive profile background"},
 
     # Future one-time Halloween item achievements.
     # These remain locked/inactive until their corresponding item is enabled
@@ -179,6 +181,10 @@ HAUNTED_CRAFTING_ACHIEVEMENTS = {
     "workshop": (("haunted_workshop_first", 1, "title_improvised_engineer"), ("haunted_workshop_five", 5, "title_haunted_handyman")),
     "ritual_table": (("haunted_ritual_first", 1, "title_occult_hobbyist"), ("haunted_ritual_five", 5, "title_occultist")),
 }
+
+LOCATION_BASED_COLLECTIBLE_TITLE_ID = "title_haunted_item_collector"
+LOCATION_BASED_COLLECTIBLE_BACKGROUND_ID = "background_haunted_item_collector"
+LOCATION_BASED_COLLECTIBLE_REWARD = 50000
 
 HAUNTED_GLOBAL_DISCOVERY_ACHIEVEMENTS = {
     "haunted_first_discovery": ("title_haunted_explorer", None),
@@ -638,7 +644,7 @@ class Achievements(commands.Cog):
                 await db.close()
 
 
-    async def _grant_haunted_achievement(self, db, user_id, achievement_id, title_id=None, background_id=None):
+    async def _grant_haunted_achievement(self, db, user_id, achievement_id, title_id=None, background_id=None, stardust_reward=0):
         async with db.execute(
             "SELECT 1 FROM achievements WHERE user_id = ? AND achievement_id = ?",
             (user_id, achievement_id),
@@ -667,6 +673,11 @@ class Achievements(commands.Cog):
             if "default" not in unlocked: unlocked.insert(0, "default")
             if background_id not in unlocked: unlocked.append(background_id)
             await db.execute("UPDATE users SET unlocked_backgrounds = ? WHERE user_id = ?", (json.dumps(unlocked), user_id))
+        if stardust_reward:
+            await db.execute(
+                "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
+                (stardust_reward, user_id),
+            )
         return True
 
     async def record_haunted_discovery(self, user_id, discovery_id, location_id, sanity=100, db=None):
@@ -785,6 +796,19 @@ class Achievements(commands.Cog):
 
             found = sum(1 for item_id, *_ in entries if item_id in owned)
             newly_unlocked = []
+
+            location_total = len(LOCATION_BASED_COLLECTIBLES)
+            location_found = sum(1 for item_id in LOCATION_BASED_COLLECTIBLES if item_id in owned)
+            if location_total and location_found >= location_total:
+                if await self._grant_haunted_achievement(
+                    db,
+                    user_id,
+                    "haunted_item_collector",
+                    LOCATION_BASED_COLLECTIBLE_TITLE_ID,
+                    LOCATION_BASED_COLLECTIBLE_BACKGROUND_ID,
+                    LOCATION_BASED_COLLECTIBLE_REWARD,
+                ):
+                    newly_unlocked.append("haunted_item_collector")
 
             thresholds = []
             half_needed = math.ceil(total * 0.5)
