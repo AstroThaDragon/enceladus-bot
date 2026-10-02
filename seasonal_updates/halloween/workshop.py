@@ -483,3 +483,7 @@ class Workshop(commands.Cog):
             ephemeral=True,
         )
 
+
+
+async def setup(bot):
+    await bot.add_cog(Workshop(bot))
