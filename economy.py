@@ -619,16 +619,33 @@ class ShopTransactionView(discord.ui.View):
 
     def _build_category_embed(self):
         title = "🛒 Buy Items" if self.mode == "buy" else "🛒 Sell Items"
-        description = "Choose a category to continue."
+
+        if self.mode == "buy":
+            categories = SHOP_BUY_CATEGORY_CHOICES
+            footer = "Choose a category to browse the station shop."
+        else:
+            categories = SHOP_SELL_CATEGORY_CHOICES
+            footer = "Choose a category to browse your sellable inventory."
+
+        category_lines = []
+        for name, value in categories:
+            emoji, label, description = SHOP_CATEGORY_INFO.get(
+                value, ("📂", name, "Shop category")
+            )
+            category_lines.append(f"{emoji} **{label}** — {description}")
+
+        description = (
+            "Choose a category to continue.\n\n"
+            "**Available Categories**\n"
+            + "\n".join(category_lines)
+        )
+
         embed = discord.Embed(
             title=title,
             description=description,
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        if self.mode == "sell":
-            embed.set_footer(text="Choose a category to browse your sellable inventory.")
-        else:
-            embed.set_footer(text="Choose a category to browse the station shop.")
+        embed.set_footer(text=footer)
         return embed
 
     async def show_category(self, interaction):
@@ -639,7 +656,14 @@ class ShopTransactionView(discord.ui.View):
         self.quantity = 1
         self.quantity_input = "1"
         self._build_category_view()
-        await interaction.response.edit_message(
+
+        # A category return can happen after other async shop work. Defer the
+        # component interaction immediately so Discord does not time out while
+        # the response is being edited.
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
+        await interaction.edit_original_response(
             embed=self._build_category_embed(),
             view=self,
         )
