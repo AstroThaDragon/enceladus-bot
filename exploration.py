@@ -574,7 +574,7 @@ class Exploration(commands.Cog):
 
     async def _start_haunted_run(self, interaction: discord.Interaction, location_id: str):
         if not halloween_is_active():
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "🎃 **Haunted Exploration is currently dormant.**",
                 ephemeral=True,
             )
@@ -586,7 +586,7 @@ class Exploration(commands.Cog):
                 await self.ensure_schema(db)
                 consumed, profile = await consume_attempt(db, user_id)
                 if not consumed:
-                    return await interaction.response.send_message(
+                    return await interaction.followup.send(
                         "🎟️ **You're out of Haunted Exploration attempts for today.**\n"
                         "Come back after the daily reset.",
                         ephemeral=True,
@@ -722,7 +722,7 @@ class Exploration(commands.Cog):
 
         embed.set_footer(text="Choose carefully. Or run.")
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             content=None,
             embed=embed,
             view=HauntedEncounterView(self, location_id, stage, total_stages, encounter),
@@ -736,7 +736,7 @@ class Exploration(commands.Cog):
                 await self.ensure_schema(db)
                 run = await get_active_run(db, user_id)
                 if not run or run["location_id"] != location_id or run["stage"] != stage:
-                    return await interaction.response.send_message(
+                    return await interaction.followup.send(
                         "⚠️ This encounter is no longer active. Start a new Haunted Exploration run.",
                         ephemeral=True,
                     )
@@ -893,7 +893,7 @@ class Exploration(commands.Cog):
                 )
                 reward_embed.set_footer(text="Adventure complete • The portals remain open...")
 
-                await interaction.response.edit_message(
+                await interaction.edit_original_response(
                     content=None,
                     embed=reward_embed,
                     view=None,
@@ -916,7 +916,7 @@ class Exploration(commands.Cog):
                 await self.ensure_schema(db)
                 run = await get_active_run(db, user_id)
                 if not run or run["location_id"] != location_id or run["stage"] != stage:
-                    return await interaction.response.send_message(
+                    return await interaction.followup.send(
                         "⚠️ This encounter is no longer active. Start a new Haunted Exploration run.",
                         ephemeral=True,
                     )
@@ -960,7 +960,7 @@ class Exploration(commands.Cog):
         )
         escape_embed.set_footer(text="You escaped. The portal remains behind you.")
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             content=None,
             embed=escape_embed,
             view=None,
@@ -2708,6 +2708,10 @@ class HauntedLocationButton(discord.ui.Button):
         self.location_id = location_id
 
     async def callback(self, interaction: discord.Interaction):
+        # A Haunted run performs several database operations before the
+        # adventure screen can be rendered. Acknowledge the button immediately
+        # so Discord does not time out the interaction while that work runs.
+        await interaction.response.defer()
         await self.cog._start_haunted_run(interaction, self.location_id)
 
 
@@ -2771,6 +2775,9 @@ class HauntedChoiceButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        # Choice resolution can involve DB work, effects, achievements, and
+        # reward progression, so acknowledge before doing any of it.
+        await interaction.response.defer()
         await self.cog._resolve_haunted_choice(
             interaction,
             self.location_id,
@@ -2795,6 +2802,8 @@ class HauntedRunButton(discord.ui.Button):
         self.total_stages = total_stages
 
     async def callback(self, interaction: discord.Interaction):
+        # Acknowledge immediately; escape resolution also touches the DB.
+        await interaction.response.defer()
         await self.cog._run_away_haunted(
             interaction,
             self.location_id,
