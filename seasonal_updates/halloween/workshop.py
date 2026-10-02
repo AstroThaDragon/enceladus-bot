@@ -223,9 +223,10 @@ def format_recipe(recipe, owned):
 
 
 class WorkshopSelect(discord.ui.Select):
-    def __init__(self, cog, owner_id):
+    def __init__(self, cog, owner_id, quantity: int = 1):
         self.cog = cog
         self.owner_id = owner_id
+        self.quantity = max(1, min(10, int(quantity)))
         options = [
             discord.SelectOption(
                 label=r["name"], value=rid, emoji=r["emoji"],
@@ -242,7 +243,7 @@ class WorkshopSelect(discord.ui.Select):
         if not halloween_is_active():
             await interaction.response.send_message("🎃 The Haunted Workshop is dormant outside Halloween.", ephemeral=True)
             return
-        await self.cog.assemble(interaction, self.values[0])
+        await self.cog.assemble(interaction, self.values[0], self.quantity)
 
 
 class WorkshopRecipeBookView(discord.ui.View):
@@ -296,11 +297,12 @@ class WorkshopRecipeBookView(discord.ui.View):
 
 
 class WorkshopView(discord.ui.View):
-    def __init__(self, cog, owner_id):
+    def __init__(self, cog, owner_id, quantity: int = 1):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.add_item(WorkshopSelect(cog, owner_id))
+        self.quantity = max(1, min(10, int(quantity)))
+        self.add_item(WorkshopSelect(cog, owner_id, self.quantity))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -366,7 +368,7 @@ class Workshop(commands.Cog):
         ) as cursor:
             return {row[0]: row[1] for row in await cursor.fetchall()}
 
-    async def show_menu(self, interaction):
+    async def show_menu(self, interaction, quantity: int = 1):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             owned = await self._owned(db, interaction.user.id)
         embed = discord.Embed(
@@ -374,7 +376,7 @@ class Workshop(commands.Cog):
             description=(
                 "Bolts, wires, dead electronics, and things that definitely should not be plugged in.\n"
                 "*Something in the static clicks when you get close.*\n\n"
-                "Choose something to assemble below."
+                f"Choose something to assemble below. Batch size: **×{craftable}**."
             ),
             color=discord.Color.dark_purple(),
         )
@@ -388,7 +390,7 @@ class Workshop(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=WorkshopView(self, interaction.user.id),
+            view=WorkshopView(self, interaction.user.id, quantity),
         )
 
     async def show_recipe_book(self, interaction):
@@ -410,61 +412,74 @@ class Workshop(commands.Cog):
         )
 
 
-    async def assemble(self, interaction, recipe_id):
+    async def assemble(self, interaction, recipe_id, quantity: int = 1):
         recipe = WORKSHOP_RECIPES[recipe_id]
+        quantity = max(1, min(10, int(quantity)))
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("BEGIN IMMEDIATE")
             owned = await self._owned(db, interaction.user.id)
+
             missing = [
-                f"{ingredient_emoji(i)} {ingredient_name(i)} ×{a-owned.get(i,0)}"
-                for i,a in recipe["ingredients"].items()
-                if owned.get(i,0) < a
+                f"{ingredient_emoji(i)} {ingredient_name(i)} ×{a * quantity - owned.get(i, 0)}"
+                for i, a in recipe["ingredients"].items()
+                if owned.get(i, 0) < a * quantity
             ]
-            if missing:
+            craftable = quantity
+            for item_id, amount in recipe["ingredients"].items():
+                craftable = min(craftable, owned.get(item_id, 0) // amount)
+
+            result_info = ITEM_REGISTRY.get(recipe["result"], {})
+            result_max = int(result_info.get("max_quantity", 10))
+            current_result = owned.get(recipe["result"], 0)
+            craftable = min(craftable, max(0, result_max - current_result))
+
+            if craftable < 1:
                 await db.rollback()
-                await interaction.response.send_message(
-                    "❌ **Missing parts:**\n" + "\n".join(missing),
-                    ephemeral=True,
-                )
+                if current_result >= result_max:
+                    message = f"❌ Your **{recipe['name']}** inventory is full. You currently have **{current_result}/{result_max}**."
+                else:
+                    message = "❌ **Missing parts:**\n" + "\n".join(missing)
+                await interaction.response.send_message(message, ephemeral=True)
                 return
 
             for item_id, amount in recipe["ingredients"].items():
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
-                    (amount, interaction.user.id, item_id),
+                    (amount * craftable, interaction.user.id, item_id),
                 )
 
             added, _, _ = await add_inventory_item(
-                db, interaction.user.id, recipe["result"], recipe["result_type"], 1
+                db, interaction.user.id, recipe["result"], recipe["result_type"], craftable
             )
-            if added < 1:
+            if added < craftable:
+                refund = craftable - added
                 for item_id, amount in recipe["ingredients"].items():
                     await db.execute(
                         "UPDATE inventory SET quantity = quantity + ? WHERE user_id = ? AND item_id = ?",
-                        (amount, interaction.user.id, item_id),
+                        (amount * refund, interaction.user.id, item_id),
                     )
-                await db.commit()
-                await interaction.response.send_message(
-                    f"❌ Your **{recipe['name']}** inventory is full. Your parts were returned.",
-                    ephemeral=True,
-                )
-                return
+                craftable = added
 
             await db.commit()
 
+        if craftable < 1:
+            await interaction.response.send_message(
+                f"❌ Your **{recipe['name']}** inventory is full. Your parts were returned.",
+                ephemeral=True,
+            )
+            return
+
         achievements_cog = self.bot.get_cog("Achievements")
         if achievements_cog:
-            await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "workshop")
+            for _ in range(craftable):
+                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "workshop")
 
         import random
         flavor = random.choice(WORKSHOP_FLAVOR_TEXT.get(recipe_id, ["The finished device gives an unsettling little hum as it comes to life."]))
         await interaction.response.send_message(
             f"*{flavor}*\n\n"
-            f"🔧 **Assembly complete!** You built **{recipe['emoji']} {recipe['name']} ×1**.",
+            f"🔧 **Assembly complete!** You built **{recipe['emoji']} {recipe['name']} ×{craftable}**."
+            + (f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**." if craftable < quantity else ""),
             ephemeral=True,
         )
 
-
-
-async def setup(bot):
-    await bot.add_cog(Workshop(bot))

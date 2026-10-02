@@ -151,9 +151,10 @@ def format_recipe(recipe, owned):
 
 
 class RitualSelect(discord.ui.Select):
-    def __init__(self, cog, owner_id):
+    def __init__(self, cog, owner_id, quantity: int = 1):
         self.cog = cog
         self.owner_id = owner_id
+        self.quantity = max(1, min(10, int(quantity)))
         options = [
             discord.SelectOption(label=r["name"], value=rid, emoji=r["emoji"], description="Perform this ritual")
             for rid, r in RITUAL_RECIPES.items()
@@ -167,7 +168,7 @@ class RitualSelect(discord.ui.Select):
         if not halloween_is_active():
             await interaction.response.send_message("🎃 The Ritual Table is dormant outside Halloween.", ephemeral=True)
             return
-        await self.cog.perform(interaction, self.values[0])
+        await self.cog.perform(interaction, self.values[0], self.quantity)
 
 
 class RitualRecipeBookView(discord.ui.View):
@@ -221,11 +222,12 @@ class RitualRecipeBookView(discord.ui.View):
 
 
 class RitualView(discord.ui.View):
-    def __init__(self, cog, owner_id):
+    def __init__(self, cog, owner_id, quantity: int = 1):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.add_item(RitualSelect(cog, owner_id))
+        self.quantity = max(1, min(10, int(quantity)))
+        self.add_item(RitualSelect(cog, owner_id, self.quantity))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -291,13 +293,13 @@ class RitualTable(commands.Cog):
         ) as cursor:
             return {row[0]: row[1] for row in await cursor.fetchall()}
 
-    async def show_menu(self, interaction):
+    async def show_menu(self, interaction, quantity: int = 1):
         embed = discord.Embed(
             title="🕯️ Ritual Table",
             description=(
                 "The surface is covered in chalk marks, candle wax, and diagrams you do not remember drawing.\n"
                 "*The candles are already lit. You don't remember lighting them.*\n\n"
-                "Choose a ritual to perform."
+                f"Choose a ritual to perform. Batch size: **×{quantity}**."
             ),
             color=discord.Color.dark_purple(),
         )
@@ -308,7 +310,7 @@ class RitualTable(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=RitualView(self, interaction.user.id),
+            view=RitualView(self, interaction.user.id, quantity),
         )
 
     async def show_recipe_book(self, interaction):
@@ -330,58 +332,78 @@ class RitualTable(commands.Cog):
         )
 
 
-    async def perform(self, interaction, recipe_id):
+    async def perform(self, interaction, recipe_id, quantity: int = 1):
         recipe = RITUAL_RECIPES[recipe_id]
+        quantity = max(1, min(10, int(quantity)))
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("BEGIN IMMEDIATE")
             owned = await self._owned(db, interaction.user.id)
+
             missing = [
-                f"{item_emoji(i)} {item_name(i)} ×{a-owned.get(i,0)}"
-                for i,a in recipe["ingredients"].items()
-                if owned.get(i,0) < a
+                f"{item_emoji(i)} {item_name(i)} ×{a * quantity - owned.get(i, 0)}"
+                for i, a in recipe["ingredients"].items()
+                if owned.get(i, 0) < a * quantity
             ]
-            if missing:
+            craftable = quantity
+            for item_id, amount in recipe["ingredients"].items():
+                craftable = min(craftable, owned.get(item_id, 0) // amount)
+
+            result_info = ITEM_REGISTRY.get(recipe["result"], {})
+            result_max = int(result_info.get("max_quantity", 10))
+            current_result = owned.get(recipe["result"], 0)
+            craftable = min(craftable, max(0, result_max - current_result))
+
+            if craftable < 1:
                 await db.rollback()
-                await interaction.response.send_message(
-                    "❌ **Missing ritual components:**\n" + "\n".join(missing),
-                    ephemeral=True,
-                )
+                if current_result >= result_max:
+                    message = f"❌ Your **{recipe['name']}** inventory is full. You currently have **{current_result}/{result_max}**."
+                else:
+                    message = "❌ **Missing ritual components:**\n" + "\n".join(missing)
+                await interaction.response.send_message(message, ephemeral=True)
                 return
 
             for item_id, amount in recipe["ingredients"].items():
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
-                    (amount, interaction.user.id, item_id),
+                    (amount * craftable, interaction.user.id, item_id),
                 )
 
             added, _, _ = await add_inventory_item(
-                db, interaction.user.id, recipe["result"], "Ritual Item", 1
+                db, interaction.user.id, recipe["result"], "Ritual Item", craftable
             )
-            if added < 1:
+            if added < craftable:
+                refund = craftable - added
                 for item_id, amount in recipe["ingredients"].items():
                     await db.execute(
                         "UPDATE inventory SET quantity = quantity + ? WHERE user_id = ? AND item_id = ?",
-                        (amount, interaction.user.id, item_id),
+                        (amount * refund, interaction.user.id, item_id),
                     )
-                await db.commit()
-                await interaction.response.send_message(
-                    f"❌ Your **{recipe['name']}** inventory is full. Your components were returned.",
-                    ephemeral=True,
-                )
-                return
+                craftable = added
 
             await db.commit()
 
+        if craftable < 1:
+            await interaction.response.send_message(
+                f"❌ Your **{recipe['name']}** inventory is full. Your components were returned.",
+                ephemeral=True,
+            )
+            return
+
         import random
-        flavor = random.choice(RITUAL_FLAVOR_TEXT.get(recipe_id, ["The final mark settles into place. The room feels subtly different afterward."]))
+        flavor = random.choice(
+            RITUAL_FLAVOR_TEXT.get(
+                recipe_id,
+                ["The final mark settles into place. The room feels subtly different afterward."],
+            )
+        )
         await interaction.response.send_message(
             f"*{flavor}*\n\n"
-            f"🕯️ **Ritual complete.** You created **{recipe['emoji']} {recipe['name']} ×1**.\n\n"
-            f"*{recipe['description']}*",
+            f"🕯️ **Ritual complete.** You created **{recipe['emoji']} {recipe['name']} ×{craftable}**."
+            + (
+                f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
+                if craftable < quantity else ""
+            )
+            + f"\n\n*{recipe['description']}*",
             ephemeral=True,
         )
 
-
-
-async def setup(bot):
-    await bot.add_cog(RitualTable(bot))

@@ -303,10 +303,11 @@ def format_recipe(recipe: dict, owned: dict[str, int] | None = None) -> str:
 
 
 class CauldronView(discord.ui.View):
-    def __init__(self, cog: "Cauldron", owner_id: int):
+    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
+        self.quantity = max(1, min(10, int(quantity)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -336,7 +337,7 @@ class CauldronView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        await self.cog.show_brew_menu(interaction)
+        await self.cog.show_brew_menu(interaction, self.quantity)
 
     @discord.ui.button(
         label="Recipes",
@@ -360,7 +361,7 @@ class CauldronView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        await self.cog.show_ingredients(interaction)
+        await self.cog.show_ingredients(interaction, self.quantity)
 
     @discord.ui.button(
         label="Close",
@@ -433,9 +434,10 @@ class CauldronRecipeBookView(discord.ui.View):
 
 
 class RecipeSelect(discord.ui.Select):
-    def __init__(self, cog: "Cauldron", owner_id: int):
+    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
         self.cog = cog
         self.owner_id = owner_id
+        self.quantity = max(1, min(10, int(quantity)))
 
         options = [
             discord.SelectOption(
@@ -470,15 +472,16 @@ class RecipeSelect(discord.ui.Select):
             return
 
         recipe_id = self.values[0]
-        await self.cog.brew(interaction, recipe_id)
+        await self.cog.brew(interaction, recipe_id, self.quantity)
 
 
 class RecipeSelectView(discord.ui.View):
-    def __init__(self, cog: "Cauldron", owner_id: int):
+    def __init__(self, cog: "Cauldron", owner_id: int, quantity: int = 1):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = owner_id
-        self.add_item(RecipeSelect(cog, owner_id))
+        self.quantity = max(1, min(10, int(quantity)))
+        self.add_item(RecipeSelect(cog, owner_id, self.quantity))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -494,10 +497,11 @@ class RecipeSelectView(discord.ui.View):
 
 
 class SeasonalCraftingView(discord.ui.View):
-    def __init__(self, cauldron, owner_id: int):
+    def __init__(self, cauldron, owner_id: int, quantity: int = 1):
         super().__init__(timeout=300)
         self.cauldron = cauldron
         self.owner_id = owner_id
+        self.quantity = max(1, min(10, int(quantity)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -519,13 +523,13 @@ class SeasonalCraftingView(discord.ui.View):
 
     @discord.ui.button(label="Witch's Cauldron", emoji="🧙", style=discord.ButtonStyle.primary, row=0)
     async def cauldron_button(self, interaction, button):
-        await self.cauldron.show_cauldron_menu(interaction)
+        await self.cauldron.show_cauldron_menu(interaction, self.quantity)
 
     @discord.ui.button(label="Haunted Workshop", emoji="🔧", style=discord.ButtonStyle.secondary, row=0)
     async def workshop_button(self, interaction, button):
         cog = self.cauldron.bot.get_cog("Workshop")
         if cog:
-            await cog.show_menu(interaction)
+            await cog.show_menu(interaction, self.quantity)
         else:
             await interaction.response.send_message("❌ The Haunted Workshop is not loaded.", ephemeral=True)
 
@@ -533,7 +537,7 @@ class SeasonalCraftingView(discord.ui.View):
     async def ritual_button(self, interaction, button):
         cog = self.cauldron.bot.get_cog("RitualTable")
         if cog:
-            await cog.show_menu(interaction)
+            await cog.show_menu(interaction, self.quantity)
         else:
             await interaction.response.send_message("❌ The Ritual Table is not loaded.", ephemeral=True)
 
@@ -563,13 +567,13 @@ class Cauldron(commands.Cog):
             color=discord.Color.dark_purple(),
         )
         embed.set_footer(text="Halloween Seasonal System")
-        view = SeasonalCraftingView(self, interaction.user.id)
+        view = SeasonalCraftingView(self, interaction.user.id, quantity)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
         else:
             await interaction.response.send_message(embed=embed, view=view)
 
-    async def show_cauldron_menu(self, interaction):
+    async def show_cauldron_menu(self, interaction, quantity: int = 1):
         embed = discord.Embed(
             title="🧙 The Witch's Cauldron",
             description=(
@@ -581,7 +585,7 @@ class Cauldron(commands.Cog):
         embed.set_footer(text="Halloween Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
-            view=CauldronView(self, interaction.user.id),
+            view=CauldronView(self, interaction.user.id, quantity),
         )
 
     async def ensure_inventory(self, db):
@@ -646,18 +650,18 @@ class Cauldron(commands.Cog):
                 ephemeral=ephemeral,
             )
 
-    async def show_brew_menu(self, interaction: discord.Interaction):
+    async def show_brew_menu(self, interaction: discord.Interaction, quantity: int = 1):
         embed = discord.Embed(
             title="🧪 Brew at the Cauldron",
             description=(
                 "*The liquid inside bubbles without any heat.*\n\n"
-                "Choose a recipe below. Your ingredients are checked again "
+                f"Choose a recipe below. This batch will craft **×{craftable}**. Your ingredients are checked again "
                 "when you brew, so you cannot spend the same ingredients twice."
             ),
             color=discord.Color.dark_purple(),
         )
 
-        view = RecipeSelectView(self, interaction.user.id)
+        view = RecipeSelectView(self, interaction.user.id, quantity)
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_recipe_book(self, interaction: discord.Interaction):
@@ -679,7 +683,7 @@ class Cauldron(commands.Cog):
             view=CauldronRecipeBookView(self, interaction.user.id, pages),
         )
 
-    async def show_ingredients(self, interaction: discord.Interaction):
+    async def show_ingredients(self, interaction: discord.Interaction, quantity: int = 1):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)
             owned = await self.owned(db, interaction.user.id)
@@ -717,113 +721,109 @@ class Cauldron(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=embed,
-            view=CauldronView(self, interaction.user.id),
+            view=CauldronView(self, interaction.user.id, quantity),
         )
 
-    async def brew(self, interaction: discord.Interaction, recipe_id: str):
+    async def brew(self, interaction: discord.Interaction, recipe_id: str, quantity: int = 1):
         recipe = CAULDRON_RECIPES.get(recipe_id)
+        quantity = max(1, min(10, int(quantity)))
         if recipe is None:
-            await interaction.response.send_message(
-                "❌ That cauldron recipe doesn't exist.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("❌ That cauldron recipe doesn't exist.", ephemeral=True)
             return
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)
             await db.execute("BEGIN IMMEDIATE")
-
             owned = await self.owned(db, interaction.user.id)
 
             missing = []
+            craftable = quantity
             for item_id, amount in recipe["ingredients"].items():
                 have = owned.get(item_id, 0)
-                if have < amount:
+                craftable = min(craftable, have // amount)
+                required = amount * quantity
+                if have < required:
                     missing.append(
-                        f"{recipe_ingredient_emoji(item_id)} "
-                        f"{recipe_ingredient_name(item_id)} ×{amount - have}"
+                        f"{recipe_ingredient_emoji(item_id)} {recipe_ingredient_name(item_id)} ×{required - have}"
                     )
 
-            if missing:
+            result_info = ITEM_REGISTRY.get(recipe["result"], {})
+            result_max = int(result_info.get("max_quantity", 10))
+            current_result = owned.get(recipe["result"], 0)
+            craftable = min(craftable, max(0, result_max - current_result))
+
+            if craftable < 1:
                 await db.rollback()
-                await interaction.response.send_message(
-                    "❌ **You're missing:**\n" + "\n".join(missing),
-                    ephemeral=True,
-                )
+                if current_result >= result_max:
+                    message = (
+                        f"❌ Your **{recipe['name']}** inventory is full. "
+                        f"You currently have **{current_result}/{result_max}**."
+                    )
+                else:
+                    message = "❌ **You're missing:**\n" + "\n".join(missing)
+                await interaction.response.send_message(message, ephemeral=True)
                 return
 
             for item_id, amount in recipe["ingredients"].items():
                 await db.execute(
-                    """
-                    UPDATE inventory
-                    SET quantity = quantity - ?
-                    WHERE user_id = ? AND item_id = ?
-                    """,
-                    (amount, interaction.user.id, item_id),
+                    "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
+                    (amount * craftable, interaction.user.id, item_id),
                 )
-
-            # Respect the existing inventory system's normal max-quantity
-            # handling for the brewed item. The helper handles overflow.
             await db.commit()
 
-        # add_inventory_item owns the inventory-capacity/overflow logic.
-        # Use a fresh connection after committing ingredient consumption so
-        # its own transaction remains isolated.
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             added, _new_quantity, _max_quantity = await add_inventory_item(
-                db,
-                interaction.user.id,
-                recipe["result"],
-                recipe["result_type"],
-                1,
+                db, interaction.user.id, recipe["result"], recipe["result_type"], craftable
             )
             await db.commit()
 
-        # If the potion itself is already at its inventory cap, refund the
-        # consumed ingredients rather than silently destroying them.
-        if added < 1:
+        if added < craftable:
+            refund = added
+            missing_output = craftable - added
             async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
                 await db.execute("BEGIN IMMEDIATE")
                 for item_id, amount in recipe["ingredients"].items():
                     await db.execute(
-                        """
-                        UPDATE inventory
-                        SET quantity = quantity + ?
-                        WHERE user_id = ? AND item_id = ?
-                        """,
-                        (amount, interaction.user.id, item_id),
+                        "UPDATE inventory SET quantity = quantity + ? WHERE user_id = ? AND item_id = ?",
+                        (amount * refund, interaction.user.id, item_id),
                     )
                 await db.commit()
+            craftable = added
 
+        if craftable < 1:
             await interaction.response.send_message(
-                f"❌ Your **{recipe['name']}** inventory is full. "
-                "Your ingredients were returned.",
+                f"❌ Your **{recipe['name']}** inventory is full. Your ingredients were returned.",
                 ephemeral=True,
             )
             return
 
         import random
-        flavor = random.choice(CAULDRON_FLAVOR_TEXT.get(recipe_id, ["The cauldron gives a final, unsettling bubble as the brew settles."]))
+        flavor = random.choice(CAULDRON_FLAVOR_TEXT.get(
+            recipe_id, ["The cauldron gives a final, unsettling bubble as the brew settles."]
+        ))
         description = (
             f"*{flavor}*\n\n"
-            f"You brewed **{recipe['emoji']} {recipe['name']} ×1**!\n\n"
-            f"{recipe['description']}\n\n"
+            f"You brewed **{recipe['emoji']} {recipe['name']} ×{craftable}**!"
+            + (
+                f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
+                if craftable < quantity else ""
+            )
+            + f"\n\n{recipe['description']}\n\n"
             f"🧪 **Effect:** `{recipe['effect']['type']}`"
         )
 
         achievements_cog = self.bot.get_cog("Achievements")
         if achievements_cog:
-            await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "cauldron")
+            for _ in range(craftable):
+                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "cauldron")
 
         embed = discord.Embed(
             title="🧙 Brew Complete!",
             description=description,
             color=discord.Color.dark_purple(),
         )
-        await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True,
-        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
     @commands.hybrid_group(name="seasonal", description="Open seasonal crafting systems.")
     async def seasonal(self, ctx: commands.Context):
@@ -834,6 +834,7 @@ class Cauldron(commands.Cog):
     @app_commands.describe(
         season="Choose the seasonal event.",
         bench="Choose the crafting station to open.",
+        quantity="How many of the selected recipe to craft (1–10).",
     )
     @app_commands.choices(
         season=[
@@ -850,7 +851,12 @@ class Cauldron(commands.Cog):
         ctx: commands.Context,
         season: str,
         bench: str,
+        quantity: int = 1,
     ):
+        if quantity < 1 or quantity > 10:
+            await ctx.send("❌ Seasonal crafting quantity must be between **1 and 10**.")
+            return
+
         if season != "halloween":
             await ctx.send("❌ That seasonal crafting event is not available.")
             return
@@ -882,7 +888,7 @@ class Cauldron(commands.Cog):
             embed.set_footer(text="Lair of Frights Seasonal System")
             await ctx.send(
                 embed=embed,
-                view=CauldronView(self, ctx.author.id),
+                view=CauldronView(self, ctx.author.id, quantity),
             )
             return
 
@@ -903,7 +909,7 @@ class Cauldron(commands.Cog):
             )
             await ctx.send(
                 embed=embed,
-                view=WorkshopView(workshop, ctx.author.id),
+                view=WorkshopView(workshop, ctx.author.id, quantity),
             )
             return
 
@@ -924,7 +930,7 @@ class Cauldron(commands.Cog):
             )
             await ctx.send(
                 embed=embed,
-                view=RitualView(ritual, ctx.author.id),
+                view=RitualView(ritual, ctx.author.id, quantity),
             )
 
 
