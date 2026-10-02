@@ -968,9 +968,9 @@ class Exploration(commands.Cog):
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
-        app_commands.Choice(name=f"{EMOJIS.get('nanite_patch', '🩹')} Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
-        app_commands.Choice(name=f"{EMOJIS.get('makeshift_medkit', '🩹')} Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
-        app_commands.Choice(name=f"{EMOJIS.get('medkit', '🧰')} Field Trauma Medkit (+100 HP)", value="medkit"),
+        app_commands.Choice(name="🩹 Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
+        app_commands.Choice(name="🩹 Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
+        app_commands.Choice(name="🧰 Field Trauma Medkit (+100 HP)", value="medkit"),
         app_commands.Choice(name="🍬 Halloween Candy (+5 HP)", value="halloween_candy"),
         app_commands.Choice(name="🎃 Trick-or-Treat Bag (+25 HP)", value="trick_or_treat_bag")
     ])
