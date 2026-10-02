@@ -842,7 +842,8 @@ class Exploration(commands.Cog):
                     collectible = reward["collectible"]
                     reward_lines.extend([
                         "",
-                        f"🎃 **Halloween Collectible Found:** {collectible[2]} **{collectible[1]}**",
+                        f"🎃 **Halloween Collectible Found: {collectible[2]} {collectible[1]}**",
+                        "━━━━━━━━━━━━━━━━━━━━━━━━",
                         f"*{collectible[3]}*",
                     ])
 
@@ -2040,12 +2041,14 @@ class Exploration(commands.Cog):
                 )
                 if added_collectible:
                     seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}**\n"
+                        f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name}**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
                         f"*{collectible_desc}*"
                     )
                 else:
                     seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found:** {collectible_emoji} **{collectible_name}** → Inventory Full\n"
+                        f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name} → Inventory Full**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
                         f"*{collectible_desc}*"
                     )
 
