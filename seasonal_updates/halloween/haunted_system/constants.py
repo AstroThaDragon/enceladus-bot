@@ -173,9 +173,9 @@ HAUNTED_REWARD_RANGES = {'common': {'stardust': (150, 275), 'candy': (3, 6), 'in
  'legendary': {'stardust': (700, 1200), 'candy': (14, 22), 'ingredients': (3, 5)},
  'void': {'stardust': (1200, 2000), 'candy': (25, 40), 'ingredients': (4, 7)}}
 
-HAUNTED_COLLECTIBLE_CHANCES = {'common': 0.08, 'uncommon': 0.12, 'rare': 0.15, 'legendary': 0.25, 'void': 0.45}
+HAUNTED_COLLECTIBLE_CHANCES = {'common': 0.15, 'uncommon': 0.20, 'rare': 0.25, 'legendary': 0.35, 'void': 0.55}
 
-HAUNTED_RARITY_WEIGHTS = {'common': 65, 'uncommon': 25, 'rare': 8, 'legendary': 1.9, 'void': 0.1}
+HAUNTED_RARITY_WEIGHTS = {'common': 50, 'uncommon': 30, 'rare': 14, 'legendary': 5.6, 'void': 0.4}
 
 HAUNTED_RARITY_LABELS = {'common': 'Common', 'uncommon': 'Uncommon', 'rare': 'Rare', 'legendary': 'Legendary', 'void': 'Void'}
 
