@@ -602,8 +602,28 @@ class Workshop(commands.Cog):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             owned = await self._owned(db, interaction.user.id)
 
-        recipes = [format_recipe(recipe, owned) for recipe in WORKSHOP_RECIPES.values()]
-        pages = ["\n\n──────────────\n\n".join(recipes[i:i + 3]) for i in range(0, len(recipes), 3)]
+        # Keep location-based collectibles in their own recipe-book section,
+        # and place that section at the beginning of the book.
+        location_recipes = [
+            format_recipe(recipe, owned)
+            for recipe in LOCATION_COLLECTIBLE_RECIPES.values()
+        ]
+        device_recipes = [
+            format_recipe(recipe, owned)
+            for recipe in WORKSHOP_RECIPES.values()
+        ]
+
+        location_pages = [
+            "## 📚 Location-Based Collectibles\n\n"
+            + "\n\n──────────────\n\n".join(location_recipes[i:i + 3])
+            for i in range(0, len(location_recipes), 3)
+        ]
+        device_pages = [
+            "## 🔧 Haunted Devices\n\n"
+            + "\n\n──────────────\n\n".join(device_recipes[i:i + 3])
+            for i in range(0, len(device_recipes), 3)
+        ]
+        pages = location_pages + device_pages
 
         embed = discord.Embed(
             title="📖 Workshop Recipe Book",
