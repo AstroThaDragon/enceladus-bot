@@ -680,6 +680,14 @@ class Exploration(commands.Cog):
                 pet_result = await grant_haunted_pet(db, user_id, location_id)
                 if pet_result and pet_result.get("new"):
                     pet_discovery_message = pet_result["message"]
+                    # Keep the discovery attached to the active run so it can
+                    # still be shown in the final summary if the player runs
+                    # away before completing all stages.
+                    effects["haunted_run_pet_discovery"] = pet_discovery_message
+                    await db.execute(
+                        "UPDATE users SET active_effects = ? WHERE user_id = ?",
+                        (json.dumps(effects), user_id),
+                    )
 
             await db.commit()
 
@@ -802,9 +810,10 @@ class Exploration(commands.Cog):
                             db=db,
                         )
 
-                # Collectible bonuses are resolved before advance_run clears the
-                # run-scoped effects on completion.
+                # Collectible bonuses and discoveries are resolved before
+                # advance_run clears the run-scoped effects on completion.
                 collectible_bonus = float(effects.get("haunted_run_collectible_bonus", 0.0))
+                pet_discovery_message = effects.get("haunted_run_pet_discovery")
                 next_stage = await advance_run(db, user_id)
                 reward = None
                 if next_stage is None:
@@ -891,6 +900,12 @@ class Exploration(commands.Cog):
                     value="\n".join(reward_lines),
                     inline=False,
                 )
+                if pet_discovery_message:
+                    reward_embed.add_field(
+                        name="🐾 Location Pet Found",
+                        value=pet_discovery_message,
+                        inline=False,
+                    )
                 reward_embed.set_footer(text="Adventure complete • The portals remain open...")
 
                 await interaction.edit_original_response(
@@ -920,6 +935,23 @@ class Exploration(commands.Cog):
                         "⚠️ This encounter is no longer active. Start a new Haunted Exploration run.",
                         ephemeral=True,
                     )
+
+                # Read the run-scoped pet discovery before clear_run removes
+                # all Haunted run state. This lets an early escape preserve the
+                # discovery in the end-of-run summary.
+                pet_discovery_message = None
+                async with db.execute(
+                    "SELECT active_effects FROM users WHERE user_id = ?",
+                    (user_id,),
+                ) as cursor:
+                    effect_row = await cursor.fetchone()
+                try:
+                    effects = json.loads(effect_row[0] or "{}") if effect_row else {}
+                    if not isinstance(effects, dict):
+                        effects = {}
+                except (TypeError, ValueError):
+                    effects = {}
+                pet_discovery_message = effects.get("haunted_run_pet_discovery")
 
                 rare_escape = random.random() < 0.08
                 if rare_escape:
@@ -958,6 +990,12 @@ class Exploration(commands.Cog):
             value="No reward was earned from this run.",
             inline=False,
         )
+        if pet_discovery_message:
+            escape_embed.add_field(
+                name="🐾 Location Pet Found",
+                value=pet_discovery_message,
+                inline=False,
+            )
         escape_embed.set_footer(text="You escaped. The portal remains behind you.")
 
         await interaction.edit_original_response(
