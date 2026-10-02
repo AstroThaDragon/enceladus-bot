@@ -2147,7 +2147,8 @@ class Economy(commands.Cog):
     @app_commands.describe(
         member="The member you want to give something to.",
         pet="An owned pet to transfer. Leave blank when giving an item.",
-        item="An owned transferable item to give. Leave blank when giving a pet.",
+        item="An owned transferable item to give. Leave blank when giving a pet or Stardust.",
+        stardust="How much Stardust to give. Leave blank when giving a pet or item.",
         quantity="How many of the selected item to give (default: 1).",
     )
     @app_commands.autocomplete(pet=give_pet_autocomplete, item=give_item_autocomplete)
@@ -2157,20 +2158,25 @@ class Economy(commands.Cog):
         member: discord.Member,
         pet: Optional[str] = None,
         item: Optional[str] = None,
+        stardust: Optional[int] = None,
         quantity: int = 1,
     ):
-        """Transfer an owned pet or transferable inventory item to another member."""
+        """Transfer Stardust, an owned pet, or a transferable inventory item to another member."""
         if member.id == ctx.author.id:
             return await ctx.send("❌ You cannot give something to yourself.")
 
         if member.bot:
             return await ctx.send("❌ You cannot give items or pets to bots.")
 
-        if pet and item:
-            return await ctx.send("❌ Choose **either a pet or an item**, not both.")
+        selected_types = sum(value is not None for value in (pet, item, stardust))
+        if selected_types > 1:
+            return await ctx.send("❌ Choose **only one** of a pet, item, or Stardust to give.")
 
-        if not pet and not item:
-            return await ctx.send("❌ Choose a **pet** or an **item** to give.")
+        if selected_types == 0:
+            return await ctx.send("❌ Choose a **pet**, an **item**, or an amount of **Stardust** to give.")
+
+        if stardust is not None and stardust < 1:
+            return await ctx.send("❌ Stardust amount must be at least **1**.")
 
         if quantity < 1 or quantity > 99:
             return await ctx.send("❌ Quantity must be between **1 and 99**.")
@@ -2197,6 +2203,35 @@ class Economy(commands.Cog):
                     await db.commit()
 
                     await db.execute("BEGIN IMMEDIATE")
+
+                    if stardust is not None:
+                        async with db.execute(
+                            "SELECT COALESCE(stardust, 0) FROM users WHERE user_id = ? LIMIT 1",
+                            (giver_id,),
+                        ) as cursor:
+                            giver_stardust_row = await cursor.fetchone()
+
+                        giver_stardust = int(giver_stardust_row[0] or 0) if giver_stardust_row else 0
+                        if giver_stardust < stardust:
+                            await db.rollback()
+                            return await ctx.send(
+                                f"❌ You only have **{giver_stardust:,} Stardust**, but you tried to give **{stardust:,}**."
+                            )
+
+                        await db.execute(
+                            "UPDATE users SET stardust = stardust - ? WHERE user_id = ?",
+                            (stardust, giver_id),
+                        )
+                        await db.execute(
+                            "UPDATE users SET stardust = stardust + ? WHERE user_id = ?",
+                            (stardust, recipient_id),
+                        )
+                        await db.commit()
+
+                        return await ctx.send(
+                            f"{ctx.author.mention} 💫 gave {member.mention} "
+                            f"**{stardust:,} Stardust**!"
+                        )
 
                     if pet:
                         try:
@@ -2253,7 +2288,7 @@ class Economy(commands.Cog):
 
                     if item is None:
                         await db.rollback()
-                        return await ctx.send("❌ Choose a **pet** or an **item** to give.")
+                        return await ctx.send("❌ Choose a **pet**, an **item**, or an amount of **Stardust** to give.")
 
                     item_id = item.lower().strip()
                     info = ITEM_REGISTRY.get(item_id)
