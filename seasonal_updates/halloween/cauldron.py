@@ -592,10 +592,7 @@ class Cauldron(commands.Cog):
         )
         embed.set_footer(text="Halloween Seasonal System")
         view = SeasonalCraftingView(self, interaction.user.id)
-        if interaction.response.is_done():
-            await interaction.edit_original_response(embed=embed, view=view)
-        else:
-            await interaction.response.send_message(embed=embed, view=view)
+        await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_cauldron_menu(self, interaction):
         embed = discord.Embed(
