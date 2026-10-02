@@ -555,7 +555,7 @@ class Cauldron(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def show_seasonal_hub(self, interaction):
+    async def show_seasonal_hub(self, interaction, quantity: int = 1):
         embed = discord.Embed(
             title="🎃 Seasonal Crafting",
             description=(
@@ -655,7 +655,7 @@ class Cauldron(commands.Cog):
             title="🧪 Brew at the Cauldron",
             description=(
                 "*The liquid inside bubbles without any heat.*\n\n"
-                f"Choose a recipe below. This batch will craft **×{craftable}**. Your ingredients are checked again "
+                f"Choose a recipe below. This batch will attempt to craft **×{quantity}**. Your ingredients are checked again "
                 "when you brew, so you cannot spend the same ingredients twice."
             ),
             color=discord.Color.dark_purple(),

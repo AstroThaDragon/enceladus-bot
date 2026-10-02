@@ -407,3 +407,6 @@ class RitualTable(commands.Cog):
             ephemeral=True,
         )
 
+
+async def setup(bot):
+    await bot.add_cog(RitualTable(bot))
