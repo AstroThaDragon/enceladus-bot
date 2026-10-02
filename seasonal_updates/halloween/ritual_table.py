@@ -22,7 +22,7 @@ RITUAL_RECIPES = {
             "black_wax": 1,
         },
         "result": "warding_sigil",
-        "description": "A ritual mark that completely blocks the first negative Sanity choice of your next Haunted run.",
+        "description": "A ritual mark that **completely blocks the first negative Sanity choice** of your next Haunted run.",
     },
     "mirror_ward": {
         "name": "Mirror Ward",
@@ -34,7 +34,7 @@ RITUAL_RECIPES = {
             "glowmoss": 1,
         },
         "result": "mirror_ward",
-        "description": "A reflective ward that halves the first negative Sanity choice of your next Haunted run.",
+        "description": "A reflective ward that **halves the first negative Sanity choice** of your next Haunted run.",
     },
     "dead_air_charm": {
         "name": "Dead-Air Charm",
@@ -46,7 +46,7 @@ RITUAL_RECIPES = {
             "incense_resin": 1,
         },
         "result": "dead_air_charm",
-        "description": "A dead-air charm that suppresses part of the supernatural Sanity drain in your next Broadcast Station run.",
+        "description": "A dead-air charm that **halves supernatural Sanity loss** in your next Broadcast Station run.",
     },
     "empty_room_token": {
         "name": "Empty Room Token",
@@ -58,7 +58,7 @@ RITUAL_RECIPES = {
             "ritual_chalk": 1,
         },
         "result": "empty_room_token",
-        "description": "A ritual token that nullifies the first negative Sanity choice in your next Endless Hotel run.",
+        "description": "A ritual token that **completely blocks the first negative Sanity choice** in your next Endless Hotel run.",
     },
     "watchers_eye": {
         "name": "Watcher's Eye",
@@ -70,7 +70,7 @@ RITUAL_RECIPES = {
             "blackened_grease": 1,
         },
         "result": "watchers_eye",
-        "description": "An occult focus that forces your next Haunted run to reveal a location-specific encounter at its first stage.",
+        "description": "An occult focus that **guarantees a location-specific encounter at the first stage** of your next Haunted run.",
     },
     "containment_mark": {
         "name": "Containment Mark",
@@ -82,7 +82,7 @@ RITUAL_RECIPES = {
             "ritual_chalk": 2,
         },
         "result": "containment_mark",
-        "description": "A containment mark that heavily reduces supernatural Sanity loss in your next Research Facility run.",
+        "description": "A containment mark that **reduces supernatural Sanity loss to 25% of normal** in your next Research Facility run.",
     },
 }
 

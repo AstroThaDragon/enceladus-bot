@@ -422,7 +422,7 @@ def _choice_outcomes(label, key, risk, flavor, base_delta=None):
     """Build a weighted outcome pool.  No choice has one fixed result anymore."""
     risk = risk if risk in {"low", "medium", "high", "extreme"} else "medium"
     if base_delta is None:
-        bases = {"low": -2, "medium": -5, "high": -9, "extreme": -14}
+        bases = {"low": -4, "medium": -8, "high": -15, "extreme": -20}
         base_delta = bases[risk]
     base_delta = int(base_delta)
     # Keep the old encounter's intent while making Sanity swings gentler.
@@ -437,7 +437,7 @@ def _choice_outcomes(label, key, risk, flavor, base_delta=None):
             (5, -2, "The room seems to notice that you made the choice."),
         ]
     else:
-        magnitude = min(abs(base_delta), 8)
+        magnitude = min(abs(base_delta), 20)
         outcomes = [
             (20, min(2, max(1, magnitude // 3)), f"{flavor} For once, the danger passes and you feel a little calmer."),
             (45, -magnitude, flavor),
@@ -1141,6 +1141,13 @@ async def start_run(db, user_id, location_id, sanity):
         effects["haunted_run_discovery_bonus"] = float(
             effects.get("haunted_run_discovery_bonus", 0.0)
         ) + (0.05 * float(potion_insight))
+
+    potion_collectible_bonus = effects.pop("haunted_potion_collectible_bonus", 0)
+    if potion_collectible_bonus:
+        effects["haunted_run_collectible_bonus"] = (
+            float(effects.get("haunted_run_collectible_bonus", 0.0))
+            + float(potion_collectible_bonus)
+        )
 
     potion_bias = effects.pop("haunted_potion_rare_encounter_bias", 0)
     if potion_bias:

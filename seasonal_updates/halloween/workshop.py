@@ -23,7 +23,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "ghost_radio",
         "result_type": "Haunted Workshop",
-        "description": "A battered radio that tunes into impossible transmissions and prepares a guaranteed signal encounter on your next Haunted run.",
+        "description": "A battered radio that tunes into impossible transmissions. **Guarantees a signal encounter on your next Haunted run.**",
     },
     "mascot_tracker": {
         "name": "Mascot Tracker",
@@ -36,7 +36,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "mascot_tracker",
         "result_type": "Haunted Workshop",
-        "description": "A crude motion detector that improves your chance of uncovering a Halloween collectible on your next Haunted run.",
+        "description": "A crude motion detector that makes Halloween collectibles **15 percentage points more likely to be found** on your next Haunted run.",
     },
     "room_314_key": {
         "name": "Room 314 Key",
@@ -48,7 +48,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "room_314_key",
         "result_type": "Haunted Workshop",
-        "description": "A rebuilt hotel key that can unlock a shortcut through the impossible hotel on your next Endless Hotel run.",
+        "description": "A rebuilt hotel key that **shortens your next Endless Hotel run by 1 stage**.",
     },
     "fog_lantern": {
         "name": "Fog Lantern",
@@ -61,7 +61,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "fog_lantern",
         "result_type": "Haunted Workshop",
-        "description": "A patched-together lantern that cuts supernatural Sanity loss in half on your next Fogbound Town run.",
+        "description": "A patched-together lantern that **halves supernatural Sanity loss** on your next Fogbound Town run.",
     },
     "spectral_receiver": {
         "name": "Spectral Receiver",
@@ -74,7 +74,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "spectral_receiver",
         "result_type": "Haunted Workshop",
-        "description": "A device that sharpens spectral signals and improves your chance of uncovering a Halloween collectible on your next Haunted run.",
+        "description": "A device that sharpens spectral signals, making Halloween collectibles **10 percentage points more likely to be found** on your next Haunted run.",
     },
     "security_monitor": {
         "name": "Security Monitor",
@@ -87,7 +87,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "security_monitor",
         "result_type": "Haunted Workshop",
-        "description": "A salvaged monitor that warns you of danger and cushions one Sanity hit during your next Haunted run.",
+        "description": "A salvaged monitor that **absorbs up to 5 points of Sanity loss from one hit** during your next Haunted run.",
     },
 
     "yellow_halls_beacon": {
@@ -100,7 +100,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "yellow_halls_beacon",
         "result_type": "Haunted Workshop",
-        "description": "A jury-rigged fluorescent beacon that cuts supernatural Sanity loss in half during your next Yellow Halls run.",
+        "description": "A jury-rigged fluorescent beacon that **halves supernatural Sanity loss** during your next Yellow Halls run.",
     },
     "highway_payphone_kit": {
         "name": "Payphone Repair Kit",
@@ -112,7 +112,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "highway_payphone_kit",
         "result_type": "Haunted Workshop",
-        "description": "A bundle of salvaged parts that can coax a dead roadside payphone back to life during your next Dead-End Highway run.",
+        "description": "A bundle of salvaged parts that **forces a signal encounter** during your next Dead-End Highway run.",
     },
     "drowned_flood_lamp": {
         "name": "Flood Lamp",
@@ -125,7 +125,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "drowned_flood_lamp",
         "result_type": "Haunted Workshop",
-        "description": "A sealed light built from drowned station hardware that cuts supernatural Sanity loss in half during your next Drowned Station run.",
+        "description": "A sealed light built from drowned station hardware that **halves supernatural Sanity loss** during your next Drowned Station run.",
     },
     "campground_static_filter": {
         "name": "Static Filter",
@@ -138,7 +138,7 @@ WORKSHOP_RECIPES = {
         },
         "result": "campground_static_filter",
         "result_type": "Haunted Workshop",
-        "description": "A crude signal filter that suppresses some of the things hiding inside the campground's static during your next Silent Campground run.",
+        "description": "A crude signal filter that **halves supernatural Sanity loss** during your next Silent Campground run.",
     },
 }
 
