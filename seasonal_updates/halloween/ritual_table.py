@@ -246,7 +246,7 @@ class RitualRecipeBookView(discord.ui.View):
         await self.cog.show_menu(interaction)
 
 
-class RitualView(discord.ui.View):
+class RitualSelectView(discord.ui.View):
     def __init__(self, cog, owner_id):
         super().__init__(timeout=300)
         self.cog = cog
@@ -273,6 +273,68 @@ class RitualView(discord.ui.View):
             )
             return False
         return True
+
+    @discord.ui.button(
+        label="Back",
+        emoji="🕯️",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def back_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        await self.cog.show_menu(interaction)
+
+
+class RitualView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This ritual table belongs to someone else.",
+                ephemeral=True,
+            )
+            return False
+        if not is_halloween_channel(interaction.channel):
+            await interaction.response.send_message(
+                halloween_channel_message(),
+                ephemeral=True,
+            )
+            return False
+        if not halloween_is_active():
+            await interaction.response.send_message(
+                "🎃 The Ritual Table is dormant outside Halloween.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="Perform",
+        emoji="🕯️",
+        style=discord.ButtonStyle.primary,
+    )
+    async def perform_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        embed = discord.Embed(
+            title="🕯️ Perform a Ritual",
+            description=(
+                "Choose a ritual to perform. You will choose the quantity after selecting a ritual."
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await interaction.response.edit_message(
+            embed=embed,
+            view=RitualSelectView(self.cog, interaction.user.id),
+        )
 
     @discord.ui.button(
         label="Recipes",

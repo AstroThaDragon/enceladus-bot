@@ -363,19 +363,16 @@ class CauldronView(discord.ui.View):
         await self.cog.show_ingredients(interaction)
 
     @discord.ui.button(
-        label="Close",
-        emoji="✖️",
-        style=discord.ButtonStyle.danger,
+        label="Back",
+        emoji="🎃",
+        style=discord.ButtonStyle.secondary,
     )
-    async def close_button(
+    async def back_button(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        for child in self.children:
-            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
-                child.disabled = True
-        await interaction.response.edit_message(view=self)
+        await self.cog.show_seasonal_hub(interaction)
 
 
 class CauldronRecipeBookView(discord.ui.View):
