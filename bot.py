@@ -520,7 +520,12 @@ async def on_message(message):
             )
             await db.commit()
 
-    await bot.process_commands(message)
+    # Prefix commands are already processed near the top of this handler.
+    # Do not process them a second time here, because an invalid prefix-like
+    # message such as "-#" would otherwise raise CommandNotFound and trigger
+    # the centralized error system.
+    if not message.content.startswith("-"):
+        await bot.process_commands(message)
 
 @bot.event
 async def on_member_join(member):
@@ -1166,6 +1171,12 @@ async def help_command(ctx):
 
 @bot.event
 async def on_command_error(ctx, error):
+    # Discord/Markdown syntax such as "-#" can look like a prefix command
+    # to discord.py. Ignore this harmless formatting-only case instead of
+    # logging it as an Enceladus error or sending the user an error message.
+    if isinstance(error, commands.CommandNotFound) and getattr(ctx, "invoked_with", "") == "#":
+        return
+
     error_id = await log_command_error(bot, ctx, error)
     await send_member_error_message(ctx, error_id)
 
