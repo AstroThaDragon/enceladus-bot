@@ -2699,7 +2699,7 @@ class HauntedInfoButton(discord.ui.Button):
 
 
 class HauntedStoryView(discord.ui.View):
-    def __init__(self, cog, location_id, stage, total_stages, scene_id):
+    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id):
         super().__init__(timeout=600)
         self.cog = cog
         self.owner_id = owner_id
