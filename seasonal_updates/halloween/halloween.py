@@ -42,8 +42,9 @@ MINING_CANDY_CHANCE = CANDY_CHANCE
 SCAVENGING_CANDY_CHANCE = CANDY_CHANCE
 PLASTIC_CHANCE = 0.45
 TRICK_OR_TREAT_BAG_CHANCE = 0.18
-# Independent pet egg roll. This only runs while Halloween is active.
-HALLOWEEN_PET_EGG_CHANCE = 1 / 20
+# Independent seasonal pet egg rolls. These only run while Halloween is active.
+HALLOWEEN_PET_EGG_CHANCE = 0.09
+GLITCHED_PET_EGG_CHANCE = 0.07
 HALLOWEEN_PET_CANDY_CHANCE = 0.25
 PLASTIC_MIN = 4
 PLASTIC_MAX = 10
