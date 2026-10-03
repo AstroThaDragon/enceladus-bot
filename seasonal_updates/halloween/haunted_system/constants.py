@@ -209,6 +209,6 @@ HAUNTED_IMPOSSIBLE_DISCOVERIES = {'bedroom_copy',
 # migrated without changing Sanity or attempt data.
 HAUNTED_STORY_VERSION = 3
 # A location pet is an occasional opportunity, not a guaranteed part of every run.
-HAUNTED_LOCATION_PET_OPPORTUNITY_CHANCE = 0.35
+HAUNTED_LOCATION_PET_OPPORTUNITY_CHANCE = 0.07
 DEFAULT_STORY_SCENES = 7
 
