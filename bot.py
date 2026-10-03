@@ -126,6 +126,7 @@ bot = Enceladus()
 DRAGON_IMAGE_URL = "https://media.discordapp.net/attachments/916221943101947914/1497326085099094209/IMG_20191102_191207_871.png?ex=69f50615&is=69f3b495&hm=eff466c1a7fa9296a8e2de3ed78ade6aa1c5d72dd7f81e60d6957f0891c29558&=&format=webp&quality=lossless"
 DB_PATH = "/app/data/levels.db" 
 FUN_DB_PATH = "/app/data/fun.db"
+BUMP_CHANNEL_ID = 1117391981627318363
 
 # Anti-double message protection
 recent_joins = set()
@@ -268,18 +269,19 @@ async def check_bump_timer():
             if now < remind_at:
                 return
 
-            channel = bot.get_channel(row[1])
+            # Bump reminders are only ever sent to the designated bump channel.
+            channel = bot.get_channel(BUMP_CHANNEL_ID)
 
             if channel is None:
                 try:
-                    channel = await bot.fetch_channel(row[1])
+                    channel = await bot.fetch_channel(BUMP_CHANNEL_ID)
                 except Exception as e:
-                    await log_task_error(bot, "check_bump_timer / fetch channel", e, context=f"channel_id={row[1]}")
-                    print(f"[BUMP LOOP ERROR]: Could not fetch channel {row[1]}: {e}")
+                    await log_task_error(bot, "check_bump_timer / fetch channel", e, context=f"channel_id={BUMP_CHANNEL_ID}")
+                    print(f"[BUMP LOOP ERROR]: Could not fetch channel {BUMP_CHANNEL_ID}: {e}")
                     return
 
             if channel is None:
-                print(f"[BUMP LOOP ERROR]: No channel found for {row[1]}")
+                print(f"[BUMP LOOP ERROR]: No channel found for {BUMP_CHANNEL_ID}")
                 return
 
             bump_role_id = "1295212860720418887"
@@ -445,7 +447,10 @@ async def on_message(message):
             return
 
     # --- BUMP DETECTION ---
-    if message.author.id == 302050872383242240:
+    # Only process Disboard bumps that occur in the designated bump channel.
+    # Disboard still handles its own /bump command elsewhere; Enceladus simply
+    # ignores those bump-result messages outside the approved channel.
+    if message.author.id == 302050872383242240 and message.channel.id == BUMP_CHANNEL_ID:
         await asyncio.sleep(2)
 
         if not message.embeds:
