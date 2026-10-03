@@ -181,12 +181,41 @@ class Profile(commands.Cog):
 
         final_level = max(stored_level or 0, calculated_level)
 
+        # Resolve the stored internal title ID to its configured display name.
+        # Keep the database value as the ID, but never expose IDs such as
+        # "title_something_is_very_wrong" on the profile card.
+        display_title = ""
+        if equipped_title:
+            try:
+                from inventory import ITEM_REGISTRY
+                title_info = ITEM_REGISTRY.get(equipped_title)
+                if title_info and str(title_info.get("type", "")).lower() == "title":
+                    display_title = title_info.get("name") or ""
+                    # Inventory title names may include the shop's title emoji.
+                    if display_title:
+                        display_title = display_title.strip()
+                        if display_title.startswith("🏷️"):
+                            display_title = display_title[len("🏷️"):].strip()
+                        if display_title.lower().startswith("title:"):
+                            display_title = display_title[len("title:"):].strip()
+            except Exception:
+                display_title = ""
+
+        # Fallback for legacy/missing registry entries: make a readable name
+        # rather than ever exposing the raw internal ID.
+        if equipped_title and not display_title:
+            display_title = (
+                equipped_title.removeprefix("title_")
+                .replace("_", " ")
+                .title()
+            )
+
         return {
             "level": final_level,
             "xp": xp or 0,
             "stardust": stardust or 0,
             "bio": bio or "Exploring the outer rims of Enceladus Station. 🚀",
-            "title": equipped_title or "",
+            "title": display_title,
             "bg": profile_card or "default_nebula",
             "pet": active_pet,
             "daily_streak": max(0, daily_streak or 0),

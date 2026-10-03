@@ -868,13 +868,20 @@ class ShopTransactionView(discord.ui.View):
         )
         embed.set_footer(text="Custom lets you enter a quantity up to 99.")
 
-        presets: list[tuple[str, str, Optional[str]]] = [("1", "1", "1️⃣"), ("10", "10", "🔟")]
         if self.mode == "buy":
-            # "2️⃣5️⃣" is two emoji sequences combined, which Discord rejects
-            # as a single button emoji (error 50035 / Invalid emoji).
-            presets.append(("25", "25", None))
+            # Keep the quick-purchase buttons aligned with the shop's common
+            # purchase limits. Custom still allows any quantity permitted by
+            # the existing purchase-limit validation.
+            presets: list[tuple[str, str, Optional[str]]] = [
+                ("1", "1", "1️⃣"),
+                ("5", "5", "5️⃣"),
+            ]
         else:
-            presets.append(("Max", "max", "📦"))
+            # Selling keeps the existing 1 / Max shortcuts.
+            presets = [
+                ("1", "1", "1️⃣"),
+                ("Max", "max", "📦"),
+            ]
         for label, value, emoji in presets:
             self.add_item(ShopQuantityButton(self, label, value, emoji=emoji))
         self.add_item(ShopQuantityButton(self, "Custom", "custom", emoji="🔢"))

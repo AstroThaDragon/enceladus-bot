@@ -2108,7 +2108,7 @@ class Exploration(commands.Cog):
                             f"**Hazard reduced to -{damage_taken} HP.**\n"
                             "🍖 **Hunting Instinct:** Your next activity has **+20% loot-finding chance**."
                         )
-                elif pet_effects["xenomorph_ambush"] and random.random() < pet_effects["xenomorph_ambush"]:
+                elif pet_effects.get("xenomorph_ambush", 0.0) and random.random() < pet_effects.get("xenomorph_ambush", 0.0):
                     if random.random() < 0.75:
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'xenomorph_ambush')}\n"
