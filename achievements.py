@@ -17,19 +17,19 @@ ACHIEVEMENTS = {
         "name": "First Glitched Pet",
         "emoji": "💾",
         "description": "Hatch your first pet from a Glitched Egg.",
-        "reward": "Permanent profile background: CORRUPTED REALITY",
+        "reward": "Exclusive profile background",
     },
     "glitched_collector": {
         "name": "[ERROR3D_COLLECTOR]",
         "emoji": "💾",
         "description": "Collect all 6 pets from the Glitched Egg.",
-        "reward": "15,000 Stardust + Permanent profile title: GLITCHED COLLECTOR",
+        "reward": "15,000 Stardust + Exclusive profile title",
     },
     "glitched_missingno": {
         "name": "[ERROR://CORRUPTED_DATA]",
         "emoji": "👾",
         "description": "Hatch MissingNo.",
-        "reward": "Permanent profile title: CORRUPTED DATA",
+        "reward": "Exclusive profile title",
     },
 
     "halloween_half": {
@@ -182,12 +182,6 @@ GLITCHED_PET_IDS = (
 )
 GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID = "glitched_collector"
 GLITCHED_PET_COLLECTION_PROGRESS_ID = "glitched_pet_collection"
-
-# Permanent cosmetic rewards for the Glitched Egg achievement chain.
-# The title names can be changed later without changing the achievement IDs.
-GLITCHED_FIRST_PET_BACKGROUND_ID = "background_corrupted_reality"
-GLITCHED_MISSINGNO_TITLE_ID = "title_corrupted_data"
-GLITCHED_COLLECTION_TITLE_ID = "title_glitched_collector"
 
 HALLOWEEN_BACKGROUND_ID = "halloween_haunted"
 HALLOWEEN_TITLE_ID = "title_horror_enthusiast"
@@ -402,19 +396,13 @@ class Achievements(commands.Cog):
             unlocked = []
 
             if await self._grant_haunted_achievement(
-                db,
-                user_id,
-                "glitched_first_pet",
-                background_id=GLITCHED_FIRST_PET_BACKGROUND_ID,
+                db, user_id, "glitched_first_pet"
             ):
                 unlocked.append("glitched_first_pet")
 
             if pet_type == "missingno":
                 if await self._grant_haunted_achievement(
-                    db,
-                    user_id,
-                    "glitched_missingno",
-                    title_id=GLITCHED_MISSINGNO_TITLE_ID,
+                    db, user_id, "glitched_missingno"
                 ):
                     unlocked.append("glitched_missingno")
 
@@ -461,7 +449,6 @@ class Achievements(commands.Cog):
                     db,
                     user_id,
                     GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID,
-                    title_id=GLITCHED_COLLECTION_TITLE_ID,
                     stardust_reward=15_000,
                 ):
                     unlocked.append(GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID)
