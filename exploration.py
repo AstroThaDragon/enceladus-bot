@@ -1396,8 +1396,7 @@ class Exploration(commands.Cog):
                 )
 
             # MissingNo. rarely corrupts the reward data of the current activity.
-            missingno_error_chance = pet_effects.get("missingno_error", 0.0)
-            if missingno_error_chance and random.random() < missingno_error_chance:
+            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
@@ -1802,6 +1801,7 @@ class Exploration(commands.Cog):
 
 
     async def _scavenge_impl(self, ctx: commands.Context):
+        xenomorph_bonus_loot_pending = False
         user_id = ctx.author.id
         current_time = time.time()
         db_path = self.get_db_path()
@@ -2042,7 +2042,6 @@ class Exploration(commands.Cog):
 
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
             pet_findings = []
-            xenomorph_bonus_loot_pending = False
 
             # 30% Environmental Hazard Chance during Scavenging.
             pet_tails_recovery = 0
@@ -2222,8 +2221,7 @@ class Exploration(commands.Cog):
                     )
 
             # MissingNo. rarely corrupts the current scavenging reward data.
-            missingno_error_chance = pet_effects.get("missingno_error", 0.0)
-            if missingno_error_chance and random.random() < missingno_error_chance:
+            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
