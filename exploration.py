@@ -2306,17 +2306,17 @@ class Exploration(commands.Cog):
                 seasonal_findings.append("\n".join(collectible_lines))
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
-            # During Halloween, normal eggs are intentionally reduced to 6%
+            # During Halloween, normal eggs are intentionally reduced to 3%
             # while the seasonal eggs become more common. After Halloween, the
             # normal egg automatically returns to its regular NORMAL_EGG_CHANCE.
             # Seasonal eggs automatically stop dropping when Halloween ends.
             egg_rolls = []
             if halloween_active:
-                if random.random() < 0.06:
+                if random.random() < 0.03:
                     egg_rolls.append("normal_egg")
-                if random.random() < HALLOWEEN_PET_EGG_CHANCE:
+                if random.random() < 0.08:
                     egg_rolls.append("halloween_egg")
-                if random.random() < GLITCHED_PET_EGG_CHANCE:
+                if random.random() < 0.065:
                     egg_rolls.append("glitched_egg")
             elif random.random() < NORMAL_EGG_CHANCE:
                 egg_rolls.append("normal_egg")
