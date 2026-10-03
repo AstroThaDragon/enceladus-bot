@@ -1396,7 +1396,8 @@ class Exploration(commands.Cog):
                 )
 
             # MissingNo. rarely corrupts the reward data of the current activity.
-            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+            missingno_error_chance = pet_effects.get("missingno_error", 0.0)
+            if missingno_error_chance and random.random() < missingno_error_chance:
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
@@ -2221,7 +2222,8 @@ class Exploration(commands.Cog):
                     )
 
             # MissingNo. rarely corrupts the current scavenging reward data.
-            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+            missingno_error_chance = pet_effects.get("missingno_error", 0.0)
+            if missingno_error_chance and random.random() < missingno_error_chance:
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
