@@ -29,6 +29,8 @@ VERIFY_LOG_CHANNEL_ID = 1352834838478061608
 
 UNVERIFIED_ROLE_ID = 1296962528546521130
 VERIFIED_ROLE_ID = 593723369422192661
+WELCOME_CHANNEL_ID = 593412741633671168
+WELCOME_PING_ROLE_ID = 1295670300674883646
 
 MOD_LOG_CHANNEL_ID = 1352095872812318760
 
@@ -719,6 +721,19 @@ class Moderation(commands.Cog):
 
             if verified_role:
                 await member.add_roles(verified_role)
+
+            # Send the server welcome only after the Stargazers role was successfully granted.
+            if verified_role and verified_role.id == VERIFIED_ROLE_ID:
+                welcome_channel = guild.get_channel(WELCOME_CHANNEL_ID)
+                if welcome_channel:
+                    try:
+                        await welcome_channel.send(
+                            f"🎉 Welcome, {member.mention} ❄️!\n"
+                            "We're happy to have you here! 💜\n\n"
+                            f"<@&{WELCOME_PING_ROLE_ID}>"
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
 
             if unverified_role and unverified_role in member.roles:
                 await member.remove_roles(unverified_role)
