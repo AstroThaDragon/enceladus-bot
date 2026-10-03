@@ -118,6 +118,51 @@ async def grant_haunted_pet(db, user_id: int, location_id: str):
 
 
 PET_PASSIVE_DIALOGUES = {
+    "kolossos_hunting_instinct": [
+        "lunged between you and the hazard, forcing it back!",
+        "snarled at the incoming danger and took the fight head-on!",
+        "moved with terrifying speed and stopped the hazard in its tracks!",
+    ],
+    "tails_doll_red_gem": [
+        "its red gem began to glow, and the bad outcome twisted into something useful!",
+        "stared silently at the hazard until reality seemed to reconsider its decision!",
+        "somehow turned the danger into a small stroke of good luck!",
+    ],
+    "xenomorph_ambush": [
+        "vanished into the shadows and attacked the hazard before it could reach you!",
+        "sprang from nowhere and tore into the incoming threat!",
+        "let out a horrible screech as it ambushed the hazard!",
+    ],
+    "xenomorph_bonus_loot": [
+        "dragged some extra salvage back from the chaos!",
+        "returned from the shadows carrying something it found during the ambush!",
+        "came back with a little extra loot between its teeth!",
+    ],
+    "missingno_error_small": [
+        "flickered violently, and the reward data duplicated itself!",
+        "glitched through the reward table and pulled out extra loot!",
+        "briefly stopped behaving like a normal pet and corrupted the loot count!",
+    ],
+    "missingno_error_major": [
+        "flickered so badly that the reward counter lost its mind!",
+        "corrupted the loot data on a much larger scale!",
+        "made reality duplicate the reward far more than it was supposed to!",
+    ],
+    "missingno_error_stardust": [
+        "corrupted the Stardust counter and made the balance jump!",
+        "briefly broke the Stardust ledger and pulled extra currency from nowhere!",
+        "glitched the station's reward system and materialized bonus Stardust!",
+    ],
+    "siren_false_signal": [
+        "erupted with a distorted warning signal before the hazard struck!",
+        "blared a horrible warning just before something went wrong!",
+        "broadcast a shrieking false signal that gave you a split-second warning!",
+    ],
+    "siren_false_signal_avoid": [
+        "its warning gave you just enough time to get out of the way!",
+        "followed the warning and slipped safely past the hazard!",
+        "reacted to the signal and escaped the danger completely!",
+    ],
     "stardust_bonus": [
         "found some extra Stardust hiding in the debris!",
         "sniffed out a little extra Stardust!",
@@ -334,6 +379,11 @@ async def get_active_pet_effects(db, user_id: int):
             "scavenge_charge_save": 0.0,
             "scavenge_material_bonus": 0.0,
             "scavenge_bonus_loot": 0.0,
+            "kolossos_hunting_instinct": 0.0,
+            "tails_doll_red_gem": 0.0,
+            "xenomorph_ambush": 0.0,
+            "missingno_error": 0.0,
+            "siren_false_signal": 0.0,
             "extra_charges": 0.0,
             "extra_charge_count": 0,
             "dragonrider_success": 0.0,
@@ -434,6 +484,16 @@ async def get_active_pet_effects(db, user_id: int):
         effects["scavenge_material_bonus"] = normal_value
     elif normal_effect_id == "scavenge_bonus_loot":
         effects["scavenge_bonus_loot"] = normal_value
+    elif normal_effect_id == "kolossos_hunting_instinct":
+        effects["kolossos_hunting_instinct"] = normal_value
+    elif normal_effect_id == "tails_doll_red_gem":
+        effects["tails_doll_red_gem"] = normal_value
+    elif normal_effect_id == "xenomorph_ambush":
+        effects["xenomorph_ambush"] = normal_value
+    elif normal_effect_id == "missingno_error":
+        effects["missingno_error"] = normal_value
+    elif normal_effect_id == "siren_false_signal":
+        effects["siren_false_signal"] = normal_value
 
     elif normal_effect_id == "extra_charges":
         effects["extra_charges"] = normal_value

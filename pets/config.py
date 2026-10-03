@@ -194,6 +194,81 @@ PETS = {
     },
 }
 
+GLITCHED_PETS = {
+    "kolossos": {
+        "name": "Kolossos",
+        "emoji": "🩸",
+        "description": "A towering, corrupted hedgehog-like creature with a hunger for anything still moving. Something about its presence makes the game feel… considerably less safe.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "kolossos_hunting_instinct",
+            "name": "Hunting Instinct",
+            "description": "When a scavenging hazard strikes, Kolossos has a chance to reduce its effect or completely negate it. Successfully defending you gives your next activity a +20% loot-finding chance.",
+            "levels": [0.15, 0.175, 0.20, 0.225, 0.25],
+        },
+    },
+    "mini_tails_doll": {
+        "name": "Mini Tails Doll",
+        "emoji": "🧸",
+        "description": "A tiny plush creature with a blank expression and a strange red gem fixed to its head. It doesn't make a sound. Somehow, that's the worst part.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "tails_doll_red_gem",
+            "name": "Red Gem",
+            "description": "When a scavenging hazard strikes, the Red Gem has a chance to twist the negative outcome into a small benefit instead.",
+            "levels": [0.09, 0.105, 0.12, 0.135, 0.15],
+        },
+    },
+    "endoskeleton": {
+        "name": "Endoskeleton",
+        "emoji": "🤖",
+        "description": "A bare mechanical frame with nothing to hide behind. Its movements are stiff, unnatural, and occasionally just a little too deliberate.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "scavenge_material_bonus",
+            "name": "Salvage Protocol",
+            "description": "The Endoskeleton helps sort through industrial wreckage, giving you a chance to recover an additional mechanical or industrial material while scavenging.",
+            "levels": [0.20, 0.225, 0.25, 0.275, 0.30],
+        },
+    },
+    "mini_xenomorph": {
+        "name": "Mini Xenomorph",
+        "emoji": "👽",
+        "description": "A small, sleek creature with an unsettlingly familiar silhouette. Despite its size, it still seems perfectly capable of finding somewhere to hide.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "xenomorph_ambush",
+            "name": "Ambush",
+            "description": "When a scavenging hazard strikes, the Mini Xenomorph has a chance to fight back, reducing or completely negating the hazard. A successful ambush also has a chance to uncover extra loot.",
+            "levels": [0.12, 0.14, 0.16, 0.18, 0.20],
+        },
+    },
+    "missingno": {
+        "name": "MissingNo.",
+        "emoji": "👾",
+        "description": "A broken piece of something that was never supposed to exist. Its shape refuses to stay consistent, and looking at it for too long makes the world around it feel… wrong.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "missingno_error",
+            "name": "Error 0x00",
+            "description": "Rarely corrupts an activity's reward data, producing +1–5 extra loot, a much larger +10–15 loot glitch, or +100–500 additional Stardust.",
+            "levels": [0.02, 0.0275, 0.035, 0.0425, 0.05],
+        },
+    },
+    "mini_siren_head": {
+        "name": "Mini Siren Head",
+        "emoji": "📢",
+        "description": "A miniature imitation of a towering forest predator, complete with rusted sirens where its head should be. It occasionally broadcasts sounds that you swear weren't there a moment ago.",
+        "egg": "glitched_egg",
+        "passive": {
+            "id": "siren_false_signal",
+            "name": "False Signal",
+            "description": "Has a chance to detect an incoming scavenging hazard and warn you. When the warning triggers, you have a 40% chance to avoid the hazard entirely.",
+            "levels": [0.18, 0.21, 0.24, 0.27, 0.30],
+        },
+    },
+}
+
 
 HALLOWEEN_PETS = {
     # ------------------------------------------------------------------
@@ -602,7 +677,7 @@ HAUNTED_PETS = {
 }
 
 
-ALL_PETS = {**PETS, **HALLOWEEN_PETS, **HAUNTED_PETS}
+ALL_PETS = {**PETS, **HALLOWEEN_PETS, **GLITCHED_PETS, **HAUNTED_PETS}
 
 
 EGG_POOLS = {
@@ -610,6 +685,10 @@ EGG_POOLS = {
     "halloween_egg": [
         pet_id for pet_id, pet in HALLOWEEN_PETS.items()
         if pet["egg"] == "halloween_egg"
+    ],
+    "glitched_egg": [
+        pet_id for pet_id, pet in GLITCHED_PETS.items()
+        if pet["egg"] == "glitched_egg"
     ],
 }
 

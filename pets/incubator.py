@@ -183,14 +183,24 @@ class PetIncubatorMixin:
                 (row[0],),
             )
 
-            if stored_egg == "halloween_egg":
-                achievements_cog = cast(
-                    Achievements | None,
-                    self.bot.get_cog("Achievements"),
-                )
-                if achievements_cog:
+            achievements_cog = cast(
+                Achievements | None,
+                self.bot.get_cog("Achievements"),
+            )
+            if achievements_cog:
+                # The Halloween hatch achievement is specifically for Halloween Eggs.
+                # Glitched Eggs have their own achievement chain.
+                if stored_egg == "halloween_egg":
                     await achievements_cog.add_halloween_hatch_progress(
                         ctx.author.id,
+                        db=db,
+                        channel=ctx.channel,
+                    )
+
+                if stored_egg == "glitched_egg":
+                    await achievements_cog.add_glitched_pet_progress(
+                        ctx.author.id,
+                        pet_type,
                         db=db,
                         channel=ctx.channel,
                     )
