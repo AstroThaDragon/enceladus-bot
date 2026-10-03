@@ -553,7 +553,8 @@ async def on_member_join(member):
                 f"for special roles while you're at it!\n\n"
                 f"We also highly recommend checking out <#1484487011933884509> for our server's unique features, roles, bots, and channels!\n\n"
                 f"Also, please be patient while our server grows; it may be a bit quiet at times!\n\n"
-                f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!"
+                f"We hope you enjoy your stay at The Cosmic Lair! Feel free to invite friends, we won't bite!\n\n"
+                f"*(Remember to check Post-Join Questions over at 'Channels & Roles' option on the server channel menu at the very top to see more channels we have to offer!)*"
             ),
             color=discord.Color.from_rgb(114, 0, 225)
         )

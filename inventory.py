@@ -270,6 +270,13 @@ def get_use_autocomplete_emoji(item_id, emoji):
         return USE_AUTOCOMPLETE_EMOJI_FALLBACKS.get(item_id, "📦")
     return emoji or "📦"
 
+
+def normalize_discord_text(text):
+    """Convert escaped newline sequences into real Discord line breaks."""
+    if not isinstance(text, str):
+        return text
+    return text.replace("\\r\\n", "\r\n").replace("\\n", "\n")
+
 # Master Item Registry used across inventory, shop, and exploration
 ITEM_REGISTRY = {
     # Currencies & Consumables
@@ -958,9 +965,11 @@ class Inventory(commands.Cog):
         if already_used:
             return {
                 "success": False,
-                "message": config.get(
-                    "already_used_message",
-                    "🚫 This item has already been used.",
+                "message": normalize_discord_text(
+                    config.get(
+                        "already_used_message",
+                        "🚫 This item has already been used.",
+                    )
                 ),
             }
 
@@ -1106,7 +1115,9 @@ class Inventory(commands.Cog):
 
         return {
             "success": True,
-            "message": config.get("use_message", "You used the item.") + effect_note,
+            "message": normalize_discord_text(
+                config.get("use_message", "You used the item.") + effect_note
+            ),
             "achievement_id": config.get("achievement_id"),
             "title_id": config.get("title_id"),
             "background_id": config.get("background_id"),
@@ -1564,9 +1575,10 @@ class Inventory(commands.Cog):
                                 f"use `/background` to equip it."
                             )
 
-                    return await ctx.send(
+                    final_message = normalize_discord_text(
                         f"{ctx.author.mention} {special_result['message']}{unlock_note}"
                     )
+                    return await ctx.send(final_message)
 
             effects = json.loads(effects_raw or "{}")
             message = ""

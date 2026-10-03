@@ -82,6 +82,7 @@ async def grant_haunted_completion_rewards(
 
     collectible = None
     collectible_added = False
+    collectible_first_discovery = False
     collectible_chance = min(
         1.0,
         HAUNTED_COLLECTIBLE_CHANCES[rarity] + max(0.0, float(collectible_bonus)),
@@ -91,7 +92,9 @@ async def grant_haunted_completion_rewards(
         collectible_id, collectible_name, collectible_emoji, collectible_desc, collectible_value, collectible_candy = collectible
         added_collectible, _, _ = await add_inventory_item(db, user_id, collectible_id, "space_junk", 1)
         if added_collectible:
-            await record_collectible(db, bot, user_id, collectible_id, "Halloween")
+            collectible_first_discovery = await record_collectible(
+                db, bot, user_id, collectible_id, "Halloween"
+            )
             collectible_added = True
         else:
             await db.execute(
@@ -118,4 +121,5 @@ async def grant_haunted_completion_rewards(
         "ingredient_overflow_stardust": ingredient_overflow_stardust,
         "collectible": collectible if collectible_added else None,
         "collectible_found": collectible_added,
+        "collectible_first_discovery": collectible_first_discovery,
     }

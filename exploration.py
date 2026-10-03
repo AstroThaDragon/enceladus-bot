@@ -876,6 +876,15 @@ class Exploration(commands.Cog):
                         f"*{collectible[3]}*",
                     ])
 
+                    if reward.get("collectible_first_discovery"):
+                        use_config = HALLOWEEN_SPECIAL_USE_ITEMS.get(collectible[0])
+                        if isinstance(use_config, dict) and use_config.get("enabled"):
+                            reward_lines.extend([
+                                "",
+                                "💡 **Usable Collectible**",
+                                "Use `/use` → `item` to activate this collectible.",
+                            ])
+
                 reward_embed = discord.Embed(
                     title=f"{HAUNTED_LOCATIONS[location_id]['emoji']} {HAUNTED_LOCATIONS[location_id]['name']}",
                     description=(
