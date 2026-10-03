@@ -367,7 +367,7 @@ HALLOWEEN_ITEMS = {
     },
     "halloween_egg": {
         "name": "Halloween Pet Egg",
-        "emoji": "🥚",
+        "emoji": "🎃",
         "max_quantity": 10,
         "type": "Pet Egg",
         "desc": "A mysterious seasonal egg containing a Halloween pet. Incubate for 12 hours.",
