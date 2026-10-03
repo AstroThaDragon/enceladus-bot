@@ -7,10 +7,12 @@ from .config import (
     PETS,
     HALLOWEEN_PETS,
     HAUNTED_PETS,
+    GLITCHED_PETS,
 )
 from .variants import (
     NORMAL_PET_TYPES,
     HALLOWEEN_PET_TYPES,
+    GLITCHED_PET_TYPES,
     variant_set_for_pet,
     get_variant_display,
 )
@@ -86,6 +88,22 @@ def build_collection_categories():
         _pet_entry(pet_type, HAUNTED_PETS[pet_type])
         for pet_type in sorted(HAUNTED_PETS)
     ]
+
+    categories["💾 Glitched Pets"] = [
+        _pet_entry(pet_type, GLITCHED_PETS[pet_type])
+        for pet_type in sorted(GLITCHED_PETS)
+    ]
+
+    glitched_variants = []
+    for pet_type in sorted(GLITCHED_PET_TYPES):
+        definition = GLITCHED_PETS.get(pet_type)
+        if not definition:
+            continue
+        for variant_id, variant in variant_set_for_pet(pet_type).items():
+            glitched_variants.append(
+                _variant_entry(pet_type, definition, variant_id, variant)
+            )
+    categories["💾 Glitched Pet Variants"] = glitched_variants
 
     return categories
 

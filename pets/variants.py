@@ -86,11 +86,6 @@ GODZILLA_VARIANTS = {
         "emoji": "🩷",
         "lore": "Its energy has evolved into a brilliant magenta glow, making the enormous creature look almost alien.",
     },
-    "shiny": {
-        "name": "Shiny Godzilla",
-        "emoji": "✨",
-        "lore": "Even Godzilla's overwhelming presence has somehow been transformed into a dazzling, impossibly rare sheen.",
-    },
 }
 
 SAMHAIN_VARIANTS = {
@@ -124,11 +119,6 @@ SAMHAIN_VARIANTS = {
         "emoji": "🎃",
         "lore": "This form feels impossibly ancient, like the very first shadow cast by the holiday itself.",
     },
-    "shiny": {
-        "name": "Shiny Samhain",
-        "emoji": "✨",
-        "lore": "Its ancient Halloween presence is wrapped in a brilliant shimmer that makes every ritual gesture sparkle.",
-    },
 }
 
 FEED_ME_VARIANTS = {
@@ -161,11 +151,6 @@ FEED_ME_VARIANTS = {
         "name": "Nightbloom",
         "emoji": "🌑",
         "lore": "Its flowers only open in darkness, revealing a beautiful glow that makes its hunger even harder to ignore.",
-    },
-    "shiny": {
-        "name": "Shiny Feed Me",
-        "emoji": "✨",
-        "lore": "Its leaves and petals gleam with a bizarrely cheerful sparkle that does absolutely nothing to make it safer.",
     },
 }
 
@@ -352,7 +337,6 @@ SPECIAL_HATCH_VARIANT_WEIGHTS = {
         "purple": 4,
         "burning": 3,
         "evolved": 2,
-        "shiny": 1,
     },
     "samhain": {
         "ghostly": 5,
@@ -361,7 +345,6 @@ SPECIAL_HATCH_VARIANT_WEIGHTS = {
         "trickster": 4,
         "ritual": 3,
         "the_first": 2,
-        "shiny": 1,
     },
     "the_feed_me": {
         "bloodroot": 5,
@@ -370,7 +353,6 @@ SPECIAL_HATCH_VARIANT_WEIGHTS = {
         "fungal": 4,
         "watcher": 3,
         "nightbloom": 2,
-        "shiny": 1,
     },
 }
 
