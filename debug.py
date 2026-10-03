@@ -20,8 +20,8 @@ class Debug(commands.Cog):
         self.sessions = {}
 
     async def is_authorized(self, ctx):
-        if await self.bot.is_owner(ctx.author):
-            return True
+        # Debug access is always locked by default. Even the bot owner must
+        # unlock a temporary session with the configured access code.
         return self.sessions.get(ctx.author.id, 0) > time.time()
 
     async def require_access(self, ctx):
@@ -38,14 +38,6 @@ class Debug(commands.Cog):
     @debug.command(name="unlock", description="Unlock debug tools for 30 minutes with the server secret.")
     @commands.has_permissions(administrator=True)
     async def unlock(self, ctx, code: str):
-        if await self.bot.is_owner(ctx.author):
-            self.sessions[ctx.author.id] = time.time() + self.SESSION_SECONDS
-            await ctx.send(
-                "**Owner detected.** You already have permanent debug access, so no unlock timer is needed.",
-                ephemeral=True
-            )
-            return
-
         secret = os.getenv("DEBUG_ACCESS_CODE")
         if not secret:
             return await ctx.send(
@@ -77,32 +69,85 @@ class Debug(commands.Cog):
     @debug.command(name="lock", description="End your temporary debug session.")
     @commands.has_permissions(administrator=True)
     async def lock(self, ctx):
-        if await self.bot.is_owner(ctx.author):
-            self.sessions.pop(ctx.author.id, None)
-            await ctx.send(
-                "**Owner detected.** Your debug access cannot be locked because owner access always overrides the debug lock.",
-                ephemeral=True
-            )
+        if not await self.require_access(ctx):
             return
 
         self.sessions.pop(ctx.author.id, None)
         await ctx.send("🔒 Debug session ended.", ephemeral=True)
 
-    @debug.command(name="stardust", description="Grant Stardust to a member for testing.")
+    @debug.command(name="stardust", description="Check, grant, or reduce a member's Stardust for testing.")
     @commands.has_permissions(administrator=True)
-    async def stardust(self, ctx, member: discord.Member, amount: int):
+    @app_commands.describe(
+        member="The member whose Stardust you want to manage.",
+        amount="Amount of Stardust to grant or reduce. Leave blank to only check the balance.",
+        reduce="Reduce the member's current Stardust by the amount instead of granting it.",
+        ephemeral="Whether the response should only be visible to you.",
+    )
+    async def stardust(
+        self,
+        ctx,
+        member: discord.Member,
+        amount: int | None = None,
+        reduce: bool = False,
+        ephemeral: bool = True,
+    ):
         if not await self.require_access(ctx):
             return
-        if amount <= 0 or amount > 1_000_000:
+
+        if amount is not None and (amount <= 0 or amount > 1_000_000):
             return await ctx.send("❌ Choose an amount from 1 to 1,000,000.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
-            await db.execute("INSERT OR IGNORE INTO users (user_id, stardust) VALUES (?, 0)", (member.id,))
-            await db.execute("UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?", (amount, member.id))
-            await db.commit()
+            await db.execute(
+                "INSERT OR IGNORE INTO users (user_id, stardust) VALUES (?, 0)",
+                (member.id,),
+            )
 
-        await ctx.send(f"✨ Granted **{amount:,} Stardust** to {member.mention} for testing.", ephemeral=True)
+            async with db.execute(
+                "SELECT COALESCE(stardust, 0) FROM users WHERE user_id = ?",
+                (member.id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            current_balance = row[0] if row else 0
+
+            if amount is None:
+                await db.commit()
+                return await ctx.send(
+                    f"💫 **{member.display_name}** currently has **{current_balance:,} Stardust**.",
+                    ephemeral=ephemeral,
+                )
+
+            if reduce:
+                new_balance = max(0, current_balance - amount)
+                actual_reduction = current_balance - new_balance
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_balance, member.id),
+                )
+                await db.commit()
+
+                await ctx.send(
+                    f"➖ Reduced **{actual_reduction:,} Stardust** from {member.mention}. "
+                    f"Their new balance is **{new_balance:,} Stardust**.",
+                    ephemeral=ephemeral,
+                )
+            else:
+                new_balance = current_balance + amount
+
+                await db.execute(
+                    "UPDATE users SET stardust = ? WHERE user_id = ?",
+                    (new_balance, member.id),
+                )
+                await db.commit()
+
+                await ctx.send(
+                    f"✨ Granted **{amount:,} Stardust** to {member.mention} for testing. "
+                    f"Their new balance is **{new_balance:,} Stardust**.",
+                    ephemeral=ephemeral,
+                )
 
     @debug.command(name="item", description="Grant a registered inventory item for testing.")
     @commands.has_permissions(administrator=True)
