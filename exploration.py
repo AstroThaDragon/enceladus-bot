@@ -22,6 +22,7 @@ from seasonal_updates.halloween.halloween import (
     HALLOWEEN_KNOCKOUT_LINES,
     is_active as halloween_is_active,
     HALLOWEEN_PET_EGG_CHANCE,
+    GLITCHED_PET_EGG_CHANCE,
     HALLOWEEN_PET_CANDY_CHANCE,
     HALLOWEEN_SPACE_JUNK,
     halloween_channel_message,
@@ -1254,11 +1255,13 @@ class Exploration(commands.Cog):
                 )
 
             effects = json.loads(effects_raw)
+            kolossos_next_loot_bonus = float(effects.pop("kolossos_next_loot_bonus", 0.0) or 0.0)
             pet_effects = await get_active_pet_effects(db, user_id)
             upgrade_cog = self.bot.get_cog("Upgrades")
             mining_upgrade = await upgrade_cog.get_effects(user_id, "mining") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
             # Space Dragon grants +3 maximum Mining charges at passive level 5.
             max_mining_charges = mining_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
+            mining_rare_bonus = mining_upgrade.get("rare_bonus", 0.0) + kolossos_next_loot_bonus
 
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
@@ -1391,6 +1394,49 @@ class Exploration(commands.Cog):
                     "\n\n📦 **Mineral Overflow:** "
                     + " • ".join(mining_overflow_findings)
                 )
+
+            # MissingNo. rarely corrupts the reward data of the current activity.
+            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+                glitch_roll = random.random()
+                if glitch_roll < 0.70:
+                    glitch_amount = random.randint(1, 5)
+                    glitch_kind = "small"
+                elif glitch_roll < 0.95:
+                    glitch_amount = random.randint(10, 15)
+                    glitch_kind = "major"
+                else:
+                    glitch_amount = random.randint(100, 500)
+                    glitch_kind = "stardust"
+
+                if glitch_kind == "stardust":
+                    new_stardust += glitch_amount
+                    loot_description += (
+                        "\n\n" + get_pet_passive_message(pet_effects, "missingno_error_stardust")
+                        + f" **+{glitch_amount:,} Stardust**"
+                    )
+                else:
+                    eligible_minerals = [
+                        (material_id, material_name)
+                        for material_id, material_name, _chance in MINING_MATERIALS
+                    ]
+                    glitch_item_id, glitch_item_name = random.choice(eligible_minerals)
+                    added_glitch, _glitch_quantity, _glitch_max = await add_inventory_item(
+                        db, user_id, glitch_item_id, "mineral", glitch_amount
+                    )
+                    overflow_glitch = glitch_amount - added_glitch
+                    if added_glitch:
+                        loot_description += (
+                            "\n\n"
+                            + get_pet_passive_message(
+                                pet_effects,
+                                "missingno_error_small" if glitch_kind == "small" else "missingno_error_major",
+                            )
+                            + f" **{glitch_item_name} ×{added_glitch}**"
+                        )
+                    if overflow_glitch > 0:
+                        overflow_value = overflow_glitch * MATERIAL_OVERFLOW_VALUES.get(glitch_item_id, 0)
+                        new_stardust += overflow_value
+                        loot_description += f"\n📦 Glitched overflow → **+{overflow_value:,} Stardust**"
 
             # Astral Essence is a separate rare mining discovery, independent of
             # the normal rarity table so it does not replace existing loot.
@@ -1556,7 +1602,7 @@ class Exploration(commands.Cog):
                     if leveled_up:
                         loot_description += f"\n\n🎉 **Level Up!** Reached **Level {new_level}**!"
 
-            elif roll < 0.75 + mining_upgrade["rare_bonus"]:
+            elif roll < 0.75 + mining_rare_bonus:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
                 added_amount, new_quantity, max_quantity = await add_inventory_item(
                     db,
@@ -1583,7 +1629,7 @@ class Exploration(commands.Cog):
 
                 rarity_badge = "rare"
 
-            elif roll < 0.90 + mining_upgrade["rare_bonus"]:
+            elif roll < 0.90 + mining_rare_bonus:
                 # Tier 4: Rare/Epic (Arcade Token for future minigames)
                 async with db.execute(
                     "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
@@ -1783,6 +1829,7 @@ class Exploration(commands.Cog):
                 knocked_out_until = row[5] or ""
                 effects_raw = row[6] or "{}"
             effects = json.loads(effects_raw)
+            kolossos_next_loot_bonus = float(effects.pop("kolossos_next_loot_bonus", 0.0) or 0.0)
             pet_effects = await get_active_pet_effects(db, user_id)
             upgrade_cog = self.bot.get_cog("Upgrades")
             scavenging_upgrade = await upgrade_cog.get_effects(user_id, "scavenging") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
@@ -1790,6 +1837,7 @@ class Exploration(commands.Cog):
             # Space Dragon grants +3 maximum Scavenging charges at passive level 5.
             max_scavenge_charges = scavenging_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
             scavenging_rare_bonus = scavenging_upgrade.get("rare_bonus", 0.0)
+            scavenging_rare_bonus += kolossos_next_loot_bonus
             salvage_bonus_chance = max(0.0, salvage_upgrade.get("bonus_chance", 0.0))
 
             # Daily charge reset: charges refresh to 10 once per calendar day.
@@ -1866,6 +1914,23 @@ class Exploration(commands.Cog):
                 "cosmic_banana": "🍌 Cosmic Banana (peels itself, but tastes like stardust)"
             }
             
+            if xenomorph_bonus_loot_pending:
+                bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
+                bonus_amount = random.randint(1, 3)
+                bonus_added, _bonus_quantity, _bonus_max = await add_inventory_item(
+                    db, user_id, bonus_item_id, "space_junk", bonus_amount
+                )
+                if bonus_added:
+                    pet_findings.append(
+                        f"{get_pet_passive_message(pet_effects, 'xenomorph_bonus_loot')} **{bonus_item_name} ×{bonus_added}**"
+                    )
+                if bonus_amount > bonus_added:
+                    overflow_value = (bonus_amount - bonus_added) * LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                    new_stardust += overflow_value
+                    pet_findings.append(
+                        f"📦 Xenomorph loot overflow → **+{overflow_value:,} Stardust**"
+                    )
+
             # --- TIERED SCAVENGING LOOT ROLL ---
             # Quantum Batteries have a 2% base chance.
             # The Deep-Space Scanner boosts that to 4%.
@@ -1975,8 +2040,11 @@ class Exploration(commands.Cog):
                 cache_note = f"\n\n🎁 **Stardust Cache Found!** **+{cache_payout:,} Stardust**"
 
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
+            pet_findings = []
+            xenomorph_bonus_loot_pending = False
 
             # 30% Environmental Hazard Chance during Scavenging.
+            pet_tails_recovery = 0
             damage_taken = 0
             hazard_note = ""
             force_hazard = effects.pop("force_hazard", False)
@@ -1994,6 +2062,84 @@ class Exploration(commands.Cog):
                     else:
                         defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
                     hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
+                elif pet_effects["tails_doll_red_gem"] and random.random() < pet_effects["tails_doll_red_gem"]:
+                    benefit_roll = random.random()
+                    if benefit_roll < 0.34:
+                        benefit = random.randint(25, 75)
+                        new_stardust += benefit
+                        benefit_text = f"**+{benefit} Stardust**"
+                    elif benefit_roll < 0.67:
+                        bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
+                        bonus_added, _bonus_quantity, _bonus_max = await add_inventory_item(
+                            db, user_id, bonus_item_id, "space_junk", 1
+                        )
+                        if bonus_added:
+                            benefit_text = f"**{bonus_item_name} ×{bonus_added}**"
+                        else:
+                            overflow_value = LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                            new_stardust += overflow_value
+                            benefit_text = f"**+{overflow_value} Stardust** from overflow"
+                    else:
+                        recovery = random.randint(4, 8)
+                        old_hp = hp
+                        # This is a converted hazard, so the recovery can restore a little HP.
+                        new_hp_preview = min(max_hp, hp + recovery)
+                        benefit_text = f"**+{new_hp_preview - old_hp} HP**" if new_hp_preview > old_hp else "a small recovery"
+                        # Apply immediately after hazard processing by carrying the target forward.
+                        pet_tails_recovery = new_hp_preview - old_hp
+                    tails_message = get_pet_passive_message(pet_effects, "tails_doll_red_gem")
+                    if 'pet_tails_recovery' not in locals():
+                        pet_tails_recovery = 0
+                    hazard_note = f"\n\n{tails_message}\n**Hazard converted into:** {benefit_text}"
+                elif pet_effects["kolossos_hunting_instinct"] and random.random() < pet_effects["kolossos_hunting_instinct"]:
+                    if random.random() < 0.40:
+                        hazard_note = (
+                            f"\n\n{get_pet_passive_message(pet_effects, 'kolossos_hunting_instinct')}\n"
+                            "**Kolossos completely negated the hazard.**\n"
+                            "🍖 **Hunting Instinct:** Your next activity has **+20% loot-finding chance**."
+                        )
+                        effects["kolossos_next_loot_bonus"] = 0.20
+                    else:
+                        base_damage = random.randint(min_damage, max_damage)
+                        damage_taken = max(1, int(base_damage * 0.50 * (1 - pet_effects["hazard_reduction"])))
+                        effects["kolossos_next_loot_bonus"] = 0.20
+                        hazard_note = (
+                            f"\n\n{get_pet_passive_message(pet_effects, 'kolossos_hunting_instinct')}\n"
+                            f"**Hazard reduced to -{damage_taken} HP.**\n"
+                            "🍖 **Hunting Instinct:** Your next activity has **+20% loot-finding chance**."
+                        )
+                elif pet_effects["xenomorph_ambush"] and random.random() < pet_effects["xenomorph_ambush"]:
+                    if random.random() < 0.75:
+                        hazard_note = (
+                            f"\n\n{get_pet_passive_message(pet_effects, 'xenomorph_ambush')}\n"
+                            "**The hazard was completely stopped.**"
+                        )
+                    else:
+                        base_damage = random.randint(min_damage, max_damage)
+                        damage_taken = max(1, int(base_damage * 0.25 * (1 - pet_effects["hazard_reduction"])))
+                        hazard_note = (
+                            f"\n\n{get_pet_passive_message(pet_effects, 'xenomorph_ambush')}\n"
+                            f"**Hazard reduced to -{damage_taken} HP.**"
+                        )
+                    if random.random() < 0.50:
+                        xenomorph_bonus_loot_pending = True
+                elif pet_effects["siren_false_signal"] and random.random() < pet_effects["siren_false_signal"]:
+                    warning_message = get_pet_passive_message(pet_effects, "siren_false_signal")
+                    if random.random() < 0.40:
+                        hazard_note = (
+                            f"\n\n{warning_message}\n"
+                            f"{get_pet_passive_message(pet_effects, 'siren_false_signal_avoid')}\n"
+                            "**0 HP damage taken.**"
+                        )
+                    else:
+                        hazard_note = f"\n\n{warning_message}\n**The warning came too late.**\n"
+                        if halloween_is_active() and HALLOWEEN_DAMAGE_MESSAGES:
+                            halloween_message, halloween_min_damage, halloween_max_damage = random.choice(HALLOWEEN_DAMAGE_MESSAGES)
+                            hazard = halloween_message
+                            damage_taken = max(1, int(random.randint(halloween_min_damage, halloween_max_damage) * (1 - pet_effects["hazard_reduction"])))
+                        else:
+                            damage_taken = max(1, int(random.randint(min_damage, max_damage) * (1 - pet_effects["hazard_reduction"])))
+                        hazard_note += f"**You {hazard} and took -{damage_taken} HP.**"
                 elif pet_effects["scavenge_hazard_avoidance"] and random.random() < pet_effects["scavenge_hazard_avoidance"]:
                     pet_warning = get_pet_passive_message(
                         pet_effects, "scavenge_hazard_avoidance"
@@ -2011,6 +2157,8 @@ class Exploration(commands.Cog):
                     hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
 
             new_hp = max(0, hp - damage_taken)
+            if pet_tails_recovery > 0:
+                new_hp = min(max_hp, new_hp + pet_tails_recovery)
             if (
                 damage_taken > 0
                 and pet_effects["scavenge_first_aid"]
@@ -2049,7 +2197,6 @@ class Exploration(commands.Cog):
             medical_supply_findings = []
             bonus_mineral_findings = []
             seasonal_findings = []
-            pet_findings = []
             bonus_overflow_findings = []
 
             # Some Haunted pets have a permanent, year-round scavenging passive
@@ -2072,6 +2219,41 @@ class Exploration(commands.Cog):
                     pet_findings.append(
                         f"{bonus_item_name} → Inventory Full (+{overflow_stardust:,} Stardust)"
                     )
+
+            # MissingNo. rarely corrupts the current scavenging reward data.
+            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+                glitch_roll = random.random()
+                if glitch_roll < 0.70:
+                    glitch_amount = random.randint(1, 5)
+                    glitch_effect_id = "missingno_error_small"
+                elif glitch_roll < 0.95:
+                    glitch_amount = random.randint(10, 15)
+                    glitch_effect_id = "missingno_error_major"
+                else:
+                    glitch_amount = random.randint(100, 500)
+                    glitch_effect_id = "missingno_error_stardust"
+
+                if glitch_effect_id == "missingno_error_stardust":
+                    new_stardust += glitch_amount
+                    pet_findings.append(
+                        f"{get_pet_passive_message(pet_effects, glitch_effect_id)} **+{glitch_amount:,} Stardust**"
+                    )
+                else:
+                    glitch_item_id, glitch_item_name = random.choice(list(junk_items.items()))
+                    added_glitch, _glitch_quantity, _glitch_max = await add_inventory_item(
+                        db, user_id, glitch_item_id, "space_junk", glitch_amount
+                    )
+                    if added_glitch:
+                        pet_findings.append(
+                            f"{get_pet_passive_message(pet_effects, glitch_effect_id)} **{glitch_item_name} ×{added_glitch}**"
+                        )
+                    overflow_glitch = glitch_amount - added_glitch
+                    if overflow_glitch > 0:
+                        overflow_value = overflow_glitch * LOOT_OVERFLOW_VALUES.get(glitch_item_id, 10)
+                        new_stardust += overflow_value
+                        pet_findings.append(
+                            f"📦 Glitched overflow → **+{overflow_value:,} Stardust**"
+                        )
 
             # Seasonal Halloween resources are independent bonus rolls and never
             # replace the normal scavenging loot.
@@ -2124,13 +2306,19 @@ class Exploration(commands.Cog):
                 seasonal_findings.append("\n".join(collectible_lines))
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
-            # Halloween and normal eggs each get their own roll, so both can be
-            # found during the same scavenging run. Halloween eggs stop dropping
-            # automatically when the event ends.
+            # During Halloween, normal eggs are intentionally reduced to 6%
+            # while the seasonal eggs become more common. After Halloween, the
+            # normal egg automatically returns to its regular NORMAL_EGG_CHANCE.
+            # Seasonal eggs automatically stop dropping when Halloween ends.
             egg_rolls = []
-            if halloween_active and random.random() < HALLOWEEN_PET_EGG_CHANCE:
-                egg_rolls.append("halloween_egg")
-            if random.random() < NORMAL_EGG_CHANCE:
+            if halloween_active:
+                if random.random() < 0.06:
+                    egg_rolls.append("normal_egg")
+                if random.random() < HALLOWEEN_PET_EGG_CHANCE:
+                    egg_rolls.append("halloween_egg")
+                if random.random() < GLITCHED_PET_EGG_CHANCE:
+                    egg_rolls.append("glitched_egg")
+            elif random.random() < NORMAL_EGG_CHANCE:
                 egg_rolls.append("normal_egg")
 
             for egg_id in egg_rolls:
@@ -2222,7 +2410,7 @@ class Exploration(commands.Cog):
                         and random.random() < effective_scavenge_material_bonus
                     )
                     if material_bonus_triggered:
-                        amount_found += 1
+                        amount_found += random.randint(1, 3)
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "crafting_material", amount_found
                     )
@@ -2276,7 +2464,7 @@ class Exploration(commands.Cog):
                             and random.random() < effective_scavenge_material_bonus
                         )
                         if material_bonus_triggered:
-                            amount_found += 1
+                            amount_found += random.randint(1, 3)
                         added_mineral, mineral_quantity, mineral_max = await add_inventory_item(
                             db, user_id, mineral_id, "mineral", amount_found
                         )

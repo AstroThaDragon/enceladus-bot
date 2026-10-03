@@ -10,6 +10,28 @@ from collectibles import LOCATION_BASED_COLLECTIBLES
 from seasonal_updates.halloween.haunted import HAUNTED_IMPOSSIBLE_DISCOVERIES
 
 ACHIEVEMENTS = {
+    # -----------------------------------------------------------------------
+    # Glitched Egg achievements
+    # -----------------------------------------------------------------------
+    "glitched_first_pet": {
+        "name": "First Glitched Pet",
+        "emoji": "💾",
+        "description": "Hatch your first pet from a Glitched Egg.",
+        "reward": "Permanent profile background: CORRUPTED REALITY",
+    },
+    "glitched_collector": {
+        "name": "[ERROR3D_COLLECTOR]",
+        "emoji": "💾",
+        "description": "Collect all 6 pets from the Glitched Egg.",
+        "reward": "15,000 Stardust + Permanent profile title: GLITCHED COLLECTOR",
+    },
+    "glitched_missingno": {
+        "name": "[ERROR://CORRUPTED_DATA]",
+        "emoji": "👾",
+        "description": "Hatch MissingNo.",
+        "reward": "Permanent profile title: CORRUPTED DATA",
+    },
+
     "halloween_half": {
         "name": "Haunted Collector",
         "emoji": "🎃",
@@ -149,6 +171,23 @@ ACHIEVEMENTS = {
         "reward": "Permanent profile background: MalO",
     },
 }
+
+GLITCHED_PET_IDS = (
+    "kolossos",
+    "mini_tails_doll",
+    "endoskeleton",
+    "mini_xenomorph",
+    "missingno",
+    "mini_siren_head",
+)
+GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID = "glitched_collector"
+GLITCHED_PET_COLLECTION_PROGRESS_ID = "glitched_pet_collection"
+
+# Permanent cosmetic rewards for the Glitched Egg achievement chain.
+# The title names can be changed later without changing the achievement IDs.
+GLITCHED_FIRST_PET_BACKGROUND_ID = "background_corrupted_reality"
+GLITCHED_MISSINGNO_TITLE_ID = "title_corrupted_data"
+GLITCHED_COLLECTION_TITLE_ID = "title_glitched_collector"
 
 HALLOWEEN_BACKGROUND_ID = "halloween_haunted"
 HALLOWEEN_TITLE_ID = "title_horror_enthusiast"
@@ -348,6 +387,94 @@ class Achievements(commands.Cog):
                 await channel.send(embed=embed)
             except (discord.Forbidden, discord.HTTPException):
                 continue
+
+    async def add_glitched_pet_progress(self, user_id, pet_type, db=None, channel=None):
+        """Record a Glitched Egg hatch and unlock the related permanent achievements."""
+        if pet_type not in GLITCHED_PET_IDS:
+            return []
+
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+
+        try:
+            await ensure_achievement_tables(db)
+            unlocked = []
+
+            if await self._grant_haunted_achievement(
+                db,
+                user_id,
+                "glitched_first_pet",
+                background_id=GLITCHED_FIRST_PET_BACKGROUND_ID,
+            ):
+                unlocked.append("glitched_first_pet")
+
+            if pet_type == "missingno":
+                if await self._grant_haunted_achievement(
+                    db,
+                    user_id,
+                    "glitched_missingno",
+                    title_id=GLITCHED_MISSINGNO_TITLE_ID,
+                ):
+                    unlocked.append("glitched_missingno")
+
+            placeholders = ",".join("?" for _ in GLITCHED_PET_IDS)
+            async with db.execute(
+                f"""
+                SELECT COUNT(DISTINCT pet_type)
+                FROM pets
+                WHERE user_id = ? AND pet_type IN ({placeholders})
+                """,
+                (user_id, *GLITCHED_PET_IDS),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            current_count = min(int(row[0] if row else 0), len(GLITCHED_PET_IDS))
+
+            await db.execute(
+                """
+                INSERT INTO achievement_progress (user_id, achievement_id, progress)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id, achievement_id)
+                DO UPDATE SET progress = MAX(progress, excluded.progress)
+                """,
+                (user_id, GLITCHED_PET_COLLECTION_PROGRESS_ID, current_count),
+            )
+
+            async with db.execute(
+                """
+                SELECT progress
+                FROM achievement_progress
+                WHERE user_id = ? AND achievement_id = ?
+                """,
+                (user_id, GLITCHED_PET_COLLECTION_PROGRESS_ID),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            collection_progress = min(
+                int(row[0] if row else current_count),
+                len(GLITCHED_PET_IDS),
+            )
+
+            if collection_progress >= len(GLITCHED_PET_IDS):
+                if await self._grant_haunted_achievement(
+                    db,
+                    user_id,
+                    GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID,
+                    title_id=GLITCHED_COLLECTION_TITLE_ID,
+                    stardust_reward=15_000,
+                ):
+                    unlocked.append(GLITCHED_PET_COLLECTION_ACHIEVEMENT_ID)
+
+            if owns_db:
+                await db.commit()
+
+            await self._notify_achievement_unlocks(user_id, unlocked, channel)
+            return unlocked
+
+        finally:
+            if owns_db:
+                await db.close()
 
     async def add_candy_progress(self, user_id, amount, db=None, channel=None):
         """Track Halloween candy consumption and unlock cosmetic rewards at 100 and 250+ pieces."""
@@ -1025,6 +1152,23 @@ class Achievements(commands.Cog):
                     ) as c:
                         row = await c.fetchone()
                     progress = f"Progress: **{min(row[0] if row else 0, threshold)}/{threshold}**"
+                elif achievement_id == "glitched_collector":
+                    async with db.execute(
+                        """
+                        SELECT progress
+                        FROM achievement_progress
+                        WHERE user_id = ? AND achievement_id = ?
+                        """,
+                        (user_id, GLITCHED_PET_COLLECTION_PROGRESS_ID),
+                    ) as cursor:
+                        glitched_row = await cursor.fetchone()
+                    glitched_progress = min(
+                        int(glitched_row[0] if glitched_row else 0),
+                        len(GLITCHED_PET_IDS),
+                    )
+                    progress = f"Progress: **{glitched_progress}/{len(GLITCHED_PET_IDS)}**"
+                elif achievement_id in {"glitched_first_pet", "glitched_missingno"}:
+                    progress = "Progress: **1/1**" if is_unlocked else "Progress: **0/1**"
                 elif achievement_id in HALLOWEEN_SPECIAL_ITEM_ACHIEVEMENTS:
                     # One-time special collectibles are binary achievements.
                     # Their permanent usage record is stored in used_collectibles.

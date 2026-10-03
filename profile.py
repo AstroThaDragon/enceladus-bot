@@ -30,7 +30,8 @@ BACKGROUND_ARTISTS = {
     "background_fogbound": "KoolShooters on Pexels",
     "background_dead_end": "Rebecca Johnsen on Unsplash",
     "background_watched_from_the_trees": "Ben Griffiths on Unsplash",
-    "background_haunted_item_collector": None,
+    "background_haunted_item_collector": "Michel Bocquet on Unsplash",
+    "background_corrupted_reality": "Egor Komarov on Unsplash",
 }
 
 class Profile(commands.Cog):
@@ -212,9 +213,20 @@ class Profile(commands.Cog):
         if bg_name == "default":
             bg_name = "default_nebula"
 
+        # Some existing background IDs do not exactly match their asset filenames.
+        # Keep the IDs stable for saved unlocks/equipped profiles, and translate
+        # them only when resolving the physical PNG asset.
+        background_asset_names = {
+            "halloween_haunted": "halloween_haunted_halloween",
+            "halloween_haunting_friend": "halloween_hunting_friend",
+        }
+        bg_asset_name = background_asset_names.get(bg_name, bg_name)
+
         # Load Background Environment
         try:
-            bg_image = Editor(f"assets/presets/backgrounds/{bg_name}.png").resize((viewport_w, viewport_h))
+            bg_image = Editor(
+                f"assets/presets/backgrounds/{bg_asset_name}.png"
+            ).resize((viewport_w, viewport_h))
             viewport.paste(bg_image, (0, 0))
         except FileNotFoundError:
             viewport.rectangle((0, 0), width=viewport_w, height=viewport_h, fill="#1E2333")
@@ -410,6 +422,7 @@ class Profile(commands.Cog):
             "background_dead_end": "Dead-End",
             "background_watched_from_the_trees": "Watched From the Trees",
             "background_haunted_item_collector": "Haunted Item Collector",
+            "background_corrupted_reality": "CORRUPTED REALITY",
         }
 
 
@@ -464,6 +477,7 @@ class Profile(commands.Cog):
                 "background_dead_end": "🛣️",
                 "background_watched_from_the_trees": "🌲",
                 "background_haunted_item_collector": "🔧",
+                "background_corrupted_reality": "💾",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -505,7 +519,8 @@ class Profile(commands.Cog):
             "background_fogbound": "Fogbound",
             "background_dead_end": "Dead-End",
             "background_watched_from_the_trees": "Watched From the Trees",
-            "background_haunted_item_collector": "Haunted Item Collector"
+            "background_haunted_item_collector": "Haunted Item Collector",
+            "background_corrupted_reality": "CORRUPTED REALITY"
         }
 
         if background not in valid_backgrounds:

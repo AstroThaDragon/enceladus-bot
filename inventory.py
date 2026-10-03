@@ -288,6 +288,7 @@ ITEM_REGISTRY = {
     "drone_quantum_battery": {"name": "Drone Quantum Battery", "emoji": EMOJIS.get("drone_quantum_battery", "⚛️"), "max_quantity": 5, "sell_price": 600, "type": "Consumable", "desc": "Fully restores your scavenging drone to its current maximum charges."},
     "pet_snack": {"name": "Pet Treat", "emoji": EMOJIS.get("pet_snack", "🍪"), "max_quantity": 99, "type": "Pet Treat", "desc": "A tasty treat that gives your active pet a chunk of Pet XP."},
     "normal_egg": {"name": "Pet Egg", "emoji": "🥚", "max_quantity": 10, "type": "Pet Egg", "desc": "A mysterious egg containing a normal station pet. Incubate for 12 hours."},
+    "glitched_egg": {"name": "Glitched Egg", "emoji": "💾", "max_quantity": 10, "type": "Pet Egg", "desc": "A corrupted egg that flickers between frames. It contains a mysterious pet from somewhere the game was never supposed to reach. Incubate for 12 hours."},
     "arcade_token": {"name": "Arcade Token", "emoji": EMOJIS["arcade_token"], "max_quantity": 1000, "type": "Currency", "desc": "A shiny token for '/minigames` and more in the future!"},
     "time_crystal": {"name": "Dilated Time Crystal", "emoji": EMOJIS.get("time_crystal", "💎"), "max_quantity": 4, "sell_price": 1750, "type": "Consumable", "desc": "Bends time backwards to restore a fortune streak missed yesterday."},
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": EMOJIS.get("nanite_patch", "🩹"), "max_quantity": 50, "sell_price": 200, "type": "Healing", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
@@ -455,6 +456,8 @@ ITEM_REGISTRY = {
     "title_horror_enthusiast": {"name": "Horror Enthusiast", "emoji": "👻", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting every Halloween Space Junk collectible."},
     "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."},
     "title_seal_breaker": {"name": "Seal Breaker", "emoji": "🍷", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by breaking the seal on the Cursed Wine Cabinet."},
+    "title_corrupted_data": {"name": "CORRUPTED DATA", "emoji": "👾", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by hatching MissingNo. from a Glitched Egg."},
+    "title_glitched_collector": {"name": "GLITCHED COLLECTOR", "emoji": "💾", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting all 6 Glitched Egg pets."},
 
     
     "mascot_fabric": {"name": "Mascot Fabric", "emoji": "🧵", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "Faded fabric torn from an old mascot costume."},
