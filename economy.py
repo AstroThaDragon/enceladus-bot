@@ -7,7 +7,7 @@ import aiosqlite
 import json
 import random
 import re
-from typing import Any, Optional
+from typing import Any, Optional, cast
 import datetime
 import time
 from datetime import datetime, timedelta, time as dt_time
@@ -489,10 +489,10 @@ class ShopTransactionView(discord.ui.View):
         self.cog = cog
         self.user_id = user_id
         self.mode = mode
-        self.category = None
+        self.category: Optional[str] = None
         self.page = 0
         self.search_query = ""
-        self.selected_item = None
+        self.selected_item: Optional[str] = None
         self.quantity = 1
         self.quantity_input = "1"
         self.item_entries = []
@@ -520,17 +520,17 @@ class ShopTransactionView(discord.ui.View):
             row=1,
         )
 
-        async def search_callback(interaction):
+        async def search_callback(interaction: discord.Interaction):
             if not await self.check_owner(interaction):
                 return
             await interaction.response.send_modal(ShopSearchModal(self))
 
-        search.callback = search_callback
+        search.callback = cast(Any, search_callback)
         self.add_item(search)
 
     def _category_title(self):
         emoji, label, _ = SHOP_CATEGORY_INFO.get(
-            self.category, ("📂", "Shop", "")
+            self.category or "", ("📂", "Shop", "")
         )
         return f"{emoji} {label}"
 
@@ -544,6 +544,8 @@ class ShopTransactionView(discord.ui.View):
                     continue
                 item_ids.extend(category_items)
             return list(dict.fromkeys(item_ids))
+        if self.category is None:
+            return []
         return list(SHOP_BUY_CATEGORY_ITEMS.get(self.category, []))
 
     async def _get_sell_items(self):
@@ -559,6 +561,8 @@ class ShopTransactionView(discord.ui.View):
                 seen.add(entry["id"])
                 unique.append(entry)
             return unique
+        if self.category is None:
+            return []
         return await self.cog.get_shop_sell_items(self.user_id, self.category)
 
     def _filter_entries(self, entries):
@@ -740,7 +744,7 @@ class ShopTransactionView(discord.ui.View):
             for entry in page_entries:
                 self.add_item(ShopItemButton(self, entry, row=0))
         else:
-            embed.description += "\n\n❌ No items match that search."
+            embed.description = (embed.description or "") + "\n\n❌ No items match that search."
 
         previous = discord.ui.Button(
             label="Previous",
@@ -769,32 +773,32 @@ class ShopTransactionView(discord.ui.View):
             row=2,
         )
 
-        async def previous_callback(i):
+        async def previous_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             self.page -= 1
             await self.show_item_picker(i)
 
-        async def next_callback(i):
+        async def next_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             self.page += 1
             await self.show_item_picker(i)
 
-        async def search_callback(i):
+        async def search_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             await i.response.send_modal(ShopSearchModal(self))
 
-        async def categories_callback(i):
+        async def categories_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             await self.show_category(i)
 
-        previous.callback = previous_callback
-        next_button.callback = next_callback
-        search.callback = search_callback
-        categories.callback = categories_callback
+        previous.callback = cast(Any, previous_callback)
+        next_button.callback = cast(Any, next_callback)
+        search.callback = cast(Any, search_callback)
+        categories.callback = cast(Any, categories_callback)
         self.add_item(previous)
         self.add_item(next_button)
         self.add_item(search)
@@ -807,6 +811,8 @@ class ShopTransactionView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     def _get_selected_info(self):
+        if self.selected_item is None:
+            return None
         entry = self._entry_for_item(self.selected_item)
         if entry:
             return entry["info"]
@@ -862,7 +868,7 @@ class ShopTransactionView(discord.ui.View):
         )
         embed.set_footer(text="Custom lets you enter a quantity up to 99.")
 
-        presets = [("1", "1", "1️⃣"), ("10", "10", "🔟")]
+        presets: list[tuple[str, str, Optional[str]]] = [("1", "1", "1️⃣"), ("10", "10", "🔟")]
         if self.mode == "buy":
             # "2️⃣5️⃣" is two emoji sequences combined, which Discord rejects
             # as a single button emoji (error 50035 / Invalid emoji).
@@ -876,18 +882,18 @@ class ShopTransactionView(discord.ui.View):
         back = discord.ui.Button(label="Back", emoji="◀️", style=discord.ButtonStyle.secondary, row=1)
         confirm = discord.ui.Button(label="Confirm", emoji="✅", style=discord.ButtonStyle.success, row=1)
 
-        async def back_callback(i):
+        async def back_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             await self.show_item_picker(i)
 
-        async def confirm_callback(i):
+        async def confirm_callback(i: discord.Interaction):
             if not await self.check_owner(i):
                 return
             await self.confirm_transaction(i)
 
-        back.callback = back_callback
-        confirm.callback = confirm_callback
+        back.callback = cast(Any, back_callback)
+        confirm.callback = cast(Any, confirm_callback)
         self.add_item(back)
         self.add_item(confirm)
         await interaction.response.edit_message(embed=embed, view=self)
@@ -932,7 +938,8 @@ class ShopTransactionView(discord.ui.View):
 
         self.finished = True
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
         await interaction.response.edit_message(view=self)
 
         # The existing transaction methods contain the full purchase/sale
@@ -946,7 +953,8 @@ class ShopTransactionView(discord.ui.View):
 
     async def on_timeout(self):
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
 
 
 class ShopListCategorySelect(discord.ui.Select):
@@ -1150,7 +1158,8 @@ class SellAllConfirmView(discord.ui.View):
         if self.finished:
             return
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
 
     @discord.ui.button(label="Yes, Sell All", emoji="✅", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1158,7 +1167,8 @@ class SellAllConfirmView(discord.ui.View):
             return
         self.finished = True
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
         await self.cog._confirm_bulk_sale(interaction, self.sale_kind, self)
 
     @discord.ui.button(label="Cancel", emoji="❌", style=discord.ButtonStyle.secondary)
@@ -1167,7 +1177,8 @@ class SellAllConfirmView(discord.ui.View):
             return
         self.finished = True
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
         await interaction.response.edit_message(
             content="❌ **Sale cancelled.** Nothing was sold.",
             embed=None,
@@ -2510,6 +2521,8 @@ class Economy(commands.Cog):
 
         for item_id, owned_quantity, stored_type in rows:
             info = ITEM_REGISTRY.get(item_id)
+            if not info:
+                continue
             if not is_sellable(item_id, info, stored_type):
                 continue
 
@@ -2569,7 +2582,7 @@ class Economy(commands.Cog):
                     category = option.get("value")
                     break
 
-        category = category or "healing"
+        category = str(category or "healing")
 
         item_ids = list(SHOP_BUY_CATEGORY_ITEMS.get(category, []))
         if category == "daily":
@@ -2634,6 +2647,7 @@ class Economy(commands.Cog):
 
         if not category:
             return []
+        category = str(category)
 
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
@@ -2748,6 +2762,8 @@ class Economy(commands.Cog):
         if category in {"space_junk", "collectibles", "halloween", "materials", *SELL_ITEM_CATEGORY_IDS.keys()}:
             for item_id, owned_quantity, stored_type in rows:
                 info = ITEM_REGISTRY.get(item_id)
+                if not info:
+                    continue
                 if not is_sellable(item_id, info, stored_type):
                     continue
 
@@ -2792,7 +2808,7 @@ class Economy(commands.Cog):
     ):
         """Compatibility router for older command registrations."""
         options = interaction.data.get("options", []) if interaction.data else []
-        action = next((o.get("value") for o in options if o.get("name") == "action"), "buy")
+        action = str(next((o.get("value") for o in options if o.get("name") == "action"), "buy"))
         if action == "sell":
             return await self.shop_sell_autocomplete(interaction, current)
         return await self.shop_buy_autocomplete(interaction, current)
@@ -3562,12 +3578,12 @@ class Economy(commands.Cog):
 
         await ctx.send("❌ An error occurred processing your transaction.")
 
-    def get_junk_sell_reward(self, item_id):
+    def get_junk_sell_reward(self, item_id) -> tuple[int, int]:
         """Return Stardust + Halloween Candy rewards for a junk item."""
         halloween_reward = get_halloween_sell_reward(item_id)
         if halloween_reward is not None:
-            return halloween_reward
-        return (self.JUNK_PRICES.get(item_id, 25), 0)
+            return (int(halloween_reward[0]), int(halloween_reward[1]))
+        return (int(self.JUNK_PRICES.get(item_id, 25)), 0)
 
     async def salvage_item_autocomplete(self, interaction: discord.Interaction, current: str):
         """Show Space Junk the user currently owns and can salvage."""
@@ -4094,18 +4110,18 @@ class Economy(commands.Cog):
         # Regular sales accept either a number (1–99) or `max`, which means
         # sell the entire quantity currently owned of the selected item.
         quantity_input = str(quantity).strip().lower()
+        quantity_amount: Optional[int] = None
         if quantity_input == "max":
             quantity_is_max = True
-            quantity = None
         else:
             try:
-                quantity = int(quantity_input)
+                quantity_amount = int(quantity_input)
             except (TypeError, ValueError):
                 return await ctx.send(
                     "❌ Quantity must be a number between **1 and 99**, or **`max`** to sell all you own."
                 )
             quantity_is_max = False
-            if quantity < 1 or quantity > 99:
+            if quantity_amount is None or quantity_amount < 1 or quantity_amount > 99:
                 return await ctx.send(
                     "❌ Quantity must be between **1 and 99**, or **`max`** to sell all you own."
                 )
@@ -4286,19 +4302,23 @@ class Economy(commands.Cog):
                     return await ctx.send("❌ You don't have any **Dilated Time Crystals** to sell.")
 
                 if quantity_is_max:
-                    quantity = owned_quantity
-                elif quantity > owned_quantity:
+                    quantity_amount = owned_quantity
+                elif quantity_amount is None or quantity_amount > owned_quantity:
                     await db.rollback()
                     return await ctx.send(
                         f"❌ You only have **{owned_quantity}x** **Dilated Time Crystals** in your inventory."
                     )
 
+                if quantity_amount is None:
+                    await db.rollback()
+                    return await ctx.send("❌ A valid sale quantity could not be determined.")
+
                 unit_payout = int(ITEM_REGISTRY.get("time_crystal", {}).get("sell_price", 0) or 0)
                 if unit_payout <= 0:
                     await db.rollback()
                     return await ctx.send("❌ Dilated Time Crystals do not currently have a sell price.")
-                payout = unit_payout * quantity
-                remaining = owned_quantity - quantity
+                payout = unit_payout * quantity_amount
+                remaining = owned_quantity - quantity_amount
 
                 await db.execute(
                     "UPDATE users SET time_crystals = ? WHERE user_id = ?",
@@ -4311,7 +4331,7 @@ class Economy(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity}x Dilated Time Crystal** "
+                    f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity_amount}x Dilated Time Crystal** "
                     f"for ✨ **{payout:,} Stardust**!\n"
                     f"📦 **Remaining:** **{remaining}x**"
                 )
@@ -4373,16 +4393,20 @@ class Economy(commands.Cog):
                     return await ctx.send("❌ That item cannot be sold.")
 
             if quantity_is_max:
-                quantity = owned_quantity
-            elif quantity > owned_quantity:
+                quantity_amount = owned_quantity
+            elif quantity_amount is None or quantity_amount > owned_quantity:
                 await db.rollback()
                 return await ctx.send(
                     f"❌ You only have **{owned_quantity}x** of **{info['name']}** in your inventory."
                 )
 
-            payout = unit_payout * quantity
-            candy_reward = unit_candy_reward * quantity
-            remaining = owned_quantity - quantity
+            if quantity_amount is None:
+                await db.rollback()
+                return await ctx.send("❌ A valid sale quantity could not be determined.")
+
+            payout = unit_payout * quantity_amount
+            candy_reward = unit_candy_reward * quantity_amount
+            remaining = owned_quantity - quantity_amount
 
             if remaining > 0:
                 await db.execute(
@@ -4428,7 +4452,7 @@ class Economy(commands.Cog):
             )
 
             await ctx.send(
-                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity}x {info['name']}** "
+                f"{ctx.author.mention} 🛍️ **Salvage Vendor:** Sold **{quantity_amount}x {info['name']}** "
                 f"for ✨ **{payout:,} Stardust**{candy_text}!\n"
                 f"📦 **Remaining:** **{remaining}x**"
                 f"{overflow_text}"

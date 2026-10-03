@@ -833,6 +833,9 @@ class Exploration(commands.Cog):
                     new_stage, _, _ = advanced
 
             if is_complete:
+                # Completion rewards are guaranteed when a Haunted run completes.
+                # Narrow the Optional return value for static type checkers.
+                assert reward is not None
                 reward_lines = [
                     f"{reward['rarity_emoji']} **{reward['rarity_label']} Haul**",
                     f"✨ **+{reward['stardust']:,} Stardust**",
