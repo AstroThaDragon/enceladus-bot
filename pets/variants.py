@@ -58,11 +58,6 @@ HALLOWEEN_VARIANTS = {
         "emoji": "🕯️",
         "lore": "Something unseen seems to be sharing its body, occasionally moving before it does.",
     },
-    "shiny": {
-        "name": "Shiny",
-        "emoji": "✨",
-        "lore": "Its Halloween form gleams with an unnaturally perfect sparkle that feels almost too cheerful.",
-    },
 }
 
 GODZILLA_VARIANTS = {
@@ -185,6 +180,117 @@ HALLOWEEN_PET_TYPES = {
     "skeleton_dragon", "samhain", "the_feed_me",
 }
 
+GLITCHED_VARIANTS = {
+    "kolossos_bloodied": {
+        "name": "Bloodied",
+        "emoji": "🩸",
+        "lore": "Dark crimson stains cover its scales and claws, as though it has only just returned from a brutal hunt. Its red accents appear deeper and more intense against its bloodied hide.",
+    },
+    "kolossos_void": {
+        "name": "Void",
+        "emoji": "🕳️",
+        "lore": "Its scales have become almost completely black, swallowing surrounding light while faint red highlights flicker like distant stars trapped beneath the surface.",
+    },
+    "kolossos_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "Kolossos appears to be breaking apart between frames, with misaligned scales, RGB-shifted edges, static fragments, and sections of its body briefly replaced by corrupted textures.",
+    },
+    "tails_doll_crimson_gem": {
+        "name": "Crimson Gem",
+        "emoji": "💎",
+        "lore": "Its signature gem burns with a vivid crimson glow, casting red light across its stitched body while its fur and seams take on deeper scarlet tones.",
+    },
+    "tails_doll_corrupted": {
+        "name": "Corrupted Doll",
+        "emoji": "🧸",
+        "lore": "Its stitched body is warped by strange digital corruption, with uneven seams, broken textures, and tiny patches of static crawling across its fur and gem.",
+    },
+    "tails_doll_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "The doll flickers between corrupted frames, its stitching misaligned and portions of its body fragmented into colorful digital noise as though its model is failing to load.",
+    },
+    "endoskeleton_rustbound": {
+        "name": "Rustbound",
+        "emoji": "🦾",
+        "lore": "Years of corrosion have eaten into its metal frame, leaving orange-brown rust, worn joints, and flaky plating across its exposed mechanical body.",
+    },
+    "endoskeleton_prototype": {
+        "name": "Prototype",
+        "emoji": "🔧",
+        "lore": "Its unfinished frame exposes experimental components, loose wiring, and mismatched mechanical parts that make it look like a machine pulled straight from a testing lab.",
+    },
+    "endoskeleton_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "Its metal frame repeatedly snaps out of alignment, with duplicated limbs, floating components, and harsh digital artifacts appearing wherever its corrupted model fails to render correctly.",
+    },
+    "xenomorph_pale": {
+        "name": "Pale",
+        "emoji": "🤍",
+        "lore": "Its normally dark exoskeleton has faded to a stark bone-white sheen, making its smooth head, claws, and elongated limbs stand out with an eerie clinical appearance.",
+    },
+    "xenomorph_royal": {
+        "name": "Royal",
+        "emoji": "👑",
+        "lore": "A richer, imposing coloration covers its exoskeleton, while its crest and spines appear larger and more pronounced, giving the creature an unmistakably regal silhouette.",
+    },
+    "xenomorph_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "Its elongated body tears between frames, leaving duplicate silhouettes, jagged texture fragments, and bands of digital static trailing behind its movements.",
+    },
+    "missingno_error_404": {
+        "name": "ERROR_404",
+        "emoji": "🚫",
+        "lore": "Its already-corrupted form has deteriorated further into broken textures and missing data, with empty spaces and malformed fragments appearing where parts of its body should be.",
+    },
+    "missingno_null": {
+        "name": "NULL",
+        "emoji": "⬛",
+        "lore": "Most of its form has collapsed into an almost featureless black void, surrounded by fragmented purple geometry that seems to exist without a proper shape or texture.",
+    },
+    "missingno_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "MissingNo. has become almost impossible to render correctly, violently flickering between broken shapes, scrambled colors, and chunks of corrupted data that spill beyond its outline.",
+    },
+    "siren_lost_transmission": {
+        "name": "Lost Transmission",
+        "emoji": "📡",
+        "lore": "Its body looks faded and out of sync, with damaged sirens, broken signal fragments, and faint static crawling across its frame as though an old broadcast is struggling to come through.",
+    },
+    "siren_dead_frequency": {
+        "name": "Dead Frequency",
+        "emoji": "📻",
+        "lore": "Its body has darkened almost to black, its sirens look worn and damaged, and a lingering layer of visual static surrounds it like the remains of a transmission that has gone silent.",
+    },
+    "siren_glitched": {
+        "name": "Glitched",
+        "emoji": "⚠️",
+        "lore": "Its towering frame violently desynchronizes, with sirens shifting position, sections of its body splitting into static, and fragments of corrupted broadcast imagery appearing around it.",
+    },
+}
+
+GLITCHED_PET_TYPES = {
+    "kolossos",
+    "mini_tails_doll",
+    "endoskeleton",
+    "mini_xenomorph",
+    "missingno",
+    "mini_siren_head",
+}
+
+GLITCHED_VARIANT_IDS = {
+    "kolossos": ("kolossos_bloodied", "kolossos_void", "kolossos_glitched"),
+    "mini_tails_doll": ("tails_doll_crimson_gem", "tails_doll_corrupted", "tails_doll_glitched"),
+    "endoskeleton": ("endoskeleton_rustbound", "endoskeleton_prototype", "endoskeleton_glitched"),
+    "mini_xenomorph": ("xenomorph_pale", "xenomorph_royal", "xenomorph_glitched"),
+    "missingno": ("missingno_error_404", "missingno_null", "missingno_glitched"),
+    "mini_siren_head": ("siren_lost_transmission", "siren_dead_frequency", "siren_glitched"),
+}
+
 SPECIAL_VARIANTS = {
     "godzilla": GODZILLA_VARIANTS,
     "samhain": SAMHAIN_VARIANTS,
@@ -198,8 +304,9 @@ SPECIAL_VARIANTS = {
 # These are total chances to discover any variant when hatching. Individual
 # variants are weighted inside the pool, so Shiny/Nebula remain the rarest.
 HATCH_VARIANT_CHANCE = {
-    "normal": 0.010,
-    "halloween": 0.015,
+    "normal": 0.020,
+    "halloween": 0.040,
+    "glitched": 0.040,
 }
 
 HATCH_VARIANT_WEIGHTS = {
@@ -214,8 +321,27 @@ HATCH_VARIANT_WEIGHTS = {
         "blood_moon": 4,
         "cursed": 6,
         "undead": 5,
-        "possessed": 4,
-        "shiny": 1,
+        "possessed": 1,
+    },
+    "glitched": {
+        "kolossos_bloodied": 5,
+        "kolossos_void": 4,
+        "kolossos_glitched": 1,
+        "tails_doll_crimson_gem": 5,
+        "tails_doll_corrupted": 4,
+        "tails_doll_glitched": 1,
+        "endoskeleton_rustbound": 5,
+        "endoskeleton_prototype": 4,
+        "endoskeleton_glitched": 1,
+        "xenomorph_pale": 5,
+        "xenomorph_royal": 4,
+        "xenomorph_glitched": 1,
+        "missingno_error_404": 5,
+        "missingno_null": 4,
+        "missingno_glitched": 1,
+        "siren_lost_transmission": 5,
+        "siren_dead_frequency": 4,
+        "siren_glitched": 1,
     },
 }
 
@@ -293,6 +419,8 @@ def variant_set_for_pet(pet_type):
         return NORMAL_VARIANTS
     if pet_type in HALLOWEEN_PET_TYPES:
         return HALLOWEEN_VARIANTS
+    if pet_type in GLITCHED_PET_TYPES:
+        return {variant_id: GLITCHED_VARIANTS[variant_id] for variant_id in GLITCHED_VARIANT_IDS[pet_type]}
     return {}
 
 def variant_category_for_pet(pet_type):
@@ -300,6 +428,8 @@ def variant_category_for_pet(pet_type):
         return "normal"
     if pet_type in HALLOWEEN_PET_TYPES:
         return "halloween"
+    if pet_type in GLITCHED_PET_TYPES:
+        return "glitched"
     return None
 
 def get_variant_info(pet_type, variant_id):
@@ -330,6 +460,11 @@ def get_variant_roll_pool(pet_type):
     if pet_type in SPECIAL_VARIANTS:
         return SPECIAL_HATCH_VARIANT_WEIGHTS.get(pet_type, {})
 
+    if pet_type in GLITCHED_PET_TYPES:
+        ids = GLITCHED_VARIANT_IDS.get(pet_type, ())
+        weights = HATCH_VARIANT_WEIGHTS.get("glitched", {})
+        return {variant_id: weights[variant_id] for variant_id in ids if variant_id in weights}
+
     category = variant_category_for_pet(pet_type)
     if category is None:
         return {}
@@ -343,7 +478,10 @@ def roll_hatched_variant(pet_type):
         return None
 
     import random
-    category = "halloween" if pet_type in HALLOWEEN_PET_TYPES else "normal"
+    if pet_type in GLITCHED_PET_TYPES:
+        category = "glitched"
+    else:
+        category = "halloween" if pet_type in HALLOWEEN_PET_TYPES else "normal"
     chance = HATCH_VARIANT_CHANCE.get(category, 0.0)
     if random.random() >= chance:
         return None
@@ -396,7 +534,7 @@ PET_DISPLAY_NAMES = {
 def build_variant_collectibles():
     """Return collectible tuples: (id, name, emoji, description)."""
     entries = []
-    for pet_type in sorted(NORMAL_PET_TYPES | HALLOWEEN_PET_TYPES):
+    for pet_type in sorted(NORMAL_PET_TYPES | HALLOWEEN_PET_TYPES | GLITCHED_PET_TYPES):
         for variant_id, info in variant_set_for_pet(pet_type).items():
             collectible_id = f"pet_variant:{pet_type}:{variant_id}"
             base_name = PET_DISPLAY_NAMES.get(pet_type, pet_type.replace("_", " ").title())

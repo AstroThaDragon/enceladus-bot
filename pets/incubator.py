@@ -170,6 +170,17 @@ class PetIncubatorMixin:
                     f"pet_variant:{pet_type}:{variant_id}",
                     category="Pet Variants",
                 )
+                if achievements_cog := cast(
+                    Achievements | None,
+                    self.bot.get_cog("Achievements"),
+                ):
+                    await achievements_cog.add_variant_discovery_progress(
+                        ctx.author.id,
+                        pet_type,
+                        variant_id,
+                        db=db,
+                        channel=ctx.channel,
+                    )
                 variant_discovered = True
 
             essence_awarded = False

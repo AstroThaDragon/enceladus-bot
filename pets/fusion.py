@@ -14,6 +14,7 @@ from .variants import (
     FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
     HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
     get_variant_info, get_variant_display, get_variant_ids_for_pet,
+    GLITCHED_PET_TYPES,
     roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
 )
 
@@ -56,7 +57,7 @@ class PetFusionMixin:
                 return await ctx.send("❌ You don't own that pet.")
 
             pet_type = target[1] or ""
-            if pet_type not in PETS and pet_type not in HALLOWEEN_PETS:
+            if pet_type not in PETS and pet_type not in HALLOWEEN_PETS and pet_type not in GLITCHED_PET_TYPES:
                 await db.rollback()
                 return await ctx.send(
                     "❌ This pet cannot be fused. Haunted location pets are unique companions."
@@ -170,6 +171,15 @@ class PetFusionMixin:
                     f"pet_variant:{pet_type}:{discovered_variant}",
                     category="Pet Variants",
                 )
+                achievements_cog = self.bot.get_cog("Achievements")
+                if achievements_cog:
+                    await achievements_cog.add_variant_discovery_progress(
+                        ctx.author.id,
+                        pet_type,
+                        discovered_variant,
+                        db=db,
+                        channel=ctx.channel,
+                    )
 
             await db.commit()
 
