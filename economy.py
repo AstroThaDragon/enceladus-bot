@@ -2267,6 +2267,19 @@ class Economy(commands.Cog):
                             await db.rollback()
                             return await ctx.send("❌ That pet can no longer be transferred because its definition is unavailable.")
 
+                        # Haunted location pets are exclusive discoveries tied to
+                        # their Haunted location. They remain visible in /give so
+                        # players can select them, but they cannot be traded.
+                        haunted_location = definition.get("haunted_location")
+                        is_location_pet = bool(haunted_location) or str(pet_type_id).lower().startswith("haunted_")
+                        if is_location_pet:
+                            await db.rollback()
+                            return await ctx.send(
+                                "🔒 **That pet is a Haunted Location Exclusive.**\n"
+                                "This companion was discovered in a specific Haunted location and "
+                                "cannot be traded or transferred to another member."
+                            )
+
                         pet_name = nickname or definition["name"]
 
                         cursor = await db.execute(

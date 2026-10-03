@@ -781,9 +781,17 @@ class Exploration(commands.Cog):
                 pet_discovery_message = run["story_state"].get("pet_discovery_message")
                 if outcome.get("pet_discovery"):
                     pet_result = await grant_haunted_pet(db, user_id, location_id)
-                    if pet_result and pet_result.get("new"):
-                        pet_discovery_message = pet_result["message"]
-                        new_state["pet_discovery_message"] = pet_discovery_message
+                    if pet_result:
+                        if pet_result.get("new"):
+                            pet_discovery_message = pet_result["message"]
+                            new_state["pet_discovery_message"] = pet_discovery_message
+                        else:
+                            pet_discovery_message = (
+                                "🐾 **Something familiar stirs...**\n"
+                                "You recognize this companion. You've already befriended it, "
+                                "and it disappears back into the darkness."
+                            )
+                            new_state["pet_discovery_message"] = pet_discovery_message
                     new_state["pet_opportunity_taken"] = True
 
                 await db.execute(
