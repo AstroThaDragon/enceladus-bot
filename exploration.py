@@ -9,7 +9,8 @@ import json
 from datetime import datetime, timedelta
 import pytz
 from emojis import EMOJIS
-from inventory import add_inventory_item, ITEM_REGISTRY
+from inventory import add_inventory_item, ITEM_REGISTRY, HALLOWEEN_SPECIAL_USE_ITEMS
+from collectibles import record_collectible
 from seasonal_updates.halloween.halloween import (
     MINING_CANDY_CHANCE as HALLOWEEN_MINING_CANDY_CHANCE,
     SCAVENGING_CANDY_CHANCE as HALLOWEEN_SCAVENGING_CANDY_CHANCE,
@@ -2046,18 +2047,36 @@ class Exploration(commands.Cog):
                 added_collectible, collectible_quantity, collectible_max = await add_inventory_item(
                     db, user_id, collectible_id, "space_junk", 1
                 )
+
+                # Seasonal collectible discoveries are permanent. For usable
+                # collectibles, only show the usage reminder the first time the
+                # collectible is actually added/discovered for this user.
+                first_discovery = False
                 if added_collectible:
-                    seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name}**\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"*{collectible_desc}*"
+                    first_discovery = await record_collectible(
+                        db, self.bot, user_id, collectible_id, category="Halloween"
                     )
-                else:
-                    seasonal_findings.append(
-                        f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name} → Inventory Full**\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"*{collectible_desc}*"
-                    )
+
+                collectible_lines = [
+                    f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name}"
+                    + (" → Inventory Full" if not added_collectible else "") + "**",
+                    "━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"*{collectible_desc}*",
+                ]
+
+                use_config = HALLOWEEN_SPECIAL_USE_ITEMS.get(collectible_id)
+                if (
+                    first_discovery
+                    and isinstance(use_config, dict)
+                    and use_config.get("enabled")
+                ):
+                    collectible_lines.extend([
+                        "",
+                        "💡 **Usable Collectible**",
+                        "Use `/use` → `item` to activate this collectible.",
+                    ])
+
+                seasonal_findings.append("\n".join(collectible_lines))
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
             # Halloween and normal eggs each get their own roll, so both can be
@@ -2699,7 +2718,7 @@ class HauntedInfoButton(discord.ui.Button):
 
 
 class HauntedStoryView(discord.ui.View):
-    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id):
+    def __init__(self, cog, location_id, stage, total_stages, scene_id):
         super().__init__(timeout=600)
         self.cog = cog
         self.owner_id = owner_id
