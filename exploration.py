@@ -1396,7 +1396,7 @@ class Exploration(commands.Cog):
                 )
 
             # MissingNo. rarely corrupts the reward data of the current activity.
-            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+            if pet_effects.get("missingno_error", 0.0) and random.random() < pet_effects.get("missingno_error", 0.0):
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
@@ -2062,7 +2062,7 @@ class Exploration(commands.Cog):
                     else:
                         defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
                     hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
-                elif pet_effects["tails_doll_red_gem"] and random.random() < pet_effects["tails_doll_red_gem"]:
+                elif pet_effects.get("tails_doll_red_gem", 0.0) and random.random() < pet_effects.get("tails_doll_red_gem", 0.0):
                     benefit_roll = random.random()
                     if benefit_roll < 0.34:
                         benefit = random.randint(25, 75)
@@ -2091,7 +2091,7 @@ class Exploration(commands.Cog):
                     if 'pet_tails_recovery' not in locals():
                         pet_tails_recovery = 0
                     hazard_note = f"\n\n{tails_message}\n**Hazard converted into:** {benefit_text}"
-                elif pet_effects["kolossos_hunting_instinct"] and random.random() < pet_effects["kolossos_hunting_instinct"]:
+                elif pet_effects.get("kolossos_hunting_instinct", 0.0) and random.random() < pet_effects.get("kolossos_hunting_instinct", 0.0):
                     if random.random() < 0.40:
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'kolossos_hunting_instinct')}\n"
@@ -2123,7 +2123,7 @@ class Exploration(commands.Cog):
                         )
                     if random.random() < 0.50:
                         xenomorph_bonus_loot_pending = True
-                elif pet_effects["siren_false_signal"] and random.random() < pet_effects["siren_false_signal"]:
+                elif pet_effects.get("siren_false_signal", 0.0) and random.random() < pet_effects.get("siren_false_signal", 0.0):
                     warning_message = get_pet_passive_message(pet_effects, "siren_false_signal")
                     if random.random() < 0.40:
                         hazard_note = (
@@ -2221,7 +2221,7 @@ class Exploration(commands.Cog):
                     )
 
             # MissingNo. rarely corrupts the current scavenging reward data.
-            if pet_effects["missingno_error"] and random.random() < pet_effects["missingno_error"]:
+            if pet_effects.get("missingno_error", 0.0) and random.random() < pet_effects.get("missingno_error", 0.0):
                 glitch_roll = random.random()
                 if glitch_roll < 0.70:
                     glitch_amount = random.randint(1, 5)
