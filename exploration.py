@@ -777,6 +777,7 @@ class Exploration(commands.Cog):
                         location_id,
                         sanity=new_sanity,
                         db=db,
+                        channel=interaction.channel,
                     )
                     await achievements_cog.mark_haunted_discovery_outcome(
                         user_id,
@@ -784,6 +785,7 @@ class Exploration(commands.Cog):
                         sanity_delta,
                         new_sanity,
                         db=db,
+                        channel=interaction.channel,
                     )
 
                 pet_discovery_message = run["story_state"].get("pet_discovery_message")
@@ -1074,6 +1076,7 @@ class Exploration(commands.Cog):
                         user_id,
                         candy_amount,
                         db=db,
+                        channel=ctx.channel,
                     )
             await db.commit()
 
@@ -2087,7 +2090,7 @@ class Exploration(commands.Cog):
                 first_discovery = False
                 if added_collectible:
                     first_discovery = await record_collectible(
-                        db, self.bot, user_id, collectible_id, category="Halloween"
+                        db, self.bot, user_id, collectible_id, category="Halloween", channel=ctx.channel
                     )
 
                 collectible_lines = [

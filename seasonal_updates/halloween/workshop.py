@@ -691,7 +691,7 @@ class Workshop(commands.Cog):
             newly_discovered = False
             if recipe.get("location_collectible") and craftable > 0:
                 newly_discovered = await record_collectible(
-                    db, self.bot, interaction.user.id, recipe["result"], category="Halloween"
+                    db, self.bot, interaction.user.id, recipe["result"], category="Halloween", channel=interaction.channel
                 )
 
             await db.commit()
@@ -706,7 +706,7 @@ class Workshop(commands.Cog):
         achievements_cog = self.bot.get_cog("Achievements")
         if achievements_cog:
             for _ in range(craftable):
-                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "workshop")
+                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "workshop", channel=interaction.channel)
 
         import random
         flavor = random.choice(WORKSHOP_FLAVOR_TEXT.get(recipe_id, ["The finished device gives an unsettling little hum as it comes to life."]))

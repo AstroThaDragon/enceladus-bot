@@ -198,7 +198,7 @@ async def ensure_collectible_tables(db):
     """)
 
 
-async def record_collectible(db, bot, user_id, collectible_id, category="Halloween"):
+async def record_collectible(db, bot, user_id, collectible_id, category="Halloween", channel=None):
     """Permanently record a seasonal collectible inside an existing transaction."""
     await ensure_collectible_tables(db)
     cursor = await db.execute(
@@ -210,7 +210,7 @@ async def record_collectible(db, bot, user_id, collectible_id, category="Hallowe
     if added:
         achievements_cog = bot.get_cog("Achievements") if bot else None
         if achievements_cog:
-            await achievements_cog.check_user_achievements(user_id, db=db)
+            await achievements_cog.check_user_achievements(user_id, db=db, channel=channel)
     return added
 
 

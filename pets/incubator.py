@@ -192,6 +192,7 @@ class PetIncubatorMixin:
                     await achievements_cog.add_halloween_hatch_progress(
                         ctx.author.id,
                         db=db,
+                        channel=ctx.channel,
                     )
 
             await db.commit()

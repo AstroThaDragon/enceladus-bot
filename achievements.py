@@ -327,15 +327,9 @@ class Achievements(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def _notify_achievement_unlocks(self, user_id, achievement_ids):
-        """Send a consistent unlock alert for every newly unlocked achievement."""
-        if not achievement_ids:
-            return
-        try:
-            user = self.bot.get_user(int(user_id))
-            if user is None:
-                user = await self.bot.fetch_user(int(user_id))
-        except (discord.NotFound, discord.HTTPException, ValueError, TypeError):
+    async def _notify_achievement_unlocks(self, user_id, achievement_ids, channel=None):
+        """Send a consistent unlock alert in the channel where it was earned."""
+        if not achievement_ids or channel is None:
             return
         for achievement_id in achievement_ids:
             achievement = ACHIEVEMENTS.get(achievement_id)
@@ -344,18 +338,18 @@ class Achievements(commands.Cog):
             embed = discord.Embed(
                 title="🏆 Achievement Unlocked!",
                 description=(
-                    f"{achievement['emoji']} **{achievement['name']}**\n"
+                    f"<@{int(user_id)}> {achievement['emoji']} **{achievement['name']}**\n"
                     f"*{achievement['description']}*\n\n"
                     f"🎁 Reward: **{achievement['reward']}**"
                 ),
                 color=discord.Color.gold(),
             )
             try:
-                await user.send(embed=embed)
+                await channel.send(embed=embed)
             except (discord.Forbidden, discord.HTTPException):
                 continue
 
-    async def add_candy_progress(self, user_id, amount, db=None):
+    async def add_candy_progress(self, user_id, amount, db=None, channel=None):
         """Track Halloween candy consumption and unlock cosmetic rewards at 100 and 250+ pieces."""
         owns_db = db is None
 
@@ -471,14 +465,14 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.commit()
 
-            await self._notify_achievement_unlocks(user_id, newly_unlocked)
+            await self._notify_achievement_unlocks(user_id, newly_unlocked, channel)
             return progress >= 250, progress
 
         finally:
             if owns_db:
                 await db.close()
 
-    async def add_halloween_hatch_progress(self, user_id, db=None):
+    async def add_halloween_hatch_progress(self, user_id, db=None, channel=None):
         """Unlock the permanent Haunting Friend background after hatching a Halloween Egg."""
         owns_db = db is None
 
@@ -538,13 +532,13 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.commit()
 
-            await self._notify_achievement_unlocks(user_id, ["halloween_hatch"])
+            await self._notify_achievement_unlocks(user_id, ["halloween_hatch"], channel)
             return True
         finally:
             if owns_db:
                 await db.close()
 
-    async def add_trick_or_treat_bag_progress(self, user_id, amount=1, db=None):
+    async def add_trick_or_treat_bag_progress(self, user_id, amount=1, db=None, channel=None):
         """Track crafted Trick-or-Treat Bags and unlock the achievement at 25."""
         owns_db = db is None
 
@@ -626,7 +620,7 @@ class Achievements(commands.Cog):
                     if owns_db:
                         await db.commit()
 
-                    await self._notify_achievement_unlocks(user_id, ["halloween_bag_crafter"])
+                    await self._notify_achievement_unlocks(user_id, ["halloween_bag_crafter"], channel)
                     return True, progress
 
             if owns_db:
@@ -638,7 +632,7 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.close()
 
-    async def unlock_special_item_achievement(self, user_id, achievement_id, title_id=None, db=None):
+    async def unlock_special_item_achievement(self, user_id, achievement_id, title_id=None, db=None, channel=None):
         """Unlock a permanent achievement reward for a one-time special item."""
         owns_db = db is None
         if owns_db:
@@ -673,7 +667,7 @@ class Achievements(commands.Cog):
                 await db.commit()
 
             if not already_unlocked:
-                await self._notify_achievement_unlocks(user_id, [achievement_id])
+                await self._notify_achievement_unlocks(user_id, [achievement_id], channel)
             return not already_unlocked
         finally:
             if owns_db:
@@ -716,7 +710,7 @@ class Achievements(commands.Cog):
             )
         return True
 
-    async def record_haunted_discovery(self, user_id, discovery_id, location_id, sanity=100, db=None):
+    async def record_haunted_discovery(self, user_id, discovery_id, location_id, sanity=100, db=None, channel=None):
         """Permanently record a rare Haunted discovery and unlock related achievements."""
         owns_db = db is None
         if owns_db:
@@ -762,13 +756,13 @@ class Achievements(commands.Cog):
 
             if owns_db:
                 await db.commit()
-            await self._notify_achievement_unlocks(user_id, unlocked)
+            await self._notify_achievement_unlocks(user_id, unlocked, channel)
             return newly_discovered, unlocked
         finally:
             if owns_db:
                 await db.close()
 
-    async def add_haunted_crafting_progress(self, user_id, station, amount=1, db=None):
+    async def add_haunted_crafting_progress(self, user_id, station, amount=1, db=None, channel=None):
         """Track Haunted crafting milestones for a crafting station."""
         if station not in HAUNTED_CRAFTING_ACHIEVEMENTS:
             return []
@@ -790,13 +784,13 @@ class Achievements(commands.Cog):
                     unlocked.append(achievement_id)
             if owns_db:
                 await db.commit()
-            await self._notify_achievement_unlocks(user_id, unlocked)
+            await self._notify_achievement_unlocks(user_id, unlocked, channel)
             return unlocked
         finally:
             if owns_db:
                 await db.close()
 
-    async def mark_haunted_discovery_outcome(self, user_id, discovery_id, sanity_delta, new_sanity, db=None):
+    async def mark_haunted_discovery_outcome(self, user_id, discovery_id, sanity_delta, new_sanity, db=None, channel=None):
         """Unlock global discovery achievements tied to surviving or breaking from a discovery."""
         owns_db = db is None
         if owns_db:
@@ -810,13 +804,13 @@ class Achievements(commands.Cog):
                 unlocked.append("haunted_unwell")
             if owns_db:
                 await db.commit()
-            await self._notify_achievement_unlocks(user_id, unlocked)
+            await self._notify_achievement_unlocks(user_id, unlocked, channel)
             return unlocked
         finally:
             if owns_db:
                 await db.close()
 
-    async def check_user_achievements(self, user_id, db=None):
+    async def check_user_achievements(self, user_id, db=None, channel=None):
         entries = get_halloween_collectibles()
         total = len(entries)
         if total <= 0:
@@ -911,7 +905,7 @@ class Achievements(commands.Cog):
             if owns_db:
                 await db.close()
 
-        await self._notify_achievement_unlocks(user_id, newly_unlocked)
+        await self._notify_achievement_unlocks(user_id, newly_unlocked, channel)
         return newly_unlocked
 
     @commands.hybrid_command(name="achievements", description="View available achievements and how to unlock them.")
@@ -919,7 +913,7 @@ class Achievements(commands.Cog):
         await ctx.defer()
         user_id = ctx.author.id
 
-        await self.check_user_achievements(user_id)
+        await self.check_user_achievements(user_id, channel=None)
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await ensure_achievement_tables(db)

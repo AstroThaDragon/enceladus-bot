@@ -836,7 +836,7 @@ class Cauldron(commands.Cog):
         achievements_cog = self.bot.get_cog("Achievements")
         if achievements_cog:
             for _ in range(craftable):
-                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "cauldron")
+                await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "cauldron", channel=interaction.channel)
 
         embed = discord.Embed(
             title="🧙 Brew Complete!",
