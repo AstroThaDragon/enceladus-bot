@@ -349,6 +349,12 @@ async def log_caught_error(
 
 
 async def log_command_error(bot, ctx, error):
+    # Discord formatting such as "-#" can be interpreted by the prefix
+    # command handler as a request to run a command literally named "#".
+    # This is harmless user input, not an Enceladus error worth logging.
+    if type(error).__name__ == "CommandNotFound" and getattr(ctx, "invoked_with", "") == "#":
+        return None
+
     return await send_error_log(bot, error, ctx=ctx, source="Prefix/Hybrid Command")
 
 
