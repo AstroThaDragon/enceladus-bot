@@ -286,11 +286,12 @@ SPECIAL_VARIANTS = {
 # Rarity
 # ---------------------------------------------------------------------------
 
-# These are total chances to discover any variant when hatching. Individual
-# variants are weighted inside the pool, so Shiny/Nebula remain the rarest.
+# These are total chances to discover any variant when hatching.
+# Normal Shiny/Nebula are each 1/100 per Normal Egg; Halloween Possessed is
+# 1/100 per Halloween Egg; the rare Glitched form is 1/150 per Glitched pet hatch.
 HATCH_VARIANT_CHANCE = {
-    "normal": 0.020,
-    "halloween": 0.040,
+    "normal": 0.100,
+    "halloween": 0.060,
     "glitched": 0.040,
 }
 
@@ -302,31 +303,31 @@ HATCH_VARIANT_WEIGHTS = {
         "void": 3,
     },
     "halloween": {
-        "spectral": 5,
-        "blood_moon": 4,
-        "cursed": 6,
-        "undead": 5,
-        "possessed": 1,
+        "spectral": 20,
+        "blood_moon": 16,
+        "cursed": 24,
+        "undead": 20,
+        "possessed": 6,
     },
     "glitched": {
-        "kolossos_bloodied": 5,
-        "kolossos_void": 4,
-        "kolossos_glitched": 1,
-        "tails_doll_crimson_gem": 5,
-        "tails_doll_corrupted": 4,
-        "tails_doll_glitched": 1,
-        "endoskeleton_rustbound": 5,
-        "endoskeleton_prototype": 4,
-        "endoskeleton_glitched": 1,
-        "xenomorph_pale": 5,
-        "xenomorph_royal": 4,
-        "xenomorph_glitched": 1,
-        "missingno_error_404": 5,
-        "missingno_null": 4,
-        "missingno_glitched": 1,
-        "siren_lost_transmission": 5,
-        "siren_dead_frequency": 4,
-        "siren_glitched": 1,
+        "kolossos_bloodied": 50,
+        "kolossos_void": 40,
+        "kolossos_glitched": 18,
+        "tails_doll_crimson_gem": 50,
+        "tails_doll_corrupted": 40,
+        "tails_doll_glitched": 18,
+        "endoskeleton_rustbound": 50,
+        "endoskeleton_prototype": 40,
+        "endoskeleton_glitched": 18,
+        "xenomorph_pale": 50,
+        "xenomorph_royal": 40,
+        "xenomorph_glitched": 18,
+        "missingno_error_404": 50,
+        "missingno_null": 40,
+        "missingno_glitched": 18,
+        "siren_lost_transmission": 50,
+        "siren_dead_frequency": 40,
+        "siren_glitched": 18,
     },
 }
 
