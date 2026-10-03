@@ -2748,6 +2748,7 @@ class HauntedStoryView(discord.ui.View):
             self.add_item(
                 HauntedStoryChoiceButton(
                     self.cog,
+                    self.owner_id,
                     self.location_id,
                     self.stage,
                     self.total_stages,
@@ -2758,7 +2759,16 @@ class HauntedStoryView(discord.ui.View):
                 )
             )
 
-        self.add_item(HauntedRunButton(self.cog, self.location_id, self.stage, self.total_stages, self.scene_id))
+        self.add_item(
+            HauntedRunButton(
+                self.cog,
+                self.owner_id,
+                self.location_id,
+                self.stage,
+                self.total_stages,
+                self.scene_id,
+            )
+        )
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -2779,7 +2789,7 @@ class HauntedStoryView(discord.ui.View):
 
 
 class HauntedStoryChoiceButton(discord.ui.Button):
-    def __init__(self, cog, location_id, stage, total_stages, scene_id, index, label, risk="medium"):
+    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id, index, label, risk="medium"):
         styles = {
             "low": discord.ButtonStyle.secondary,
             "medium": discord.ButtonStyle.primary,
@@ -2788,6 +2798,7 @@ class HauntedStoryChoiceButton(discord.ui.Button):
         }
         super().__init__(label=label, style=styles.get(risk, discord.ButtonStyle.secondary), row=0)
         self.cog = cog
+        self.owner_id = owner_id
         self.location_id = location_id
         self.stage = stage
         self.total_stages = total_stages
@@ -2795,6 +2806,14 @@ class HauntedStoryChoiceButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.defer()
         await self.cog._resolve_haunted_choice(
             interaction,
@@ -2807,7 +2826,7 @@ class HauntedStoryChoiceButton(discord.ui.Button):
 
 
 class HauntedRunButton(discord.ui.Button):
-    def __init__(self, cog, location_id, stage, total_stages, scene_id):
+    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id):
         super().__init__(
             label="Run Away",
             emoji="🏃",
@@ -2815,12 +2834,21 @@ class HauntedRunButton(discord.ui.Button):
             row=1,
         )
         self.cog = cog
+        self.owner_id = owner_id
         self.location_id = location_id
         self.stage = stage
         self.total_stages = total_stages
         self.scene_id = scene_id
 
     async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.defer()
         await self.cog._run_away_haunted(
             interaction,
