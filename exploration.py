@@ -691,12 +691,20 @@ class Exploration(commands.Cog):
     async def _resolve_haunted_choice(
         self,
         interaction: discord.Interaction,
+        owner_id: int,
         location_id: str,
         stage: int,
         total_stages: int,
         scene_id: str,
         choice_index: int,
     ):
+        if interaction.user.id != owner_id:
+            return await interaction.followup.send(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+
         user_id = interaction.user.id
         lock = self._user_locks.setdefault(user_id, asyncio.Lock())
         async with lock:
@@ -894,7 +902,21 @@ class Exploration(commands.Cog):
                 result_text=result_text,
             )
 
-    async def _run_away_haunted(self, interaction: discord.Interaction, location_id: str, stage: int, total_stages: int):
+    async def _run_away_haunted(
+        self,
+        interaction: discord.Interaction,
+        owner_id: int,
+        location_id: str,
+        stage: int,
+        total_stages: int,
+    ):
+        if interaction.user.id != owner_id:
+            return await interaction.followup.send(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+
         user_id = interaction.user.id
         lock = self._user_locks.setdefault(user_id, asyncio.Lock())
         async with lock:
@@ -2817,6 +2839,7 @@ class HauntedStoryChoiceButton(discord.ui.Button):
         await interaction.response.defer()
         await self.cog._resolve_haunted_choice(
             interaction,
+            self.owner_id,
             self.location_id,
             self.stage,
             self.total_stages,
@@ -2852,6 +2875,7 @@ class HauntedRunButton(discord.ui.Button):
         await interaction.response.defer()
         await self.cog._run_away_haunted(
             interaction,
+            self.owner_id,
             self.location_id,
             self.stage,
             self.total_stages,
