@@ -728,8 +728,8 @@ class Moderation(commands.Cog):
                 if welcome_channel:
                     try:
                         await welcome_channel.send(
-                            f"🎉 Welcome, {member.mention} ❄️!\n"
-                            "We're happy to have you here! 💜\n\n"
+                            f"Welcome, {member.mention}! 🎉\n"
+                            "We're happy to have you here, and we hope you enjoy your stay! 💜\n\n"
                             f"<@&{WELCOME_PING_ROLE_ID}>"
                         )
                     except (discord.Forbidden, discord.HTTPException):
