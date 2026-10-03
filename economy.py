@@ -3147,7 +3147,7 @@ class Economy(commands.Cog):
 
             # Backgrounds are individual permanent unlocks.
             # They cannot be purchased in bulk.
-            if item["type"] == "background_voucher" and quantity != 1:
+            if item_type == "background_voucher" and quantity != 1:
                 await db.rollback()
                 return await ctx.send(
                     "🖼️ Background vouchers can only be purchased **one at a time**."
@@ -3245,7 +3245,7 @@ class Economy(commands.Cog):
                     + price_note
                 )
 
-            if item["type"] == "revive":
+            if item_type == "revive":
                 added_amount, new_quantity, max_quantity = await add_inventory_item(
                     db,
                     user_id,
@@ -3279,7 +3279,7 @@ class Economy(commands.Cog):
                     f"**{cost:,} Stardust**!"
                 )
 
-            if item["type"] == "consumable" and item_id in {
+            if item_type == "consumable" and item_id in {
                 "fuel_refill",
                 "laser_charge_cell",
                 "laser_power_cell",
@@ -3315,7 +3315,7 @@ class Economy(commands.Cog):
                     f"**{cost:,} Stardust**!"
                 )
 
-            if item["type"] == "consumable" and item_id == "pet_snack":
+            if item_type == "consumable" and item_id == "pet_snack":
                 added_amount, new_quantity, max_quantity = await add_inventory_item(
                     db,
                     user_id,
@@ -3422,7 +3422,7 @@ class Economy(commands.Cog):
                     f"If you miss a fortune streak, use `/usecrystal` to repair it."
                 )
 
-            if item["type"] == "background_voucher":
+            if item_type == "background_voucher":
                 # A redeemed voucher permanently unlocks its background.
                 # Check that unlock list before charging Stardust so users can
                 # never buy another copy of a background they already own.
@@ -3488,7 +3488,7 @@ class Economy(commands.Cog):
                     f"**{item['name']}** for **{cost:,} Stardust**!"
                 )
 
-            if item["type"] == "heal":
+            if item_type == "heal":
                 # Item key format:
                 # medkit -> medkits
                 # nanite_patch -> nanite_patchs
