@@ -56,13 +56,13 @@ LOCATION_BASED_COLLECTIBLES = {
         "name": "The Mascot's Spare Parts", "emoji": "🍕",
         "description": "A handful of replacement parts from the pizzeria's long-dead mascot. The manufacturer's logo has been scratched away.",
         "location": "Dilapidated Pizzeria",
-        "ingredients": {"nuts_bolts": 2, "glue": 2}, "sell_price": 1100,
+        "ingredients": {"mechanical_parts": 2, "mascot_fabric": 2, "scrap_metal": 1}, "sell_price": 1100,
     },
     "employee_prize_token": {
         "name": "Employee Prize Token", "emoji": "🎟️",
         "description": "A cheap prize token from the arcade machines. It shouldn't be worth anything. Somehow, it feels important.",
         "location": "Dilapidated Pizzeria",
-        "ingredients": {"nuts_bolts": 1, "glue": 3}, "sell_price": 1250,
+        "ingredients": {"mechanical_parts": 2, "scrap_metal": 1, "glue": 2}, "sell_price": 1250,
     },
     "unfinished_toy": {
         "name": "The Unfinished Toy", "emoji": "🧸",
