@@ -442,7 +442,7 @@ class Exploration(commands.Cog):
                 embed = self._haunted_location_embed(interaction.user, profile)
                 await interaction.response.send_message(
                     embed=embed,
-                    view=HauntedLocationView(self),
+                    view=HauntedLocationView(self, interaction.user.id),
                 )
 
     def _haunted_location_embed(self, member, profile):
@@ -2697,14 +2697,23 @@ class Exploration(commands.Cog):
         )
 
 class HauntedLocationView(discord.ui.View):
-    def __init__(self, cog):
+    def __init__(self, cog, owner_id):
         super().__init__(timeout=90)
         self.cog = cog
+        self.owner_id = owner_id
 
         for index, (location_id, location) in enumerate(HAUNTED_LOCATIONS.items()):
-            self.add_item(HauntedLocationButton(self.cog, location_id, location, index))
+            self.add_item(HauntedLocationButton(self.cog, self.owner_id, location_id, location, index))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+            return False
+
         if not is_halloween_channel(interaction.channel):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
@@ -2715,7 +2724,7 @@ class HauntedLocationView(discord.ui.View):
 
 
 class HauntedLocationButton(discord.ui.Button):
-    def __init__(self, cog, location_id, location, index):
+    def __init__(self, cog, owner_id, location_id, location, index):
         super().__init__(
             label=location["name"],
             emoji=location["emoji"],
@@ -2723,9 +2732,18 @@ class HauntedLocationButton(discord.ui.Button):
             row=index // 5,
         )
         self.cog = cog
+        self.owner_id = owner_id
         self.location_id = location_id
 
     async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run.",
+                ephemeral=True,
+            )
+            return
+
         # A Haunted run performs several database operations before the
         # adventure screen can be rendered. Acknowledge the button immediately
         # so Discord does not time out the interaction while that work runs.
