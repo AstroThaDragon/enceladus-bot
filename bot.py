@@ -496,6 +496,21 @@ async def on_message(message):
                 user_id = int(match.group(1))
                 user_obj = message.guild.get_member(user_id)
 
+        # Leveling requires a guild Member, but interaction metadata can
+        # provide a plain discord.User. Resolve the user back to this
+        # guild before passing them to the leveling cog.
+        if user_obj and message.guild:
+            resolved_member = message.guild.get_member(user_obj.id)
+
+            if resolved_member is None:
+                try:
+                    resolved_member = await message.guild.fetch_member(user_obj.id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    resolved_member = None
+
+            if resolved_member is not None:
+                user_obj = resolved_member
+
         user_mention = user_obj.mention if user_obj else "there"
 
         thanks_text = (
