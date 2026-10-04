@@ -123,7 +123,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
 
     async def _owned_eggs(self, db, user_id):
-        egg_ids = ["normal_egg", "halloween_egg"]
+        egg_ids = ["normal_egg", "halloween_egg", "glitched_egg"]
         placeholders = ",".join("?" for _ in egg_ids)
         async with db.execute(
             f"""
@@ -168,7 +168,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     async def _egg_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
         choices = []
-        for egg_id in ("normal_egg", "halloween_egg"):
+        for egg_id in ("normal_egg", "halloween_egg", "glitched_egg"):
             info = ITEM_REGISTRY.get(egg_id)
             if not info:
                 continue
