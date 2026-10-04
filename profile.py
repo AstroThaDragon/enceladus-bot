@@ -150,6 +150,7 @@ BACKGROUND_COLLECTION_INFO = {
 
 BACKGROUND_ASSET_NAMES = {
     "default": "default_nebula",
+    "halloween_haunted": "halloween_haunted_halloween",
     "halloween_haunting_friend": "halloween_hunting_friend",
 }
 
@@ -159,22 +160,25 @@ def _normalize_background_name(value):
     return re.sub(r"[^a-z0-9]", "", str(value).lower())
 
 
+def _background_name_variants(value):
+    """Return normalized forms with common Enceladus asset prefixes removed."""
+    raw = str(value).lower().strip()
+    forms = {raw}
+    changed = True
+    while changed:
+        changed = False
+        for form in list(forms):
+            for prefix in ("background_", "halloween_", "bg_"):
+                if form.startswith(prefix):
+                    trimmed = form[len(prefix):]
+                    if trimmed and trimmed not in forms:
+                        forms.add(trimmed)
+                        changed = True
+    return {_normalize_background_name(form) for form in forms}
+
+
 def get_background_asset_path(background_id):
-    """
-    Resolve a background ID to its actual PNG asset.
-
-    Background IDs are kept stable in the database, while the physical PNG
-    filenames may use a slightly different name (for example,
-    halloween_haunting_friend -> halloween_hunting_friend or
-    background_midnight_pizzeria -> midnight_pizzeria).
-    """
-    asset_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "assets",
-        "presets",
-        "backgrounds",
-    )
-
+    """Resolve a background ID to the actual artwork file on disk."""
     mapped_name = BACKGROUND_ASSET_NAMES.get(background_id, background_id)
     candidates = [
         mapped_name,
@@ -183,29 +187,39 @@ def get_background_asset_path(background_id):
         str(mapped_name).removeprefix("background_"),
     ]
 
-    for candidate in candidates:
-        path = os.path.join(asset_dir, f"{candidate}.png")
-        if os.path.isfile(path):
-            return path
+    # Try paths relative to both this cog and the process working directory.
+    # This keeps the resolver working on Railway as well as local development.
+    asset_dirs = []
+    for base in (os.path.dirname(os.path.abspath(__file__)), os.getcwd()):
+        directory = os.path.join(base, "assets", "presets", "backgrounds")
+        if directory not in asset_dirs:
+            asset_dirs.append(directory)
 
-    try:
-        png_files = [
-            filename for filename in os.listdir(asset_dir)
-            if filename.lower().endswith(".png")
-        ]
-    except OSError:
-        return None
+    extensions = (".png", ".jpg", ".jpeg", ".webp")
 
-    normalized_candidates = {
-        _normalize_background_name(candidate)
-        for candidate in candidates
-    }
+    for asset_dir in asset_dirs:
+        for candidate in candidates:
+            for extension in extensions:
+                path = os.path.join(asset_dir, f"{candidate}{extension}")
+                if os.path.isfile(path):
+                    return path
 
-    for filename in png_files:
-        stem = os.path.splitext(filename)[0]
-        normalized_stem = _normalize_background_name(stem)
-        if normalized_stem in normalized_candidates:
-            return os.path.join(asset_dir, filename)
+        try:
+            files = [
+                filename for filename in os.listdir(asset_dir)
+                if filename.lower().endswith(extensions)
+            ]
+        except OSError:
+            continue
+
+        wanted = set()
+        for candidate in candidates:
+            wanted.update(_background_name_variants(candidate))
+
+        for filename in files:
+            stem = os.path.splitext(filename)[0]
+            if _background_name_variants(stem) & wanted:
+                return os.path.join(asset_dir, filename)
 
     return None
 
@@ -631,15 +645,13 @@ class Profile(commands.Cog):
         viewport = Editor(canvas)
 
         bg_name = data['bg']
-        if bg_name == "default":
-            bg_name = "default_nebula"
+        bg_asset_path = get_background_asset_path(bg_name)
 
-        # Load Background Environment
-        background_asset_path = get_background_asset_path(bg_name)
+        # Load Background Environment using the same resolver as the collection.
         try:
-            if not background_asset_path:
+            if not bg_asset_path:
                 raise FileNotFoundError(bg_name)
-            bg_image = Editor(background_asset_path).resize((viewport_w, viewport_h))
+            bg_image = Editor(bg_asset_path).resize((viewport_w, viewport_h))
             viewport.paste(bg_image, (0, 0))
         except FileNotFoundError:
             viewport.rectangle((0, 0), width=viewport_w, height=viewport_h, fill="#1E2333")
