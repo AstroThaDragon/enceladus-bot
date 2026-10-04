@@ -4,6 +4,7 @@ from discord.ext import commands
 import aiosqlite
 import os
 import json
+import re
 from easy_pil import Canvas, Editor, Font, load_image_async
 
 # Artwork credits for profile backgrounds.
@@ -153,6 +154,62 @@ BACKGROUND_ASSET_NAMES = {
 }
 
 
+def _normalize_background_name(value):
+    """Normalize a background ID/filename for flexible asset matching."""
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+
+def get_background_asset_path(background_id):
+    """
+    Resolve a background ID to its actual PNG asset.
+
+    Background IDs are kept stable in the database, while the physical PNG
+    filenames may use a slightly different name (for example,
+    halloween_haunting_friend -> halloween_hunting_friend or
+    background_midnight_pizzeria -> midnight_pizzeria).
+    """
+    asset_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "assets",
+        "presets",
+        "backgrounds",
+    )
+
+    mapped_name = BACKGROUND_ASSET_NAMES.get(background_id, background_id)
+    candidates = [
+        mapped_name,
+        background_id,
+        str(background_id).removeprefix("background_"),
+        str(mapped_name).removeprefix("background_"),
+    ]
+
+    for candidate in candidates:
+        path = os.path.join(asset_dir, f"{candidate}.png")
+        if os.path.isfile(path):
+            return path
+
+    try:
+        png_files = [
+            filename for filename in os.listdir(asset_dir)
+            if filename.lower().endswith(".png")
+        ]
+    except OSError:
+        return None
+
+    normalized_candidates = {
+        _normalize_background_name(candidate)
+        for candidate in candidates
+    }
+
+    for filename in png_files:
+        stem = os.path.splitext(filename)[0]
+        normalized_stem = _normalize_background_name(stem)
+        if normalized_stem in normalized_candidates:
+            return os.path.join(asset_dir, filename)
+
+    return None
+
+
 class BackgroundCollectionView(discord.ui.View):
     def __init__(self, cog, user_id, unlocked):
         super().__init__(timeout=300)
@@ -290,9 +347,8 @@ class BackgroundCollectionView(discord.ui.View):
         )
         embed.set_footer(text=f"{category['label']} • Background {self.page + 1}/{len(self.items)}")
 
-        asset_name = BACKGROUND_ASSET_NAMES.get(item_id, item_id)
-        asset_path = os.path.join("assets", "presets", "backgrounds", f"{asset_name}.png")
-        if os.path.exists(asset_path):
+        asset_path = get_background_asset_path(item_id)
+        if asset_path:
             file = discord.File(asset_path, filename="background_collection.png")
             embed.set_image(url="attachment://background_collection.png")
             return embed, file
@@ -578,20 +634,12 @@ class Profile(commands.Cog):
         if bg_name == "default":
             bg_name = "default_nebula"
 
-        # Some existing background IDs do not exactly match their asset filenames.
-        # Keep the IDs stable for saved unlocks/equipped profiles, and translate
-        # them only when resolving the physical PNG asset.
-        background_asset_names = {
-            "halloween_haunted": "halloween_haunted_halloween",
-            "halloween_haunting_friend": "halloween_hunting_friend",
-        }
-        bg_asset_name = background_asset_names.get(bg_name, bg_name)
-
         # Load Background Environment
+        background_asset_path = get_background_asset_path(bg_name)
         try:
-            bg_image = Editor(
-                f"assets/presets/backgrounds/{bg_asset_name}.png"
-            ).resize((viewport_w, viewport_h))
+            if not background_asset_path:
+                raise FileNotFoundError(bg_name)
+            bg_image = Editor(background_asset_path).resize((viewport_w, viewport_h))
             viewport.paste(bg_image, (0, 0))
         except FileNotFoundError:
             viewport.rectangle((0, 0), width=viewport_w, height=viewport_h, fill="#1E2333")
