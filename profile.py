@@ -34,6 +34,342 @@ BACKGROUND_ARTISTS = {
     "background_corrupted_reality": "Egor Komarov on Unsplash",
 }
 
+BACKGROUND_COLLECTIONS = {
+    "shop": {
+        "label": "🛒 Shop Backgrounds",
+        "emoji": "🛒",
+        "items": [
+            "default",
+            "neon_grid",
+            "deep_void",
+            "solaris_ring",
+        ],
+    },
+    "halloween": {
+        "label": "🎃 Halloween",
+        "emoji": "🎃",
+        "items": [
+            "halloween_haunted",
+            "halloween_candy_collector",
+            "halloween_haunting_friend",
+            "halloween_trick_or_treat",
+            "background_glowing_gem",
+            "background_malo",
+            "background_the_graveyard",
+            "background_abandoned_sanctuary",
+            "background_midnight_pizzeria",
+            "background_dead_air",
+            "background_fogbound",
+            "background_dead_end",
+            "background_watched_from_the_trees",
+            "background_haunted_item_collector",
+            "background_corrupted_reality",
+        ],
+    },
+}
+
+BACKGROUND_COLLECTION_INFO = {
+    "default": {
+        "name": "Default Nebula", "emoji": "🌌",
+        "obtained": "Available automatically when you join the station.",
+    },
+    "neon_grid": {
+        "name": "Cyberpunk Neon Grid City", "emoji": "🌆",
+        "obtained": "Redeem the **Cyberpunk Neon Grid** voucher.",
+    },
+    "deep_void": {
+        "name": "Deep Void Galaxy", "emoji": "🌌",
+        "obtained": "Redeem the **Deep Void Galaxy** voucher.",
+    },
+    "solaris_ring": {
+        "name": "Solaris Ring System", "emoji": "💫",
+        "obtained": "Redeem the **Solaris Ring System** voucher.",
+    },
+    "halloween_haunted": {
+        "name": "Haunted Halloween", "emoji": "🎃",
+        "obtained": "Collect at least **50% of the Halloween collectibles**.",
+    },
+    "halloween_candy_collector": {
+        "name": "Candy Collector", "emoji": "🍬",
+        "obtained": "Consume **100 pieces of Halloween Candy and/or Trick-or-Treat Bags**.",
+    },
+    "halloween_haunting_friend": {
+        "name": "Haunting Friend", "emoji": "🐣",
+        "obtained": "Hatch a **Halloween Egg**.",
+    },
+    "halloween_trick_or_treat": {
+        "name": "Trick-or-Treat", "emoji": "🎃",
+        "obtained": "Craft **25 Trick-or-Treat Bags**.",
+    },
+    "background_glowing_gem": {
+        "name": "Glowing Gem", "emoji": "💎",
+        "obtained": "Use the **Doll of Tails**.",
+    },
+    "background_malo": {
+        "name": "MalO", "emoji": "📱",
+        "obtained": "Use the **Hacked Phone**.",
+    },
+    "background_the_graveyard": {
+        "name": "The Graveyard", "emoji": "🪦",
+        "obtained": "Discover every rare discovery in the **Forgotten Graveyard**.",
+    },
+    "background_abandoned_sanctuary": {
+        "name": "Abandoned Sanctuary", "emoji": "⛪",
+        "obtained": "Discover every rare discovery in the **Abandoned Church**.",
+    },
+    "background_midnight_pizzeria": {
+        "name": "Midnight Pizzeria", "emoji": "🍕",
+        "obtained": "Discover every rare discovery in the **Dilapidated Pizzeria**.",
+    },
+    "background_dead_air": {
+        "name": "Dead Air", "emoji": "📡",
+        "obtained": "Discover every rare discovery in the **Abandoned Broadcast Station**.",
+    },
+    "background_fogbound": {
+        "name": "Fogbound", "emoji": "🌫️",
+        "obtained": "Discover every rare discovery in **Fogbound Town**.",
+    },
+    "background_dead_end": {
+        "name": "Dead-End", "emoji": "🛣️",
+        "obtained": "Discover every rare discovery on the **Dead-End Highway**.",
+    },
+    "background_watched_from_the_trees": {
+        "name": "Watched From the Trees", "emoji": "🌲",
+        "obtained": "Discover every rare discovery in the **Silent Campground**.",
+    },
+    "background_haunted_item_collector": {
+        "name": "Haunted Item Collector", "emoji": "🔧",
+        "obtained": "Craft all **23 location-based Haunted collectibles**.",
+    },
+    "background_corrupted_reality": {
+        "name": "CORRUPTED REALITY", "emoji": "💾",
+        "obtained": "Hatch your first pet from a **Glitched Egg**.",
+    },
+}
+
+BACKGROUND_ASSET_NAMES = {
+    "default": "default_nebula",
+    "halloween_haunting_friend": "halloween_hunting_friend",
+}
+
+
+class BackgroundCollectionView(discord.ui.View):
+    def __init__(self, cog, user_id, unlocked):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.unlocked = set(unlocked)
+        self.section = "main"
+        self.page = 0
+        self.items = []
+        self._refresh_items()
+
+    def _refresh_items(self):
+        if self.section == "main":
+            self.items = []
+            return
+
+        if self.section == "events":
+            self.items = []
+            return
+
+        category = BACKGROUND_COLLECTIONS.get(self.section)
+        if not category:
+            self.items = []
+            return
+
+        self.items = [
+            item_id for item_id in category["items"]
+            if item_id in self.unlocked
+        ]
+        self.page = max(0, min(self.page, max(0, len(self.items) - 1)))
+
+    def _rebuild_buttons(self):
+        self.clear_items()
+
+        if self.section == "main":
+            shop = discord.ui.Button(
+                label="Shop Backgrounds", emoji="🛒",
+                style=discord.ButtonStyle.primary
+            )
+            events = discord.ui.Button(
+                label="Event Backgrounds", emoji="🎃",
+                style=discord.ButtonStyle.primary
+            )
+            shop.callback = self._shop_callback
+            events.callback = self._events_callback
+            self.add_item(shop)
+            self.add_item(events)
+            return
+
+        if self.section == "events":
+            halloween = discord.ui.Button(
+                label="Halloween", emoji="🎃",
+                style=discord.ButtonStyle.primary
+            )
+            back = discord.ui.Button(
+                label="Back", emoji="↩️",
+                style=discord.ButtonStyle.secondary
+            )
+            halloween.callback = self._halloween_callback
+            back.callback = self._back_main_callback
+            self.add_item(halloween)
+            self.add_item(back)
+            return
+
+        prev_button = discord.ui.Button(
+            label="Previous", emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            disabled=(self.page <= 0)
+        )
+        next_button = discord.ui.Button(
+            label="Next", emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            disabled=(self.page >= len(self.items) - 1)
+        )
+        back_button = discord.ui.Button(
+            label="Back", emoji="↩️",
+            style=discord.ButtonStyle.secondary
+        )
+        prev_button.callback = self._previous_callback
+        next_button.callback = self._next_callback
+        back_button.callback = self._back_category_callback
+        self.add_item(prev_button)
+        self.add_item(next_button)
+        self.add_item(back_button)
+
+    async def render(self):
+        self._rebuild_buttons()
+
+        if self.section == "main":
+            embed = discord.Embed(
+                title="🖼️ Background Collection",
+                description=(
+                    "Browse the profile backgrounds you have permanently unlocked.\n\n"
+                    "Choose a category below to get started.\n"
+                    "Locked backgrounds are not shown here."
+                ),
+                color=discord.Color.blurple()
+            )
+            embed.set_footer(text="Your collection is separate from your currently equipped background.")
+            return embed, None
+
+        if self.section == "events":
+            embed = discord.Embed(
+                title="🎃 Event Backgrounds",
+                description=(
+                    "Choose an event to browse the backgrounds you've unlocked from it.\n\n"
+                    "More events can be added here in the future!"
+                ),
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="Only backgrounds you own are shown in each collection.")
+            return embed, None
+
+        category = BACKGROUND_COLLECTIONS[self.section]
+        if not self.items:
+            embed = discord.Embed(
+                title=f"{category['emoji']} {category['label'].split(' ', 1)[1]}",
+                description="You don't own any backgrounds in this collection yet.",
+                color=discord.Color.dark_grey()
+            )
+            return embed, None
+
+        item_id = self.items[self.page]
+        info = BACKGROUND_COLLECTION_INFO[item_id]
+        active = await self.cog.get_user_profile(self.user_id)
+        is_equipped = (active.get("bg") or "default_nebula") == item_id
+
+        embed = discord.Embed(
+            title=f"{info['emoji']} {info['name']}",
+            description=(
+                ("✨ **Currently Equipped**\n\n" if is_equipped else "") +
+                f"**Obtained:** {info['obtained']}"
+            ),
+            color=discord.Color.gold() if is_equipped else discord.Color.blurple()
+        )
+        embed.set_footer(text=f"{category['label']} • Background {self.page + 1}/{len(self.items)}")
+
+        asset_name = BACKGROUND_ASSET_NAMES.get(item_id, item_id)
+        asset_path = os.path.join("assets", "presets", "backgrounds", f"{asset_name}.png")
+        if os.path.exists(asset_path):
+            file = discord.File(asset_path, filename="background_collection.png")
+            embed.set_image(url="attachment://background_collection.png")
+            return embed, file
+
+        embed.add_field(
+            name="Preview",
+            value="🖼️ Background artwork is currently unavailable.",
+            inline=False
+        )
+        return embed, None
+
+    async def _update(self, interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "❌ This collection belongs to someone else.",
+                ephemeral=True
+            )
+
+        embed, file = await self.render()
+        kwargs = {"embed": embed, "view": self}
+        if file:
+            kwargs["attachments"] = [file]
+        else:
+            kwargs["attachments"] = []
+        await interaction.response.edit_message(**kwargs)
+
+    async def _shop_callback(self, interaction):
+        self.section = "shop"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _events_callback(self, interaction):
+        self.section = "events"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _halloween_callback(self, interaction):
+        self.section = "halloween"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _back_main_callback(self, interaction):
+        self.section = "main"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _back_category_callback(self, interaction):
+        self.section = "main" if self.section == "shop" else "events"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _previous_callback(self, interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "❌ This collection belongs to someone else.", ephemeral=True
+            )
+        self.page = max(0, self.page - 1)
+        await self._update(interaction)
+
+    async def _next_callback(self, interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "❌ This collection belongs to someone else.", ephemeral=True
+            )
+        self.page = min(len(self.items) - 1, self.page + 1)
+        await self._update(interaction)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+
 class Profile(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -519,13 +855,56 @@ class Profile(commands.Cog):
         choices.sort(key=lambda choice: choice.name.lower())
         return choices[:25]
 
-    @commands.hybrid_command(
+    async def _get_owned_backgrounds(self, user_id):
+        """Return the user's permanently unlocked background IDs."""
+        from database import ECONOMY_DB_NAME
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            async with db.execute(
+                "SELECT unlocked_backgrounds FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        unlocked = {"default"}
+        if row:
+            try:
+                stored = json.loads(row[0] or '["default"]')
+                if isinstance(stored, list):
+                    unlocked.update(stored)
+            except (TypeError, ValueError):
+                pass
+
+        return unlocked
+
+    @commands.hybrid_group(
         name="background",
+        description="Manage your profile backgrounds.",
+        invoke_without_command=True
+    )
+    async def background(self, ctx: commands.Context):
+        """Show the background command options."""
+        embed = discord.Embed(
+            title="🖼️ Profile Backgrounds",
+            description=(
+                "Manage your unlocked profile backgrounds.\n\n"
+                "**Equip a background:** `/background equip`\n"
+                "**Browse your collection:** `/background collection`"
+            ),
+            color=discord.Color.blurple()
+        )
+        await ctx.send(embed=embed)
+
+    @background.command(
+        name="equip",
         description="Equip an unlocked background for your profile card."
     )
-    @app_commands.describe(background="Choose an unlocked background for your profile card.")
+    @app_commands.describe(
+        background="Choose an unlocked background for your profile card."
+    )
     @app_commands.autocomplete(background=background_autocomplete)
-    async def background(self, ctx: commands.Context, background: str):
+    async def background_equip(self, ctx: commands.Context, background: str):
         await ctx.defer()
         user_id = ctx.author.id
         background = background.lower().strip()
@@ -594,6 +973,23 @@ class Profile(commands.Cog):
             f"**{valid_backgrounds[background]}** as your active profile background. "
             f"Run `/profile` to check it out!"
         )
+
+    @background.command(
+        name="collection",
+        description="Browse your owned profile background collection."
+    )
+    async def background_collection(self, ctx: commands.Context):
+        await ctx.defer()
+
+        user_id = ctx.author.id
+        unlocked = await self._get_owned_backgrounds(user_id)
+        view = BackgroundCollectionView(self, user_id, unlocked)
+        embed, file = await view.render()
+
+        if file:
+            await ctx.send(embed=embed, file=file, view=view)
+        else:
+            await ctx.send(embed=embed, view=view)
 
     @commands.hybrid_command(
         name="voucher",

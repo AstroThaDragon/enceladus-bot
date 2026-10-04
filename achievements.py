@@ -374,6 +374,7 @@ class Achievements(commands.Cog):
                     f"<@{int(user_id)}> {achievement['emoji']} **{achievement['name']}**\n"
                     f"*{achievement['description']}*\n\n"
                     f"🎁 Reward: **{achievement['reward']}**"
+                    + ("\n\n🎨 Use `/background collection` to view your unlocked backgrounds, or `/background equip` to equip one." if "background" in achievement["reward"].lower() else "")
                 ),
                 color=discord.Color.gold(),
             )
