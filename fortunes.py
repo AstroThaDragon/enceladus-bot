@@ -8,6 +8,8 @@ import pytz
 import aiosqlite
 import discord
 
+from database import ECONOMY_DB_NAME
+
 from discord.ext import commands, tasks
 
 
@@ -913,102 +915,159 @@ class Fortunes(commands.Cog):
         yesterday_et = (today_date - datetime.timedelta(days=1)).isoformat()
         two_days_ago_et = (today_date - datetime.timedelta(days=2)).isoformat()
 
+        # Fortune streak data lives in levels.db, while Dilated Time Crystals
+        # are Station-economy inventory and live in economy.db.
         async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute(
-                """
-                SELECT time_crystals, tc_uses_this_month, tc_last_used_month, 
-                       fortune_streak, last_fortune_streak_date, last_broken_streak, last_fortune_date
-                FROM users WHERE user_id = ?
-                """,
-                (user_id,)
-            ) as cursor:
-                row = await cursor.fetchone()
-
-            if not row:
-                return await ctx.send("❌ You don't have an active profile yet! Run `/fortune` first.")
-
-            crystals = row[0] or 0
-            uses_this_month = row[1] or 0
-            last_used_month = row[2] or ""
-            streak = row[3] or 0
-            last_streak_date = row[4]
-            last_broken_streak = row[5] or 0
-            last_fortune_date = row[6]
-
-            # 1. Check if user owns crystals
-            if crystals <= 0:
-                return await ctx.send("❌ **No Crystals!** You don't have any Dilated Time Crystals in your inventory.")
-
-            # Reset monthly limit counter on new calendar month
-            if last_used_month != current_month:
-                uses_this_month = 0
-
-            # 2. Check 2 per month limit
-            if uses_this_month >= 2:
-                return await ctx.send("⏳ **Monthly Limit Reached!** You can only use **2 Dilated Time Crystals per month**. Try again next month!")
-
-            # Scenario A: User ALREADY ran /fortune today and got reset to 1 day
-            if last_fortune_date == today_et and streak == 1 and last_broken_streak > 0:
-                restored_streak = last_broken_streak + 1
-                new_crystals = crystals - 1
-                new_uses = uses_this_month + 1
-
-                await db.execute(
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as economy_db:
+                async with db.execute(
                     """
-                    UPDATE users
-                    SET time_crystals = ?,
-                        tc_uses_this_month = ?,
-                        tc_last_used_month = ?,
-                        fortune_streak = ?,
-                        last_broken_streak = 0
+                    SELECT fortune_streak, last_fortune_streak_date,
+                           last_broken_streak, last_fortune_date
+                    FROM users
                     WHERE user_id = ?
                     """,
-                    (new_crystals, new_uses, current_month, restored_streak, user_id)
-                )
-                await db.commit()
+                    (user_id,),
+                ) as cursor:
+                    fortune_row = await cursor.fetchone()
 
-                return await ctx.send(
-                    f"💎 **Dilated Time Crystal Activated!**\n"
-                    f"Time bends backwards! Yesterday's missed fortune was repaired and your streak has been boosted to 🔥 **{restored_streak} days**!\n\n"
-                    f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • Crystals Left: {new_crystals}*"
-                )
+                if not fortune_row:
+                    return await ctx.send(
+                        "❌ You don't have an active profile yet! Run `/fortune` first."
+                    )
 
-            # Scenario B: User hasn't opened /fortune today yet, but missed yesterday
-            if last_streak_date == two_days_ago_et:
-                target_streak = max(streak, last_broken_streak)
-                if target_streak == 0:
-                    target_streak = 1
-
-                new_crystals = crystals - 1
-                new_uses = uses_this_month + 1
-
-                await db.execute(
+                async with economy_db.execute(
                     """
-                    UPDATE users
-                    SET time_crystals = ?,
-                        tc_uses_this_month = ?,
-                        tc_last_used_month = ?,
-                        fortune_streak = ?,
-                        last_fortune_streak_date = ?,
-                        last_broken_streak = 0
+                    SELECT COALESCE(time_crystals, 0),
+                           COALESCE(tc_uses_this_month, 0),
+                           COALESCE(tc_last_used_month, '')
+                    FROM users
                     WHERE user_id = ?
                     """,
-                    (new_crystals, new_uses, current_month, target_streak, yesterday_et, user_id)
-                )
-                await db.commit()
+                    (user_id,),
+                ) as cursor:
+                    economy_row = await cursor.fetchone()
 
+                if not economy_row:
+                    return await ctx.send(
+                        "❌ You don't have any Dilated Time Crystals in your inventory."
+                    )
+
+                crystals, uses_this_month, last_used_month = economy_row
+                crystals = int(crystals or 0)
+                uses_this_month = int(uses_this_month or 0)
+                last_used_month = last_used_month or ""
+
+                streak, last_streak_date, last_broken_streak, last_fortune_date = fortune_row
+                streak = int(streak or 0)
+                last_broken_streak = int(last_broken_streak or 0)
+
+                if crystals <= 0:
+                    return await ctx.send(
+                        "❌ **No Crystals!** You don't have any Dilated Time Crystals in your inventory."
+                    )
+
+                # Reset monthly limit counter on a new calendar month.
+                if last_used_month != current_month:
+                    uses_this_month = 0
+
+                if uses_this_month >= 2:
+                    return await ctx.send(
+                        "⏳ **Monthly Limit Reached!** You can only use "
+                        "**2 Dilated Time Crystals per month**. Try again next month!"
+                    )
+
+                # Scenario A: User ALREADY ran /fortune today and got reset to
+                # a 1-day streak after missing yesterday.
+                if last_fortune_date == today_et and streak == 1 and last_broken_streak > 0:
+                    restored_streak = last_broken_streak + 1
+                    new_crystals = crystals - 1
+                    new_uses = uses_this_month + 1
+
+                    await economy_db.execute(
+                        """
+                        UPDATE users
+                        SET time_crystals = ?,
+                            tc_uses_this_month = ?,
+                            tc_last_used_month = ?
+                        WHERE user_id = ?
+                        """,
+                        (new_crystals, new_uses, current_month, user_id),
+                    )
+                    await db.execute(
+                        """
+                        UPDATE users
+                        SET fortune_streak = ?,
+                            last_broken_streak = 0
+                        WHERE user_id = ?
+                        """,
+                        (restored_streak, user_id),
+                    )
+                    await economy_db.commit()
+                    await db.commit()
+
+                    return await ctx.send(
+                        f"💎 **Dilated Time Crystal Activated!**\n"
+                        f"Time bends backwards! Yesterday's missed fortune was repaired "
+                        f"and your streak has been boosted to 🔥 **{restored_streak} days**!\n\n"
+                        f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • "
+                        f"Crystals Left: {new_crystals}*"
+                    )
+
+                # Scenario B: User hasn't opened /fortune today yet, but missed
+                # exactly yesterday.
+                if last_streak_date == two_days_ago_et:
+                    target_streak = max(streak, last_broken_streak)
+                    if target_streak == 0:
+                        target_streak = 1
+
+                    new_crystals = crystals - 1
+                    new_uses = uses_this_month + 1
+
+                    await economy_db.execute(
+                        """
+                        UPDATE users
+                        SET time_crystals = ?,
+                            tc_uses_this_month = ?,
+                            tc_last_used_month = ?
+                        WHERE user_id = ?
+                        """,
+                        (new_crystals, new_uses, current_month, user_id),
+                    )
+                    await db.execute(
+                        """
+                        UPDATE users
+                        SET fortune_streak = ?,
+                            last_fortune_streak_date = ?,
+                            last_broken_streak = 0
+                        WHERE user_id = ?
+                        """,
+                        (target_streak, yesterday_et, user_id),
+                    )
+                    await economy_db.commit()
+                    await db.commit()
+
+                    return await ctx.send(
+                        f"💎 **Dilated Time Crystal Activated!**\n"
+                        f"Time bends backwards! Yesterday's missed fortune has been "
+                        f"repaired. Your 🔥 **{target_streak}-day streak** is intact—"
+                        f"run `/fortune` now to extend it!\n\n"
+                        f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • "
+                        f"Crystals Left: {new_crystals}*"
+                    )
+
+                # Scenario C: Streak is already intact.
+                if last_streak_date in (yesterday_et, today_et):
+                    return await ctx.send(
+                        f"✨ **Streak Active!** Your fortune streak (`{streak}` days) "
+                        f"is intact. You don't need to use a Dilated Time Crystal!"
+                    )
+
+                # Scenario D: Missed 2 or more days.
                 return await ctx.send(
-                    f"💎 **Dilated Time Crystal Activated!**\n"
-                    f"Time bends backwards! Yesterday's missed fortune has been repaired. Your 🔥 **{target_streak}-day streak** is intact—run `/fortune` now to extend it!\n\n"
-                    f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • Crystals Left: {new_crystals}*"
+                    "❌ **Streak Expired!** You missed more than 1 day. "
+                    "Dilated Time Crystals can only restore a streak if "
+                    "**exactly 1 day** was missed."
                 )
-
-            # Scenario C: Streak is already intact
-            if last_streak_date in (yesterday_et, today_et):
-                return await ctx.send(f"✨ **Streak Active!** Your fortune streak (`{streak}` days) is intact. You don't need to use a Dilated Time Crystal!")
-
-            # Scenario D: Missed 2 or more days
-            return await ctx.send("❌ **Streak Expired!** You missed more than 1 day. Dilated Time Crystals can only restore a streak if **exactly 1 day** was missed.")
 
     @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. For restoration purposes only! (Admin only)")
     @commands.has_permissions(administrator=True)
