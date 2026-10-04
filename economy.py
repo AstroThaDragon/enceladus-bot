@@ -2606,7 +2606,9 @@ class Economy(commands.Cog):
             halloween_collectible = normal_collectible
             item_type = str(info.get("type", ""))
 
-            if category == "space_junk" and not junk:
+            if category == "space_junk" and (
+                not junk or item_id in HALLOWEEN_SPACE_JUNK_IDS
+            ):
                 continue
             if category == "collectibles" and not normal_collectible:
                 continue
@@ -2847,7 +2849,9 @@ class Economy(commands.Cog):
                 halloween_collectible = is_halloween_collectible(item_id)
                 item_type = str(info.get("type", ""))
 
-                if category == "space_junk" and not junk:
+                if category == "space_junk" and (
+                    not junk or item_id in HALLOWEEN_SPACE_JUNK_IDS
+                ):
                     continue
                 if category == "collectibles" and not normal_collectible:
                     continue
