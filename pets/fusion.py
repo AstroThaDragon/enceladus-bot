@@ -83,8 +83,10 @@ class PetFusionMixin:
                 cost = VARIANT_HUNT_COST
                 cost_label = "Variant Hunt"
 
+            duplicate_requirement = 2 if (pet_type in HALLOWEEN_PETS or pet_type in GLITCHED_PET_TYPES) else 5
+
             async with db.execute(
-                """
+                f"""
                 SELECT pet_id
                 FROM pets
                 WHERE user_id = ?
@@ -93,18 +95,18 @@ class PetFusionMixin:
                   AND COALESCE(variant_id, '') = ?
                   AND COALESCE(is_favorite, 0) = 0
                 ORDER BY pet_id
-                LIMIT 5
+                LIMIT {duplicate_requirement}
                 """,
                 (ctx.author.id, target_pet_id, pet_type, variant_id),
             ) as cursor:
                 duplicate_rows = list(await cursor.fetchall())
 
-            if len(duplicate_rows) < 5:
+            if len(duplicate_rows) < duplicate_requirement:
                 await db.rollback()
                 variant_text = " with the same variant" if variant_id else ""
                 return await ctx.send(
-                    f"❌ You need **5 non-favorited duplicates** of this pet{variant_text}. "
-                    f"You currently have **{len(duplicate_rows)}/5** available."
+                    f"❌ You need **{duplicate_requirement} non-favorited duplicates** of this pet{variant_text}. "
+                    f"You currently have **{len(duplicate_rows)}/{duplicate_requirement}** available."
                 )
 
             async with db.execute(
@@ -193,11 +195,11 @@ class PetFusionMixin:
                     f"🧬 **Fusion complete!** {target_definition['emoji']} **{target_definition['name']}** "
                     f"is now **Fusion {next_fusion}/5**.\n"
                     f"✨ Passive strength increased by **+2%**.\n\n"
-                    f"Consumed **5 duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
+                    f"Consumed **{duplicate_requirement} duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
                 )
             return await ctx.send(
                 f"🧬 **Variant Hunt complete!** No new variant was discovered this time.\n\n"
-                f"Consumed **5 duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
+                f"Consumed **{duplicate_requirement} duplicates**, **{cost['stardust']:,} Stardust**, and **{cost['essence']} Astral Essence**."
             )
 
         variant_info = get_variant_info(pet_type, discovered_variant)

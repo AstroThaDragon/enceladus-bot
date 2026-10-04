@@ -166,6 +166,230 @@ class RenamePetModal(discord.ui.Modal):
         )
 
 
+class PetCollectionView(discord.ui.View):
+    """Landing-page category selector for the grouped /pets collection."""
+
+    def __init__(self, cog, user_id, ctx):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.user_id = user_id
+        self.ctx = ctx
+
+    async def _ensure_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "❌ This pet collection isn't for you.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _open_category(self, interaction, category):
+        if not await self._ensure_owner(interaction):
+            return
+        pets = await self.cog._get_owned_pets(self.user_id)
+        entries = self.cog._group_owned_pets(pets, category)
+        page_count = max(1, (len(entries) + 19) // 20)
+        self.stop()
+        view = PetCategoryView(
+            self.cog,
+            self.user_id,
+            self.ctx,
+            category,
+            pets=pets,
+            page=0,
+        )
+        await interaction.response.edit_message(
+            embed=self.cog._pet_category_embed(self.ctx, pets, category, 0, page_count),
+            view=view,
+        )
+
+    @discord.ui.button(label="🥚 Normal Eggs", style=discord.ButtonStyle.primary, row=0)
+    async def normal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "normal")
+
+    @discord.ui.button(label="💾 Glitched Eggs", style=discord.ButtonStyle.primary, row=0)
+    async def glitched(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "glitched")
+
+    @discord.ui.button(label="🎃 Halloween Eggs", style=discord.ButtonStyle.primary, row=1)
+    async def halloween(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "halloween")
+
+    @discord.ui.button(label="👻 Haunted Pets", style=discord.ButtonStyle.primary, row=1)
+    async def haunted(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "haunted")
+
+
+class PetGroupSelect(discord.ui.Select):
+    """Select one grouped pet entry and open an individual copy for management."""
+
+    def __init__(self, cog, user_id, ctx, category, entries, page):
+        options = []
+        for entry in entries:
+            pet = entry["pet"]
+            marker = "⭐ " if any(member["is_active"] for member in entry["members"]) else ""
+            count_text = f" ×{entry['count']}" if entry["count"] > 1 else ""
+            label = f"{marker}{pet['name']} — Lv. {pet['level']}{count_text}"
+            options.append(discord.SelectOption(
+                label=label[:100],
+                value=str(pet["pet_id"]),
+                emoji=pet["emoji"],
+                description=(
+                    "Active companion" if any(member["is_active"] for member in entry["members"])
+                    else f"{entry['count']} matching copies"
+                ),
+            ))
+        super().__init__(
+            placeholder="Choose a pet group to manage...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+        self.cog = cog
+        self.user_id = user_id
+        self.ctx = ctx
+        self.category = category
+        self.page = page
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message(
+                "❌ This pet collection isn't for you.",
+                ephemeral=True,
+            )
+
+        pets = await self.cog._get_owned_pets(self.user_id)
+        pet_id = int(self.values[0])
+        index = next((i for i, pet in enumerate(pets) if pet["pet_id"] == pet_id), None)
+        if index is None:
+            return await interaction.response.send_message(
+                "❌ That pet is no longer in your collection.",
+                ephemeral=True,
+            )
+
+        self.view.stop()
+        view = PetManagementView(self.cog, self.user_id, self.ctx, pets, index)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, pets[index], index, len(pets)),
+            view=view,
+        )
+
+
+class PetCategoryView(discord.ui.View):
+    """Paginated grouped pet list for one /pets category."""
+
+    def __init__(self, cog, user_id, ctx, category, pets=None, page=0):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.user_id = user_id
+        self.ctx = ctx
+        self.category = category
+        self.page = page
+        if pets is not None:
+            self._rebuild(pets)
+
+    def _page_data(self, pets):
+        entries = self.cog._group_owned_pets(pets, self.category)
+        page_count = max(1, (len(entries) + 19) // 20)
+        self.page = min(self.page, page_count - 1)
+        start = self.page * 20
+        return entries, page_count, entries[start:start + 20]
+
+    def _rebuild(self, pets=None):
+        if pets is None:
+            # The view is constructed before the async refresh; controls are
+            # rebuilt by _refresh once the live collection has been loaded.
+            return
+        for item in list(self.children):
+            self.remove_item(item)
+        entries, page_count, visible = self._page_data(pets)
+        if visible:
+            self.add_item(PetGroupSelect(
+                self.cog,
+                self.user_id,
+                self.ctx,
+                self.category,
+                visible,
+                self.page,
+            ))
+
+        previous = discord.ui.Button(
+            label="◀️",
+            style=discord.ButtonStyle.primary,
+            disabled=self.page <= 0,
+            row=1,
+        )
+        next_button = discord.ui.Button(
+            label="▶️",
+            style=discord.ButtonStyle.primary,
+            disabled=self.page >= page_count - 1,
+            row=1,
+        )
+        back = discord.ui.Button(
+            label="◀️ Back to Collection",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+
+        async def previous_callback(interaction):
+            if not await self._ensure_owner(interaction):
+                return
+            self.page -= 1
+            await self._refresh(interaction)
+
+        async def next_callback(interaction):
+            if not await self._ensure_owner(interaction):
+                return
+            self.page += 1
+            await self._refresh(interaction)
+
+        async def back_callback(interaction):
+            if not await self._ensure_owner(interaction):
+                return
+            pets_now = await self.cog._get_owned_pets(self.user_id)
+            self.stop()
+            view = PetCollectionView(self.cog, self.user_id, self.ctx)
+            await interaction.response.edit_message(
+                embed=self.cog._pet_collection_embed(self.ctx, pets_now),
+                view=view,
+            )
+
+        previous.callback = previous_callback
+        next_button.callback = next_callback
+        back.callback = back_callback
+        self.add_item(previous)
+        self.add_item(next_button)
+        self.add_item(back)
+
+    async def _ensure_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "❌ This pet collection isn't for you.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _refresh(self, interaction):
+        pets = await self.cog._get_owned_pets(self.user_id)
+        entries = self.cog._group_owned_pets(pets, self.category)
+        page_count = max(1, (len(entries) + 19) // 20)
+        self.page = min(self.page, page_count - 1)
+        self._rebuild(pets)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_category_embed(
+                self.ctx,
+                pets,
+                self.category,
+                self.page,
+                page_count,
+            ),
+            view=self,
+        )
+
+
+
 class PetStatsView(discord.ui.View):
     def __init__(self, cog, user_id, ctx, pets, index=0):
         super().__init__(timeout=600)
@@ -367,6 +591,18 @@ class PetManagementView(discord.ui.View):
         self.index = (self.index + 1) % len(self.pets)
         self._sync_buttons()
         await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+
+    @discord.ui.button(label="📚 Collection", style=discord.ButtonStyle.secondary, row=3)
+    async def collection(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._ensure_owner(interaction):
+            return
+        pets = await self.cog._get_owned_pets(self.user_id)
+        self.stop()
+        view = PetCollectionView(self.cog, self.user_id, self.ctx)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_collection_embed(self.ctx, pets),
+            view=view,
+        )
 
 
 class FusionVariantView(discord.ui.View):

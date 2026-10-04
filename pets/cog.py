@@ -28,6 +28,7 @@ from .core import *
 from .views import (
     FeedTreatSelect, FeedTreatView, ReleaseConfirmationView, RenamePetModal,
     PetStatsView, PetManagementView, FusionVariantView, PostFusionConfirmView,
+    PetCollectionView, PetCategoryView,
 )
 from .management import PetManagementMixin
 from .fusion import PetFusionMixin
@@ -605,7 +606,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite in rows:
             pet_type_id = pet_type or pet_stage
 
-            if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS:
+            if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS and pet_type_id not in GLITCHED_PET_TYPES:
                 continue
 
             definition = get_pet_definition(pet_type_id, variant_id)
@@ -632,6 +633,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
 
             display_name = nickname or definition["name"]
+            duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PET_TYPES) else 5
             level = int(level or 1)
             fusion = int(fusion_level or 0)
 
@@ -645,10 +647,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
             variant_label = f" • {variant_id}" if variant_id else ""
 
-            if matching_duplicates >= 5:
-                duplicate_label = "5/5 duplicates"
+            duplicate_requirement = 2 if pet_type_id in HALLOWEEN_PETS else 5
+            if matching_duplicates >= duplicate_requirement:
+                duplicate_label = f"{duplicate_requirement}/{duplicate_requirement} duplicates"
             else:
-                duplicate_label = f"{matching_duplicates}/5 duplicates"
+                duplicate_label = f"{matching_duplicates}/{duplicate_requirement} duplicates"
 
             choices.append(
                 app_commands.Choice(
@@ -686,8 +689,9 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         embed = discord.Embed(
             title="🧬 Pet Fusion",
             description=(
-                "Fusion strengthens a pet by consuming **5 matching, non-favorited duplicates** "
-                "of the same pet and variant. Each Fusion level increases that pet's passive strength."
+                "Fusion strengthens a pet by consuming matching, non-favorited duplicates "
+                "of the same pet and variant. **Normal/Glitched pets require 5; Halloween pets require 2.** "
+                "Each Fusion level increases that pet's passive strength."
             ),
             color=discord.Color.blurple(),
         )
@@ -696,7 +700,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             name="🔧 How Fusion Works",
             value=(
                 "• Choose the pet you want to keep.\n"
-                "• You need **5 matching duplicates** of that pet.\n"
+                "• You need **5 matching duplicates** for Normal/Glitched pets or **2** for Halloween pets.\n"
                 "• The duplicates must have the **same variant** as the target.\n"
                 "• Duplicates marked as **Favorite** cannot be consumed.\n"
                 "• Haunted location pets are unique companions and cannot be fused."
@@ -738,7 +742,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             value=(
                 "Once a pet reaches **Fusion 5**, further attempts no longer increase its passive. "
                 "They instead become **Variant Hunts**, costing **15,000 Stardust** and **3 Astral Essence** "
-                "while consuming **5 matching duplicates**."
+                "while consuming the same duplicate requirement as the pet's category (5 Normal/Glitched, 2 Halloween)."
             ),
             inline=False,
         )
@@ -758,7 +762,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     @fusion.command(
         name="fuse",
-        description="Fuse a pet using 5 matching duplicates.",
+        description="Fuse a pet using its required matching duplicates.",
     )
     @app_commands.describe(
         pet="Choose the pet to fuse."
@@ -790,7 +794,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 f"🧬 **{display} has reached maximum Fusion 5.**\n\n"
                 "Further fusions will **not** increase its passive bonus. "
                 "They only give you another chance to discover a rare variant.\n\n"
-                "This attempt will consume **5 matching duplicates**, **15,000 Stardust**, and **3 Astral Essence**.\n\n"
+                f"This attempt will consume **{2 if (row[1] or '') in HALLOWEEN_PETS else 5} matching duplicates**, **15,000 Stardust**, and **3 Astral Essence**.\n\n"
                 "Continue?",
                 view=PostFusionConfirmView(self, ctx, target_pet_id),
             )
@@ -798,6 +802,138 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         return await self._execute_pet_fusion(ctx, target_pet_id)
 
 
+
+
+    def _pet_collection_category(self, pet):
+        """Return the user-facing /pets category for an owned pet."""
+        pet_type = pet.get("pet_type")
+        if pet_type in HAUNTED_PETS:
+            return "haunted"
+        if pet_type in HALLOWEEN_PETS:
+            return "halloween"
+        if pet_type in GLITCHED_PETS:
+            return "glitched"
+        return "normal"
+
+
+    def _pet_group_key(self, pet):
+        """Group only exact pet + variant + level matches for collection display."""
+        return (
+            pet.get("pet_type"),
+            pet.get("variant_id") or "",
+            int(pet.get("level") or 1),
+        )
+
+
+    def _group_owned_pets(self, pets, category):
+        """Return grouped collection entries while preserving individual pet IDs."""
+        filtered = [pet for pet in pets if self._pet_collection_category(pet) == category]
+        groups = {}
+        for pet in filtered:
+            groups.setdefault(self._pet_group_key(pet), []).append(pet)
+
+        entries = []
+        for key, members in groups.items():
+            # Prefer the active copy as the representative so opening a group
+            # from /pets naturally lands on the currently equipped pet.
+            representative = next((pet for pet in members if pet["is_active"]), members[0])
+            entries.append({
+                "pet": representative,
+                "members": members,
+                "count": len(members),
+                "key": key,
+            })
+
+        entries.sort(
+            key=lambda entry: (
+                not entry["pet"]["is_active"],
+                entry["pet"]["name"].lower(),
+                int(entry["pet"]["level"] or 1),
+                entry["pet"].get("variant_id") or "",
+            )
+        )
+        return entries
+
+
+    def _pet_collection_embed(self, ctx, pets):
+        active = next((pet for pet in pets if pet["is_active"]), None)
+        if active:
+            active_name = active["nickname"] or active["name"]
+            active_variant = ""
+            if active.get("variant_id"):
+                variant = get_variant_info(active["pet_type"], active["variant_id"])
+                if variant:
+                    active_variant = f"\n{variant['emoji']} **Variant:** {variant['name']}"
+            active_text = (
+                f"{active['emoji']} **{active_name}**\n"
+                f"📈 Level **{active['level']}** • XP **{active['xp']}**"
+                f"{active_variant}"
+            )
+        else:
+            active_text = "No active companion is equipped. Choose a pet below and use **Equip Pet** to set one."
+
+        category_meta = (
+            ("normal", "🥚 Normal Eggs", "Standard egg companions"),
+            ("glitched", "💾 Glitched Eggs", "Companions hatched from Glitched Eggs"),
+            ("halloween", "🎃 Halloween Eggs", "Companions hatched from Halloween Eggs"),
+            ("haunted", "👻 Haunted Pets", "Unique companions discovered during Haunted explorations"),
+        )
+        lines = []
+        for category, label, description in category_meta:
+            total = sum(1 for pet in pets if self._pet_collection_category(pet) == category)
+            unique = len(self._group_owned_pets(pets, category))
+            if total:
+                lines.append(f"{label} — **{unique} unique** / **{total} copies**\n-# {description}")
+            else:
+                lines.append(f"{label} — **None yet**\n-# {description}")
+
+        embed = discord.Embed(
+            title=f"🐾 {ctx.author.display_name}'s Pet Collection",
+            description=(
+                "⭐ **Active Companion**\n"
+                f"{active_text}\n\n"
+                "Choose a category below. Copies are bundled only when they share the "
+                "same pet, variant, and level.\n\n"
+                + "\n\n".join(lines)
+            ),
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        embed.set_footer(text="Different levels or variants remain separate entries.")
+        return embed
+
+
+    def _pet_category_embed(self, ctx, pets, category, page, page_count):
+        labels = {
+            "normal": "🥚 Normal Eggs",
+            "glitched": "💾 Glitched Eggs",
+            "halloween": "🎃 Halloween Eggs",
+            "haunted": "👻 Haunted Pets",
+        }
+        entries = self._group_owned_pets(pets, category)
+        per_page = 20
+        start = page * per_page
+        visible = entries[start:start + per_page]
+        lines = []
+        for entry in visible:
+            pet = entry["pet"]
+            marker = "⭐ " if any(member["is_active"] for member in entry["members"]) else ""
+            count_text = f" ×{entry['count']}" if entry["count"] > 1 else ""
+            lines.append(
+                f"{marker}{pet['emoji']} **{pet['name']}** — Lv. **{pet['level']}**{count_text}"
+            )
+
+        description = (
+            "Copies are bundled only when the pet, variant, and level all match. "
+            "Different levels or variants remain separate.\n\n"
+            + ("\n".join(lines) if lines else "No pets in this category yet.")
+        )
+        embed = discord.Embed(
+            title=f"{labels.get(category, '🐾 Pet Collection')}",
+            description=description,
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        embed.set_footer(text=f"Page {page + 1}/{page_count} • Select a pet group to manage a copy.")
+        return embed
 
 
     @commands.hybrid_command(name="pets", description="View and manage your pet collection.")
@@ -816,8 +952,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
             return await ctx.send(embed=embed)
 
-        view = PetManagementView(self, ctx.author.id, ctx, pets, 0)
-        await ctx.send(embed=self._pet_embed(ctx, pets[0], 0, len(pets)), view=view)
+        view = PetCollectionView(self, ctx.author.id, ctx)
+        await ctx.send(embed=self._pet_collection_embed(ctx, pets), view=view)
 
 
     async def _refresh_pet_view(self, message, user_id, pet_id, allow_missing=False, ctx=None):
