@@ -12,6 +12,7 @@ from emojis import EMOJIS
 from seasonal_updates.halloween import halloween as halloween_season
 from seasonal_updates.halloween.halloween import halloween_channel_message, is_halloween_channel
 from error_handler import log_command_error
+from database import ECONOMY_DB_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -859,6 +860,7 @@ class Inventory(commands.Cog):
             "cosmic_insurance",
             "fate_anchor",
             "quantum_battery",
+            "time_crystal",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
             *HAUNTED_CRAFTED_USE_ITEMS.keys(),
             *[
@@ -891,6 +893,21 @@ class Inventory(commands.Cog):
             # global item catalog. Returning no choices is safer and avoids
             # suggesting items the user may not own.
             return []
+
+        # Dilated Time Crystals are stored in the Station economy database,
+        # not as rows in the normal inventory table.
+        try:
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as economy_db:
+                async with economy_db.execute(
+                    "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ? LIMIT 1",
+                    (interaction.user.id,),
+                ) as cursor:
+                    crystal_row = await cursor.fetchone()
+            crystal_quantity = int(crystal_row[0] or 0) if crystal_row else 0
+            if crystal_quantity > 0:
+                quantities["time_crystal"] = crystal_quantity
+        except Exception:
+            pass
 
         choices = []
         for item_id, quantity in quantities.items():
@@ -1156,6 +1173,14 @@ class Inventory(commands.Cog):
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
             *HAUNTED_CRAFTED_USE_ITEMS.keys(),
         }
+
+        # Dilated Time Crystals are handled by the Fortune system and are
+        # stored in economy.db rather than the normal inventory table.
+        if item_id == "time_crystal":
+            fortune_cog = self.bot.get_cog("Fortunes") or self.bot.get_cog("Fortune")
+            if fortune_cog is None:
+                return await ctx.send("❌ The Fortune system is currently unavailable. Please try again later.")
+            return await fortune_cog._use_crystal_impl(ctx, already_deferred=True)
 
         if item_id not in valid:
             return await ctx.send(

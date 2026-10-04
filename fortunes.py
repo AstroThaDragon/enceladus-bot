@@ -902,8 +902,9 @@ class Fortunes(commands.Cog):
         async with self._get_user_lock(user_id):
             return await self._use_crystal_impl(ctx)
 
-    async def _use_crystal_impl(self, ctx: commands.Context):
-        await ctx.defer()
+    async def _use_crystal_impl(self, ctx: commands.Context, already_deferred: bool = False):
+        if not already_deferred:
+            await ctx.defer()
         user_id = ctx.author.id
 
         et_timezone = pytz.timezone("US/Eastern")
