@@ -532,6 +532,13 @@ for _item_id, _name, _emoji, _desc, _stardust, _candy in halloween_season.HALLOW
 
 del _item_id, _name, _emoji, _desc
 
+# Keep Halloween Space Junk in its own inventory category instead of mixing it
+# into the normal Space Junk section. The seasonal module remains the source of
+# truth for the collectible definitions.
+HALLOWEEN_SPACE_JUNK_IDS = {
+    item_id for item_id, *_ in halloween_season.HALLOWEEN_SPACE_JUNK
+}
+
 # Seasonal Halloween crafting/healing items are registered separately from
 # Space Junk so they can be used normally without becoming collectibles.
 ITEM_REGISTRY.update(halloween_season.HALLOWEEN_ITEMS)
@@ -757,7 +764,9 @@ class Inventory(commands.Cog):
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute("""
                 SELECT item_id, item_type, quantity FROM inventory
-                WHERE user_id = ? AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit', 'arcade_token')
+                WHERE user_id = ?
+                  AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit', 'arcade_token')
+                  AND LOWER(COALESCE(item_type, '')) != 'title'
             """, (user_id,)) as cursor:
                 inv_rows = await cursor.fetchall()
             async with db.execute("PRAGMA table_info(users)") as cursor:
@@ -780,7 +789,7 @@ class Inventory(commands.Cog):
         if not inv_rows and not user_items:
             return await ctx.send("📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!")
 
-        categories = {"Space Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Haunted Ingredient": [], "Voucher": [], "Currency": []}
+        categories = {"Space Junk": [], "Halloween Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Haunted Ingredient": [], "Voucher": [], "Currency": []}
         for item_id, count in user_items:
             info = ITEM_REGISTRY.get(item_id)
             if info:
@@ -792,10 +801,10 @@ class Inventory(commands.Cog):
             if not quantity or quantity <= 0:
                 continue
             info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."})
-            cat = info.get("type", "Space Junk")
+            cat = "Halloween Junk" if item_id in HALLOWEEN_SPACE_JUNK_IDS else info.get("type", "Space Junk")
             categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
 
-        names = {"Space Junk":"Space Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Haunted Ingredient":"Haunted Ingredients","Voucher":"Vouchers","Currency":"Currencies"}
+        names = {"Space Junk":"Space Junk","Halloween Junk":"Halloween Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Haunted Ingredient":"Haunted Ingredients","Voucher":"Vouchers","Currency":"Currencies"}
         pages=[]
         for cat, items in categories.items():
             if not items: continue
@@ -866,6 +875,7 @@ class Inventory(commands.Cog):
         # Only show items the user actually owns.  /use is an inventory
         # action, so the autocomplete should not offer the entire catalog.
         quantities = {}
+        time_crystal_quantity = 0
         try:
             async with aiosqlite.connect(self.get_db_path()) as db:
                 async with db.execute(
@@ -881,6 +891,12 @@ class Inventory(commands.Cog):
                         item_id: quantity
                         for item_id, quantity in await cursor.fetchall()
                     }
+                async with db.execute(
+                    "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                    (interaction.user.id,),
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    time_crystal_quantity = int(row[0] or 0) if row else 0
         except Exception:
             # If the inventory database cannot be read, do not expose the
             # global item catalog. Returning no choices is safer and avoids
@@ -888,6 +904,18 @@ class Inventory(commands.Cog):
             return []
 
         choices = []
+        if time_crystal_quantity > 0:
+            info = ITEM_REGISTRY.get("time_crystal", {})
+            display_name = info.get("name", "Dilated Time Crystal")
+            search_text = f"{display_name} time_crystal".lower()
+            if not current or current in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{get_use_autocomplete_emoji('time_crystal', info.get('emoji'))} {display_name} (x{time_crystal_quantity})",
+                        value="time_crystal",
+                    )
+                )
+
         for item_id, quantity in quantities.items():
             if item_id not in usable_items:
                 continue
@@ -916,6 +944,24 @@ class Inventory(commands.Cog):
     @app_commands.describe(item_id="Choose an item from your inventory.")
     @app_commands.autocomplete(item_id=use_item_autocomplete)
     async def use_item(self, ctx: commands.Context, item_id: str):
+        item_id = item_id.lower().strip()
+
+        # Dilated Time Crystals are stored on users.time_crystals and already
+        # have their complete streak-repair logic in the Fortunes cog. Route
+        # /use item: time_crystal through that implementation instead of
+        # duplicating the monthly-limit/streak rules here.
+        if item_id == "time_crystal":
+            fortunes_cog = self.bot.get_cog("Fortunes")
+            if fortunes_cog is None or not hasattr(fortunes_cog, "_use_crystal_impl"):
+                return await ctx.send("❌ The Dilated Time Crystal system is currently unavailable.")
+
+            # Reuse the same per-user lock as /usecrystal so the normal command
+            # and /use item: time_crystal cannot race each other.
+            if hasattr(fortunes_cog, "_get_user_lock"):
+                async with fortunes_cog._get_user_lock(ctx.author.id):
+                    return await fortunes_cog._use_crystal_impl(ctx)
+            return await fortunes_cog._use_crystal_impl(ctx)
+
         await ctx.defer()
 
         user_id = ctx.author.id

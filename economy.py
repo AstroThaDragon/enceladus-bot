@@ -2046,6 +2046,7 @@ class Economy(commands.Cog):
         current = (current or "").lower().strip()
         user_id = interaction.user.id
 
+        time_crystal_quantity = 0
         async with aiosqlite.connect(self.get_db_path()) as db:
             async with db.execute(
                 """
@@ -2058,7 +2059,26 @@ class Economy(commands.Cog):
             ) as cursor:
                 rows = await cursor.fetchall()
 
+            async with db.execute(
+                "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                (user_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                time_crystal_quantity = int(row[0] or 0) if row else 0
+
         choices = []
+        if time_crystal_quantity > 0:
+            info = ITEM_REGISTRY.get("time_crystal", {})
+            display_name = info.get("name", "Dilated Time Crystal")
+            search_text = f"{display_name} time_crystal".lower()
+            if not current or current in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"💎 {display_name} (x{time_crystal_quantity})",
+                        value="time_crystal",
+                    )
+                )
+
         for item_id, quantity in rows:
             info = ITEM_REGISTRY.get(item_id)
             if not info or self._give_item_excluded(item_id, info):
@@ -2328,8 +2348,57 @@ class Economy(commands.Cog):
                     item_id = item.lower().strip()
                     info = ITEM_REGISTRY.get(item_id)
                     if not info or self._give_item_excluded(item_id, info):
-                        await db.rollback()
-                        return await ctx.send("❌ That item cannot be given to another member.")
+                        # Dilated Time Crystals are stored on users.time_crystals,
+                        # not in the inventory table, so handle them separately.
+                        if item_id != "time_crystal":
+                            await db.rollback()
+                            return await ctx.send("❌ That item cannot be given to another member.")
+
+                    if item_id == "time_crystal":
+                        max_quantity = int(info.get("max_quantity", 4))
+
+                        async with db.execute(
+                            "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                            (giver_id,),
+                        ) as cursor:
+                            giver_crystal_row = await cursor.fetchone()
+                        giver_crystals = int(giver_crystal_row[0] or 0) if giver_crystal_row else 0
+
+                        if giver_crystals < quantity:
+                            await db.rollback()
+                            return await ctx.send(
+                                f"❌ You do not have **{quantity}x {info['name']}** to give."
+                            )
+
+                        async with db.execute(
+                            "SELECT COALESCE(time_crystals, 0) FROM users WHERE user_id = ?",
+                            (recipient_id,),
+                        ) as cursor:
+                            recipient_crystal_row = await cursor.fetchone()
+                        recipient_crystals = int(recipient_crystal_row[0] or 0) if recipient_crystal_row else 0
+
+                        if recipient_crystals + quantity > max_quantity:
+                            available_space = max(0, max_quantity - recipient_crystals)
+                            await db.rollback()
+                            return await ctx.send(
+                                f"❌ {member.mention} can only hold **{available_space}x** more "
+                                f"**{info['name']}** (max **{max_quantity}x**)."
+                            )
+
+                        await db.execute(
+                            "UPDATE users SET time_crystals = COALESCE(time_crystals, 0) - ? WHERE user_id = ?",
+                            (quantity, giver_id),
+                        )
+                        await db.execute(
+                            "UPDATE users SET time_crystals = COALESCE(time_crystals, 0) + ? WHERE user_id = ?",
+                            (quantity, recipient_id),
+                        )
+                        await db.commit()
+
+                        return await ctx.send(
+                            f"{ctx.author.mention} 🎁 gave {member.mention} "
+                            f"**{quantity}x {info.get('emoji', '💎')} {info['name']}**!"
+                        )
 
                     async with db.execute(
                         """
