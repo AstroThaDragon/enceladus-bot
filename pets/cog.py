@@ -633,7 +633,6 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
 
             display_name = nickname or definition["name"]
-            duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PET_TYPES) else 5
             level = int(level or 1)
             fusion = int(fusion_level or 0)
 
@@ -647,7 +646,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
             variant_label = f" • {variant_id}" if variant_id else ""
 
-            duplicate_requirement = 2 if pet_type_id in HALLOWEEN_PETS else 5
+            duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PET_TYPES) else 5
             if matching_duplicates >= duplicate_requirement:
                 duplicate_label = f"{duplicate_requirement}/{duplicate_requirement} duplicates"
             else:
@@ -811,8 +810,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             return "haunted"
         if pet_type in HALLOWEEN_PETS:
             return "halloween"
-        if pet_type in GLITCHED_PETS:
-            return "glitched"
+        # Keep Glitched Egg pets under the broader Normal Eggs section so
+        # every owned pet remains reachable without adding another category.
         return "normal"
 
 
@@ -873,8 +872,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             active_text = "No active companion is equipped. Choose a pet below and use **Equip Pet** to set one."
 
         category_meta = (
-            ("normal", "🥚 Normal Eggs", "Standard egg companions"),
-            ("glitched", "💾 Glitched Eggs", "Companions hatched from Glitched Eggs"),
+            ("normal", "🥚 Normal Eggs", "Standard and Glitched Egg companions"),
             ("halloween", "🎃 Halloween Eggs", "Companions hatched from Halloween Eggs"),
             ("haunted", "👻 Haunted Pets", "Unique companions discovered during Haunted explorations"),
         )
@@ -905,7 +903,6 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     def _pet_category_embed(self, ctx, pets, category, page, page_count):
         labels = {
             "normal": "🥚 Normal Eggs",
-            "glitched": "💾 Glitched Eggs",
             "halloween": "🎃 Halloween Eggs",
             "haunted": "👻 Haunted Pets",
         }
