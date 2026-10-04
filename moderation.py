@@ -72,6 +72,11 @@ class VerifyView(View):
     async def verify_button(self, interaction, button):
         member = interaction.user
 
+        # Acknowledge the button interaction immediately. Database work and
+        # DM delivery can take long enough for Discord's initial response
+        # window to expire, which would cause a 10062 Unknown interaction.
+        await interaction.response.defer(ephemeral=True)
+
         # Keep the verification code persistent so a bot restart does not
         # invalidate an otherwise active verification. Reuse an existing
         # code when the button is clicked multiple times.
@@ -108,7 +113,7 @@ class VerifyView(View):
             )
         except discord.Forbidden:
             pending_codes.pop(member.id, None)
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "⚠️ **DM Delivery Failed!**\n"
                 "I couldn't send you a verification code because your Direct Messages are disabled for this server.\n\n"
                 "**How to fix:**\n"
@@ -119,7 +124,7 @@ class VerifyView(View):
                 delete_after=10
             )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "✅ I sent you a verification code in DMs!\n\n"
             "Once you receive it, return here and type:\n"
             "`-verifycode YOUR-CODE`",
