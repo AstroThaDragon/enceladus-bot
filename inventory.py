@@ -262,6 +262,7 @@ USE_AUTOCOMPLETE_EMOJI_FALLBACKS = {
     "prototype_drill_bit": "⚙️",
     "quantum_battery": "⚛️",
     "station_rations": "🥫",
+    "time_crystal": "💎",
 }
 
 
