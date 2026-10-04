@@ -334,9 +334,13 @@ async def start_run(db, user_id, location_id, sanity):
     skip_scenes = list(dict.fromkeys(skip_scenes))
     total_stages = max(2, total_stages - len(skip_scenes))
 
+    opening_variants = story.get("opening_variants") or []
+    opening_variant = random.randrange(len(opening_variants)) if opening_variants else None
+
     story_state = {
         "flags": {},
         "discoveries_found": [],
+        "opening_variant": opening_variant,
         "pet_opportunity_available": pet_opportunity_available,
         "pet_opportunity_taken": False,
         "pet_discovery_message": None,

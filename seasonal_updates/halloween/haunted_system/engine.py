@@ -42,6 +42,19 @@ def render_scene(location_id, scene_id, state, sanity, *, active_effects=None):
             text = story["opening"].get("low") or story["opening"].get("normal", "")
         else:
             text = story["opening"].get("normal", "")
+
+        # Opening variants are an additive narrative layer. The authored
+        # sanity-specific opening above remains intact; a selected variant
+        # simply gives the run a different first impression without changing
+        # the opening scene or its choices. Existing stories without variants
+        # behave exactly as before.
+        opening_variants = story.get("opening_variants") or []
+        variant_index = state.get("opening_variant")
+        if opening_variants and isinstance(variant_index, int):
+            if 0 <= variant_index < len(opening_variants):
+                variant_text = str(opening_variants[variant_index] or "").strip()
+                if variant_text:
+                    text = f"{variant_text}\n\n{text}"
     else:
         if float(sanity) <= 0 and scene.get("insane"):
             text = scene["insane"]
