@@ -55,13 +55,13 @@ ACHIEVEMENTS = {
     "candy_background": {
         "name": "Candy Collector",
         "emoji": "🍬",
-        "description": "Consume 100 pieces of Halloween Candy and/or Trick or Treat bags.",
+        "description": "Consume 100 pieces of Halloween Candy. Each Trick-or-Treat Bag consumed counts as 25 pieces of candy.",
         "reward": "Permanent profile background: Candy Collector",
     },
     "candy_nommer": {
         "name": "Candy Nommer",
         "emoji": "🍫",
-        "description": "Consume 250 or more pieces of Halloween Candy and/or Trick or Treat bags. Diabeetus.",
+        "description": "Consume 250 or more pieces of Halloween Candy. Each Trick-or-Treat Bag consumed counts as 25 pieces of candy. Diabeetus.",
         "reward": "Permanent profile title: Candy Nommer",
     },
 
