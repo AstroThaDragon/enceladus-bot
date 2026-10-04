@@ -2314,9 +2314,9 @@ class Exploration(commands.Cog):
             if halloween_active:
                 if random.random() < 0.03:
                     egg_rolls.append("normal_egg")
-                if random.random() < 0.08:
+                if random.random() < 0.10:
                     egg_rolls.append("halloween_egg")
-                if random.random() < 0.065:
+                if random.random() < 0.08:
                     egg_rolls.append("glitched_egg")
             elif random.random() < NORMAL_EGG_CHANCE:
                 egg_rolls.append("normal_egg")
