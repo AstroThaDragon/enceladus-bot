@@ -6,6 +6,7 @@ import asyncio
 import time
 import json
 from datetime import datetime, timedelta
+from typing import Any, Optional
 import pytz
 import random
 from emojis import EMOJIS
@@ -590,6 +591,316 @@ async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
 
     return added_amount, new_quantity, max_quantity
 
+
+
+INVENTORY_CATEGORY_INFO = {
+    "Space Junk": ("🛰️", "Space Junk", "Salvaged debris and station junk."),
+    "Halloween Junk": ("🎃", "Halloween Junk", "Seasonal haunted salvage."),
+    "Mineral": ("💎", "Minerals", "Ores and minerals recovered during exploration."),
+    "Crafting Material": ("🔧", "Crafting Materials", "Materials used for crafting and station projects."),
+    "Medical Supply": ("⚕️", "Medical Supplies", "Medical supplies and emergency equipment."),
+    "Upgrade Component": ("🛠️", "Upgrade Components", "Components used for station upgrades."),
+    "Defense Weapon": ("🛡️", "Defense Weapons", "Weapons and defensive equipment."),
+    "Consumable": ("🧪", "Consumables", "Items that can be used from your inventory."),
+    "Pet Treat": ("🐾", "Pet Treats", "Treats and items for your active pet."),
+    "Pet Egg": ("🥚", "Pet Eggs", "Eggs waiting to be incubated."),
+    "Healing": ("❤️", "Healing", "Items used for restoring health."),
+    "Haunted Ingredient": ("👻", "Haunted Ingredients", "Ingredients recovered from haunted locations."),
+    "Voucher": ("🎟️", "Vouchers", "Vouchers and permanent unlock items."),
+    "Currency": ("💰", "Currencies", "Special currencies stored in your inventory."),
+}
+
+
+class InventorySearchModal(discord.ui.Modal, title="🔎 Search Inventory"):
+    search = discord.ui.TextInput(
+        label="Search",
+        placeholder="Type an item name or keyword...",
+        required=False,
+        max_length=100,
+    )
+
+    def __init__(self, inventory_view):
+        super().__init__()
+        self.inventory_view = inventory_view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.inventory_view.check_owner(interaction):
+            return
+        self.inventory_view.search_query = str(self.search.value or "").strip().lower()
+        self.inventory_view.category = "__search__"
+        self.inventory_view.page = 0
+        await self.inventory_view.show_items(interaction)
+
+
+class InventoryCategorySelect(discord.ui.Select):
+    def __init__(self, inventory_view):
+        self.inventory_view = inventory_view
+        options = []
+        for category in inventory_view.available_categories:
+            emoji, label, description = INVENTORY_CATEGORY_INFO.get(
+                category, ("📦", category, "Inventory category")
+            )
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    emoji=emoji,
+                    value=category,
+                    description=description[:100],
+                )
+            )
+
+        super().__init__(
+            placeholder="📂 Select an inventory category...",
+            min_values=1,
+            max_values=1,
+            options=options[:25],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.inventory_view.check_owner(interaction):
+            return
+        self.inventory_view.category = self.values[0]
+        self.inventory_view.page = 0
+        self.inventory_view.search_query = ""
+        self.inventory_view.selected_item = None
+        await self.inventory_view.show_items(interaction)
+
+
+class InventoryItemButton(discord.ui.Button):
+    def __init__(self, inventory_view, entry, row=0):
+        self.inventory_view = inventory_view
+        self.item_id = entry["id"]
+        super().__init__(
+            label=str(entry["name"])[:80],
+            style=discord.ButtonStyle.secondary,
+            row=row,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.inventory_view.check_owner(interaction):
+            return
+        self.inventory_view.selected_item = self.item_id
+        await self.inventory_view.show_item_details(interaction)
+
+
+class InventoryView(discord.ui.View):
+    """Interactive Category → Item → Details inventory browser."""
+
+    PAGE_SIZE = 5
+
+    def __init__(self, cog, user_id, entries):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.entries = entries
+        self.category: Optional[str] = None
+        self.page = 0
+        self.search_query = ""
+        self.selected_item: Optional[str] = None
+        self._build_category_view()
+
+    async def check_owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "⚠️ This inventory menu belongs to the person who opened it.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @property
+    def available_categories(self):
+        categories = []
+        for entry in self.entries:
+            category = entry["category"]
+            if category not in categories:
+                categories.append(category)
+        return categories
+
+    def _build_category_view(self):
+        self.clear_items()
+        self.add_item(InventoryCategorySelect(self))
+
+        search = discord.ui.Button(
+            label="Search",
+            emoji="🔎",
+            style=discord.ButtonStyle.primary,
+            row=1,
+        )
+
+        async def search_callback(interaction: discord.Interaction):
+            if not await self.check_owner(interaction):
+                return
+            await interaction.response.send_modal(InventorySearchModal(self))
+
+        search.callback = search_callback
+        self.add_item(search)
+
+    def _category_embed(self):
+        lines = []
+        for category in self.available_categories:
+            emoji, label, description = INVENTORY_CATEGORY_INFO.get(
+                category, ("📦", category, "Inventory category")
+            )
+            lines.append(f"{emoji} **{label}** — {description}")
+
+        embed = discord.Embed(
+            title="📦 Storage Locker",
+            description=(
+                "Choose a category to browse your inventory.\n\n"
+                "**Available Categories**\n" + "\n".join(lines)
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.set_footer(text="Choose a category below to view your items.")
+        return embed
+
+    def _filtered_entries(self):
+        entries = self.entries
+        if self.category and self.category != "__search__":
+            entries = [entry for entry in entries if entry["category"] == self.category]
+        if self.search_query:
+            query = self.search_query
+            entries = [
+                entry for entry in entries
+                if query in entry["search"]
+            ]
+        return entries
+
+    def _category_title(self):
+        if self.category == "__search__":
+            return "🔎 Search Results"
+        emoji, label, _ = INVENTORY_CATEGORY_INFO.get(
+            self.category or "", ("📦", "Inventory", "")
+        )
+        return f"{emoji} {label}"
+
+    async def show_category(self, interaction):
+        self.category = None
+        self.page = 0
+        self.search_query = ""
+        self.selected_item = None
+        self._build_category_view()
+        await interaction.response.edit_message(embed=self._category_embed(), view=self)
+
+    async def show_items(self, interaction):
+        self.clear_items()
+        entries = self._filtered_entries()
+        total_pages = max(1, (len(entries) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+        self.page = min(max(self.page, 0), total_pages - 1)
+        start = self.page * self.PAGE_SIZE
+        page_entries = entries[start:start + self.PAGE_SIZE]
+
+        page_text = f"Page {self.page + 1}/{total_pages}"
+        if self.search_query:
+            page_text += f" • Search: `{self.search_query}`"
+
+        embed = discord.Embed(
+            title=f"📦 Inventory — {self._category_title()}",
+            description=(
+                f"**{page_text}**\n"
+                f"{len(entries):,} item{'s' if len(entries) != 1 else ''} found."
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+
+        if page_entries:
+            for entry in page_entries:
+                info = entry["info"]
+                embed.add_field(
+                    name=f"{info.get('emoji', '📦')} {entry['name']}",
+                    value=(
+                        f"📦 **{entry['quantity']:,} / {entry['max_quantity']:,}**\n"
+                        f"📖 {info.get('desc', 'No description available.') }"
+                    ),
+                    inline=False,
+                )
+                self.add_item(InventoryItemButton(self, entry, row=0))
+        else:
+            embed.description = (embed.description or "") + "\n\n❌ No items match that search."
+
+        previous = discord.ui.Button(
+            label="Previous", emoji="◀️", style=discord.ButtonStyle.secondary,
+            disabled=self.page <= 0, row=1,
+        )
+        next_button = discord.ui.Button(
+            label="Next", emoji="▶️", style=discord.ButtonStyle.secondary,
+            disabled=self.page >= total_pages - 1, row=1,
+        )
+        search = discord.ui.Button(
+            label="Search", emoji="🔎", style=discord.ButtonStyle.primary, row=2,
+        )
+        categories = discord.ui.Button(
+            label="Categories", emoji="↩️", style=discord.ButtonStyle.secondary, row=2,
+        )
+
+        async def previous_callback(i):
+            if not await self.check_owner(i): return
+            self.page -= 1
+            await self.show_items(i)
+
+        async def next_callback(i):
+            if not await self.check_owner(i): return
+            self.page += 1
+            await self.show_items(i)
+
+        async def search_callback(i):
+            if not await self.check_owner(i): return
+            await i.response.send_modal(InventorySearchModal(self))
+
+        async def categories_callback(i):
+            if not await self.check_owner(i): return
+            await self.show_category(i)
+
+        previous.callback = previous_callback
+        next_button.callback = next_callback
+        search.callback = search_callback
+        categories.callback = categories_callback
+        self.add_item(previous)
+        self.add_item(next_button)
+        self.add_item(search)
+        self.add_item(categories)
+
+        embed.set_footer(text="Select an item above to view its details.")
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def show_item_details(self, interaction):
+        entry = next((item for item in self.entries if item["id"] == self.selected_item), None)
+        if not entry:
+            return await self.show_items(interaction)
+
+        info = entry["info"]
+        embed = discord.Embed(
+            title=f"{info.get('emoji', '📦')} {entry['name']}",
+            description=info.get("desc", "No description available."),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.add_field(name="Quantity", value=f"**{entry['quantity']:,} / {entry['max_quantity']:,}**", inline=True)
+        embed.add_field(name="Category", value=self._category_label(entry["category"]), inline=True)
+        embed.set_footer(text="Use the Categories button to return to your inventory.")
+
+        self.clear_items()
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary)
+
+        async def back_callback(i):
+            if not await self.check_owner(i): return
+            await self.show_items(i)
+
+        back.callback = back_callback
+        self.add_item(back)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @staticmethod
+    def _category_label(category):
+        return INVENTORY_CATEGORY_INFO.get(category, ("📦", category, ""))[1]
+
+    async def on_timeout(self):
+        for child in self.children:
+            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
+                child.disabled = True
+
+
 class Inventory(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -771,74 +1082,76 @@ class Inventory(commands.Cog):
                 WHERE user_id = ? AND item_id NOT IN ('time_crystal', 'nanite_patch', 'medkit', 'arcade_token')
             """, (user_id,)) as cursor:
                 inv_rows = await cursor.fetchall()
+
             async with db.execute("PRAGMA table_info(users)") as cursor:
                 columns = [row[1] async for row in cursor]
+
             user_items = []
             if all(col in columns for col in ["time_crystals", "nanite_patchs", "medkits"]):
-                async with db.execute("SELECT time_crystals, nanite_patchs, medkits FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                async with db.execute(
+                    "SELECT time_crystals, nanite_patchs, medkits FROM users WHERE user_id = ?",
+                    (user_id,),
+                ) as cursor:
                     row = await cursor.fetchone()
                     if row:
                         tc, nanites, medkits = row[0] or 0, row[1] or 0, row[2] or 0
-                        if tc > 0: user_items.append(("time_crystal", tc))
-                        if nanites > 0: user_items.append(("nanite_patch", nanites))
-                        if medkits > 0: user_items.append(("medkit", medkits))
+                        if tc > 0:
+                            user_items.append(("time_crystal", tc))
+                        if nanites > 0:
+                            user_items.append(("nanite_patch", nanites))
+                        if medkits > 0:
+                            user_items.append(("medkit", medkits))
+
             if "arcade_coins" in columns:
-                async with db.execute("SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                async with db.execute(
+                    "SELECT COALESCE(arcade_coins, 0) FROM users WHERE user_id = ?",
+                    (user_id,),
+                ) as cursor:
                     row = await cursor.fetchone()
                     if row and row[0] > 0:
                         user_items.append(("arcade_token", min(row[0], 1000)))
 
-        if not inv_rows and not user_items:
-            return await ctx.send("📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!")
-
-        categories = {"Space Junk": [], "Halloween Junk": [], "Mineral": [], "Crafting Material": [], "Medical Supply": [], "Upgrade Component": [], "Defense Weapon": [], "Consumable": [], "Pet Treat": [], "Pet Egg": [], "Healing": [], "Haunted Ingredient": [], "Voucher": [], "Currency": []}
+        entries = []
         for item_id, count in user_items:
             info = ITEM_REGISTRY.get(item_id)
-            if info:
-                cat = info.get("type", "Consumable")
-                categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({count}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
+            if not info:
+                continue
+            category = info.get("type", "Consumable")
+            entries.append({
+                "id": item_id,
+                "name": info.get("name", item_id),
+                "category": category,
+                "quantity": count,
+                "max_quantity": info.get("max_quantity", 10),
+                "info": info,
+                "search": f"{item_id} {info.get('name', '')} {info.get('desc', '')}".lower(),
+            })
+
         for item_id, item_type, quantity in inv_rows:
-            # Do not display depleted inventory rows. Some consumed items remain
-            # in the database at quantity 0 for bookkeeping/legacy compatibility.
             if not quantity or quantity <= 0:
                 continue
-            info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."})
-            cat = "Halloween Junk" if item_id in HALLOWEEN_SPACE_JUNK_IDS else info.get("type", "Space Junk")
-            categories.setdefault(cat, []).append(f"{info['emoji']} **{info['name']}** ({quantity}/{info.get('max_quantity', 10)})\n└ *{info['desc']}*")
+            info = ITEM_REGISTRY.get(
+                item_id,
+                {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."},
+            )
+            category = "Halloween Junk" if item_id in HALLOWEEN_SPACE_JUNK_IDS else info.get("type", "Space Junk")
+            entries.append({
+                "id": item_id,
+                "name": info.get("name", item_id),
+                "category": category,
+                "quantity": quantity,
+                "max_quantity": info.get("max_quantity", 10),
+                "info": info,
+                "search": f"{item_id} {info.get('name', '')} {info.get('desc', '')}".lower(),
+            })
 
-        names = {"Space Junk":"Space Junk","Halloween Junk":"Halloween Junk","Mineral":"Minerals","Crafting Material":"Crafting Materials","Medical Supply":"Medical Supplies","Upgrade Component":"Upgrade Components","Defense Weapon":"Defense Weapons","Consumable":"Consumables","Pet Treat":"Pet Treats","Pet Egg":"Pet Eggs","Healing":"Healing","Haunted Ingredient":"Haunted Ingredients","Voucher":"Vouchers","Currency":"Currencies"}
-        pages=[]
-        for cat, items in categories.items():
-            if not items: continue
-            chunks=[]; current=""
-            for item in items:
-                if current and len(current)+len(item)+1 > 1000:
-                    chunks.append(current); current=item
-                else: current=f"{current}\n{item}" if current else item
-            if current: chunks.append(current)
-            for i, chunk in enumerate(chunks):
-                display=names.get(cat,cat); suffix=f" ({i+1}/{len(chunks)})" if len(chunks)>1 else ""
-                e=discord.Embed(title=f"📦 {ctx.author.display_name}'s Storage Locker", description=f"**{display}**", color=discord.Color.from_rgb(0,229,255))
-                e.add_field(name=f"✨ Items{suffix}", value=chunk, inline=False); pages.append(e)
+        if not entries:
+            return await ctx.send(
+                "📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!"
+            )
 
-        class InventoryView(discord.ui.View):
-            def __init__(self, owner_id, embeds):
-                super().__init__(timeout=300); self.owner_id=owner_id; self.embeds=embeds; self.current_page=0
-            def current_embed(self):
-                e=self.embeds[self.current_page]; e.set_footer(text=f"Page {self.current_page+1}/{len(self.embeds)} • Sell unwanted salvage with /shop sell"); return e
-            async def interaction_check(self, interaction):
-                if interaction.user.id != self.owner_id:
-                    await interaction.response.send_message("❌ This inventory menu belongs to someone else.", ephemeral=True); return False
-                return True
-            @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
-            async def previous(self, interaction, button):
-                self.current_page=(self.current_page-1)%len(self.embeds); await interaction.response.edit_message(embed=self.current_embed(), view=self)
-            @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
-            async def next(self, interaction, button):
-                self.current_page=(self.current_page+1)%len(self.embeds); await interaction.response.edit_message(embed=self.current_embed(), view=self)
-
-        view=InventoryView(ctx.author.id,pages)
-        await ctx.send(embed=view.current_embed(), view=view)
+        view = InventoryView(self, user_id, entries)
+        await ctx.send(embed=view._category_embed(), view=view)
 
     async def use_item_autocomplete(
         self,
