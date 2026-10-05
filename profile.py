@@ -7,9 +7,6 @@ import json
 import re
 from easy_pil import Canvas, Editor, Font, load_image_async
 
-# Artwork credits for profile backgrounds.
-# Replace each placeholder with the artist's preferred credit name.
-# Leave the value as None when no artwork credit is needed.
 BACKGROUND_ARTISTS = {
     "default": "NASA Hubble Space Telescope",
     "default_nebula": "NASA Hubble Space Telescope",
@@ -33,8 +30,8 @@ BACKGROUND_ARTISTS = {
     "background_watched_from_the_trees": "Ben Griffiths on Unsplash",
     "background_haunted_item_collector": "Michel Bocquet on Unsplash",
     "background_corrupted_reality": "Egor Komarov on Unsplash",
-    "background_quantum_genesis": None,
-    "background_astral_foundry": None,
+    "background_quantum_genesis": "Brecht Corbell on Unsplash",
+    "background_astral_foundry": "Michael Pointner on Unsplash",
 }
 
 BACKGROUND_COLLECTIONS = {
@@ -67,8 +64,8 @@ BACKGROUND_COLLECTIONS = {
             "background_watched_from_the_trees",
             "background_haunted_item_collector",
             "background_corrupted_reality",
-             "background_quantum_genesis",
-             "background_astral_foundry",
+            "background_quantum_genesis",
+            "background_astral_foundry",
         ],
     },
 }
@@ -449,7 +446,8 @@ class BackgroundCollectionView(discord.ui.View):
 
     async def on_timeout(self):
         for item in self.children:
-            item.disabled = True
+            if isinstance(item, (discord.ui.Button, discord.ui.Select)):
+                item.disabled = True
 
 
 class Profile(commands.Cog):
@@ -953,7 +951,7 @@ class Profile(commands.Cog):
     @commands.hybrid_group(
         name="background",
         description="Manage your profile backgrounds.",
-        invoke_without_command=True
+        invoke_without_command=True  # type: ignore[call-arg]
     )
     async def background(self, ctx: commands.Context):
         """Show the background command options."""

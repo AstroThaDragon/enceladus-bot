@@ -1915,23 +1915,6 @@ class Exploration(commands.Cog):
                 "cosmic_banana": "🍌 Cosmic Banana (peels itself, but tastes like stardust)"
             }
             
-            if xenomorph_bonus_loot_pending:
-                bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
-                bonus_amount = random.randint(1, 3)
-                bonus_added, _bonus_quantity, _bonus_max = await add_inventory_item(
-                    db, user_id, bonus_item_id, "space_junk", bonus_amount
-                )
-                if bonus_added:
-                    pet_findings.append(
-                        f"{get_pet_passive_message(pet_effects, 'xenomorph_bonus_loot')} **{bonus_item_name} ×{bonus_added}**"
-                    )
-                if bonus_amount > bonus_added:
-                    overflow_value = (bonus_amount - bonus_added) * LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
-                    new_stardust += overflow_value
-                    pet_findings.append(
-                        f"📦 Xenomorph loot overflow → **+{overflow_value:,} Stardust**"
-                    )
-
             # --- TIERED SCAVENGING LOOT ROLL ---
             # Quantum Batteries have a 2% base chance.
             # The Deep-Space Scanner boosts that to 4%.
@@ -2041,7 +2024,25 @@ class Exploration(commands.Cog):
                 cache_note = f"\n\n🎁 **Stardust Cache Found!** **+{cache_payout:,} Stardust**"
 
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
+
             pet_findings = []
+
+            if xenomorph_bonus_loot_pending:
+                bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
+                bonus_amount = random.randint(1, 3)
+                bonus_added, _bonus_quantity, _bonus_max = await add_inventory_item(
+                    db, user_id, bonus_item_id, "space_junk", bonus_amount
+                )
+                if bonus_added:
+                    pet_findings.append(
+                        f"{get_pet_passive_message(pet_effects, 'xenomorph_bonus_loot')} **{bonus_item_name} ×{bonus_added}**"
+                    )
+                if bonus_amount > bonus_added:
+                    overflow_value = (bonus_amount - bonus_added) * LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                    new_stardust += overflow_value
+                    pet_findings.append(
+                        f"📦 Xenomorph loot overflow → **+{overflow_value:,} Stardust**"
+                    )
 
             # 30% Environmental Hazard Chance during Scavenging.
             pet_tails_recovery = 0

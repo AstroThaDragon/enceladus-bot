@@ -625,7 +625,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite in rows:
             pet_type_id = pet_type or pet_stage
 
-            if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS and pet_type_id not in GLITCHED_PET_TYPES:
+            if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS and pet_type_id not in GLITCHED_PETS:
                 continue
 
             definition = get_pet_definition(pet_type_id, variant_id)
@@ -665,7 +665,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
             variant_label = f" • {variant_id}" if variant_id else ""
 
-            duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PET_TYPES) else 5
+            duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PETS) else 5
             if matching_duplicates >= duplicate_requirement:
                 duplicate_label = f"{duplicate_requirement}/{duplicate_requirement} duplicates"
             else:
@@ -829,7 +829,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             return "haunted"
         if pet_type in HALLOWEEN_PETS:
             return "halloween"
-        if pet_type in GLITCHED_PET_TYPES:
+        if pet_type in GLITCHED_PETS:
             return "glitched"
         return "normal"
 

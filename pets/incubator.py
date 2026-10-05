@@ -395,13 +395,19 @@ class PetIncubatorMixin:
                     Achievements | None,
                     self.bot.get_cog("Achievements"),
                 ):
-                    await achievements_cog.add_variant_discovery_progress(
-                        ctx.author.id,
-                        pet_type,
-                        variant_id,
-                        db=db,
-                        channel=ctx.channel,
+                    add_variant_progress = getattr(
+                        achievements_cog,
+                        "add_variant_discovery_progress",
+                        None,
                     )
+                    if add_variant_progress is not None:
+                        await add_variant_progress(
+                            ctx.author.id,
+                            pet_type,
+                            variant_id,
+                            db=db,
+                            channel=ctx.channel,
+                        )
                 variant_discovered = True
 
             essence_awarded = False
