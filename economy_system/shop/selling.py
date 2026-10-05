@@ -482,6 +482,7 @@ class EconomyShopSellingMixin:
                         }
                         and not is_upgrade_kit
                         and target_item not in SELLABLE_ITEM_IDS
+                        and target_item != "astral_essence"
                     ):
                         await db.rollback()
                         return await ctx.send("❌ That item cannot be sold.")
