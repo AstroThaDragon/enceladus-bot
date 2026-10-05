@@ -1316,7 +1316,7 @@ class Exploration(commands.Cog):
             
             pet_effects = await get_active_pet_effects(db, user_id)
             found_stardust = int(
-                random.randint(50, 150)
+                random.randint(150, 1250)
                 * mining_upgrade["stardust_mult"]
                 * (
                     1
@@ -1591,7 +1591,7 @@ class Exploration(commands.Cog):
 
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
-                found_xp = random.randint(75, 200)
+                found_xp = random.randint(100, 500)
                 loot_description += f"\n\n📊 **XP Data Shard:** **+{found_xp} XP**"
                 rarity_badge = "uncommon"
 
@@ -2002,7 +2002,7 @@ class Exploration(commands.Cog):
                 new_charges = charges - 1
                 scavenge_charge_saved = False
             found_stardust = int(
-                random.randint(45, 120)
+                random.randint(250, 1000)
                 * scavenging_upgrade["stardust_mult"]
                 * (
                     1
