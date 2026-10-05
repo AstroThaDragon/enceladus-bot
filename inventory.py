@@ -595,7 +595,6 @@ async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
 
 INVENTORY_CATEGORY_INFO = {
     "Space Junk": ("🛰️", "Space Junk", "Salvaged debris and station junk."),
-    "Halloween Junk": ("🎃", "Halloween Junk", "Seasonal haunted salvage."),
     "Mineral": ("💎", "Minerals", "Ores and minerals recovered during exploration."),
     "Crafting Material": ("🔧", "Crafting Materials", "Materials used for crafting and station projects."),
     "Medical Supply": ("⚕️", "Medical Supplies", "Medical supplies and emergency equipment."),
@@ -605,10 +604,26 @@ INVENTORY_CATEGORY_INFO = {
     "Pet Treat": ("🐾", "Pet Treats", "Treats and items for your active pet."),
     "Pet Egg": ("🥚", "Pet Eggs", "Eggs waiting to be incubated."),
     "Healing": ("❤️", "Healing", "Items used for restoring health."),
-    "Haunted Ingredient": ("👻", "Haunted Ingredients", "Ingredients recovered from haunted locations."),
     "Voucher": ("🎟️", "Vouchers", "Vouchers and permanent unlock items."),
     "Currency": ("💰", "Currencies", "Special currencies stored in your inventory."),
     "Special": ("✨", "Special", "Rare items and unique materials used for special station systems."),
+    "Event Items": ("🎉", "Event Items", "Seasonal items grouped by event."),
+}
+
+EVENT_CATEGORY_INFO = {
+    "halloween": ("🎃", "Halloween", "Seasonal items and discoveries from the Halloween event."),
+}
+
+EVENT_SUBCATEGORY_INFO = {
+    "Halloween Junk": ("🎃", "Halloween Junk", "Seasonal haunted salvage."),
+    "Haunted Ingredient": ("👻", "Haunted Ingredients", "Ingredients recovered from haunted locations."),
+    "Location-Based Collectible": ("🧸", "Location-Based Collectibles", "Unique collectibles discovered at specific exploration locations."),
+}
+
+EVENT_SUBCATEGORY_TO_EVENT = {
+    "Halloween Junk": "halloween",
+    "Haunted Ingredient": "halloween",
+    "Location-Based Collectible": "halloween",
 }
 
 
@@ -637,9 +652,90 @@ class InventoryCategorySelect(discord.ui.Select):
     def __init__(self, inventory_view):
         self.inventory_view = inventory_view
         options = []
-        for category in inventory_view.available_categories:
-            emoji, label, description = INVENTORY_CATEGORY_INFO.get(
-                category, ("📦", category, "Inventory category")
+        for category in inventory_view.available_top_categories:
+            if category == "Event Items":
+                emoji, label, description = INVENTORY_CATEGORY_INFO[category]
+                value = "__event_items__"
+            else:
+                emoji, label, description = INVENTORY_CATEGORY_INFO.get(
+                    category, ("📦", category, "Inventory category")
+                )
+                value = category
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    emoji=emoji,
+                    value=value,
+                    description=description[:100],
+                )
+            )
+
+        super().__init__(
+            placeholder="📂 Select an inventory category...",
+            min_values=1,
+            max_values=1,
+            options=options[:25],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.inventory_view.check_owner(interaction):
+            return
+        value = self.values[0]
+        self.inventory_view.page = 0
+        self.inventory_view.search_query = ""
+        self.inventory_view.selected_item = None
+        if value == "__event_items__":
+            self.inventory_view.category = "__event_items__"
+            await self.inventory_view.show_event_categories(interaction)
+            return
+        self.inventory_view.category = value
+        await self.inventory_view.show_items(interaction)
+
+
+class InventoryEventSelect(discord.ui.Select):
+    def __init__(self, inventory_view):
+        self.inventory_view = inventory_view
+        options = []
+        for event_key in inventory_view.available_events:
+            emoji, label, description = EVENT_CATEGORY_INFO.get(
+                event_key, ("🎉", event_key.title(), "Seasonal event items.")
+            )
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    emoji=emoji,
+                    value=event_key,
+                    description=description[:100],
+                )
+            )
+
+        super().__init__(
+            placeholder="🎉 Select an event...",
+            min_values=1,
+            max_values=1,
+            options=options[:25],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.inventory_view.check_owner(interaction):
+            return
+        self.inventory_view.event = self.values[0]
+        self.inventory_view.category = "__event_subcategories__"
+        self.inventory_view.page = 0
+        self.inventory_view.search_query = ""
+        self.inventory_view.selected_item = None
+        await self.inventory_view.show_event_subcategories(interaction)
+
+
+class InventoryEventSubcategorySelect(discord.ui.Select):
+    def __init__(self, inventory_view):
+        self.inventory_view = inventory_view
+        options = []
+        for category in inventory_view.available_event_subcategories:
+            emoji, label, description = EVENT_SUBCATEGORY_INFO.get(
+                category, ("📦", category, "Event items.")
             )
             options.append(
                 discord.SelectOption(
@@ -651,7 +747,7 @@ class InventoryCategorySelect(discord.ui.Select):
             )
 
         super().__init__(
-            placeholder="📂 Select an inventory category...",
+            placeholder="📂 Select an event category...",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -696,6 +792,7 @@ class InventoryView(discord.ui.View):
         self.user_id = user_id
         self.entries = entries
         self.category: Optional[str] = None
+        self.event: Optional[str] = None
         self.page = 0
         self.search_query = ""
         self.selected_item: Optional[str] = None
@@ -719,6 +816,39 @@ class InventoryView(discord.ui.View):
                 categories.append(category)
         return categories
 
+    @property
+    def available_top_categories(self):
+        categories = []
+        has_event_items = False
+        for category in self.available_categories:
+            if category in EVENT_SUBCATEGORY_TO_EVENT:
+                has_event_items = True
+                continue
+            if category not in categories:
+                categories.append(category)
+        if has_event_items:
+            categories.append("Event Items")
+        return categories
+
+    @property
+    def available_events(self):
+        events = []
+        for category in self.available_categories:
+            event = EVENT_SUBCATEGORY_TO_EVENT.get(category)
+            if event and event not in events:
+                events.append(event)
+        return events
+
+    @property
+    def available_event_subcategories(self):
+        if not self.event:
+            return []
+        return [
+            category
+            for category in self.available_categories
+            if EVENT_SUBCATEGORY_TO_EVENT.get(category) == self.event
+        ]
+
     def _build_category_view(self):
         self.clear_items()
         self.add_item(InventoryCategorySelect(self))
@@ -740,7 +870,7 @@ class InventoryView(discord.ui.View):
 
     def _category_embed(self):
         lines = []
-        for category in self.available_categories:
+        for category in self.available_top_categories:
             emoji, label, description = INVENTORY_CATEGORY_INFO.get(
                 category, ("📦", category, "Inventory category")
             )
@@ -772,6 +902,9 @@ class InventoryView(discord.ui.View):
     def _category_title(self):
         if self.category == "__search__":
             return "🔎 Search Results"
+        if self.category in EVENT_SUBCATEGORY_INFO:
+            emoji, label, _ = EVENT_SUBCATEGORY_INFO[self.category]
+            return f"{emoji} {label}"
         emoji, label, _ = INVENTORY_CATEGORY_INFO.get(
             self.category or "", ("📦", "Inventory", "")
         )
@@ -779,11 +912,84 @@ class InventoryView(discord.ui.View):
 
     async def show_category(self, interaction):
         self.category = None
+        self.event = None
         self.page = 0
         self.search_query = ""
         self.selected_item = None
         self._build_category_view()
         await interaction.response.edit_message(embed=self._category_embed(), view=self)
+
+    async def show_event_categories(self, interaction):
+        self.clear_items()
+        self.add_item(InventoryEventSelect(self))
+
+        back = discord.ui.Button(
+            label="Categories", emoji="↩️", style=discord.ButtonStyle.secondary, row=1
+        )
+
+        async def back_callback(i):
+            if not await self.check_owner(i):
+                return
+            await self.show_category(i)
+
+        back.callback = back_callback
+        self.add_item(back)
+
+        lines = []
+        for event in self.available_events:
+            emoji, label, description = EVENT_CATEGORY_INFO.get(
+                event, ("🎉", event.title(), "Seasonal event items.")
+            )
+            lines.append(f"{emoji} **{label}** — {description}")
+
+        embed = discord.Embed(
+            title="📦 Storage Locker — Event Items",
+            description=(
+                "Choose an event to browse its inventory.\n\n"
+                + "\n".join(lines)
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.set_footer(text="Choose an event below to continue.")
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def show_event_subcategories(self, interaction):
+        self.clear_items()
+        self.add_item(InventoryEventSubcategorySelect(self))
+
+        back = discord.ui.Button(
+            label="Events", emoji="↩️", style=discord.ButtonStyle.secondary, row=1
+        )
+
+        async def back_callback(i):
+            if not await self.check_owner(i):
+                return
+            self.category = "__event_items__"
+            await self.show_event_categories(i)
+
+        back.callback = back_callback
+        self.add_item(back)
+
+        event_emoji, event_label, event_description = EVENT_CATEGORY_INFO.get(
+            self.event or "", ("🎉", "Event", "Seasonal event items.")
+        )
+        lines = []
+        for category in self.available_event_subcategories:
+            emoji, label, description = EVENT_SUBCATEGORY_INFO.get(
+                category, ("📦", category, "Event items.")
+            )
+            lines.append(f"{emoji} **{label}** — {description}")
+
+        embed = discord.Embed(
+            title=f"{event_emoji} Storage Locker — {event_label}",
+            description=(
+                f"{event_description}\n\n"
+                "**Available Categories**\n" + "\n".join(lines)
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        embed.set_footer(text="Choose an event category below to view your items.")
+        await interaction.response.edit_message(embed=embed, view=self)
 
     async def show_items(self, interaction):
         self.clear_items()
@@ -894,6 +1100,8 @@ class InventoryView(discord.ui.View):
 
     @staticmethod
     def _category_label(category):
+        if category in EVENT_SUBCATEGORY_INFO:
+            return EVENT_SUBCATEGORY_INFO[category][1]
         return INVENTORY_CATEGORY_INFO.get(category, ("📦", category, ""))[1]
 
     async def on_timeout(self):
