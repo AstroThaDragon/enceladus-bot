@@ -26,6 +26,20 @@ from ..data import *
 from .autocomplete import EconomySalvageAutocompleteMixin
 
 
+HALLOWEEN_COLLECTIBLE_IDS = {
+    item_id for item_id, *_ in get_halloween_collectibles()
+}
+
+HALLOWEEN_SPACE_JUNK_IDS = {
+    item_id for item_id, *_ in HALLOWEEN_SPACE_JUNK
+}
+
+# Halloween collectibles that are not craftable should never be salvageable.
+NON_CRAFTABLE_HALLOWEEN_COLLECTIBLE_IDS = (
+    HALLOWEEN_COLLECTIBLE_IDS - set(LOCATION_BASED_COLLECTIBLES)
+) | HALLOWEEN_SPACE_JUNK_IDS
+
+
 class EconomySalvageMixin(commands.Cog):
     # These members are supplied by the main Economy cog / other economy mixins.
     # Declaring them here keeps static type checkers aware of the host interface
@@ -35,9 +49,24 @@ class EconomySalvageMixin(commands.Cog):
     get_db_path: Callable[[], str]
 
     async def salvage_item_autocomplete(self, interaction: discord.Interaction, current: str):
-        return await EconomySalvageAutocompleteMixin.salvage_item_autocomplete(
+        choices = await EconomySalvageAutocompleteMixin.salvage_item_autocomplete(
             cast(EconomySalvageAutocompleteMixin, self), interaction, current
         )
+
+        filtered_choices = []
+        for choice in choices:
+            if choice.value in NON_CRAFTABLE_HALLOWEEN_COLLECTIBLE_IDS:
+                continue
+
+            # Discord custom emoji markup (<:name:id> / <a:name:id>) exposes
+            # the emoji ID in autocomplete text. Keep normal Unicode emoji,
+            # but strip custom emoji markup from the visible choice name.
+            clean_name = re.sub(r"<a?:[^:>]+:\d+>\s*", "", choice.name)
+            filtered_choices.append(
+                app_commands.Choice(name=clean_name, value=choice.value)
+            )
+
+        return filtered_choices[:25]
 
     def get_junk_sell_reward(self, item_id) -> tuple[int, int]:
             """Return Stardust + Halloween Candy rewards for a junk item."""
@@ -90,7 +119,12 @@ class EconomySalvageMixin(commands.Cog):
             user_id = ctx.author.id
             target_item = item.lower().strip()
             db_path = self.get_db_path()
-    
+
+            if target_item in NON_CRAFTABLE_HALLOWEEN_COLLECTIBLE_IDS:
+                return await ctx.send(
+                    f"{ctx.author.mention} ❌ That Halloween collectible cannot be salvaged."
+                )
+
             # Get the user's current Salvage Rig bonus chance.
             upgrade_cog = self.bot.get_cog("Upgrades")
             get_effects = getattr(upgrade_cog, "get_effects", None)
@@ -210,7 +244,13 @@ class EconomySalvageMixin(commands.Cog):
                         (user_id,)
                     ) as cursor:
                         junk_rows = await cursor.fetchall()
-    
+
+                    junk_rows = [
+                        (junk_id, quantity)
+                        for junk_id, quantity in junk_rows
+                        if junk_id not in NON_CRAFTABLE_HALLOWEEN_COLLECTIBLE_IDS
+                    ]
+
                     if not junk_rows:
                         await db.rollback()
                         return await ctx.send(f"{ctx.author.mention} 🎒 You don't have any Space Junk to salvage!")
