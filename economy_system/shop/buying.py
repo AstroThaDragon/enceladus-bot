@@ -50,13 +50,32 @@ class EconomyShopBuyingHost:
         raise NotImplementedError
 
 
-class EconomyShopBuyingMixin(EconomyShopBuyingHost):
+class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
+    @commands.hybrid_group(name="shop", description="Browse the station shop and manage your purchases.")
     async def shop(self, ctx: commands.Context):
             """Shop command group."""
             await ctx.send(
                 "🛒 Choose a shop option: **list**, **buy**, **sell**, or **rotating**."
             )
 
+    @shop.command(
+        name="list",
+        description="View the station shop catalog.",
+    )
+    @app_commands.describe(
+        category="Optional shop category to open directly.",
+    )
+    @app_commands.choices(
+        category=[
+            app_commands.Choice(name="❤️ Healing", value="healing"),
+            app_commands.Choice(name="🔋 Recharge", value="recharge"),
+            app_commands.Choice(name="🛠️ Upgrades", value="upgrades"),
+            app_commands.Choice(name="🐾 Pet Items", value="pet_items"),
+            app_commands.Choice(name="✨ Special", value="special"),
+            app_commands.Choice(name="🎟️ Lottery", value="lottery"),
+            app_commands.Choice(name="🖼️ Backgrounds", value="backgrounds"),
+        ]
+    )
     async def shop_list(
             self,
             ctx: commands.Context,
@@ -67,18 +86,30 @@ class EconomyShopBuyingMixin(EconomyShopBuyingHost):
             embed = view.build_embed(category)
             await ctx.send(embed=embed, view=view)
 
+    @shop.command(
+        name="buy",
+        description="Open the interactive shop and buy an item.",
+    )
     async def shop_buy(self, ctx: commands.Context):
             """Open the interactive Category → Item → Quantity → Confirm buy flow."""
             view = ShopTransactionView(self, ctx.author.id, "buy")
             embed = view._build_category_embed()
             await ctx.send(embed=embed, view=view)
 
+    @shop.command(
+        name="sell",
+        description="Open the interactive inventory shop and sell an item.",
+    )
     async def shop_sell(self, ctx: commands.Context):
             """Open the interactive Category → Item → Quantity → Confirm sell flow."""
             view = ShopTransactionView(self, ctx.author.id, "sell")
             embed = view._build_category_embed()
             await ctx.send(embed=embed, view=view)
 
+    @shop.command(
+        name="rotating",
+        description="View today's rotating shop offers.",
+    )
     async def shop_rotating(self, ctx: commands.Context):
             """Display today's rotating shop with direct purchase buttons."""
             view = ShopView(self, ctx.author.id, category="daily")
