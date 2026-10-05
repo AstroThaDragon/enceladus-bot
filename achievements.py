@@ -8,6 +8,7 @@ from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
 from collectibles import LOCATION_BASED_COLLECTIBLES
 from seasonal_updates.halloween.haunted import HAUNTED_IMPOSSIBLE_DISCOVERIES
+from inventory import add_inventory_item
 
 ACHIEVEMENTS = {
     # -----------------------------------------------------------------------
@@ -170,6 +171,40 @@ ACHIEVEMENTS = {
         "description": "Use the Hacked Phone.",
         "reward": "Permanent profile background: MalO",
     },
+
+    # -----------------------------------------------------------------------
+    # Incubator upgrade achievements
+    # -----------------------------------------------------------------------
+    "incubator_first_upgrade": {
+        "name": "First Upgrade",
+        "emoji": "🧪",
+        "description": "Upgrade an incubator tube for the first time.",
+        "reward": "5,000 Stardust + starter incubator material bundle",
+    },
+    "incubator_tube_1_mastered": {
+        "name": "Tube I Mastered",
+        "emoji": "🧪",
+        "description": "Max every upgrade on Incubator Tube I.",
+        "reward": "50,000 Stardust",
+    },
+    "incubator_tube_2_mastered": {
+        "name": "Tube II Mastered",
+        "emoji": "🔬",
+        "description": "Max every upgrade on Incubator Tube II.",
+        "reward": "100,000 Stardust + Permanent profile title: Genetic Engineer",
+    },
+    "incubator_tube_3_mastered": {
+        "name": "Tube III Mastered",
+        "emoji": "🧬",
+        "description": "Max every upgrade on Incubator Tube III.",
+        "reward": "250,000 Stardust + Permanent profile title: Incubator Architect + exclusive profile background: Quantum Genesis",
+    },
+    "incubator_complete_mastery": {
+        "name": "Complete Incubator Mastery",
+        "emoji": "🌌",
+        "description": "Max every upgrade on all three incubator tubes.",
+        "reward": "500,000 Stardust + Permanent profile title: Astral Geneticist + exclusive profile background: The Astral Foundry",
+    },
 }
 
 GLITCHED_PET_IDS = (
@@ -190,6 +225,22 @@ HALLOWEEN_CANDY_TITLE_ID = "title_candy_nommer"
 HALLOWEEN_HATCH_BACKGROUND_ID = "halloween_haunting_friend"
 HALLOWEEN_BAG_BACKGROUND_ID = "halloween_trick_or_treat"
 HALLOWEEN_WINE_TITLE_ID = "title_seal_breaker"
+
+INCUBATOR_MASTERED_ACHIEVEMENTS = {
+    1: "incubator_tube_1_mastered",
+    2: "incubator_tube_2_mastered",
+    3: "incubator_tube_3_mastered",
+}
+INCUBATOR_MASTERED_REWARDS = {
+    1: {"stardust": 50_000},
+    2: {"stardust": 100_000, "title": "title_genetic_engineer"},
+    3: {"stardust": 250_000, "title": "title_incubator_architect", "background": "background_quantum_genesis"},
+}
+INCUBATOR_COMPLETE_REWARD = {
+    "stardust": 500_000,
+    "title": "title_astral_geneticist",
+    "background": "background_astral_foundry",
+}
 
 HAUNTED_DISCOVERY_ACHIEVEMENTS = {
     "asylum": ("haunted_asylum", 3, "title_patient_zero", None),
@@ -824,6 +875,67 @@ class Achievements(commands.Cog):
                 (stardust_reward, user_id),
             )
         return True
+
+    async def record_incubator_upgrade(self, user_id, tube_id, levels, db=None, channel=None):
+        """Record an incubator upgrade and award the one-time mastery rewards."""
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+        try:
+            await ensure_achievement_tables(db)
+            unlocked = []
+
+            if await self._grant_haunted_achievement(db, user_id, "incubator_first_upgrade"):
+                unlocked.append("incubator_first_upgrade")
+                await db.execute(
+                    "UPDATE users SET stardust = COALESCE(stardust, 0) + 5000 WHERE user_id = ?",
+                    (user_id,),
+                )
+                for item_id, amount, item_type in (
+                    ("quantum_coil", 2, "Incubator Material"),
+                    ("astral_lens", 2, "Incubator Material"),
+                    ("mutation_catalyst", 2, "Incubator Material"),
+                    ("analysis_module", 2, "Incubator Material"),
+                    ("astral_essence", 1, "Special"),
+                ):
+                    await add_inventory_item(db, user_id, item_id, item_type, amount)
+
+            caps = {1: (5, 3, 3, 5), 2: (10, 7, 7, 8), 3: (15, 15, 10, 10)}
+            current = tuple(int(levels.get(key, 0)) for key in ("speed", "detection", "luck", "analysis"))
+            tube_cap = caps.get(int(tube_id))
+            if tube_cap and current == tube_cap:
+                achievement_id = INCUBATOR_MASTERED_ACHIEVEMENTS[int(tube_id)]
+                reward = INCUBATOR_MASTERED_REWARDS[int(tube_id)]
+                if await self._grant_haunted_achievement(
+                    db, user_id, achievement_id, reward.get("title"), reward.get("background"), reward.get("stardust", 0)
+                ):
+                    unlocked.append(achievement_id)
+
+                if int(tube_id) == 3:
+                    all_mastered = True
+                    for check_tube in (1, 2, 3):
+                        check_caps = caps[check_tube]
+                        async with db.execute(
+                            "SELECT speed, detection, luck, analysis FROM incubator_upgrades WHERE user_id = ? AND tube_id = ?",
+                            (user_id, check_tube),
+                        ) as cursor:
+                            row = await cursor.fetchone()
+                        if not row or tuple(map(int, row)) != check_caps:
+                            all_mastered = False
+                            break
+                    if all_mastered and await self._grant_haunted_achievement(
+                        db, user_id, "incubator_complete_mastery", INCUBATOR_COMPLETE_REWARD["title"], INCUBATOR_COMPLETE_REWARD["background"], INCUBATOR_COMPLETE_REWARD["stardust"]
+                    ):
+                        unlocked.append("incubator_complete_mastery")
+
+            if owns_db:
+                await db.commit()
+            if unlocked:
+                await self._notify_achievement_unlocks(user_id, unlocked, channel)
+            return unlocked
+        finally:
+            if owns_db:
+                await db.close()
 
     async def record_haunted_discovery(self, user_id, discovery_id, location_id, sanity=100, db=None, channel=None):
         """Permanently record a rare Haunted discovery and unlock related achievements."""

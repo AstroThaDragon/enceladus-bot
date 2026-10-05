@@ -134,7 +134,7 @@ SHOP_BUY_CATEGORY_ITEMS = {
         "drone_battery", "drone_power_cell", "drone_quantum_battery",
     ],
     "upgrades": [
-        "incubator_2", "incubator_3", "vault_expansion",
+        "incubator_2", "incubator_3", "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module", "vault_expansion",
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
     ],
     "pet_items": ["pet_snack"],
@@ -186,7 +186,7 @@ SELL_ITEM_CATEGORY_IDS = {
         "wooden_spoon", "heavy_wrench", "plasma_cutter",
     },
     "special": {
-        "time_crystal",
+        "time_crystal", "astral_essence",
     },
 }
 
@@ -1287,6 +1287,30 @@ class Economy(commands.Cog):
                 "cost": 5000,
                 "type": "special",
                 "desc": "A concentrated fragment of stellar energy used to fuse duplicate pets and hunt for rare pet variants."
+            },
+            "quantum_coil": {
+                "name": "🌀 Quantum Coil",
+                "cost": 10000,
+                "type": "special",
+                "desc": "A precision quantum component used to improve incubator incubation speed."
+            },
+            "astral_lens": {
+                "name": "🔭 Astral Lens",
+                "cost": 12500,
+                "type": "special",
+                "desc": "A finely tuned optical component used to improve incubator variant detection."
+            },
+            "mutation_catalyst": {
+                "name": "🧬 Mutation Catalyst",
+                "cost": 15000,
+                "type": "special",
+                "desc": "A volatile catalyst used to improve variant quality and mutation luck."
+            },
+            "analysis_module": {
+                "name": "🔬 Analysis Module",
+                "cost": 7500,
+                "type": "special",
+                "desc": "A specialized analysis unit that reveals increasingly detailed information about incubating eggs."
             },
             "neon_grid": {
                 "name": "🌆 Background Voucher: Neon Grid",
@@ -2559,10 +2583,11 @@ class Economy(commands.Cog):
 
             return (
                 item_type in {
-                    "Mineral", "Crafting Material", "Haunted Ingredient",
+                    "Mineral", "Crafting Material", "Incubator Material", "Haunted Ingredient",
                     "Location-Based Collectible", "Collectible"
                 }
                 or item_id in SELLABLE_ITEM_IDS
+                or item_id == "astral_essence"
             )
 
         entries = []
@@ -2615,7 +2640,7 @@ class Economy(commands.Cog):
             if category == "halloween" and not halloween:
                 continue
             if category == "materials" and (
-                item_type not in {"Mineral", "Crafting Material"}
+                item_type not in {"Mineral", "Crafting Material", "Incubator Material"}
                 or halloween_collectible
                 or item_id in HALLOWEEN_SPACE_JUNK_IDS
             ):
@@ -2668,7 +2693,7 @@ class Economy(commands.Cog):
             "nanite_patch": "🩹", "medkit": "🧰", "revive": "⚕️", "full_revive": "⚕️",
             "laser_charge_cell": "🔋", "laser_power_cell": "⚡", "fuel_refill": "⚛️",
             "drone_battery": "🔋", "drone_power_cell": "⚡", "drone_quantum_battery": "⚛️",
-            "pet_snack": "🍪", "time_crystal": "💎", "astral_essence": "✨",
+            "pet_snack": "🍪", "time_crystal": "💎", "astral_essence": "✨", "quantum_coil": "🌀", "astral_lens": "🔭", "mutation_catalyst": "🧬", "analysis_module": "🔬",
             "neon_grid": "🌆", "deep_void": "🌌", "solaris_ring": "💫",
             "fuel_stabilizer": "🛢️", "hazard_shield": "🛡️", "lucky_scanner": "📡",
             "prototype_drill_bit": "⚙️",
@@ -2800,10 +2825,11 @@ class Economy(commands.Cog):
 
             return (
                 item_type in {
-                    "Mineral", "Crafting Material", "Haunted Ingredient",
+                    "Mineral", "Crafting Material", "Incubator Material", "Haunted Ingredient",
                     "Location-Based Collectible", "Collectible"
                 }
                 or item_id in SELLABLE_ITEM_IDS
+                or item_id == "astral_essence"
             )
 
         def display_choice(item_id, quantity, info):
@@ -2858,7 +2884,7 @@ class Economy(commands.Cog):
                 if category == "halloween" and not halloween:
                     continue
                 if category == "materials" and (
-                    item_type not in {"Mineral", "Crafting Material"}
+                    item_type not in {"Mineral", "Crafting Material", "Incubator Material"}
                     or halloween_collectible
                     or item_id in HALLOWEEN_SPACE_JUNK_IDS
                 ):

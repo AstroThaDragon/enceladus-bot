@@ -33,6 +33,8 @@ BACKGROUND_ARTISTS = {
     "background_watched_from_the_trees": "Ben Griffiths on Unsplash",
     "background_haunted_item_collector": "Michel Bocquet on Unsplash",
     "background_corrupted_reality": "Egor Komarov on Unsplash",
+    "background_quantum_genesis": None,
+    "background_astral_foundry": None,
 }
 
 BACKGROUND_COLLECTIONS = {
@@ -65,6 +67,8 @@ BACKGROUND_COLLECTIONS = {
             "background_watched_from_the_trees",
             "background_haunted_item_collector",
             "background_corrupted_reality",
+             "background_quantum_genesis",
+             "background_astral_foundry",
         ],
     },
 }
@@ -145,6 +149,14 @@ BACKGROUND_COLLECTION_INFO = {
     "background_corrupted_reality": {
         "name": "CORRUPTED REALITY", "emoji": "💾",
         "obtained": "Hatch your first pet from a **Glitched Egg**.",
+    },
+    "background_quantum_genesis": {
+        "name": "Quantum Genesis", "emoji": "🧬",
+        "obtained": "Master all upgrades on **Incubator Tube III**.",
+    },
+    "background_astral_foundry": {
+        "name": "The Astral Foundry", "emoji": "🌌",
+        "obtained": "Master all upgrades on **all three incubator tubes**.",
     },
 }
 

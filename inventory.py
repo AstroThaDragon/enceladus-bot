@@ -310,7 +310,11 @@ ITEM_REGISTRY = {
 
     # Legendary Loot
     "astral_core": {"name": "Astral Core", "emoji": "🌌", "max_quantity": 5, "type": "Special", "desc": "A mysterious crystalline core recovered from deep space. Required to craft higher-tier exploration upgrades."},
-    "astral_essence": {"name": "Astral Essence", "emoji": "✨", "max_quantity": 99, "type": "Special", "desc": "A concentrated fragment of strange stellar energy used to fuse duplicate pets and hunt for rare pet variants."},
+    "astral_essence": {"name": "Astral Essence", "emoji": "✨", "max_quantity": 50, "sell_price": 1250, "type": "Special", "desc": "A concentrated fragment of strange stellar energy used to fuse duplicate pets, hunt for rare pet variants, and upgrade advanced incubator systems."},
+    "quantum_coil": {"name": "Quantum Coil", "emoji": "🌀", "max_quantity": 99, "sell_price": 2500, "type": "Incubator Material", "desc": "A precision quantum component used to improve incubator incubation speed."},
+    "astral_lens": {"name": "Astral Lens", "emoji": "🔭", "max_quantity": 99, "sell_price": 3125, "type": "Incubator Material", "desc": "A finely tuned optical component used to improve incubator variant detection."},
+    "mutation_catalyst": {"name": "Mutation Catalyst", "emoji": "🧬", "max_quantity": 99, "sell_price": 3750, "type": "Incubator Material", "desc": "A volatile catalyst used to improve variant quality and mutation luck."},
+    "analysis_module": {"name": "Analysis Module", "emoji": "🔬", "max_quantity": 99, "sell_price": 1875, "type": "Incubator Material", "desc": "A specialized analysis unit that reveals increasingly detailed information about incubating eggs."},
     "quantum_battery": {"name": "Quantum Battery", "emoji": EMOJIS.get("quantum_battery", "⚛️"), "max_quantity": 5, "type": "Consumable", "desc": "Adds 5 mining laser charges and 5 scavenging drone charges, then triples Stardust from your next mining or scavenging run."},
 
     # Materials & Minerals
