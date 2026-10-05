@@ -75,6 +75,12 @@ SCAVENGE_MATERIALS = [
     ("scrap_metal", "Scrap Metal", 0.29),
     ("nuts_bolts", "Nuts & Bolts", 0.20),
     ("wiring", "Wiring", 0.24),
+    # Incubator materials are uncommon salvage finds and use the same
+    # independent material-roll system as the normal scavenging materials.
+    ("quantum_coil", "Quantum Coil", 0.05),
+    ("astral_lens", "Astral Lens", 0.05),
+    ("mutation_catalyst", "Mutation Catalyst", 0.05),
+    ("analysis_module", "Analysis Module", 0.05),
 ]
 SCAVENGE_MEDICAL_SUPPLIES = [
     ("gauze", "Sterile Gauze", 0.20),
@@ -99,6 +105,10 @@ MATERIAL_OVERFLOW_VALUES = {
     "wiring": 5,
     "glue": 6,
     "circuit_board": 20,
+    "quantum_coil": 2500,
+    "astral_lens": 3125,
+    "mutation_catalyst": 3750,
+    "analysis_module": 1875,
 }
 
 LOOT_OVERFLOW_VALUES = {
