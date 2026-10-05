@@ -240,10 +240,22 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                             "⚠️ Unlock Incubator Tube II before purchasing Tube III."
                         )
     
-                    if item_id == "vault_expansion" and vault_capacity >= self.MAX_VAULT_CAPACITY:
+                    if item_id == "vault_expansion" and vault_capacity >= 500_000:
                         await db.rollback()
                         return await ctx.send(
-                            "🔐 Your Stardust vault is already at its 500,000 Stardust maximum."
+                            "🔐 Your Stardust vault is already at its 500,000 Stardust capacity."
+                        )
+
+                    if item_id == "vault_expansion_2" and vault_capacity >= self.MAX_VAULT_CAPACITY:
+                        await db.rollback()
+                        return await ctx.send(
+                            "🔐 Your Stardust vault is already at its 1,000,000 Stardust maximum."
+                        )
+
+                    if item_id == "vault_expansion_2" and vault_capacity < 500_000:
+                        await db.rollback()
+                        return await ctx.send(
+                            "⚠️ Purchase **Vault Expansion** first to increase your vault to 500,000 Stardust."
                         )
     
                     if stardust < cost:
@@ -263,7 +275,12 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                             "UPDATE users SET stardust = stardust - ?, incubator_slots = 3 WHERE user_id = ?",
                             (cost, user_id),
                         )
-                    else:
+                    elif item_id == "vault_expansion":
+                        await db.execute(
+                            "UPDATE users SET stardust = stardust - ?, vault_capacity = 500000 WHERE user_id = ?",
+                            (cost, user_id),
+                        )
+                    elif item_id == "vault_expansion_2":
                         await db.execute(
                             "UPDATE users SET stardust = stardust - ?, vault_capacity = ? WHERE user_id = ?",
                             (cost, self.MAX_VAULT_CAPACITY, user_id),

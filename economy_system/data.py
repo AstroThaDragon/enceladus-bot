@@ -131,7 +131,7 @@ SHOP_BUY_CATEGORY_ITEMS = {
         "drone_battery", "drone_power_cell", "drone_quantum_battery",
     ],
     "upgrades": [
-        "incubator_2", "incubator_3", "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module", "vault_expansion",
+        "incubator_2", "incubator_3", "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module", "vault_expansion", "vault_expansion_2",
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
     ],
     "pet_items": ["pet_snack"],
@@ -358,7 +358,13 @@ SHOP_ITEMS = {
                 "name": "🔐 Vault Expansion",
                 "cost": 150_000,
                 "type": "station_upgrade",
-                "desc": "Raises your Stardust vault capacity to the 500,000 Stardust maximum."
+                "desc": "Raises your Stardust vault capacity to 500,000 Stardust."
+            },
+            "vault_expansion_2": {
+                "name": "🔐 Vault Expansion II",
+                "cost": 250_000,
+                "type": "station_upgrade",
+                "desc": "Raises your Stardust vault capacity to 1,000,000 Stardust."
             },
         }
 
@@ -448,6 +454,7 @@ SHOP_LIMITS = {
             "incubator_2": (1, "lifetime"),
             "incubator_3": (1, "lifetime"),
             "vault_expansion": (1, "lifetime"),
+            "vault_expansion_2": (1, "lifetime"),
             "stop_sign": (1, "lifetime"),
             "stick": (1, "lifetime"),
             "wooden_sword": (1, "lifetime"),

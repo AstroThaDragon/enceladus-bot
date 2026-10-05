@@ -5,7 +5,7 @@ small dependency-light home for upgrade identifiers used by future economy
 features and tests.
 """
 
-UPGRADE_IDS = frozenset({"incubator_2", "incubator_3", "vault_expansion"})
+UPGRADE_IDS = frozenset({"incubator_2", "incubator_3", "vault_expansion", "vault_expansion_2"})
 
 
 def is_station_upgrade(item_type: str | None) -> bool:

@@ -54,7 +54,7 @@ class Economy(
     def __init__(self, bot):
         self.bot = bot
         self.DEFAULT_VAULT_CAPACITY = 250_000
-        self.MAX_VAULT_CAPACITY = 500_000
+        self.MAX_VAULT_CAPACITY = 1_000_000
         self._give_locks = {}
         self.SHOP_ITEMS = SHOP_ITEMS
         self.JUNK_PRICES = JUNK_PRICES
