@@ -28,11 +28,11 @@ from .core import *
 from .views import (
     FeedTreatSelect, FeedTreatView, ReleaseConfirmationView, RenamePetModal,
     PetStatsView, PetManagementView, FusionVariantView, PostFusionConfirmView,
-    PetCollectionView, PetCategoryView,
+    PetCollectionView, PetCategoryView, IncubatorMainView, IncubatorTubeSelectView,
 )
 from .management import PetManagementMixin
 from .fusion import PetFusionMixin
-from .incubator import PetIncubatorMixin
+from .incubator import (PetIncubatorMixin, INCUBATOR_UPGRADE_CAPS, UPGRADE_COSTS, UPGRADE_LABELS, UPGRADE_DESCRIPTIONS, SPEED_REDUCTIONS, DETECTION_BONUSES, LUCK_OCCURRENCE_BONUSES)
 
 class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     def __init__(self, bot):
@@ -51,6 +51,17 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     async def ensure_schema(self, db):
         """Add pet fields/tables without deleting existing pet data."""
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS incubator_upgrades (
+                user_id INTEGER NOT NULL,
+                tube_id INTEGER NOT NULL,
+                speed INTEGER NOT NULL DEFAULT 0,
+                detection INTEGER NOT NULL DEFAULT 0,
+                luck INTEGER NOT NULL DEFAULT 0,
+                analysis INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, tube_id)
+            )
+        """)
         async with db.execute("PRAGMA table_info(pets)") as cursor:
             columns = {row[1] async for row in cursor}
 
@@ -417,7 +428,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         return embed
 
 
-    def _pet_embed(self, ctx, pet, page, total):
+    def _pet_embed(self, ctx, pet, page, total, bundle_count=1):
         level = pet["level"]
         xp = pet["xp"]
         needed = xp_needed_for_next_level(level)
@@ -432,11 +443,19 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         display_name = pet["nickname"] or pet["name"]
         active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
 
+        bundle_suffix = f" ×{bundle_count}" if bundle_count > 1 else ""
+        pet_name_line = f"{pet['emoji']} **{display_name}**"
+        if bundle_count > 1:
+            if pet["nickname"]:
+                pet_name_line += f" • **{pet['name']} ×{bundle_count}**"
+            else:
+                pet_name_line = f"{pet['emoji']} **{pet['name']} ×{bundle_count}**"
+
         embed = discord.Embed(
             title=f"🐾 {ctx.author.display_name}'s Pet",
             description=(
-                f"{pet['emoji']} **{display_name}**\n"
-                + (f"-# Original: {pet['name']}\n" if pet["nickname"] else "")
+                f"{pet_name_line}\n"
+                + (f"-# Original: {pet['name']}\n" if pet["nickname"] and bundle_count <= 1 else "")
                 + f"*{pet['description']}*\n\n"
                 + ("🔒 **FAVORITED — PROTECTED FROM RELEASE**" if pet["is_favorite"] else "-# 🔒 Favorite this pet to lock it and prevent accidental release.")
                 + f"\n{active_text}"
@@ -810,8 +829,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             return "haunted"
         if pet_type in HALLOWEEN_PETS:
             return "halloween"
-        # Keep Glitched Egg pets under the broader Normal Eggs section so
-        # every owned pet remains reachable without adding another category.
+        if pet_type in GLITCHED_PET_TYPES:
+            return "glitched"
         return "normal"
 
 
@@ -872,7 +891,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             active_text = "No active companion is equipped. Choose a pet below and use **Equip Pet** to set one."
 
         category_meta = (
-            ("normal", "🥚 Normal Eggs", "Standard and Glitched Egg companions"),
+            ("normal", "🥚 Normal Eggs", "Standard Egg companions"),
+            ("glitched", "💾 Glitched Eggs", "Companions hatched from Glitched Eggs"),
             ("halloween", "🎃 Halloween Eggs", "Companions hatched from Halloween Eggs"),
             ("haunted", "👻 Haunted Pets", "Unique companions discovered during Haunted explorations"),
         )
@@ -903,6 +923,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     def _pet_category_embed(self, ctx, pets, category, page, page_count):
         labels = {
             "normal": "🥚 Normal Eggs",
+            "glitched": "💾 Glitched Eggs",
             "halloween": "🎃 Halloween Eggs",
             "haunted": "👻 Haunted Pets",
         }
@@ -933,24 +954,28 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         return embed
 
 
-    @commands.hybrid_command(name="pets", description="View and manage your pet collection.")
+    @commands.hybrid_command(name="pets", description="View and manage your pets.")
     async def pets(self, ctx: commands.Context):
         await ctx.defer()
         pets = await self._get_owned_pets(ctx.author.id)
         if not pets:
             embed = discord.Embed(
-                title=f"🐾 {ctx.author.display_name}'s Pet Collection",
+                title=f"🐾 {ctx.author.display_name}'s Pet",
                 description=(
-                    "Your collection is empty!\n\n"
+                    "You don't have any pets yet!\n\n"
                     "🥚 Eggs can be discovered during scavenging.\n"
-                    "⏳ Use `/incubator` with **Start incubation** to begin incubation."
+                    "⏳ Use `/incubator` with **Start incubation** to hatch one."
                 ),
                 color=discord.Color.from_rgb(120, 140, 160),
             )
             return await ctx.send(embed=embed)
 
-        view = PetCollectionView(self, ctx.author.id, ctx)
-        await ctx.send(embed=self._pet_collection_embed(ctx, pets), view=view)
+        # The old /pets experience is the landing screen again: show the
+        # currently active companion first, then let the normal pet controls
+        # handle navigation through the rest of the collection.
+        index = next((i for i, pet in enumerate(pets) if pet["is_active"]), 0)
+        view = PetManagementView(self, ctx.author.id, ctx, pets, index)
+        await ctx.send(embed=self._pet_embed(ctx, pets[index], index, len(pets)), view=view)
 
 
     async def _refresh_pet_view(self, message, user_id, pet_id, allow_missing=False, ctx=None):
@@ -975,6 +1000,249 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         except discord.HTTPException:
             pass
 
+
+    async def _incubator_main_embed(self, user_id, display_name=None):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            slots = await self._get_incubator_slots(db, user_id)
+            rows = await self._incubator_rows(db, user_id)
+            eggs = await self._owned_eggs(db, user_id)
+            upgrades_by_slot = {
+                slot_id: await self._get_incubator_upgrades(db, user_id, slot_id)
+                for slot_id in range(1, slots + 1)
+            }
+
+        self._incubator_slots_cache = getattr(self, "_incubator_slots_cache", {})
+        self._incubator_slots_cache[user_id] = slots
+        by_slot = {int(row[5]): row for row in rows}
+        title = f"🥚 {display_name}'s Pet Incubation Bay" if display_name else "🥚 Pet Incubation Bay"
+        embed = discord.Embed(title=title, color=discord.Color.from_rgb(120, 140, 160))
+        tube_titles = ["🧪 TUBE I", "🔬 TUBE II", "🧬 TUBE III"]
+
+        for slot_id in range(1, 4):
+            if slot_id > slots:
+                tube_art = (
+                    "```text\n"
+                    "╭────────╮\n"
+                    "│  🧪    │\n"
+                    "│        │\n"
+                    "│   🔒   │\n"
+                    "│ LOCKED │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "╰────────╯\n"
+                    "```"
+                    "🔒 **Locked**\n"
+                    "Unlock in `/shop` → 🛠️ Upgrades"
+                )
+                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
+                continue
+
+            upgrades = upgrades_by_slot[slot_id]
+            row = by_slot.get(slot_id)
+            if not row:
+                tube_art = (
+                    "```text\n"
+                    "╭────────╮\n"
+                    "│  🧪    │\n"
+                    "│        │\n"
+                    "│   ·    │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "│        │\n"
+                    "╰────────╯\n"
+                    "```"
+                    "🟢 **Empty**\n"
+                    f"⏱️ Speed **Lv. {upgrades['speed']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['speed']}** • "
+                    f"✨ Detection **Lv. {upgrades['detection']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['detection']}**\n"
+                    f"🍀 Luck **Lv. {upgrades['luck']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['luck']}** • "
+                    f"🔬 Analysis **Lv. {upgrades['analysis']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['analysis']}**\n"
+                    "Use `/incubator` with **Start incubation** to begin."
+                )
+                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
+                continue
+
+            _incubator_id, egg_id, started_at, ready_at, _notified, _slot_id = row
+            info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
+            remaining = max(0, int(ready_at - time.time()))
+            duration = max(1, int(ready_at - started_at))
+            progress = max(0.0, min(1.0, 1 - (remaining / duration)))
+            filled_rows = round(progress * 2)
+            liquid = ["▓▓▓▓▓▓" if row_index >= 2 - filled_rows else "░░░░░░" for row_index in range(2)]
+
+            if remaining <= 0:
+                status = "✨ **READY TO HATCH!**"
+                instruction = f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}**"
+            else:
+                hours = remaining // 3600
+                minutes = (remaining % 3600) // 60
+                seconds = remaining % 60
+                status = f"⏳ **{hours}h {minutes}m {seconds}s**"
+                instruction = "🔔 Alert when ready"
+
+            tube_art = (
+                "```text\n"
+                "╭────────╮\n"
+                "│  🧪    │\n"
+                "│        │\n"
+                f"│   {info['emoji']}   │\n"
+                "│        │\n"
+                f"│ {liquid[0]} │\n"
+                f"│ {liquid[1]} │\n"
+                "╰────────╯\n"
+                "```"
+                f"{info['emoji']} **{info['name']}**\n"
+                f"{status}\n"
+                f"{instruction}\n\n"
+                f"⏱️ Speed **Lv. {upgrades['speed']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['speed']}** • "
+                f"✨ Detection **Lv. {upgrades['detection']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['detection']}**\n"
+                f"🍀 Luck **Lv. {upgrades['luck']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['luck']}** • "
+                f"🔬 Analysis **Lv. {upgrades['analysis']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['analysis']}**"
+            )
+            embed.add_field(name=tube_titles[slot_id - 1], value=tube_art[:1024], inline=True)
+
+            analysis_lines = self._analysis_lines(
+                egg_id,
+                upgrades["analysis"],
+                upgrades["detection"],
+                upgrades["luck"],
+            )
+            if analysis_lines:
+                embed.add_field(
+                    name=f"🔬 Tube {slot_id} Analysis",
+                    value="\n".join(analysis_lines)[:1024],
+                    inline=False,
+                )
+
+        if eggs:
+            egg_lines = []
+            for egg_id, quantity in eggs.items():
+                info = ITEM_REGISTRY.get(egg_id)
+                if info:
+                    egg_lines.append(f"{info['emoji']} **{info['name']}** ×{quantity}")
+            if egg_lines:
+                embed.add_field(name="🥚 Eggs in Storage", value="\n".join(egg_lines), inline=False)
+
+        embed.set_footer(text=f"Unlocked tubes: {slots}/3 • Base incubation time: 12 hours")
+        return embed
+
+    async def _incubator_upgrade_tubes_embed(self, user_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            slots = await self._get_incubator_slots(db, user_id)
+            rows = [(tube_id, await self._get_incubator_upgrades(db, user_id, tube_id)) for tube_id in range(1, slots + 1)]
+        self._incubator_slots_cache = getattr(self, "_incubator_slots_cache", {})
+        self._incubator_slots_cache[user_id] = slots
+        embed = discord.Embed(
+            title="🔧 Upgrade Tubes",
+            description="Select an unlocked incubator tube to view and upgrade its systems.",
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        for tube_id, levels in rows:
+            caps = INCUBATOR_UPGRADE_CAPS[tube_id]
+            embed.add_field(
+                name=f"{('🧪', '🔬', '🧬')[tube_id - 1]} Tube {tube_id}",
+                value=(
+                    f"⏱️ Speed: **{levels['speed']}/{caps['speed']}**\n"
+                    f"✨ Detection: **{levels['detection']}/{caps['detection']}**\n"
+                    f"🍀 Luck: **{levels['luck']}/{caps['luck']}**\n"
+                    f"🔬 Analysis: **{levels['analysis']}/{caps['analysis']}**"
+                ),
+                inline=True,
+            )
+        embed.set_footer(text="Each tube is independent. Upgrade paths can be improved separately.")
+        return embed
+
+    async def _incubator_tube_upgrade_embed(self, user_id, tube_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            levels = await self._get_incubator_upgrades(db, user_id, tube_id)
+        caps = INCUBATOR_UPGRADE_CAPS[tube_id]
+        embed = discord.Embed(
+            title=f"{('🧪', '🔬', '🧬')[tube_id - 1]} Tube {tube_id} — Upgrades",
+            description="Select an upgrade path to view its effect and next-level requirements.",
+            color=discord.Color.from_rgb(120, 140, 160),
+        )
+        for category in ("speed", "detection", "luck", "analysis"):
+            emoji, label = UPGRADE_LABELS[category]
+            embed.add_field(
+                name=f"{emoji} {label}",
+                value=f"Level **{levels[category]}/{caps[category]}**\n{UPGRADE_DESCRIPTIONS[category]}",
+                inline=True,
+            )
+        embed.set_footer(text="Back returns to tube selection.")
+        return embed
+
+    async def _incubator_upgrade_detail_embed(self, user_id, tube_id, category, error=None, success=None):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            levels = await self._get_incubator_upgrades(db, user_id, tube_id)
+            async with db.execute("SELECT stardust FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+            stardust = int(row[0] or 0) if row else 0
+            owned = {}
+            item_ids = {value[0] for value in UPGRADE_COSTS[category].values()} | {"astral_essence"}
+            for item_id in item_ids:
+                async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id)) as cursor:
+                    item_row = await cursor.fetchone()
+                owned[item_id] = int(item_row[0] or 0) if item_row else 0
+
+        emoji, label = UPGRADE_LABELS[category]
+        current = levels[category]
+        cap = INCUBATOR_UPGRADE_CAPS[tube_id][category]
+        embed = discord.Embed(title=f"{emoji} {label}", color=discord.Color.from_rgb(120, 140, 160))
+        if success:
+            embed.description = f"✅ **Upgrade Complete!**\n\nTube {tube_id}'s **{label}** is now **Level {success['level']}**."
+        elif error:
+            embed.description = error
+        else:
+            embed.description = UPGRADE_DESCRIPTIONS[category]
+        embed.add_field(name="Current Level", value=f"**{current}/{cap}**", inline=True)
+
+        if current < cap:
+            next_level = current + 1
+            material_id, material_amount, essence_amount, cost = UPGRADE_COSTS[category][next_level]
+            material_info = ITEM_REGISTRY.get(material_id, {"name": material_id, "emoji": "📦"})
+            req = f"{material_info['emoji']} **{material_info['name']} ×{material_amount}**\n"
+            if essence_amount:
+                req += f"✨ **Astral Essence ×{essence_amount}**\n"
+            req += f"💰 **{cost:,} Stardust**"
+            embed.add_field(name=f"Next Level — {next_level}", value=req, inline=True)
+            have = f"{material_info['emoji']} **{owned.get(material_id, 0)}** / {material_amount}\n"
+            if essence_amount:
+                have += f"✨ **{owned.get('astral_essence', 0)}** / {essence_amount}\n"
+            have += f"💰 **{stardust:,}** / {cost:,}"
+            embed.add_field(name="Your Inventory", value=have, inline=True)
+
+            if category == "speed":
+                embed.add_field(
+                    name="Effect",
+                    value=(
+                        f"Level {next_level}: **{SPEED_REDUCTIONS[next_level] * 100:.2f}% shorter incubation**\n"
+                        f"A 12-hour egg would take about **{12 * (1 - SPEED_REDUCTIONS[next_level]):.2f} hours**."
+                    ),
+                    inline=False,
+                )
+            elif category == "detection":
+                embed.add_field(name="Effect", value=f"Level {next_level}: **+{DETECTION_BONUSES[next_level] * 100:.2f} percentage points** to variant occurrence.", inline=False)
+            elif category == "luck":
+                embed.add_field(
+                    name="Effect",
+                    value=f"Level {next_level}: **+{LUCK_OCCURRENCE_BONUSES[next_level] * 100:.2f} percentage points** to occurrence, plus stronger weighting toward higher-weight variants.",
+                    inline=False,
+                )
+            else:
+                unlocked = {
+                    1: "Egg type", 2: "Possible pet count", 3: "Hatch distribution",
+                    4: "Whether variants are possible", 5: "Current variant chance",
+                    6: "Possible pet pool", 7: "Pet identities and relative rarity",
+                    8: "Hatch distribution / configured probabilities", 9: "Variant pool and relative weighting",
+                    10: "Full Advanced Analysis",
+                }
+                embed.add_field(name="Effect", value=f"Level {next_level} reveals: **{unlocked[next_level]}**", inline=False)
+        else:
+            embed.add_field(name="Maximum", value="✨ This upgrade path is fully mastered for this tube.", inline=False)
+        return embed
 
     @commands.hybrid_command(
         name="incubator",
@@ -1019,117 +1287,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         if egg:
             return await ctx.send("❌ Choose **Start** or **Hatch** when providing an egg.")
 
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await self.ensure_schema(db)
-            slots = await self._get_incubator_slots(db, ctx.author.id)
-            rows = await self._incubator_rows(db, ctx.author.id)
-            eggs = await self._owned_eggs(db, ctx.author.id)
-
-        by_slot = {int(row[5]): row for row in rows}
-        embed = discord.Embed(
-            title=f"🥚 {ctx.author.display_name}'s Pet Incubation Bay",
-            color=discord.Color.from_rgb(120, 140, 160),
-        )
-
-        tube_titles = ["🧪 TUBE I", "🧪 TUBE II", "🧪 TUBE III"]
-
-        for slot_id in range(1, 4):
-            if slot_id > slots:
-                tube_art = (
-                    "```text\n"
-                    "╭────────╮\n"
-                    "│  🧪    │\n"
-                    "│        │\n"
-                    "│   🔒   │\n"
-                    "│ LOCKED │\n"
-                    "│        │\n"
-                    "│        │\n"
-                    "╰────────╯\n"
-                    "```"
-                    "🔒 **Locked**\n"
-                    "Unlock in `/shop` → 🛠️ Upgrades"
-                )
-                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
-                continue
-
-            row = by_slot.get(slot_id)
-            if not row:
-                tube_art = (
-                    "```text\n"
-                    "╭────────╮\n"
-                    "│  🧪    │\n"
-                    "│        │\n"
-                    "│   ·    │\n"
-                    "│        │\n"
-                    "│        │\n"
-                    "│        │\n"
-                    "╰────────╯\n"
-                    "```"
-                    "🟢 **Empty**\n"
-                    "Use `/incubator` with **Start incubation** and choose an egg"
-                )
-                embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
-                continue
-
-            _incubator_id, egg_id, _started_at, ready_at, _notified, _slot_id = row
-            info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
-            remaining = max(0, int(ready_at - time.time()))
-
-            # Fill the lower part of the tube as incubation progresses.
-            progress = max(0.0, min(1.0, 1 - (remaining / INCUBATION_SECONDS)))
-            filled_rows = round(progress * 2)
-            liquid_rows = {
-                "full": "▓▓▓▓▓▓",
-                "empty": "░░░░░░",
-            }
-            liquid = []
-            for row_index in range(2):
-                liquid.append(
-                    liquid_rows["full"] if row_index >= 2 - filled_rows else liquid_rows["empty"]
-                )
-
-            if remaining <= 0:
-                status = "✨ **READY TO HATCH!**"
-                instruction = f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}**"
-            else:
-                hours = remaining // 3600
-                minutes = (remaining % 3600) // 60
-                seconds = remaining % 60
-                status = f"⏳ **{hours}h {minutes}m {seconds}s**"
-                instruction = "🔔 Alert when ready"
-
-            tube_art = (
-                "```text\n"
-                "╭────────╮\n"
-                "│  🧪    │\n"
-                "│        │\n"
-               f"│   {info['emoji']}   │\n"
-                "│        │\n"
-               f"│ {liquid[0]} │\n"
-               f"│ {liquid[1]} │\n"
-                "╰────────╯\n"
-                "```"
-                f"{info['emoji']} **{info['name']}**\n"
-                f"{status}\n"
-                f"{instruction}"
-            )
-            embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
-
-        if eggs:
-            egg_lines = []
-            for egg_id, quantity in eggs.items():
-                info = ITEM_REGISTRY.get(egg_id)
-                if info:
-                    egg_lines.append(f"{info['emoji']} **{info['name']}** ×{quantity}")
-            if egg_lines:
-                embed.add_field(
-                    name="🥚 Eggs in Storage",
-                    value="\n".join(egg_lines),
-                    inline=False,
-                )
-
-        embed.set_footer(text=f"Unlocked tubes: {slots}/3 • Incubation time: 12 hours")
-        await ctx.send(embed=embed)
+        embed = await self._incubator_main_embed(ctx.author.id, ctx.author.display_name)
+        await ctx.send(embed=embed, view=IncubatorMainView(self, ctx.author.id))
 
 
     @tasks.loop(minutes=1)

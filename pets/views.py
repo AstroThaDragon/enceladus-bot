@@ -6,6 +6,178 @@ import discord
 
 from .config import PET_PASSIVE_MAX_LEVEL
 from .core import get_pet_definition, get_passive_value, passive_level_for_pet, xp_needed_for_next_level
+from .incubator import (INCUBATOR_UPGRADE_CAPS, UPGRADE_COSTS, UPGRADE_DESCRIPTIONS, UPGRADE_LABELS, SPEED_REDUCTIONS, DETECTION_BONUSES, LUCK_OCCURRENCE_BONUSES)
+
+
+
+class IncubatorMainView(discord.ui.View):
+    """Persistent controls for the main /incubator embed."""
+    def __init__(self, cog, user_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+
+    async def _owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Upgrade Tubes", emoji="🔧", style=discord.ButtonStyle.primary, row=0)
+    async def upgrade(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._owner(interaction):
+            return
+        view = IncubatorTubeSelectView(self.cog, self.user_id)
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_upgrade_tubes_embed(self.user_id),
+            view=view,
+        )
+
+
+class IncubatorTubeSelectView(discord.ui.View):
+    def __init__(self, cog, user_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+
+        for tube_id in range(1, 4):
+            if tube_id <= getattr(cog, "_incubator_slots_cache", {}).get(user_id, 3):
+                button = discord.ui.Button(
+                    label=f"Tube {tube_id}", emoji=("🧪", "🔬", "🧬")[tube_id - 1],
+                    style=discord.ButtonStyle.primary, row=0,
+                )
+                button.callback = self._make_tube_callback(tube_id)
+                self.add_item(button)
+
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary, row=1)
+        back.callback = self._back
+        self.add_item(back)
+
+    async def _owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    def _make_tube_callback(self, tube_id):
+        async def callback(interaction):
+            if not await self._owner(interaction):
+                return
+            view = IncubatorCategoryView(self.cog, self.user_id, tube_id)
+            await interaction.response.edit_message(
+                embed=await self.cog._incubator_tube_upgrade_embed(self.user_id, tube_id),
+                view=view,
+            )
+        return callback
+
+    async def _back(self, interaction):
+        if not await self._owner(interaction):
+            return
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_main_embed(self.user_id),
+            view=IncubatorMainView(self.cog, self.user_id),
+        )
+
+
+class IncubatorCategoryView(discord.ui.View):
+    def __init__(self, cog, user_id, tube_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.tube_id = tube_id
+        categories = ("speed", "detection", "luck", "analysis")
+        for index, category in enumerate(categories):
+            emoji, label = UPGRADE_LABELS[category]
+            button = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.primary, row=index // 2)
+            button.callback = self._make_category_callback(category)
+            self.add_item(button)
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary, row=2)
+        back.callback = self._back
+        self.add_item(back)
+
+    async def _owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    def _make_category_callback(self, category):
+        async def callback(interaction):
+            if not await self._owner(interaction):
+                return
+            view = IncubatorUpgradeDetailView(self.cog, self.user_id, self.tube_id, category)
+            await interaction.response.edit_message(
+                embed=await self.cog._incubator_upgrade_detail_embed(self.user_id, self.tube_id, category),
+                view=view,
+            )
+        return callback
+
+    async def _back(self, interaction):
+        if not await self._owner(interaction):
+            return
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_upgrade_tubes_embed(self.user_id),
+            view=IncubatorTubeSelectView(self.cog, self.user_id),
+        )
+
+
+class IncubatorUpgradeDetailView(discord.ui.View):
+    def __init__(self, cog, user_id, tube_id, category):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.tube_id = tube_id
+        self.category = category
+        cap = INCUBATOR_UPGRADE_CAPS[tube_id][category]
+        # Upgrade button is disabled at max level; the detail screen remains useful.
+        button = discord.ui.Button(label="Upgrade", emoji="⬆️", style=discord.ButtonStyle.success, row=0, disabled=False)
+        button.callback = self._upgrade
+        self.add_item(button)
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary, row=0)
+        back.callback = self._back
+        self.add_item(back)
+        cancel = discord.ui.Button(label="Cancel", emoji="❌", style=discord.ButtonStyle.secondary, row=0)
+        cancel.callback = self._cancel
+        self.add_item(cancel)
+
+    async def _owner(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    async def _upgrade(self, interaction):
+        if not await self._owner(interaction):
+            return
+        result = await self.cog._upgrade_incubator(self.user_id, self.tube_id, self.category, channel=interaction.channel)
+        if not result.get("ok"):
+            return await interaction.response.edit_message(
+                embed=await self.cog._incubator_upgrade_detail_embed(self.user_id, self.tube_id, self.category, error=result.get("message")),
+                view=IncubatorUpgradeDetailView(self.cog, self.user_id, self.tube_id, self.category),
+            )
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_upgrade_detail_embed(
+                self.user_id, self.tube_id, self.category, success=result
+            ),
+            view=IncubatorUpgradeDetailView(self.cog, self.user_id, self.tube_id, self.category),
+        )
+
+    async def _back(self, interaction):
+        if not await self._owner(interaction):
+            return
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_tube_upgrade_embed(self.user_id, self.tube_id),
+            view=IncubatorCategoryView(self.cog, self.user_id, self.tube_id),
+        )
+
+    async def _cancel(self, interaction):
+        if not await self._owner(interaction):
+            return
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_main_embed(self.user_id),
+            view=IncubatorMainView(self.cog, self.user_id),
+        )
+
 
 class FeedTreatSelect(discord.ui.Select):
     def __init__(self, cog, user_id, pet_id, owned, parent_message, ctx):
@@ -189,18 +361,33 @@ class PetCollectionView(discord.ui.View):
             return
         pets = await self.cog._get_owned_pets(self.user_id)
         entries = self.cog._group_owned_pets(pets, category)
-        page_count = max(1, (len(entries) + 19) // 20)
+        if not entries:
+            await interaction.response.edit_message(
+                embed=self.cog._pet_category_embed(self.ctx, pets, category, 0, 1),
+                view=self,
+            )
+            return
+
+        # The inventory category behaves like the old pet screen: one pet at
+        # a time, with the ◀️/▶️ buttons acting as the category's scroll.
+        # Each entry is a representative for an exact pet/variant/level group.
+        grouped_pets = [entry["pet"] for entry in entries]
+        index = 0
         self.stop()
-        view = PetCategoryView(
+        view = PetManagementView(
             self.cog,
             self.user_id,
             self.ctx,
-            category,
-            pets=pets,
-            page=0,
+            grouped_pets,
+            index,
+            inventory_category=category,
+            bundle_counts=[entry["count"] for entry in entries],
         )
         await interaction.response.edit_message(
-            embed=self.cog._pet_category_embed(self.ctx, pets, category, 0, page_count),
+            embed=self.cog._pet_embed(
+                self.ctx, grouped_pets[index], index, len(grouped_pets),
+                bundle_count=entries[index]["count"],
+            ),
             view=view,
         )
 
@@ -436,14 +623,41 @@ class PetStatsView(discord.ui.View):
 
 
 class PetManagementView(discord.ui.View):
-    def __init__(self, cog, user_id, ctx, pets, index=0):
+    def __init__(self, cog, user_id, ctx, pets, index=0, inventory_category=None, bundle_counts=None):
         super().__init__(timeout=600)
         self.cog = cog
         self.user_id = user_id
         self.ctx = ctx
         self.pets = pets
         self.index = index
+        self.inventory_category = inventory_category
+        self.bundle_counts = bundle_counts or [1] * len(pets)
         self._sync_buttons()
+
+    def _current_bundle_count(self):
+        if 0 <= self.index < len(self.bundle_counts):
+            return self.bundle_counts[self.index]
+        return 1
+
+    async def _reload_inventory_groups(self):
+        pets = await self.cog._get_owned_pets(self.user_id)
+        if not self.inventory_category:
+            self.pets = pets
+            self.bundle_counts = [1] * len(pets)
+            self.index = min(self.index, len(pets) - 1)
+            return
+
+        entries = self.cog._group_owned_pets(pets, self.inventory_category)
+        old_pet_id = self.pets[self.index]["pet_id"] if self.pets and self.index < len(self.pets) else None
+        self.pets = [entry["pet"] for entry in entries]
+        self.bundle_counts = [entry["count"] for entry in entries]
+        if not self.pets:
+            self.index = 0
+            return
+        self.index = next(
+            (i for i, pet in enumerate(self.pets) if pet["pet_id"] == old_pet_id),
+            min(self.index, len(self.pets) - 1),
+        )
 
     def _sync_buttons(self):
         previous = cast(discord.ui.Button, self.previous)
@@ -466,7 +680,7 @@ class PetManagementView(discord.ui.View):
         return True
 
     async def _refresh(self, interaction=None, message=None):
-        self.pets = await self.cog._get_owned_pets(self.user_id)
+        await self._reload_inventory_groups()
         if not self.pets:
             self.stop()
             embed = discord.Embed(
@@ -482,7 +696,13 @@ class PetManagementView(discord.ui.View):
         self._sync_buttons()
         target = message or (interaction.message if interaction else None)
         if target:
-            await target.edit(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+            await target.edit(
+                embed=self.cog._pet_embed(
+                    self.ctx, self.pets[self.index], self.index, len(self.pets),
+                    bundle_count=self._current_bundle_count(),
+                ),
+                view=self,
+            )
 
     @discord.ui.button(label="◀️", style=discord.ButtonStyle.primary, row=2)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -490,7 +710,10 @@ class PetManagementView(discord.ui.View):
             return
         self.index = (self.index - 1) % len(self.pets)
         self._sync_buttons()
-        await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
+            view=self,
+        )
 
     @discord.ui.button(label="📊 Pet Stats", style=discord.ButtonStyle.primary, row=0)
     async def stats(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -517,21 +740,29 @@ class PetManagementView(discord.ui.View):
             changed = await self.cog._unequip_pet(self.user_id, pet["pet_id"])
             if not changed:
                 return await interaction.response.send_message("❌ That pet is no longer equipped.", ephemeral=True)
-            self.pets = await self.cog._get_owned_pets(self.user_id)
-            self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), self.index)
+            await self._reload_inventory_groups()
+            if not self.pets:
+                return await interaction.response.edit_message(content="❌ That pet is no longer available in this category.", view=None)
             self._sync_buttons()
             await interaction.response.edit_message(
-                embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)),
+                embed=self.cog._pet_embed(
+                    self.ctx, self.pets[self.index], self.index, len(self.pets),
+                    bundle_count=self._current_bundle_count(),
+                ),
                 view=self,
             )
         else:
             definition, error = await self.cog._equip_pet(self.user_id, pet["pet_id"])
             if error:
                 return await interaction.response.send_message(error, ephemeral=True)
-            self.pets = await self.cog._get_owned_pets(self.user_id)
-            self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), 0)
+            await self._reload_inventory_groups()
+            if not self.pets:
+                return await interaction.response.edit_message(content="❌ That category is now empty.", view=None)
             self._sync_buttons()
-            await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+            await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
+            view=self,
+        )
 
     @discord.ui.button(label="🔒 Favorite", style=discord.ButtonStyle.primary, row=1)
     async def favorite(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -541,11 +772,15 @@ class PetManagementView(discord.ui.View):
         favorited, error = await self.cog._set_pet_favorite(self.user_id, pet["pet_id"], not pet["is_favorite"])
         if error:
             return await interaction.response.send_message(error, ephemeral=True)
-        self.pets = await self.cog._get_owned_pets(self.user_id)
-        self.index = next((i for i, p in enumerate(self.pets) if p["pet_id"] == pet["pet_id"]), self.index)
+        await self._reload_inventory_groups()
+        if not self.pets:
+            return await interaction.response.edit_message(content="❌ That category is now empty.", view=None)
         self._sync_buttons()
         await interaction.response.edit_message(
-            embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)),
+            embed=self.cog._pet_embed(
+                self.ctx, self.pets[self.index], self.index, len(self.pets),
+                bundle_count=self._current_bundle_count(),
+            ),
             view=self,
         )
 
@@ -590,9 +825,12 @@ class PetManagementView(discord.ui.View):
             return
         self.index = (self.index + 1) % len(self.pets)
         self._sync_buttons()
-        await interaction.response.edit_message(embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets)), view=self)
+        await interaction.response.edit_message(
+            embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
+            view=self,
+        )
 
-    @discord.ui.button(label="📚 Collection", style=discord.ButtonStyle.secondary, row=3)
+    @discord.ui.button(label="📦 Pet Inventory", style=discord.ButtonStyle.secondary, row=3)
     async def collection(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return

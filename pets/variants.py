@@ -290,8 +290,8 @@ SPECIAL_VARIANTS = {
 # Normal Shiny/Nebula are each 1/100 per Normal Egg; Halloween Possessed is
 # 1/100 per Halloween Egg; the rare Glitched form is 1/150 per Glitched pet hatch.
 HATCH_VARIANT_CHANCE = {
-    "normal": 0.100,
-    "halloween": 0.060,
+    "normal": 0.020,
+    "halloween": 0.040,
     "glitched": 0.040,
 }
 
@@ -454,8 +454,40 @@ def get_variant_roll_pool(pet_type):
 
     return HATCH_VARIANT_WEIGHTS.get(category, {})
 
-def roll_hatched_variant(pet_type):
-    """Return a rare variant ID for a freshly hatched base pet, or None."""
+def get_hatched_variant_chance(pet_type, detection_level=0, luck_level=0):
+    """Return the effective hatch variant chance after incubator bonuses."""
+    if not get_variant_roll_pool(pet_type):
+        return 0.0
+    if pet_type in GLITCHED_PET_TYPES:
+        category = "glitched"
+    else:
+        category = "halloween" if pet_type in HALLOWEEN_PET_TYPES else "normal"
+    detection_level = max(0, min(15, int(detection_level or 0)))
+    luck_level = max(0, min(10, int(luck_level or 0)))
+    return min(0.25, HATCH_VARIANT_CHANCE.get(category, 0.0) + detection_level * 0.005 + luck_level * 0.001)
+
+
+def get_effective_hatch_variant_weights(pet_type, luck_level=0):
+    """Return hatch variant weights after Mutation Luck adjustment."""
+    pool = get_variant_roll_pool(pet_type)
+    if not pool:
+        return {}
+    luck_level = max(0, min(10, int(luck_level or 0)))
+    luck_factor = 0.05 * luck_level
+    max_weight = max(pool.values())
+    return {
+        variant_id: weight + (max_weight - weight) * luck_factor
+        for variant_id, weight in pool.items()
+    }
+
+
+def roll_hatched_variant(pet_type, detection_level=0, luck_level=0):
+    """Return a rare variant ID for a freshly hatched base pet, or None.
+
+    Detection adds percentage points to the chance of any variant occurring.
+    Luck adds a smaller occurrence bonus and shifts existing variant weights
+    toward the highest-weight outcome without changing the variant pool.
+    """
     pool = get_variant_roll_pool(pet_type)
     if not pool:
         return None
@@ -465,13 +497,15 @@ def roll_hatched_variant(pet_type):
         category = "glitched"
     else:
         category = "halloween" if pet_type in HALLOWEEN_PET_TYPES else "normal"
-    chance = HATCH_VARIANT_CHANCE.get(category, 0.0)
+
+    chance = get_hatched_variant_chance(pet_type, detection_level, luck_level)
     if random.random() >= chance:
         return None
 
+    effective_weights = get_effective_hatch_variant_weights(pet_type, luck_level)
     return random.choices(
-        list(pool.keys()),
-        weights=list(pool.values()),
+        list(effective_weights.keys()),
+        weights=list(effective_weights.values()),
         k=1,
     )[0]
 

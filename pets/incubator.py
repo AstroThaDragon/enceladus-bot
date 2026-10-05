@@ -18,6 +18,7 @@ from .variants import (
     HATCH_ESSENCE_CHANCE, RELEASE_ESSENCE_CHANCE,
     get_variant_info, get_variant_display, get_variant_ids_for_pet,
     roll_hatched_variant, roll_fusion_variant, build_variant_collectibles,
+    get_hatched_variant_chance, get_effective_hatch_variant_weights, get_variant_roll_pool,
 )
 from typing import TYPE_CHECKING
 from typing import TYPE_CHECKING, cast
@@ -26,6 +27,72 @@ if TYPE_CHECKING:
     from achievements import Achievements
 from .config import *
 from .core import *
+
+# ---------------------------------------------------------------------------
+# Incubator upgrade system
+# ---------------------------------------------------------------------------
+INCUBATOR_UPGRADE_CAPS = {
+    1: {"speed": 5, "detection": 3, "luck": 3, "analysis": 5},
+    2: {"speed": 10, "detection": 7, "luck": 7, "analysis": 8},
+    3: {"speed": 15, "detection": 15, "luck": 10, "analysis": 10},
+}
+
+SPEED_REDUCTIONS = {
+    0: 0.00, 1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.25,
+    6: 0.30, 7: 0.35, 8: 0.40, 9: 0.45, 10: 0.50,
+    11: 0.54, 12: 0.58, 13: 0.61, 14: 0.64, 15: 2 / 3,
+}
+DETECTION_BONUSES = {level: level * 0.005 for level in range(16)}
+LUCK_OCCURRENCE_BONUSES = {level: level * 0.001 for level in range(11)}
+
+UPGRADE_COSTS = {
+    "speed": {
+        1: ("quantum_coil", 2, 0, 3000), 2: ("quantum_coil", 4, 0, 6000),
+        3: ("quantum_coil", 7, 1, 10000), 4: ("quantum_coil", 10, 1, 15000),
+        5: ("quantum_coil", 14, 2, 22500), 6: ("quantum_coil", 18, 3, 32500),
+        7: ("quantum_coil", 23, 4, 45000), 8: ("quantum_coil", 29, 5, 60000),
+        9: ("quantum_coil", 36, 6, 80000), 10: ("quantum_coil", 44, 8, 105000),
+        11: ("quantum_coil", 52, 10, 135000), 12: ("quantum_coil", 61, 12, 175000),
+        13: ("quantum_coil", 71, 15, 225000), 14: ("quantum_coil", 82, 18, 285000),
+        15: ("quantum_coil", 95, 22, 360000),
+    },
+    "detection": {
+        1: ("astral_lens", 2, 0, 5000), 2: ("astral_lens", 5, 0, 10000),
+        3: ("astral_lens", 8, 1, 17500), 4: ("astral_lens", 12, 1, 25000),
+        5: ("astral_lens", 16, 2, 35000), 6: ("astral_lens", 21, 3, 50000),
+        7: ("astral_lens", 27, 4, 70000), 8: ("astral_lens", 34, 5, 95000),
+        9: ("astral_lens", 42, 6, 125000), 10: ("astral_lens", 50, 8, 165000),
+        11: ("astral_lens", 59, 10, 215000), 12: ("astral_lens", 68, 12, 275000),
+        13: ("astral_lens", 77, 15, 350000), 14: ("astral_lens", 87, 18, 450000),
+        15: ("astral_lens", 97, 22, 575000),
+    },
+    "luck": {
+        1: ("mutation_catalyst", 3, 0, 7500), 2: ("mutation_catalyst", 6, 0, 15000),
+        3: ("mutation_catalyst", 10, 1, 25000), 4: ("mutation_catalyst", 15, 2, 35000),
+        5: ("mutation_catalyst", 20, 3, 50000), 6: ("mutation_catalyst", 26, 4, 70000),
+        7: ("mutation_catalyst", 33, 5, 95000), 8: ("mutation_catalyst", 41, 7, 125000),
+        9: ("mutation_catalyst", 50, 9, 165000), 10: ("mutation_catalyst", 65, 12, 215000),
+    },
+    "analysis": {
+        1: ("analysis_module", 1, 0, 2000), 2: ("analysis_module", 2, 0, 4000),
+        3: ("analysis_module", 3, 0, 7500), 4: ("analysis_module", 5, 0, 12000),
+        5: ("analysis_module", 7, 1, 18000), 6: ("analysis_module", 9, 1, 27500),
+        7: ("analysis_module", 11, 2, 40000), 8: ("analysis_module", 14, 3, 57500),
+        9: ("analysis_module", 17, 4, 80000), 10: ("analysis_module", 21, 5, 110000),
+    },
+}
+UPGRADE_LABELS = {
+    "speed": ("⏱️", "Incubation Speed"),
+    "detection": ("✨", "Variant Detection"),
+    "luck": ("🍀", "Mutation Luck"),
+    "analysis": ("🔬", "Egg Analysis"),
+}
+UPGRADE_DESCRIPTIONS = {
+    "speed": "Reduces the incubation time of eggs in this tube.",
+    "detection": "Increases the chance that a hatch produces a variant.",
+    "luck": "Improves variant quality and adds a smaller bonus to variant occurrence chance.",
+    "analysis": "Reveals more information about eggs incubating in this tube.",
+}
 
 class PetIncubatorMixin:
     bot: commands.Bot
@@ -50,6 +117,153 @@ class PetIncubatorMixin:
             user_id: int,
         ) -> list:
             ...
+    async def _get_incubator_upgrades(self, db, user_id, tube_id):
+        async with db.execute(
+            "SELECT speed, detection, luck, analysis FROM incubator_upgrades WHERE user_id = ? AND tube_id = ?",
+            (user_id, tube_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if not row:
+            return {"speed": 0, "detection": 0, "luck": 0, "analysis": 0}
+        return {key: int(value or 0) for key, value in zip(("speed", "detection", "luck", "analysis"), row)}
+
+    def _speed_multiplier(self, level):
+        reduction = SPEED_REDUCTIONS.get(max(0, min(15, int(level))), 0.0)
+        return max(1 / 3, 1.0 - reduction)
+
+    def _analysis_lines(self, egg_id, level, detection_level=0, luck_level=0):
+        if level <= 0:
+            return []
+        pool = EGG_POOLS.get(egg_id, [])
+        lines = [f"🔬 **Analysis Lv. {level}**"]
+        if level >= 1:
+            egg_info = ITEM_REGISTRY.get(egg_id, {"name": egg_id})
+            lines.append(f"• Egg type: **{egg_info.get('name', egg_id)}**")
+        if level >= 2:
+            lines.append(f"• Possible pet count: **{len(pool)}**")
+        if level >= 3:
+            lines.append("• Hatch distribution: **equal chance among configured base pets**")
+        if level >= 4:
+            variant_possible = any(get_variant_roll_pool(pet_type) for pet_type in pool)
+            lines.append(f"• Variants possible: **{'Yes' if variant_possible else 'No'}**")
+        if level >= 5 and pool:
+            chances = [get_hatched_variant_chance(pet_type, detection_level, luck_level) for pet_type in pool]
+            lines.append(f"• Current variant chance: **{max(chances) * 100:.2f}%**")
+        if level >= 6:
+            names = []
+            for pet_type in pool:
+                definition = get_pet_definition(pet_type)
+                if definition:
+                    names.append(f"{definition['emoji']} {definition['name']}")
+            if names:
+                lines.append("• Possible pet pool: " + ", ".join(names))
+        if level >= 7:
+            if pool:
+                lines.append("• Pet identity odds: **equal among the configured pool**")
+        if level >= 8 and pool:
+            lines.append("• Hatch distribution: **each configured base pet currently has an equal 1/N chance**")
+        if level >= 9:
+            variant_ids = []
+            for pet_type in pool:
+                for variant_id in get_variant_roll_pool(pet_type):
+                    if variant_id not in variant_ids:
+                        variant_ids.append(variant_id)
+            if variant_ids:
+                weight_map = {}
+                for pet_type in pool:
+                    for variant_id, weight in get_effective_hatch_variant_weights(pet_type, luck_level).items():
+                        weight_map[variant_id] = weight
+                variant_ids.sort(key=lambda vid: (-weight_map.get(vid, 0), vid))
+                lines.append("• Variant pool: " + ", ".join(variant_ids))
+                lines.append("• Variant rarity: **relative weighting shown by the configured hatch weights**")
+        if level >= 10:
+            lines.append("• Full analysis: **all currently configured egg, pet, variant, and weighting information**")
+        return lines
+
+    async def _upgrade_incubator(self, user_id, tube_id, category, channel=None):
+        category = str(category).lower()
+        tube_id = int(tube_id)
+        if category not in UPGRADE_COSTS or tube_id not in INCUBATOR_UPGRADE_CAPS:
+            return {"ok": False, "message": "❌ That incubator upgrade is not configured."}
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            await db.execute("BEGIN IMMEDIATE")
+            async with db.execute("SELECT incubator_slots, stardust FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                user_row = await cursor.fetchone()
+            if not user_row:
+                await db.rollback()
+                return {"ok": False, "message": "❌ You don't have an active station profile yet."}
+            slots, stardust = int(user_row[0] or 1), int(user_row[1] or 0)
+            if tube_id > slots:
+                await db.rollback()
+                return {"ok": False, "message": f"🔒 Tube {tube_id} is not unlocked yet."}
+
+            levels = await self._get_incubator_upgrades(db, user_id, tube_id)
+            current = levels[category]
+            cap = INCUBATOR_UPGRADE_CAPS[tube_id][category]
+            if current >= cap:
+                await db.rollback()
+                return {"ok": False, "message": f"✨ **{UPGRADE_LABELS[category][1]}** is already at its maximum level for Tube {tube_id}."}
+
+            next_level = current + 1
+            material_id, material_amount, essence_amount, cost = UPGRADE_COSTS[category][next_level]
+            requirements = [(material_id, material_amount)]
+            if essence_amount:
+                requirements.append(("astral_essence", essence_amount))
+
+            missing = []
+            for item_id, amount in requirements:
+                async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id)) as cursor:
+                    row = await cursor.fetchone()
+                owned = int(row[0] or 0) if row else 0
+                if owned < amount:
+                    missing.append((item_id, amount - owned))
+            if stardust < cost:
+                missing.append(("stardust", cost - stardust))
+            if missing:
+                await db.rollback()
+                bits = []
+                for item_id, amount in missing:
+                    if item_id == "stardust":
+                        bits.append(f"✨ **{amount:,}** more Stardust")
+                    else:
+                        info = ITEM_REGISTRY.get(item_id, {"name": item_id, "emoji": "📦"})
+                        bits.append(f"{info.get('emoji', '📦')} **{amount}** more {info.get('name', item_id)}")
+                return {"ok": False, "message": "❌ You don't have the required materials.\n" + "\n".join(bits)}
+
+            for item_id, amount in requirements:
+                await db.execute(
+                    "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
+                    (amount, user_id, item_id),
+                )
+                await db.execute(
+                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
+                    (user_id, item_id),
+                )
+            levels[category] = next_level
+            await db.execute(
+                """INSERT INTO incubator_upgrades (user_id, tube_id, speed, detection, luck, analysis)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(user_id, tube_id) DO UPDATE SET
+                     speed = excluded.speed, detection = excluded.detection,
+                     luck = excluded.luck, analysis = excluded.analysis""",
+                (user_id, tube_id, levels["speed"], levels["detection"], levels["luck"], levels["analysis"]),
+            )
+            await db.execute("UPDATE users SET stardust = stardust - ? WHERE user_id = ?", (cost, user_id))
+            await db.commit()
+
+            achievements_cog = cast(Achievements | None, self.bot.get_cog("Achievements"))
+            if achievements_cog:
+                await achievements_cog.record_incubator_upgrade(user_id, tube_id, levels, db=db, channel=channel)
+                await db.commit()
+
+            return {
+                "ok": True, "tube_id": tube_id, "category": category, "level": next_level,
+                "levels": levels, "material_id": material_id, "material_amount": material_amount,
+                "essence_amount": essence_amount, "cost": cost,
+            }
+
     async def _incubator_start(self, ctx: commands.Context, egg: str):
         egg = egg.lower().strip()
 
@@ -92,8 +306,10 @@ class PetIncubatorMixin:
                 (ctx.author.id, egg),
             )
 
+            upgrades = await self._get_incubator_upgrades(db, ctx.author.id, available_slot)
             started = time.time()
-            ready = started + INCUBATION_SECONDS
+            duration = max(1, int(round(INCUBATION_SECONDS * self._speed_multiplier(upgrades["speed"]))))
+            ready = started + duration
             await db.execute(
                 """
                 INSERT INTO pet_incubators
@@ -107,7 +323,7 @@ class PetIncubatorMixin:
         info = ITEM_REGISTRY[egg]
         await ctx.send(
             f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating in Tube {available_slot}!**\n"
-            "⏳ Incubation time: **12 hours**\n"
+            f"⏳ Incubation time: **{duration // 3600}h {(duration % 3600) // 60}m**\n"
             "🔔 I'll alert you when it's ready to hatch!\n"
             f"Use `/incubator` with **Hatch ready egg** and choose **{egg}** when the timer finishes."
         )
@@ -142,7 +358,12 @@ class PetIncubatorMixin:
                 return await ctx.send("❌ This egg currently has no pets configured.")
 
             pet_type = random.choice(pool)
-            variant_id = roll_hatched_variant(pet_type)
+            upgrades = await self._get_incubator_upgrades(db, ctx.author.id, int(slot_id))
+            variant_id = roll_hatched_variant(
+                pet_type,
+                detection_level=upgrades["detection"],
+                luck_level=upgrades["luck"],
+            )
             definition = get_pet_definition(pet_type, variant_id)
             if not definition:
                 return await ctx.send("❌ This egg points to a pet that is not currently configured.")
