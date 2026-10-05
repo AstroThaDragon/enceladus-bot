@@ -205,6 +205,15 @@ class Crafting(commands.Cog):
         return await target.send(*args, **kwargs)
 
     async def perform_craft(self, ctx, recipe_id, quantity):
+        # Support both discord.ext.commands.Context and discord.Interaction.
+        # The interactive crafting UI passes an Interaction, which uses .user
+        # instead of .author.
+        author = getattr(ctx, "author", None) or getattr(ctx, "user", None)
+        if author is None:
+            return await self._send(ctx, "❌ I couldn't determine who is crafting this item.")
+        user_id = author.id
+        mention = author.mention
+
         data = RECIPES.get(recipe_id)
         if not data:
             return await self._send(ctx, "❌ That recipe does not exist.")
@@ -228,7 +237,7 @@ class Crafting(commands.Cog):
                 column = UPGRADE_DATA[progression_system]["column"]
                 async with progress_db.execute(
                     f"SELECT COALESCE({column}, 0) FROM users WHERE user_id = ?",
-                    (ctx.author.id,),
+                    (user_id,),
                 ) as cursor:
                     row = await cursor.fetchone()
 
@@ -250,7 +259,7 @@ class Crafting(commands.Cog):
                 previous_display = f"{previous_display} {required_level}"
 
                 return await self._send(ctx, 
-                    f"{ctx.author.mention} 🚫 **Upgrade progression locked!**\n\n"
+                    f"{mention} 🚫 **Upgrade progression locked!**\n\n"
                     f"You must **craft and use {previous_display}** before you can "
                     f"craft **{data['name']}**.\n\n"
                     f"Current **{info['name']}** level: **{current_level}/5**\n"
@@ -260,7 +269,7 @@ class Crafting(commands.Cog):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)
             await db.execute("BEGIN IMMEDIATE")
-            owned = await self.owned(db, ctx.author.id)
+            owned = await self.owned(db, user_id)
 
             craftable = quantity
             for item_id, amount in data["ingredients"].items():
@@ -276,26 +285,26 @@ class Crafting(commands.Cog):
                         missing.append(f"{icon} {name} ×{required - have}")
                 await db.rollback()
                 return await self._send(ctx, 
-                    f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing)
+                    f"{mention} ❌ You're missing:\n" + "\n".join(missing)
                 )
 
             for item_id, amount in data["ingredients"].items():
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
-                    (amount * craftable, ctx.author.id, item_id),
+                    (amount * craftable, user_id, item_id),
                 )
 
             await db.execute(
                 "INSERT INTO inventory (user_id, item_id, item_type, quantity) VALUES (?, ?, 'upgrade_component', ?) "
                 "ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = quantity + ?",
-                (ctx.author.id, data["result"], craftable, craftable),
+                (user_id, data["result"], craftable, craftable),
             )
             await db.commit()
 
         embed = discord.Embed(
             title="🔨 Crafting Complete!",
             description=(
-                f"{ctx.author.mention}\n\nYou crafted **{data['emoji']} {data['name']} ×{craftable}**!"
+                f"{mention}\n\nYou crafted **{data['emoji']} {data['name']} ×{craftable}**!"
                 + (
                     f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
                     if craftable < quantity else ""
