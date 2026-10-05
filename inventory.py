@@ -608,6 +608,7 @@ INVENTORY_CATEGORY_INFO = {
     "Haunted Ingredient": ("👻", "Haunted Ingredients", "Ingredients recovered from haunted locations."),
     "Voucher": ("🎟️", "Vouchers", "Vouchers and permanent unlock items."),
     "Currency": ("💰", "Currencies", "Special currencies stored in your inventory."),
+    "Special": ("✨", "Special", "Rare items and unique materials used for special station systems."),
 }
 
 
@@ -1117,6 +1118,8 @@ class Inventory(commands.Cog):
             if not info:
                 continue
             category = info.get("type", "Consumable")
+            if category == "Title":
+                continue
             entries.append({
                 "id": item_id,
                 "name": info.get("name", item_id),
@@ -1135,6 +1138,8 @@ class Inventory(commands.Cog):
                 {"name": item_id, "emoji": "📦", "type": "Space Junk", "desc": "A weird salvage find."},
             )
             category = "Halloween Junk" if item_id in HALLOWEEN_SPACE_JUNK_IDS else info.get("type", "Space Junk")
+            if category == "Title":
+                continue
             entries.append({
                 "id": item_id,
                 "name": info.get("name", item_id),
