@@ -1,6 +1,5 @@
 import aiosqlite
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from emojis import EMOJIS
@@ -129,10 +128,6 @@ def recipe_display_emoji(recipe):
     return RECIPE_EMOJI_FALLBACKS.get(result, "🔨")
 
 
-CHOICES = [
-    app_commands.Choice(name=f"{recipe_display_emoji(r)} {r['name']}", value=k)
-    for k, r in RECIPES.items()
-]
 
 
 class Crafting(commands.Cog):
@@ -154,7 +149,9 @@ class Crafting(commands.Cog):
         await db.commit()
 
     async def owned(self, db, user_id):
-        async with db.execute("SELECT item_id, quantity FROM inventory WHERE user_id = ?", (user_id,)) as cursor:
+        async with db.execute(
+            "SELECT item_id, quantity FROM inventory WHERE user_id = ?", (user_id,)
+        ) as cursor:
             return {item_id: quantity for item_id, quantity in await cursor.fetchall()}
 
     def recipe_embed(self, recipe, owned):
@@ -164,97 +161,65 @@ class Crafting(commands.Cog):
             have = owned.get(item_id, 0)
             mark = "✅" if have >= amount else "❌"
             lines.append(f"{mark} {icon} {name} ×{amount}  *(you have {have})*")
-        destination = "Use `/heal` to restore HP." if recipe["result"] in {"makeshift_medkit", "trick_or_treat_bag"} else "These crafted parts are used by `/upgrade`."
+        destination = (
+            "Use `/heal` to restore HP."
+            if recipe["result"] in {"makeshift_medkit", "trick_or_treat_bag"}
+            else "These crafted parts are used by `/upgrade`."
+        )
         lines += ["", f"🔨 **Produces:** {recipe['emoji']} {recipe['name']} ×1", "", destination]
-        return discord.Embed(title="🔨 Crafting", description="\n".join(lines), color=discord.Color.from_rgb(0, 229, 255))
+        return discord.Embed(
+            title="🔨 Crafting",
+            description="\n".join(lines),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
 
-    @commands.hybrid_command(name="recipes", description="View all available crafting recipes.")
-    async def recipes(self, ctx):
-        await ctx.defer()
-
+    def recipe_book_embeds(self, owned):
         items = list(RECIPES.items())
-        page_size = 5
+        page_size = 3
         pages = []
 
         for start in range(0, len(items), page_size):
             chunk = items[start:start + page_size]
-            lines = []
+            sections = []
             for _recipe_id, recipe in chunk:
-                emoji = recipe_display_emoji(recipe)
-                materials = []
+                lines = [f"{recipe_display_emoji(recipe)} **{recipe['name']}**"]
                 for item_id, amount in recipe["ingredients"].items():
                     material_emoji, name = MATERIAL_NAMES[item_id]
-                    materials.append(f"{material_emoji} {name} ×{amount}")
-                lines.append(
-                    f"{recipe['emoji']} **{recipe['name']}**\n"
-                    + " • ".join(materials)
-                )
+                    have = owned.get(item_id, 0)
+                    mark = "✅" if have >= amount else "❌"
+                    lines.append(f"{mark} {material_emoji} {name} ×{amount} *(you have {have})*")
+                sections.append("\n".join(lines))
 
             embed = discord.Embed(
-                title="📖 Crafting Recipes",
-                description="\n\n".join(lines),
+                title="📖 Crafting Recipe Book",
+                description="\n\n".join(sections),
                 color=discord.Color.from_rgb(0, 229, 255),
-            )
-            embed.set_footer(
-                text=f"Page {len(pages) + 1}/{(len(items) + page_size - 1) // page_size} • Use /craft to make an item."
             )
             pages.append(embed)
 
-        class RecipesView(discord.ui.View):
-            def __init__(self, owner_id, embeds):
-                super().__init__(timeout=300)
-                self.owner_id = owner_id
-                self.embeds = embeds
-                self.current_page = 0
+        return pages
 
-            async def interaction_check(self, interaction):
-                if interaction.user.id != self.owner_id:
-                    await interaction.response.send_message(
-                        "❌ This recipe menu belongs to someone else.", ephemeral=True
-                    )
-                    return False
-                return True
+    async def _send(self, target, *args, **kwargs):
+        if isinstance(target, discord.Interaction):
+            return await target.followup.send(*args, **kwargs)
+        return await target.send(*args, **kwargs)
 
-            @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
-            async def previous(self, interaction, button):
-                self.current_page = (self.current_page - 1) % len(self.embeds)
-                await interaction.response.edit_message(
-                    embed=self.embeds[self.current_page], view=self
-                )
-
-            @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
-            async def next(self, interaction, button):
-                self.current_page = (self.current_page + 1) % len(self.embeds)
-                await interaction.response.edit_message(
-                    embed=self.embeds[self.current_page], view=self
-                )
-
-        view = RecipesView(ctx.author.id, pages)
-        await ctx.send(embed=pages[0], view=view)
-
-    @commands.hybrid_command(name="craft", description="Craft components used for permanent exploration upgrades.")
-    @app_commands.describe(
-        recipe="Choose a recipe to craft.",
-        quantity="How many to craft (1–10). Upgrade components are limited to ×1.",
-    )
-    @app_commands.choices(recipe=CHOICES)
-    async def craft(self, ctx, recipe: str, quantity: int = 1):
-        await ctx.defer()
-        data = RECIPES.get(recipe)
+    async def perform_craft(self, ctx, recipe_id, quantity):
+        data = RECIPES.get(recipe_id)
         if not data:
-            return await ctx.send("❌ That recipe does not exist.")
+            return await self._send(ctx, "❌ That recipe does not exist.")
 
         if quantity < 1 or quantity > 10:
-            return await ctx.send("❌ Crafting quantity must be between **1 and 10**.")
+            return await self._send(ctx, "❌ Crafting quantity must be between **1 and 10**.")
 
-        # Upgrade components are intentionally single-craft items.
         progression_system, progression_tier = get_tiered_recipe_progression(data)
         is_upgrade_component = (
             progression_system is not None
             or data["result"] in {"nanite_retrofit_kit", "astral_power_core"}
         )
+
         if is_upgrade_component and quantity != 1:
-            return await ctx.send(
+            return await self._send(ctx, 
                 f"❌ **{data['name']}** can only be crafted **×1 at a time**."
             )
 
@@ -284,7 +249,7 @@ class Crafting(commands.Cog):
                 }[prefix]
                 previous_display = f"{previous_display} {required_level}"
 
-                return await ctx.send(
+                return await self._send(ctx, 
                     f"{ctx.author.mention} 🚫 **Upgrade progression locked!**\n\n"
                     f"You must **craft and use {previous_display}** before you can "
                     f"craft **{data['name']}**.\n\n"
@@ -310,7 +275,7 @@ class Crafting(commands.Cog):
                         icon, name = MATERIAL_NAMES[item_id]
                         missing.append(f"{icon} {name} ×{required - have}")
                 await db.rollback()
-                return await ctx.send(
+                return await self._send(ctx, 
                     f"{ctx.author.mention} ❌ You're missing:\n" + "\n".join(missing)
                 )
 
@@ -336,11 +301,299 @@ class Crafting(commands.Cog):
                     if craftable < quantity else ""
                 )
                 + "\n\n"
-                + ("Use `/heal` when you want to chow down on your Halloween treats!" if data["result"] == "trick_or_treat_bag" else "Use `/heal` to patch yourself up when needed." if data["result"] == "makeshift_medkit" else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade.")
+                + (
+                    "Use `/heal` when you want to chow down on your Halloween treats!"
+                    if data["result"] == "trick_or_treat_bag"
+                    else "Use `/heal` to patch yourself up when needed."
+                    if data["result"] == "makeshift_medkit"
+                    else "Use `/upgrade` when you have the Stardust and remaining materials needed for the next upgrade."
+                )
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
-        await ctx.send(embed=embed)
+        await self._send(ctx, embed=embed)
+
+    async def show_crafting_menu(self, target, owner_id):
+        view = CraftingView(self, owner_id)
+        embed = discord.Embed(
+            title="🔨 Crafting",
+            description=(
+                "Craft components, upgrade kits, and field supplies from collected materials.\n\n"
+                "**Known Recipes**\n"
+                f"{len(RECIPES)} recipes available.\n\n"
+                "Choose an option below."
+            ),
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        if hasattr(target, "response"):
+            await target.response.edit_message(embed=embed, view=view)
+        else:
+            await target.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="craft", description="Open the crafting station.")
+    async def craft(self, ctx):
+        await ctx.defer()
+        await self.show_crafting_menu(ctx, ctx.author.id)
+
+
+class CraftingView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This crafting menu belongs to someone else.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="📖 Recipes", style=discord.ButtonStyle.primary)
+    async def recipes_button(self, interaction, button):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.cog.ensure_inventory(db)
+            owned = await self.cog.owned(db, self.owner_id)
+        pages = self.cog.recipe_book_embeds(owned)
+        view = CraftingRecipeBookView(self.cog, self.owner_id, pages)
+        await interaction.response.edit_message(embed=pages[0], view=view)
+
+    @discord.ui.button(label="🔨 Craft", style=discord.ButtonStyle.success)
+    async def craft_button(self, interaction, button):
+        view = CraftingSelectView(self.cog, self.owner_id)
+        embed = discord.Embed(
+            title="🔨 Craft",
+            description="Choose a recipe to craft.",
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="🎒 Materials", style=discord.ButtonStyle.secondary)
+    async def materials_button(self, interaction, button):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.cog.ensure_inventory(db)
+            owned = await self.cog.owned(db, self.owner_id)
+
+        lines = []
+        for item_id, (_emoji, name) in MATERIAL_NAMES.items():
+            amount = owned.get(item_id, 0)
+            if amount > 0:
+                icon, _ = MATERIAL_NAMES[item_id]
+                lines.append(f"{icon} **{name}** ×{amount}")
+
+        description = "\n".join(lines) if lines else "You don't have any crafting materials yet."
+        embed = discord.Embed(
+            title="🎒 Crafting Materials",
+            description=description,
+            color=discord.Color.from_rgb(0, 229, 255),
+        )
+        await interaction.response.edit_message(embed=embed, view=CraftingMaterialsView(self.cog, self.owner_id))
+
+
+class CraftingMaterialsView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This crafting menu belongs to someone else.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back(self, interaction, button):
+        await self.cog.show_crafting_menu(interaction, self.owner_id)
+
+
+class CraftingRecipeBookView(discord.ui.View):
+    def __init__(self, cog, owner_id, embeds):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.embeds = embeds
+        self.current_page = 0
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This crafting menu belongs to someone else.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def previous(self, interaction, button):
+        self.current_page = (self.current_page - 1) % len(self.embeds)
+        await interaction.response.edit_message(
+            embed=self.embeds[self.current_page], view=self
+        )
+
+    @discord.ui.button(label="🔨 Craft", style=discord.ButtonStyle.success)
+    async def craft(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="🔨 Craft",
+                description="Choose a recipe to craft.",
+                color=discord.Color.from_rgb(0, 229, 255),
+            ),
+            view=CraftingSelectView(self.cog, self.owner_id),
+        )
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next(self, interaction, button):
+        self.current_page = (self.current_page + 1) % len(self.embeds)
+        await interaction.response.edit_message(
+            embed=self.embeds[self.current_page], view=self
+        )
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary, row=1)
+    async def back(self, interaction, button):
+        await self.cog.show_crafting_menu(interaction, self.owner_id)
+
+
+class CraftingSelect(discord.ui.Select):
+    def __init__(self, cog, owner_id):
+        self.cog = cog
+        self.owner_id = owner_id
+        options = [
+            discord.SelectOption(
+                label=recipe["name"][:100],
+                value=recipe_id,
+                emoji=recipe_display_emoji(recipe),
+            )
+            for recipe_id, recipe in RECIPES.items()
+        ]
+        super().__init__(
+            placeholder="Select a recipe...",
+            options=options,
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, interaction):
+        recipe_id = self.values[0]
+        recipe = RECIPES[recipe_id]
+
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.cog.ensure_inventory(db)
+            owned = await self.cog.owned(db, self.owner_id)
+
+        embed = self.cog.recipe_embed(recipe, owned)
+        is_upgrade_component = (
+            get_tiered_recipe_progression(recipe)[0] is not None
+            or recipe["result"] in {"nanite_retrofit_kit", "astral_power_core"}
+        )
+        view = CraftingRecipeActionView(
+            self.cog, self.owner_id, recipe_id, is_upgrade_component
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class CraftingSelectView(discord.ui.View):
+    def __init__(self, cog, owner_id):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.add_item(CraftingSelect(cog, owner_id))
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This crafting menu belongs to someone else.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back(self, interaction, button):
+        await self.cog.show_crafting_menu(interaction, self.owner_id)
+
+
+class CraftingRecipeActionView(discord.ui.View):
+    def __init__(self, cog, owner_id, recipe_id, single_craft):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.recipe_id = recipe_id
+        self.single_craft = single_craft
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "❌ This crafting menu belongs to someone else.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="🔨 Craft", style=discord.ButtonStyle.success)
+    async def craft(self, interaction, button):
+        if self.single_craft:
+            quantity = 1
+            await interaction.response.defer()
+            await self.cog.perform_craft(interaction, self.recipe_id, quantity)
+            return
+
+        modal = CraftQuantityModal(self.cog, self.recipe_id)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="📖 Recipes", style=discord.ButtonStyle.primary)
+    async def recipes(self, interaction, button):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.cog.ensure_inventory(db)
+            owned = await self.cog.owned(db, self.owner_id)
+        pages = self.cog.recipe_book_embeds(owned)
+        await interaction.response.edit_message(
+            embed=pages[0],
+            view=CraftingRecipeBookView(self.cog, self.owner_id, pages),
+        )
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back(self, interaction, button):
+        view = CraftingSelectView(self.cog, self.owner_id)
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="🔨 Craft",
+                description="Choose a recipe to craft.",
+                color=discord.Color.from_rgb(0, 229, 255),
+            ),
+            view=view,
+        )
+
+
+class CraftQuantityModal(discord.ui.Modal, title="Craft Quantity"):
+    quantity = discord.ui.TextInput(
+        label="Quantity",
+        placeholder="Enter a quantity from 1 to 10",
+        min_length=1,
+        max_length=2,
+        required=True,
+    )
+
+    def __init__(self, cog, recipe_id):
+        super().__init__()
+        self.cog = cog
+        self.recipe_id = recipe_id
+
+    async def on_submit(self, interaction):
+        try:
+            quantity = int(self.quantity.value)
+        except ValueError:
+            return await interaction.response.send_message(
+                "❌ Quantity must be a whole number.", ephemeral=True
+            )
+
+        if quantity < 1 or quantity > 10:
+            return await interaction.response.send_message(
+                "❌ Crafting quantity must be between **1 and 10**.", ephemeral=True
+            )
+
+        await interaction.response.defer()
+        await self.cog.perform_craft(interaction, self.recipe_id, quantity)
 
 
 async def setup(bot):
