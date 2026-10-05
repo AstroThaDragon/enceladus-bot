@@ -25,18 +25,22 @@ from error_handler import log_task_error
 from .data import *
 
 
-class _EconomyBankHost(Protocol):
+class EconomyBankMixin(commands.Cog):
     DEFAULT_VAULT_CAPACITY: int
 
     def get_db_path(self) -> str:
-        ...
+        raise NotImplementedError
 
     async def ensure_schema(self, db: Any) -> Any:
-        ...
+        raise NotImplementedError
 
 
-class EconomyBankMixin:
-    async def bank(self: _EconomyBankHost, ctx: commands.Context):
+    @commands.hybrid_command(
+        name="bank",
+        aliases=["bal"],
+        description="View your current Stardust balance and vaulted Stardust."
+    )
+    async def bank(self, ctx: commands.Context):
             """Show available Stardust and protected vault balance."""
             user_id = ctx.author.id
             db_path = self.get_db_path()
@@ -104,7 +108,9 @@ class EconomyBankMixin:
     
             await ctx.send(embed=embed)
 
-    async def bank_deposit(self: _EconomyBankHost, ctx: commands.Context, amount: int):
+    @commands.hybrid_command(name="deposit", description="Deposit your Stardust into the bank vault for safe keeping.")
+    @app_commands.describe(amount="How much Stardust to store in the vault")
+    async def bank_deposit(self, ctx: commands.Context, amount: int):
             """Deposit available Stardust into the protected vault."""
             if amount <= 0:
                 return await ctx.send("⚠️ The deposit amount must be greater than 0.")
@@ -156,7 +162,9 @@ class EconomyBankMixin:
                 f"Your vault now holds **{vault + amount:,} Stardust**."
             )
 
-    async def bank_withdraw(self: _EconomyBankHost, ctx: commands.Context, amount: int):
+    @commands.hybrid_command(name="withdraw", description="Withdraw Stardust from your bank vault to spend.")
+    @app_commands.describe(amount="How much Stardust to withdraw from the vault")
+    async def bank_withdraw(self, ctx: commands.Context, amount: int):
             """Withdraw Stardust from the protected vault."""
             if amount <= 0:
                 return await ctx.send("⚠️ The withdrawal amount must be greater than 0.")
