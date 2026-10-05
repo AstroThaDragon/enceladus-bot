@@ -32,8 +32,8 @@ from .core import *
 # Incubator upgrade system
 # ---------------------------------------------------------------------------
 INCUBATOR_UPGRADE_CAPS = {
-    1: {"speed": 5, "detection": 3, "luck": 3, "analysis": 5},
-    2: {"speed": 10, "detection": 7, "luck": 7, "analysis": 8},
+    1: {"speed": 15, "detection": 15, "luck": 10, "analysis": 10},
+    2: {"speed": 15, "detection": 15, "luck": 10, "analysis": 10},
     3: {"speed": 15, "detection": 15, "luck": 10, "analysis": 10},
 }
 
@@ -45,40 +45,118 @@ SPEED_REDUCTIONS = {
 DETECTION_BONUSES = {level: level * 0.005 for level in range(16)}
 LUCK_OCCURRENCE_BONUSES = {level: level * 0.001 for level in range(11)}
 
-UPGRADE_COSTS = {
+# Tube-specific Stardust pricing. Material and Astral Essence requirements remain unchanged.
+INCUBATOR_COST_MULTIPLIERS = {
+    1: 0.50,
+    2: 1.00,
+    3: 1.50,
+}
+
+
+# Tube-specific material requirements (Tube 1 / Tube 2 / Tube 3).
+INCUBATOR_MATERIAL_COSTS = {
     "speed": {
-        1: ("quantum_coil", 2, 0, 3000), 2: ("quantum_coil", 4, 0, 6000),
-        3: ("quantum_coil", 7, 1, 10000), 4: ("quantum_coil", 10, 1, 15000),
-        5: ("quantum_coil", 14, 2, 22500), 6: ("quantum_coil", 18, 3, 32500),
-        7: ("quantum_coil", 23, 4, 45000), 8: ("quantum_coil", 29, 5, 60000),
-        9: ("quantum_coil", 36, 6, 80000), 10: ("quantum_coil", 44, 8, 105000),
-        11: ("quantum_coil", 52, 10, 135000), 12: ("quantum_coil", 61, 12, 175000),
-        13: ("quantum_coil", 71, 15, 225000), 14: ("quantum_coil", 82, 18, 285000),
-        15: ("quantum_coil", 95, 22, 360000),
+        1: [1, 1, 2],
+        2: [2, 3, 4],
+        3: [3, 4, 5],
+        4: [4, 6, 8],
+        5: [6, 8, 10],
+        6: [7, 10, 13],
+        7: [9, 13, 17],
+        8: [11, 16, 21],
+        9: [13, 19, 25],
+        10: [15, 22, 30],
+        11: [18, 26, 34],
+        12: [20, 30, 39],
+        13: [23, 34, 45],
+        14: [26, 38, 50],
+        15: [30, 43, 57],
     },
     "detection": {
-        1: ("astral_lens", 2, 0, 5000), 2: ("astral_lens", 5, 0, 10000),
-        3: ("astral_lens", 8, 1, 17500), 4: ("astral_lens", 12, 1, 25000),
-        5: ("astral_lens", 16, 2, 35000), 6: ("astral_lens", 21, 3, 50000),
-        7: ("astral_lens", 27, 4, 70000), 8: ("astral_lens", 34, 5, 95000),
-        9: ("astral_lens", 42, 6, 125000), 10: ("astral_lens", 50, 8, 165000),
-        11: ("astral_lens", 59, 10, 215000), 12: ("astral_lens", 68, 12, 275000),
-        13: ("astral_lens", 77, 15, 350000), 14: ("astral_lens", 87, 18, 450000),
-        15: ("astral_lens", 97, 22, 575000),
+        1: [1, 1, 2],
+        2: [2, 3, 4],
+        3: [3, 4, 6],
+        4: [4, 6, 8],
+        5: [5, 8, 10],
+        6: [7, 10, 13],
+        7: [9, 13, 16],
+        8: [11, 16, 20],
+        9: [13, 19, 24],
+        10: [15, 22, 28],
+        11: [18, 26, 33],
+        12: [21, 30, 38],
+        13: [24, 34, 43],
+        14: [27, 38, 49],
+        15: [30, 42, 55],
     },
     "luck": {
-        1: ("mutation_catalyst", 3, 0, 7500), 2: ("mutation_catalyst", 6, 0, 15000),
-        3: ("mutation_catalyst", 10, 1, 25000), 4: ("mutation_catalyst", 15, 2, 35000),
-        5: ("mutation_catalyst", 20, 3, 50000), 6: ("mutation_catalyst", 26, 4, 70000),
-        7: ("mutation_catalyst", 33, 5, 95000), 8: ("mutation_catalyst", 41, 7, 125000),
-        9: ("mutation_catalyst", 50, 9, 165000), 10: ("mutation_catalyst", 65, 12, 215000),
+        1: [1, 2, 2],
+        2: [2, 4, 5],
+        3: [4, 6, 8],
+        4: [6, 9, 11],
+        5: [8, 12, 15],
+        6: [10, 15, 19],
+        7: [13, 19, 24],
+        8: [16, 23, 30],
+        9: [20, 28, 36],
+        10: [24, 34, 43],
     },
     "analysis": {
-        1: ("analysis_module", 1, 0, 2000), 2: ("analysis_module", 2, 0, 4000),
-        3: ("analysis_module", 3, 0, 7500), 4: ("analysis_module", 5, 0, 12000),
-        5: ("analysis_module", 7, 1, 18000), 6: ("analysis_module", 9, 1, 27500),
-        7: ("analysis_module", 11, 2, 40000), 8: ("analysis_module", 14, 3, 57500),
-        9: ("analysis_module", 17, 4, 80000), 10: ("analysis_module", 21, 5, 110000),
+        1: [1, 1, 1],
+        2: [1, 1, 2],
+        3: [1, 2, 3],
+        4: [2, 3, 4],
+        5: [3, 4, 6],
+        6: [4, 5, 7],
+        7: [5, 7, 9],
+        8: [6, 9, 11],
+        9: [8, 11, 14],
+        10: [10, 14, 18],
+    },
+}
+
+def _get_upgrade_cost(tube_id, category, level):
+    material_id, _base_material_amount, essence_amount, base_cost = UPGRADE_COSTS[category][level]
+    tube_index = max(1, min(3, int(tube_id))) - 1
+    material_amount = INCUBATOR_MATERIAL_COSTS[category][level][tube_index]
+    multiplier = INCUBATOR_COST_MULTIPLIERS.get(int(tube_id), 1.0)
+    cost = int(round(base_cost * multiplier))
+    return material_id, material_amount, essence_amount, cost
+
+UPGRADE_COSTS = {
+    "speed": {
+        1: ("quantum_coil", 1, 0, 3000), 2: ("quantum_coil", 2, 0, 6000),
+        3: ("quantum_coil", 3, 1, 10000), 4: ("quantum_coil", 4, 1, 15000),
+        5: ("quantum_coil", 6, 2, 22500), 6: ("quantum_coil", 7, 3, 32500),
+        7: ("quantum_coil", 9, 4, 45000), 8: ("quantum_coil", 11, 5, 60000),
+        9: ("quantum_coil", 13, 6, 80000), 10: ("quantum_coil", 15, 8, 105000),
+        11: ("quantum_coil", 18, 10, 135000), 12: ("quantum_coil", 20, 12, 175000),
+        13: ("quantum_coil", 23, 15, 225000), 14: ("quantum_coil", 26, 18, 285000),
+        15: ("quantum_coil", 30, 22, 360000),
+    },
+    "detection": {
+        1: ("astral_lens", 1, 0, 5000), 2: ("astral_lens", 2, 0, 10000),
+        3: ("astral_lens", 3, 1, 17500), 4: ("astral_lens", 4, 1, 25000),
+        5: ("astral_lens", 5, 2, 35000), 6: ("astral_lens", 7, 3, 50000),
+        7: ("astral_lens", 9, 4, 70000), 8: ("astral_lens", 11, 5, 95000),
+        9: ("astral_lens", 13, 6, 125000), 10: ("astral_lens", 15, 8, 165000),
+        11: ("astral_lens", 18, 10, 215000), 12: ("astral_lens", 21, 12, 275000),
+        13: ("astral_lens", 24, 15, 350000), 14: ("astral_lens", 27, 18, 450000),
+        15: ("astral_lens", 30, 22, 575000),
+    },
+    "luck": {
+        1: ("mutation_catalyst", 1, 0, 7500), 2: ("mutation_catalyst", 2, 0, 15000),
+        3: ("mutation_catalyst", 4, 1, 25000), 4: ("mutation_catalyst", 6, 2, 35000),
+        5: ("mutation_catalyst", 8, 3, 50000), 6: ("mutation_catalyst", 10, 4, 70000),
+        7: ("mutation_catalyst", 13, 5, 95000), 8: ("mutation_catalyst", 16, 7, 125000),
+        9: ("mutation_catalyst", 20, 9, 165000), 10: ("mutation_catalyst", 24, 12, 215000),
+    },
+    "analysis": {
+        1: ("analysis_module", 1, 0, 2000), 2: ("analysis_module", 1, 0, 4000),
+        3: ("analysis_module", 1, 0, 7500), 4: ("analysis_module", 2, 0, 12000),
+        5: ("analysis_module", 3, 1, 18000), 6: ("analysis_module", 4, 1, 27500),
+        7: ("analysis_module", 5, 2, 40000), 8: ("analysis_module", 6, 3, 57500),
+        9: ("analysis_module", 8, 4, 80000), 10: ("analysis_module", 10, 5, 110000),
     },
 }
 UPGRADE_LABELS = {
@@ -207,7 +285,7 @@ class PetIncubatorMixin:
                 return {"ok": False, "message": f"✨ **{UPGRADE_LABELS[category][1]}** is already at its maximum level for Tube {tube_id}."}
 
             next_level = current + 1
-            material_id, material_amount, essence_amount, cost = UPGRADE_COSTS[category][next_level]
+            material_id, material_amount, essence_amount, cost = _get_upgrade_cost(tube_id, category, next_level)
             requirements = [(material_id, material_amount)]
             if essence_amount:
                 requirements.append(("astral_essence", essence_amount))
