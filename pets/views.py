@@ -708,9 +708,10 @@ class PetManagementView(discord.ui.View):
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         self.index = (self.index - 1) % len(self.pets)
         self._sync_buttons()
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
             view=self,
         )
@@ -719,8 +720,9 @@ class PetManagementView(discord.ui.View):
     async def stats(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         pet = self.pets[self.index]
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.cog._pet_stats_embed(self.ctx, pet),
             view=PetStatsView(
                 self.cog,
@@ -735,16 +737,17 @@ class PetManagementView(discord.ui.View):
     async def equip(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         pet = self.pets[self.index]
         if pet["is_active"]:
             changed = await self.cog._unequip_pet(self.user_id, pet["pet_id"])
             if not changed:
-                return await interaction.response.send_message("❌ That pet is no longer equipped.", ephemeral=True)
+                return await interaction.followup.send("❌ That pet is no longer equipped.", ephemeral=True)
             await self._reload_inventory_groups()
             if not self.pets:
-                return await interaction.response.edit_message(content="❌ That pet is no longer available in this category.", view=None)
+                return await interaction.edit_original_response(content="❌ That pet is no longer available in this category.", view=None)
             self._sync_buttons()
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
                 embed=self.cog._pet_embed(
                     self.ctx, self.pets[self.index], self.index, len(self.pets),
                     bundle_count=self._current_bundle_count(),
@@ -754,12 +757,12 @@ class PetManagementView(discord.ui.View):
         else:
             definition, error = await self.cog._equip_pet(self.user_id, pet["pet_id"])
             if error:
-                return await interaction.response.send_message(error, ephemeral=True)
+                return await interaction.followup.send(error, ephemeral=True)
             await self._reload_inventory_groups()
             if not self.pets:
-                return await interaction.response.edit_message(content="❌ That category is now empty.", view=None)
+                return await interaction.edit_original_response(content="❌ That category is now empty.", view=None)
             self._sync_buttons()
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
             embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
             view=self,
         )
@@ -768,15 +771,16 @@ class PetManagementView(discord.ui.View):
     async def favorite(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         pet = self.pets[self.index]
         favorited, error = await self.cog._set_pet_favorite(self.user_id, pet["pet_id"], not pet["is_favorite"])
         if error:
-            return await interaction.response.send_message(error, ephemeral=True)
+            return await interaction.followup.send(error, ephemeral=True)
         await self._reload_inventory_groups()
         if not self.pets:
-            return await interaction.response.edit_message(content="❌ That category is now empty.", view=None)
+            return await interaction.edit_original_response(content="❌ That category is now empty.", view=None)
         self._sync_buttons()
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.cog._pet_embed(
                 self.ctx, self.pets[self.index], self.index, len(self.pets),
                 bundle_count=self._current_bundle_count(),
@@ -823,9 +827,10 @@ class PetManagementView(discord.ui.View):
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         self.index = (self.index + 1) % len(self.pets)
         self._sync_buttons()
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.cog._pet_embed(self.ctx, self.pets[self.index], self.index, len(self.pets), bundle_count=self._current_bundle_count()),
             view=self,
         )
@@ -834,10 +839,11 @@ class PetManagementView(discord.ui.View):
     async def collection(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._ensure_owner(interaction):
             return
+        await interaction.response.defer()
         pets = await self.cog._get_owned_pets(self.user_id)
         self.stop()
         view = PetCollectionView(self.cog, self.user_id, self.ctx)
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.cog._pet_collection_embed(self.ctx, pets),
             view=view,
         )
