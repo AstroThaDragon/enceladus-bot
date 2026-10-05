@@ -23,15 +23,21 @@ from pets.core import get_pet_definition
 from error_handler import log_task_error
 
 from ..data import *
+from .autocomplete import EconomySalvageAutocompleteMixin
 
 
-class EconomySalvageMixin:
+class EconomySalvageMixin(commands.Cog):
     # These members are supplied by the main Economy cog / other economy mixins.
     # Declaring them here keeps static type checkers aware of the host interface
     # without creating a runtime import cycle.
     bot: commands.Bot
     JUNK_PRICES: dict[str, int]
     get_db_path: Callable[[], str]
+
+    async def salvage_item_autocomplete(self, interaction: discord.Interaction, current: str):
+        return await EconomySalvageAutocompleteMixin.salvage_item_autocomplete(
+            cast(EconomySalvageAutocompleteMixin, self), interaction, current
+        )
 
     def get_junk_sell_reward(self, item_id) -> tuple[int, int]:
             """Return Stardust + Halloween Candy rewards for a junk item."""
@@ -72,6 +78,12 @@ class EconomySalvageMixin:
             ) as cursor:
                 return await cursor.fetchone() is not None
 
+    @commands.hybrid_command(
+        name="salvage",
+        description="Salvage Space Junk or upgrade kits for materials."
+    )
+    @app_commands.describe(item="Choose Space Junk to salvage, or salvage all of it.")
+    @app_commands.autocomplete(item=salvage_item_autocomplete)
     async def salvage(self, ctx: commands.Context, item: str):
             await ctx.defer()
     

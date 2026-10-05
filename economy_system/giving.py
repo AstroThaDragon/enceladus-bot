@@ -35,7 +35,7 @@ class EconomyGivingMixin:
         raise NotImplementedError
     
     async def give_item_autocomplete(
-            self,
+            self: Any,
             interaction: discord.Interaction,
             current: str,
         ):
@@ -94,7 +94,7 @@ class EconomyGivingMixin:
             return choices[:25]
 
     async def give_pet_autocomplete(
-            self,
+            self: Any,
             interaction: discord.Interaction,
             current: str,
         ):

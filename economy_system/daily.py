@@ -6,7 +6,7 @@ import random
 import re
 import time
 from datetime import datetime, timedelta, time as dt_time
-from typing import Any, Optional, Protocol, cast
+from typing import Any, Optional, Protocol, TYPE_CHECKING, cast
 
 import discord
 from discord import app_commands
@@ -24,17 +24,14 @@ from error_handler import log_task_error
 
 from .data import *
 
-
 class _EconomyDailyHost(Protocol):
+    """Attributes and methods supplied by the final Economy Cog."""
     bot: Any
 
-    def get_db_path(self) -> str:
-        ...
+    def get_db_path(self) -> str: ...
 
-    async def ensure_schema(self, db: Any) -> Any:
-        ...
+    async def ensure_schema(self, db: Any) -> Any: ...
 
-    midnight_hp_regeneration: Any
 
 HP_REGEN_TIME = dt_time(
     hour=0,
@@ -42,14 +39,16 @@ HP_REGEN_TIME = dt_time(
     tzinfo=pytz.timezone("US/Eastern"),
 )
 
+
 class EconomyDailyMixin:
     @tasks.loop(time=HP_REGEN_TIME)
-    async def midnight_hp_regeneration(self: _EconomyDailyHost):
+    async def midnight_hp_regeneration(self: Any):
             """Restore 50 HP to every user at midnight Eastern Time."""
-            db_path = self.get_db_path()
+            host = cast(_EconomyDailyHost, self)
+            db_path = host.get_db_path()
     
             async with aiosqlite.connect(db_path) as db:
-                await self.ensure_schema(db)
+                await host.ensure_schema(db)
                 await db.execute(
                     """
                     UPDATE users
@@ -66,11 +65,11 @@ class EconomyDailyMixin:
                 await db.commit()
 
     @midnight_hp_regeneration.before_loop
-    async def before_midnight_hp_regeneration(self: _EconomyDailyHost):
+    async def before_midnight_hp_regeneration(self: Any):
             await self.bot.wait_until_ready()
 
     @midnight_hp_regeneration.error
-    async def midnight_hp_regeneration_error(self: _EconomyDailyHost, error):
+    async def midnight_hp_regeneration_error(self: Any, error):
             await log_task_error(
                 self.bot,
                 "Economy.midnight_hp_regeneration",
@@ -84,17 +83,22 @@ class EconomyDailyMixin:
     def cog_unload(self):
             self.midnight_hp_regeneration.cancel()
 
-    async def daily(self: _EconomyDailyHost, ctx: commands.Context):
+    @commands.hybrid_command(
+        name="daily",
+        description="Claim your daily Stardust reward and build your streak! Rewards max out at 1,150 Stardust.",
+    )
+    async def daily(self: Any, ctx: commands.Context):
             """Claim the daily Stardust reward and build a consecutive-day streak."""
+            host = cast(_EconomyDailyHost, self)
             user_id = ctx.author.id
-            db_path = self.get_db_path()
+            db_path = host.get_db_path()
             eastern = pytz.timezone("US/Eastern")
             today = datetime.now(eastern).date()
             today_str = today.isoformat()
             yesterday_str = (today - timedelta(days=1)).isoformat()
     
             async with aiosqlite.connect(db_path) as db:
-                await self.ensure_schema(db)
+                await host.ensure_schema(db)
     
                 await db.execute(
                     """
@@ -251,7 +255,12 @@ class EconomyDailyMixin:
                 embed=embed
             )
 
-    async def claim_legacy_bonus(self: _EconomyDailyHost, ctx: commands.Context):
+    @commands.hybrid_command(
+        name="claimlegacy",
+        description="Claim your one-time Stardust bonus for being in the server before the **Frontier** update!",
+    )
+    async def claim_legacy_bonus(self: Any, ctx: commands.Context):
+            host = cast(_EconomyDailyHost, self)
             await ctx.defer()
     
             # This command only makes sense inside the server.
@@ -281,10 +290,10 @@ class EconomyDailyMixin:
                     "who joined the server before **September 10, 2026!**"
                 )
     
-            db_path = self.get_db_path()
+            db_path = host.get_db_path()
     
             async with aiosqlite.connect(db_path) as db:
-                await self.ensure_schema(db)
+                await host.ensure_schema(db)
                 await db.commit()
     
                 # Lock the transaction so two simultaneous /claimlegacy
@@ -339,7 +348,9 @@ class EconomyDailyMixin:
                 f"here before the **Frontier** update."
             )
 
-    async def on_message(self: _EconomyDailyHost, message: discord.Message):
+    @commands.Cog.listener()
+    async def on_message(self: Any, message: discord.Message):
+            host = cast(_EconomyDailyHost, self)
             if message.author.bot or message.guild is None:
                 return
     
@@ -347,8 +358,8 @@ class EconomyDailyMixin:
             now = time.time()
             reward = random.randint(5, 15)
     
-            async with aiosqlite.connect(self.get_db_path()) as db:
-                await self.ensure_schema(db)
+            async with aiosqlite.connect(host.get_db_path()) as db:
+                await host.ensure_schema(db)
                 await db.commit()
                 await db.execute("BEGIN IMMEDIATE")
     

@@ -27,7 +27,7 @@ from .data import *
 
 class EconomyLookupMixin:
     async def item_category_autocomplete(
-            self,
+            self: Any,
             interaction: discord.Interaction,
             current: str
         ):
@@ -58,7 +58,7 @@ class EconomyLookupMixin:
             return choices[:25]
 
     async def item_autocomplete(
-            self,
+            self: Any,
             interaction: discord.Interaction,
             current: str
         ):
@@ -202,7 +202,10 @@ class EconomyLookupMixin:
     
             return choices[:25]
 
-    async def item_lookup(self, ctx: commands.Context, category: str, item: str):
+    @commands.hybrid_command(name="item", description="Inspect an item from the station catalog.")
+    @app_commands.describe(category="Choose an item category.", item="Choose an item to inspect.")
+    @app_commands.autocomplete(category=item_category_autocomplete, item=item_autocomplete)
+    async def item_lookup(self: Any, ctx: commands.Context, category: str, item: str):
             item_id = item.lower()
             from inventory import ITEM_REGISTRY
     
