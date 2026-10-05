@@ -176,6 +176,18 @@ class EconomyGivingMixin:
     def _get_give_lock(self, user_id):
             return self._give_locks.setdefault(user_id, asyncio.Lock())
 
+    @commands.hybrid_command(
+        name="give",
+        description="Give another member one of your pets or transferable items.",
+    )
+    @app_commands.describe(
+        member="The member you want to give something to.",
+        pet="An owned pet to transfer. Leave blank when giving an item.",
+        item="An owned transferable item to give. Leave blank when giving a pet or Stardust.",
+        stardust="How much Stardust to give. Leave blank when giving a pet or item.",
+        quantity="How many of the selected item to give (default: 1).",
+    )
+    @app_commands.autocomplete(pet=give_pet_autocomplete, item=give_item_autocomplete)
     async def give(
             self,
             ctx: commands.Context,
