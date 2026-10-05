@@ -680,24 +680,59 @@ class Profile(commands.Cog):
         file = discord.File(fp=viewport.image_bytes, filename="viewport.png")
 
         # 3. Assemble Embed
+        separator = "━━━━━━━━━━━━━━━━━━━━━━━━"
+
         embed = discord.Embed(
             title=f"🛸 Personnel Record — {target.display_name}",
             description=(
                 f"🏷️ **{data['title']}**\n"
+                f"{separator}\n"
                 f"📜 *{data['bio']}*"
                 if data["title"]
                 else f"📜 *{data['bio']}*"
             ),
             color=target.color or discord.Color.blue()
         )
-        
+
         # User's avatar in the top-right thumbnail spot
         embed.set_thumbnail(url=target.display_avatar.url)
-        
+
         # Native Discord Stat Fields
-        embed.add_field(name="⭐ Rank & XP", value=f"Level **{data['level']}** • **{data['xp']:,} XP**", inline=True)
-        embed.add_field(name="✨ Stardust", value=f"**{data['stardust']:,}**", inline=True)
-        embed.add_field(name="🔥 Daily Streak", value=f"**{data['daily_streak']} days**", inline=True)
+        embed.add_field(
+            name=separator,
+            value="\u200b",
+            inline=False
+        )
+        embed.add_field(
+            name="⭐ Rank & XP",
+            value=f"Level **{data['level']}** • **{data['xp']:,} XP**",
+            inline=True
+        )
+        embed.add_field(
+            name=separator,
+            value="\u200b",
+            inline=False
+        )
+        embed.add_field(
+            name="✨ Stardust",
+            value=f"**{data['stardust']:,}**",
+            inline=True
+        )
+        embed.add_field(
+            name=separator,
+            value="\u200b",
+            inline=False
+        )
+        embed.add_field(
+            name="🔥 Daily Streak",
+            value=f"**{data['daily_streak']} days**",
+            inline=True
+        )
+        embed.add_field(
+            name=separator,
+            value="\u200b",
+            inline=False
+        )
         embed.add_field(
             name="🛠️ Exploration Upgrades",
             value=(
@@ -706,6 +741,12 @@ class Profile(commands.Cog):
             ),
             inline=False
         )
+        embed.add_field(
+            name=separator,
+            value="\u200b",
+            inline=False
+        )
+
         if data.get("pet"):
             pet_name = data["pet"]["nickname"] or data["pet"]["name"]
             companion_text = (
