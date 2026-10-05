@@ -1326,7 +1326,7 @@ class Exploration(commands.Cog):
             
             pet_effects = await get_active_pet_effects(db, user_id)
             found_stardust = int(
-                random.randint(120, 650)
+                random.randint(150, 1250)
                 * mining_upgrade["stardust_mult"]
                 * (
                     1
@@ -2012,7 +2012,7 @@ class Exploration(commands.Cog):
                 new_charges = charges - 1
                 scavenge_charge_saved = False
             found_stardust = int(
-                random.randint(80, 550)
+                random.randint(250, 1000)
                 * scavenging_upgrade["stardust_mult"]
                 * (
                     1
@@ -2402,16 +2402,33 @@ class Exploration(commands.Cog):
                     seasonal_findings.append("🎃 Trick-or-Treat Bag → Inventory Full")
 
             # Scavenging can recover multiple types of crafting material in one run.
-            # Each successful material find yields 1–5 units.
+            # Incubator materials yield 1–2 units and are capped at two
+            # different incubator materials per run.
             #
             # Salvage Rig bonus is a relative chance multiplier:
             # +10% turns a 20% base chance into 22%, while +65% turns it
             # into 33%. This keeps higher tiers meaningful without making
             # common materials nearly guaranteed.
-            for material_id, material_name, chance in SCAVENGE_MATERIALS:
+            incubator_material_ids = {
+                "quantum_coil",
+                "astral_lens",
+                "mutation_catalyst",
+                "analysis_module",
+            }
+            incubator_materials_found = 0
+            material_rolls = list(SCAVENGE_MATERIALS)
+            random.shuffle(material_rolls)
+            for material_id, material_name, chance in material_rolls:
+                is_incubator_material = material_id in incubator_material_ids
+                if is_incubator_material and incubator_materials_found >= 2:
+                    continue
                 effective_material_chance = min(1.0, chance * (1 + salvage_bonus_chance))
                 if random.random() < effective_material_chance:
-                    amount_found = random.randint(1, 5)
+                    if is_incubator_material:
+                        amount_found = random.randint(1, 2)
+                        incubator_materials_found += 1
+                    else:
+                        amount_found = random.randint(1, 5)
                     effective_scavenge_material_bonus = max(
                         pet_effects["material_bonus"],
                         pet_effects["scavenge_material_bonus"],
