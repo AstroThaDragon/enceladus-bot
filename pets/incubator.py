@@ -342,8 +342,12 @@ class PetIncubatorMixin:
                 "essence_amount": essence_amount, "cost": cost,
             }
 
-    async def _incubator_start(self, ctx: commands.Context, egg: str):
+    async def _incubator_start(self, ctx: commands.Context, egg: str, tube: int):
         egg = egg.lower().strip()
+        try:
+            tube = int(tube)
+        except (TypeError, ValueError):
+            return await ctx.send("❌ Please choose a valid incubator tube.")
 
         if egg not in EGG_POOLS:
             return await ctx.send("❌ That isn't a valid pet egg.")
@@ -353,18 +357,21 @@ class PetIncubatorMixin:
             await db.execute("BEGIN IMMEDIATE")
 
             slots = await self._get_incubator_slots(db, ctx.author.id)
+            if tube < 1 or tube > slots:
+                return await ctx.send(
+                    f"🔒 **Tube {tube}** is not unlocked yet. "
+                    f"You currently have **{slots}/3** tubes unlocked."
+                )
+
             rows = await self._incubator_rows(db, ctx.author.id)
             occupied_slots = {int(row[5]) for row in rows}
-            available_slot = next(
-                (slot_id for slot_id in range(1, slots + 1) if slot_id not in occupied_slots),
-                None,
-            )
-
-            if available_slot is None:
+            if tube in occupied_slots:
                 return await ctx.send(
-                    "⏳ All unlocked incubator tubes are occupied! "
-                    "Use `/incubator` to check their status."
+                    f"❌ **Tube {tube}** is already occupied. "
+                    "Choose an empty unlocked tube instead."
                 )
+
+            available_slot = tube
 
             async with db.execute(
                 "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",

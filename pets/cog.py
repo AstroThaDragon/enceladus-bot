@@ -1251,12 +1251,18 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     @app_commands.describe(
         action="Choose Start to begin incubation or Hatch to claim a ready egg.",
         egg="Choose the egg to start or hatch.",
+        tube="Choose which unlocked incubator tube to use when starting an egg.",
     )
     @app_commands.choices(
         action=[
             app_commands.Choice(name="Start incubation", value="start"),
             app_commands.Choice(name="Hatch ready egg", value="hatch"),
-        ]
+        ],
+        tube=[
+            app_commands.Choice(name="🧪 Tube I", value=1),
+            app_commands.Choice(name="🔬 Tube II", value=2),
+            app_commands.Choice(name="🧬 Tube III", value=3),
+        ],
     )
     @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
     async def incubator(
@@ -1264,6 +1270,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         ctx: commands.Context,
         action: str | None = None,
         egg: str | None = None,
+        tube: int | None = None,
     ):
         """View the incubator bay, start an egg, or hatch a ready egg."""
         await ctx.defer()
@@ -1274,7 +1281,9 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         if action == "start":
             if not egg:
                 return await ctx.send("❌ Choose an egg to start incubating.")
-            return await self._incubator_start(ctx, egg)
+            if tube is None:
+                return await ctx.send("❌ Choose which incubator tube to use.")
+            return await self._incubator_start(ctx, egg, tube)
 
         if action == "hatch":
             if not egg:
