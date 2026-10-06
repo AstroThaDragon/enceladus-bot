@@ -349,6 +349,12 @@ async def log_caught_error(
 
 
 async def log_command_error(bot, ctx, error):
+    # Missing required arguments are normal command-usage mistakes, not bot
+    # failures. Individual commands can provide their own friendly error
+    # handlers, so do not duplicate those mistakes in the centralized log.
+    if isinstance(error, discord.ext.commands.MissingRequiredArgument):
+        return None
+
     # Discord formatting such as "-#" can be interpreted by the prefix
     # command handler as a request to run a command literally named "#".
     # This is harmless user input, not an Enceladus error worth logging.
