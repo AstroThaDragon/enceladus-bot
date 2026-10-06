@@ -654,7 +654,7 @@ class InventoryCategorySelect(discord.ui.Select):
         options = []
         for category in inventory_view.available_top_categories:
             if category == "Event Items":
-                emoji, label, description = INVENTORY_CATEGORY_INFO[category]
+                label, emoji, description = INVENTORY_CATEGORY_INFO[category]
                 value = "__event_items__"
             else:
                 label, emoji, description = INVENTORY_CATEGORY_INFO.get(
