@@ -28,6 +28,22 @@ DEFENSE_MESSAGES = {
     "plasma_cutter": "The Plasma Cutter sliced through the incoming hazard before it could hit you!",
 }
 
+# Pet-specific messages for defenses that can prevent a hazard outright.
+# Keep these keyed by effect ID so new pet defenses can be added without
+# changing the hazard-resolution logic in Exploration.
+PET_DEFENSE_MESSAGES = {
+    "atomic_breath": (
+        "**Godzilla unleashes Atomic Breath, vaporizing the hazard before it can reach you.**"
+    ),
+}
+
+
+def get_pet_defense_message(effect_id):
+    return PET_DEFENSE_MESSAGES.get(
+        effect_id,
+        "**Your companion intercepted the hazard before it could reach you.**",
+    )
+
 async def get_equipped_weapon(db, user_id):
     async with db.execute(
         "SELECT active_effects FROM users WHERE user_id = ?",
@@ -70,8 +86,14 @@ async def get_defense_info(db, user_id):
 async def roll_hazard_defense(db, user_id):
     weapon_id, weapon_chance, pet_chance, combined = await get_defense_info(db, user_id)
     if combined <= 0 or random.random() >= combined:
-        return False, weapon_id, pet_chance, combined
-    return True, weapon_id, pet_chance, combined
+        return False, weapon_id, pet_chance, combined, None
+
+    # The combined roll above determines whether a defense succeeds. If it
+    # succeeds without an equipped weapon being selected as the defender,
+    # identify the pet defense responsible so Exploration can use a
+    # pet-specific message instead of a generic one.
+    pet_effect_id = "atomic_breath" if pet_chance > 0 else None
+    return True, weapon_id, pet_chance, combined, pet_effect_id if not weapon_id else None
 
 async def equip_weapon(db, user_id, weapon_id):
     if weapon_id not in DEFENSE_WEAPONS:

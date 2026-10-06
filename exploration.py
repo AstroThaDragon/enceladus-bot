@@ -2054,14 +2054,18 @@ class Exploration(commands.Cog):
                     weights=[entry[3] for entry in self.SCAVENGE_HAZARDS],
                     k=1,
                 )[0]
-                defended, defense_weapon_id, _atomic_breath_chance, _defense_chance = await roll_hazard_defense(db, user_id)
+                defended, defense_weapon_id, _atomic_breath_chance, _defense_chance, defense_pet_effect_id = await roll_hazard_defense(db, user_id)
                 if defended:
                     if defense_weapon_id:
-                        from defense import DEFENSE_MESSAGES
+                        from defense import DEFENSE_MESSAGES, DEFENSE_WEAPONS
                         defense_text = DEFENSE_MESSAGES.get(defense_weapon_id, "Your defensive weapon stopped the hazard!")
+                        defense_name = DEFENSE_WEAPONS.get(defense_weapon_id, {}).get("name", "Defensive weapon")
+                        hazard_note = f"\n\n**{defense_name} defense!** {defense_text}\n**0 HP damage taken.**"
                     else:
-                        defense_text = "**ATOMIC BREATH! ☢️** Your Godzilla has blasted the incoming hazard before it could reach you!"
-                    hazard_note = f"\n\n**Red Gem defense!** {defense_text}\n**0 HP damage taken thanks to your pet.**"
+                        from defense import get_pet_defense_message
+                        defense_text = get_pet_defense_message(defense_pet_effect_id)
+                        defense_label = "Atomic Breath" if defense_pet_effect_id == "atomic_breath" else "Pet defense"
+                        hazard_note = f"\n\n**{defense_label} defense!**\n{defense_text}\n**0 HP damage taken.**"
                 elif pet_effects.get("tails_doll_red_gem", 0.0) and random.random() < pet_effects.get("tails_doll_red_gem", 0.0):
                     benefit_roll = random.random()
                     if benefit_roll < 0.34:
