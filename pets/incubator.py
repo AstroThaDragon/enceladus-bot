@@ -410,21 +410,38 @@ class PetIncubatorMixin:
             f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating in Tube {available_slot}!**\n"
             f"⏳ Incubation time: **{duration // 3600}h {(duration % 3600) // 60}m**\n"
             "🔔 I'll alert you when it's ready to hatch!\n"
-            f"Use `/incubator` with **Hatch ready egg** and choose **{egg}** when the timer finishes."
+            f"Use `/incubator` with **Hatch ready egg**, choose **Tube {available_slot}**, and select **{egg}** when the timer finishes."
         )
 
 
-    async def _incubator_hatch(self, ctx: commands.Context, egg: str):
+    async def _incubator_hatch(self, ctx: commands.Context, egg: str, tube: int):
         egg = egg.lower().strip()
+        try:
+            tube = int(tube)
+        except (TypeError, ValueError):
+            return await ctx.send("❌ Please choose a valid incubator tube.")
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
-            rows = await self._incubator_rows(db, ctx.author.id)
+            slots = await self._get_incubator_slots(db, ctx.author.id)
+            if tube < 1 or tube > slots:
+                return await ctx.send(
+                    f"🔒 **Tube {tube}** is not unlocked yet. "
+                    f"You currently have **{slots}/3** tubes unlocked."
+                )
 
-            row = next((candidate for candidate in rows if candidate[1] == egg), None)
+            rows = await self._incubator_rows(db, ctx.author.id)
+            row = next((candidate for candidate in rows if int(candidate[5]) == tube), None)
             if not row:
                 return await ctx.send(
-                    f"❌ None of your incubator tubes currently contains **{egg}**."
+                    f"❌ **Tube {tube}** is currently empty. There is no egg to hatch there."
+                )
+
+            if row[1] != egg:
+                info = ITEM_REGISTRY.get(row[1], {"name": row[1], "emoji": "🥚"})
+                return await ctx.send(
+                    f"❌ **Tube {tube}** contains **{info['name']}**, not **{egg}**. "
+                    f"Choose **{info['name']}** from the egg selection for Tube {tube}."
                 )
 
             _incubator_id, stored_egg, _started_at, ready_at, _notified, slot_id = row

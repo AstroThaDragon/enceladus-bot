@@ -195,14 +195,23 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     async def _incubator_egg_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
-        action = getattr(getattr(interaction, "namespace", None), "action", None)
+        namespace = getattr(interaction, "namespace", None)
+        action = getattr(namespace, "action", None)
         action = str(action).lower().strip() if action else ""
+        selected_tube = getattr(namespace, "tube", None)
+        try:
+            selected_tube = int(selected_tube) if selected_tube is not None else None
+        except (TypeError, ValueError):
+            selected_tube = None
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
             if action == "hatch":
                 rows = await self._incubator_rows(db, interaction.user.id)
-                egg_ids = [row[1] for row in rows]
+                if selected_tube is not None:
+                    egg_ids = [row[1] for row in rows if int(row[5]) == selected_tube]
+                else:
+                    egg_ids = [row[1] for row in rows]
             else:
                 owned = await self._owned_eggs(db, interaction.user.id)
                 egg_ids = list(owned.keys())
@@ -1251,7 +1260,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     @app_commands.describe(
         action="Choose Start to begin incubation or Hatch to claim a ready egg.",
         egg="Choose the egg to start or hatch.",
-        tube="Choose which unlocked incubator tube to use when starting an egg.",
+        tube="Choose which incubator tube to use for starting or hatching an egg.",
     )
     @app_commands.choices(
         action=[
@@ -1286,9 +1295,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             return await self._incubator_start(ctx, egg, tube)
 
         if action == "hatch":
+            if tube is None:
+                return await ctx.send("❌ Choose which incubator tube to hatch from.")
             if not egg:
-                return await ctx.send("❌ Choose an egg to hatch.")
-            return await self._incubator_hatch(ctx, egg)
+                return await ctx.send("❌ Choose the egg to hatch.")
+            return await self._incubator_hatch(ctx, egg, tube)
 
         if action is not None:
             return await ctx.send("❌ Choose **Start** or **Hatch** as the incubator action.")
@@ -1310,7 +1321,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
                 async with db.execute(
                     """
-                    SELECT incubator_id, user_id, egg_id
+                    SELECT incubator_id, user_id, egg_id, slot_id
                     FROM pet_incubators
                     WHERE ready_at <= ? AND notified = 0
                     """,
@@ -1318,7 +1329,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 ) as cursor:
                     rows = await cursor.fetchall()
 
-                for incubator_id, user_id, egg_id in rows:
+                for incubator_id, user_id, egg_id, slot_id in rows:
                     channel = self.bot.get_channel(INCUBATOR_NOTIFICATION_CHANNEL_ID)
                     if channel is None:
                         try:
@@ -1344,11 +1355,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                         await channel.send(
                             f"<@{user_id}> 🔔 {info['emoji']} "
                             f"**Your pet egg is ready to hatch!**\n"
-                            f"Your **{info['name']}** has finished incubating.\n\n"
-                            f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}** to reveal your new companion! 🐣"
+                            f"Your **{info['name']}** in **Tube {slot_id}** has finished incubating.\n\n"
+                            f"Use `/incubator` with **Hatch ready egg**, choose **Tube {slot_id}**, and select **{egg_id}** to reveal your new companion! 🐣"
                         )
                     except Exception as e:
-                        await log_task_error(self.bot, "incubator_checker / send notification", e, context=f"user_id={user_id}, egg_id={egg_id}")
+                        await log_task_error(self.bot, "incubator_checker / send notification", e, context=f"user_id={user_id}, egg_id={egg_id}, slot_id={slot_id}")
                         # Keep the notification pending if the channel/message
                         # cannot be sent right now.
                         continue
