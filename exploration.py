@@ -1750,7 +1750,7 @@ class Exploration(commands.Cog):
         }
 
         embed = discord.Embed(
-            title=f"Starship Mining Log — {ctx.author.mention}",
+            title=f"Starship Mining Log — {ctx.author.display_name}",
             description=(
                 f"Your laser beam fired into the debris field...\n\n"
                 f"{loot_description}"
@@ -2581,7 +2581,7 @@ class Exploration(commands.Cog):
         status_text = f"**Health:** **{new_hp}/{max_hp}HP**" if new_hp > 0 else f"**Knocked out!** Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{knocked_out_until}**."
 
         embed = discord.Embed(
-            title=f"Derelict Salvage Log — {ctx.author.mention}",
+            title=f"Derelict Salvage Log — {ctx.author.display_name}",
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
                 f"**Stardust Found:** **{found_stardust:,}**"
