@@ -30,28 +30,105 @@ class EconomyDatabaseMixin:
             return datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
 
     def daily_rotation(self):
-            """Return the same three distinct rotating offers for every user on a given day.
-    
-            The daily market is drawn exclusively from ROTATING_ITEMS. Permanent shop
-            inventory is intentionally not part of this pool. The result is deterministic
-            for the current Eastern-time date, so every user sees the same three offers
-            throughout the day and the set changes at midnight Eastern time.
+            """Return the same three daily offers for every user on a given day.
+
+            Two offers are drawn from eligible regular/rotating shop inventory, while
+            exactly one offer is always a defensive weapon. Permanent shop items receive
+            the Daily Offer discount in the buying/UI layers; rotating-only items and
+            defensive weapons keep their normal listed price.
+
+            The result is deterministic for the current Eastern-time date, so every user
+            sees the same offers throughout the day and the set changes at midnight
+            Eastern time. Defensive weapons are selected from a stable date-based cycle,
+            so the same weapon cannot appear on consecutive days.
             """
+            rotation_date = datetime.now(pytz.timezone("US/Eastern")).date()
+            date_key = rotation_date.isoformat()
+
             excluded_types = {"background_voucher", "title", "station_upgrade"}
-            eligible_items = []
-    
+            # These are listed under the Upgrades buy category but are temporary
+            # consumables and are intentionally allowed in the Daily Offers pool.
+            temporary_upgrade_consumables = {
+                "fuel_stabilizer",
+                "hazard_shield",
+                "lucky_scanner",
+                "prototype_drill_bit",
+            }
+            excluded_upgrade_ids = (
+                set(SHOP_BUY_CATEGORY_ITEMS.get("upgrades", ()))
+                - temporary_upgrade_consumables
+            )
+
+            # Regular shop inventory: consumables, healing items, recharge items,
+            # pet items, and special purchasable items are eligible. Actual station
+            # upgrades, tickets, vouchers, and titles are not.
+            regular_pool = []
+            for item_id, item in SHOP_ITEMS.items():
+                if item.get("halloween_only") and not halloween_is_active():
+                    continue
+                if item.get("type") in excluded_types:
+                    continue
+                if item_id in excluded_upgrade_ids:
+                    continue
+                if item_id == "lottery_ticket":
+                    continue
+                regular_pool.append(item_id)
+
+            # Existing rotating-only utilities remain eligible. Defensive weapons are
+            # selected separately so the daily shop always contains exactly one weapon.
+            rotating_pool = []
             for item_id, item in ROTATING_ITEMS.items():
                 if item.get("halloween_only") and not halloween_is_active():
                     continue
                 if item.get("type") in excluded_types:
                     continue
-                eligible_items.append(item_id)
-    
-            if len(eligible_items) < 3:
-                return eligible_items
-    
-            generator = random.Random(f"enceladus-rotation-{self.rotation_date()}")
-            return generator.sample(eligible_items, k=3)
+                if item.get("type") == "defense_weapon":
+                    continue
+                rotating_pool.append(item_id)
+
+            offer_pool = sorted(set(regular_pool + rotating_pool))
+
+            # Use one stable global weapon order and advance one position per day.
+            # Inactive seasonal weapons are skipped, which also prevents a repeat when
+            # the Halloween weapon enters or leaves the active pool.
+            all_weapon_ids = sorted(
+                item_id
+                for item_id, item in ROTATING_ITEMS.items()
+                if item.get("type") == "defense_weapon"
+            )
+            active_weapon_ids = [
+                item_id
+                for item_id in all_weapon_ids
+                if not (
+                    ROTATING_ITEMS[item_id].get("halloween_only")
+                    and not halloween_is_active()
+                )
+            ]
+
+            generator = random.Random(f"enceladus-rotation-{date_key}")
+
+            weapon_id = None
+            if active_weapon_ids:
+                if all_weapon_ids:
+                    start_index = rotation_date.toordinal() % len(all_weapon_ids)
+                    for offset in range(len(all_weapon_ids)):
+                        candidate = all_weapon_ids[
+                            (start_index + offset) % len(all_weapon_ids)
+                        ]
+                        if candidate in active_weapon_ids:
+                            weapon_id = candidate
+                            break
+
+            regular_offers = (
+                generator.sample(offer_pool, k=2)
+                if len(offer_pool) >= 2
+                else offer_pool[:]
+            )
+
+            if weapon_id is not None and weapon_id not in regular_offers:
+                return regular_offers + [weapon_id]
+
+            return regular_offers
 
     def get_db_path(self):
             """Return the separate Station economy database."""
