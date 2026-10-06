@@ -1152,7 +1152,7 @@ class Leveling(commands.Cog):
         else:
             await interaction.response.send_message(f"Successfully added {amount}XP to {member.mention}. They now have a total of **{amount}XP**.")
 
-    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on current roles only and ignoring XP totals. (This is a dangerous command!)")
+    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles only and ignoring XP. (This is a dangerous command!)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
