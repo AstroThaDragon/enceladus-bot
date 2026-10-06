@@ -564,7 +564,8 @@ class ShopTransactionView(discord.ui.View):
         self.add_item(previous)
         self.add_item(next_button)
         self.add_item(search)
-        self.add_item(categories)
+        if self.category != "__rotating__":
+            self.add_item(categories)
 
         embed.set_footer(
             text="Items are shown above • Use the item buttons to select one, or Search to filter."
@@ -813,7 +814,7 @@ class ShopView(discord.ui.View):
 
     def _add_daily_buttons(self):
         for item_id in self.cog.daily_rotation():
-            item = self.cog.ROTATING_ITEMS.get(item_id)
+            item = self.cog.SHOP_ITEMS.get(item_id) or self.cog.ROTATING_ITEMS.get(item_id)
             if not item:
                 continue
             self.add_item(
