@@ -121,14 +121,14 @@ class VerifyView(View):
                 "2. Go to **Privacy Settings**.\n"
                 "3. Enable **Direct Messages**.\n"
                 "4. Click the **Verify** button again!",
-                delete_after=10
+                ephemeral=True
             )
 
         await interaction.followup.send(
             "I sent you a verification code in your DMs!\n\n"
             "Once you receive it, return here and type:\n"
             "`-verifycode <YOUR-CODE>`",
-            delete_after=10
+            ephemeral=True
         )
 
 
