@@ -19,7 +19,7 @@ IGNORED_CHANNEL_IDS = [
 AUTO_RESPONSES = {
     "good bot": [
         "Beep boop! 💜",
-        "Cosmic appreciation detected! 🌌",
+        "Cosmic appreciation detected!",
         "Thank youuu <3"
     ],
 
@@ -46,7 +46,7 @@ AUTO_RESPONSES = {
         "🧀",
         "*Cheese slap*",
         "Munster be my fav frfr",
-        "I promise I'm not a mouse 🫣"
+        "I promise I'm not a mouse-"
     ],
 
     "shawty": [

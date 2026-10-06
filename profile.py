@@ -13,12 +13,12 @@ BACKGROUND_ARTISTS = {
     "neon_grid": "pikisuperstar on Magnific",
     "deep_void": "Marek Pavlík on Unsplash",
     "solaris_ring": "NASA / Solar Dynamics Observatory (SDO)",
-    "halloween_haunted": "@john_silliman on Unsplash",
+    "halloween_haunted": "john_silliman on Unsplash",
     "halloween_candy_collector": "Yaroslav Danylchenko0",
-    "halloween_haunting_friend": "@helloimnik on Unsplash",
+    "halloween_haunting_friend": "helloimnik on Unsplash",
     "halloween_trick_or_treat": "Daisy Anderson on Pexels",
     "background_glowing_gem": "SynoMatesXD on Reddit",
-    "background_malo": "@upsetfroglet on Tumblr",
+    "background_malo": "upsetfroglet on Tumblr",
 
     # Haunted achievement backgrounds
     "background_the_graveyard": "Just Jus on Unsplash",
@@ -36,7 +36,7 @@ BACKGROUND_ARTISTS = {
 
 BACKGROUND_COLLECTIONS = {
     "shop": {
-        "label": "🛒 Shop Backgrounds",
+        "label": "Shop Backgrounds 🛒",
         "emoji": "🛒",
         "items": [
             "default",
@@ -46,7 +46,7 @@ BACKGROUND_COLLECTIONS = {
         ],
     },
     "halloween": {
-        "label": "🎃 Halloween",
+        "label": "Halloween 🎃",
         "emoji": "🎃",
         "items": [
             "halloween_haunted",
@@ -323,9 +323,9 @@ class BackgroundCollectionView(discord.ui.View):
 
         if self.section == "main":
             embed = discord.Embed(
-                title="🖼️ Background Collection",
+                title="Background collection",
                 description=(
-                    "Browse the profile backgrounds you have permanently unlocked.\n\n"
+                    "Browse the profile backgrounds you've unlocked.\n\n"
                     "Choose a category below to get started.\n"
                     "Locked backgrounds are not shown here."
                 ),
@@ -336,7 +336,7 @@ class BackgroundCollectionView(discord.ui.View):
 
         if self.section == "events":
             embed = discord.Embed(
-                title="🎃 Event Backgrounds",
+                title="Event backgrounds",
                 description=(
                     "Choose an event to browse the backgrounds you've unlocked from it.\n\n"
                     "More events can be added here in the future!"
@@ -363,7 +363,7 @@ class BackgroundCollectionView(discord.ui.View):
         embed = discord.Embed(
             title=f"{info['emoji']} {info['name']}",
             description=(
-                ("✨ **Currently Equipped**\n\n" if is_equipped else "") +
+                ("**Currently equipped**\n\n" if is_equipped else "") +
                 f"**Obtained:** {info['obtained']}"
             ),
             color=discord.Color.gold() if is_equipped else discord.Color.blurple()
@@ -378,7 +378,7 @@ class BackgroundCollectionView(discord.ui.View):
 
         embed.add_field(
             name="Preview",
-            value="🖼️ Background artwork is currently unavailable.",
+            value="Background artwork is currently unavailable.",
             inline=False
         )
         return embed, None
@@ -386,7 +386,7 @@ class BackgroundCollectionView(discord.ui.View):
     async def _update(self, interaction):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message(
-                "❌ This collection belongs to someone else.",
+                "This collection belongs to someone else.",
                 ephemeral=True
             )
 
@@ -431,7 +431,7 @@ class BackgroundCollectionView(discord.ui.View):
     async def _previous_callback(self, interaction):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message(
-                "❌ This collection belongs to someone else.", ephemeral=True
+                "This collection belongs to someone else.", ephemeral=True
             )
         self.page = max(0, self.page - 1)
         await self._update(interaction)
@@ -439,7 +439,7 @@ class BackgroundCollectionView(discord.ui.View):
     async def _next_callback(self, interaction):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message(
-                "❌ This collection belongs to someone else.", ephemeral=True
+                "This collection belongs to someone else.", ephemeral=True
             )
         self.page = min(len(self.items) - 1, self.page + 1)
         await self._update(interaction)
@@ -640,7 +640,7 @@ class Profile(commands.Cog):
             "unlocked_backgrounds": unlocked_backgrounds
         }
 
-    @commands.hybrid_command(name="profile", description="View your cosmic station profile.")
+    @commands.hybrid_command(name="profile", description="View your profile.")
     @app_commands.describe(member="The user whose profile you want to view")
     async def profile(self, ctx: commands.Context, member: discord.Member | None = None):
         target = member or ctx.author
@@ -685,11 +685,11 @@ class Profile(commands.Cog):
         embed = discord.Embed(
             title=f"🛸 Personnel Record — {target.display_name}",
             description=(
-                f"🏷️ **{data['title']}**\n"
+                f"🏷️ Title: **{data['title']}**\n"
                 f"{separator}\n"
-                f"📜 *{data['bio']}*"
+                f"📜 Bio: *{data['bio']}*"
                 if data["title"]
-                else f"📜 *{data['bio']}*"
+                else f"📜 Bio: *{data['bio']}*"
             ),
             color=target.color or discord.Color.blue()
         )
@@ -704,7 +704,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="⭐ Rank & XP",
+            name="Rank & XP",
             value=f"Level **{data['level']}** • **{data['xp']:,} XP**",
             inline=True
         )
@@ -714,7 +714,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="✨ Stardust",
+            name="Stardust",
             value=f"**{data['stardust']:,}**",
             inline=True
         )
@@ -724,7 +724,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="🔥 Daily Streak",
+            name="Daily Exploration Streak",
             value=f"**{data['daily_streak']} days**",
             inline=True
         )
@@ -734,10 +734,10 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="🛠️ Exploration Upgrades",
+            name="Exploration Upgrades",
             value=(
-                f"⛏️ Mining Laser — **Tier {data['mining_upgrade']}/5**\n"
-                f"🤖 Scavenging Drone — **Tier {data['scavenging_upgrade']}/5**"
+                f"Mining Laser — **Tier {data['mining_upgrade']}/5**\n"
+                f"Scavenging Drone — **Tier {data['scavenging_upgrade']}/5**"
             ),
             inline=False
         )
@@ -756,7 +756,7 @@ class Profile(commands.Cog):
         else:
             companion_text = "**None**"
 
-        embed.add_field(name="🐾 Companion", value=companion_text, inline=True)
+        embed.add_field(name="Current companion", value=companion_text, inline=True)
         
         # Environment Window Image
         embed.set_image(url="attachment://viewport.png")
@@ -774,10 +774,10 @@ class Profile(commands.Cog):
 
     @commands.hybrid_command(
         name="bio",
-        description="Set your Enceladus Station profile biography."
+        description="Set your profile bio."
     )
     @app_commands.describe(
-        text="The biography you want displayed on your profile."
+        text="The bio you want displayed on your profile."
     )
     async def bio(self, ctx: commands.Context, text: str):
         await ctx.defer(ephemeral=True)
@@ -787,15 +787,14 @@ class Profile(commands.Cog):
         # Keep profile bios short enough to fit nicely on the profile card.
         if len(text) > 180:
             return await ctx.send(
-                f"❌ **Your bio is too long!** "
+                f"**Woah there, bru!Your bio is too long!** "
                 f"Please keep it to **180 characters or fewer** "
                 f"({len(text)}/180)."
             )
 
         if not text:
             return await ctx.send(
-                "❌ **Your bio can't be empty.** "
-                "Use `/bio reset` if you want to restore the default bio."
+                "**Your bio can't be empty!**"
             )
 
         from database import ECONOMY_DB_NAME
@@ -814,14 +813,13 @@ class Profile(commands.Cog):
 
         await ctx.send(
             f"**Bio updated!**"
-            f"Use `/profile` to check it out!\n"
-            f"> {text}",
+            f"Use `/profile` to check it out!\n",
             ephemeral=True
         )
 
     @commands.hybrid_command(
         name="moderatebio",
-        description="Force a user's profile bio to be marked as Moderated."
+        description="Force a user's profile bio to be marked as moderated."
     )
     @app_commands.describe(
         member="The user whose bio should be moderated.",
@@ -834,7 +832,7 @@ class Profile(commands.Cog):
     ):
         if not ctx.guild:
             return await ctx.send(
-                "❌ This command can only be used in a server."
+                "This command can only be used in a server."
             )
 
         is_owner = await self.bot.is_owner(ctx.author)
@@ -865,7 +863,7 @@ class Profile(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🛡️ **Bio Moderated**\n"
+            f"**User bio has been moderated**\n"
             f"User: {member.mention}\n"
             f"Reason: {reason}"
         )
@@ -875,7 +873,7 @@ class Profile(commands.Cog):
         interaction: discord.Interaction,
         current: str
     ):
-        """Show backgrounds permanently unlocked by the user."""
+        """Show backgrounds unlocked by the user."""
         user_id = interaction.user.id
         current = current.lower().strip()
 
@@ -967,7 +965,7 @@ class Profile(commands.Cog):
         return choices[:25]
 
     async def _get_owned_backgrounds(self, user_id):
-        """Return the user's permanently unlocked background IDs."""
+        """Return the user's unlocked background IDs."""
         from database import ECONOMY_DB_NAME
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
@@ -997,11 +995,11 @@ class Profile(commands.Cog):
     async def background(self, ctx: commands.Context):
         """Show the background command options."""
         embed = discord.Embed(
-            title="🖼️ Profile Backgrounds",
+            title="Profile backgrounds",
             description=(
                 "Manage your unlocked profile backgrounds.\n\n"
-                "**Equip a background:** `/background equip`\n"
-                "**Browse your collection:** `/background collection`"
+                "Equip a background with* `/background equip`\n"
+                "Browse your collection with `/background collection`"
             ),
             color=discord.Color.blurple()
         )
@@ -1009,10 +1007,10 @@ class Profile(commands.Cog):
 
     @background.command(
         name="equip",
-        description="Equip an unlocked background for your profile card."
+        description="Equip a background for your profile card."
     )
     @app_commands.describe(
-        background="Choose an unlocked background for your profile card."
+        background="Choose a background for your profile card."
     )
     @app_commands.autocomplete(background=background_autocomplete)
     async def background_equip(self, ctx: commands.Context, background: str):
@@ -1044,7 +1042,7 @@ class Profile(commands.Cog):
 
         if background not in valid_backgrounds:
             return await ctx.send(
-                "❌ That background isn't unlocked. Please choose one from the dropdown."
+                "That background isn't unlocked. Please choose one from the dropdown."
             )
 
         from database import ECONOMY_DB_NAME
@@ -1070,7 +1068,7 @@ class Profile(commands.Cog):
 
             if background not in unlocked_backgrounds:
                 return await ctx.send(
-                    "🔒 **Background Locked!** Redeem its voucher with `/voucher` first."
+                    "**That background is locked for you!**"
                 )
 
             await db.execute(
@@ -1080,8 +1078,8 @@ class Profile(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"{ctx.author.mention} 🌟 **Profile Updated!** Successfully equipped "
-            f"**{valid_backgrounds[background]}** as your active profile background. "
+            f"**Your profile has been updated {ctx.author.mention}!**\nSuccessfully equipped "
+            f"**{valid_backgrounds[background]}** as your active profile background.\n "
             f"Run `/profile` to check it out!"
         )
 
@@ -1154,8 +1152,8 @@ class Profile(commands.Cog):
 
         if not owned_vouchers:
             return await ctx.send(
-                "🎟️ **You don't have any redeemable vouchers!** "
-                "Check the shop for available vouchers."
+                "**You don't have any redeemable vouchers!** "
+                "Check `shop buy` for available vouchers."
             )
 
         cog = self
@@ -1173,7 +1171,7 @@ class Profile(commands.Cog):
                     for reward in [voucher_rewards[item_id]]
                 ]
                 super().__init__(
-                    placeholder="Choose a voucher to redeem...",
+                    placeholder="Choose a voucher to redeem.",
                     min_values=1,
                     max_values=1,
                     options=options
@@ -1182,7 +1180,7 @@ class Profile(commands.Cog):
             async def callback(self, interaction: discord.Interaction):
                 if interaction.user.id != user_id:
                     return await interaction.response.send_message(
-                        "❌ This menu belongs to someone else.",
+                        "This menu belongs to someone else.",
                         ephemeral=True
                     )
 
@@ -1204,7 +1202,7 @@ class Profile(commands.Cog):
 
                     if not voucher_row:
                         return await interaction.response.send_message(
-                            "❌ You no longer have that voucher.",
+                            "You no longer have that voucher!",
                             ephemeral=True
                         )
 
@@ -1225,8 +1223,8 @@ class Profile(commands.Cog):
 
                     if item_id in unlocked:
                         return await interaction.response.send_message(
-                            f"🔒 **{reward['name']}** is already permanently unlocked. "
-                            "You cannot redeem or buy another copy.",
+                            f"**{reward['name']}** is already unlocked. "
+                            "You cannot redeem or buy another copy!",
                             ephemeral=True
                         )
 
@@ -1259,9 +1257,9 @@ class Profile(commands.Cog):
 
                 await interaction.response.edit_message(
                     content=(
-                        f"{interaction.user.mention} 🎟️ **Voucher Redeemed!**\n"
-                        f"{reward['emoji']} **{reward['name']}** is now permanently unlocked!\n"
-                        "You can select it anytime with `/background`."
+                        f"{interaction.user.mention} **Voucher redeemed!**\n"
+                        f"{reward['emoji']} **{reward['name']}** is now unlocked!\n"
+                        "You can select it anytime with `/background equip`"
                     ),
                     embed=None,
                     view=None
@@ -1275,16 +1273,16 @@ class Profile(commands.Cog):
             async def interaction_check(self, interaction: discord.Interaction):
                 if interaction.user.id != user_id:
                     await interaction.response.send_message(
-                        "❌ This menu belongs to someone else.",
+                        "This menu belongs to someone else.",
                         ephemeral=True
                     )
                     return False
                 return True
 
         embed = discord.Embed(
-            title=f"🎟️ {ctx.author.display_name}'s Vouchers",
+            title=f"{ctx.author.display_name}'s Vouchers",
             description=(
-                "Redeem a voucher to permanently unlock its reward.\n"
+                "Redeem a voucher to unlock its reward.\n"
                 "Choose one below:"
             ),
             color=discord.Color.gold()

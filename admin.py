@@ -15,7 +15,7 @@ from database import DB_NAME, ECONOMY_DB_NAME
 class SetXPModal(discord.ui.Modal):
     amount = discord.ui.TextInput(
         label="XP Amount",
-        placeholder="Enter the XP amount to set...",
+        placeholder="Enter the XP amount to set.",
         required=True
     )
 
@@ -29,19 +29,19 @@ class SetXPModal(discord.ui.Modal):
             amount = int(self.amount.value)
             if amount <= 0:
                 return await interaction.response.send_message(
-                    "⚠️ XP must be greater than zero.",
+                    "XP must be greater than zero!",
                     ephemeral=True
                 )
         except ValueError:
             return await interaction.response.send_message(
-                "⚠️ Please enter a valid whole number for XP.",
+                "Please enter a valid whole number for XP.",
                 ephemeral=True
             )
 
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "❌ The leveling system is currently unavailable.",
+                "The leveling system is currently unavailable. Please report to staff.",
                 ephemeral=True
             )
 
@@ -71,7 +71,7 @@ class SetXPModal(discord.ui.Modal):
         await leveling_cog._update_member_roles(self.member, temp_level)
 
         await interaction.response.send_message(
-            f"✅ Set {self.member.name}'s XP to {amount} "
+            f"Set {self.member.name}'s XP to {amount} "
             f"(Level {temp_level}).",
             ephemeral=True
         )
@@ -100,7 +100,7 @@ class SetXPView(discord.ui.View):
 class SetLevelModal(discord.ui.Modal):
     level = discord.ui.TextInput(
         label="Level",
-        placeholder="Enter the level to set...",
+        placeholder="Enter the level to set.",
         required=True
     )
 
@@ -114,19 +114,19 @@ class SetLevelModal(discord.ui.Modal):
             level = int(self.level.value)
             if level < 0:
                 return await interaction.response.send_message(
-                    "⚠️ Level cannot be negative.",
+                    "Level cannot be negative!",
                     ephemeral=True
                 )
         except ValueError:
             return await interaction.response.send_message(
-                "⚠️ Please enter a valid whole number for level.",
+                "Please enter a valid whole number for level!",
                 ephemeral=True
             )
 
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "❌ The leveling system is currently unavailable.",
+                "The leveling system is currently unavailable. Please report to staff.",
                 ephemeral=True
             )
 
@@ -154,7 +154,7 @@ class SetLevelModal(discord.ui.Modal):
         await leveling_cog._update_member_roles(self.member, level)
 
         await interaction.response.send_message(
-            f"✅ Set {self.member.mention} to **Level {level}** "
+            f"Set {self.member.mention} to **Level {level}** "
             f"({new_xp} XP).",
             ephemeral=True
         )
@@ -183,7 +183,7 @@ class SetLevelView(discord.ui.View):
 class AddXPModal(discord.ui.Modal):
     amount = discord.ui.TextInput(
         label="XP Amount",
-        placeholder="Enter the XP amount to add...",
+        placeholder="Enter the XP amount to add.",
         required=True
     )
 
@@ -197,19 +197,19 @@ class AddXPModal(discord.ui.Modal):
             amount = int(self.amount.value)
             if amount < 0:
                 return await interaction.response.send_message(
-                    "⚠️ XP cannot be negative.",
+                    "XP cannot be negative!",
                     ephemeral=True
                 )
         except ValueError:
             return await interaction.response.send_message(
-                "⚠️ Please enter a valid whole number for XP.",
+                "Please enter a valid whole number for XP.",
                 ephemeral=True
             )
 
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "❌ The leveling system is currently unavailable.",
+                "The leveling system is currently unavailable. Please report to staff.",
                 ephemeral=True
             )
 
@@ -225,13 +225,13 @@ class AddXPModal(discord.ui.Modal):
         if result:
             new_xp, new_level = result
             await interaction.response.send_message(
-                f"✅ Added {amount} XP to {self.member.mention}! "
+                f"Added {amount} XP to {self.member.mention}! "
                 f"They now have **{new_xp} XP** (Level {new_level}).",
                 ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"✅ Added {amount} XP to {self.member.mention}!",
+                f"Added {amount} XP to {self.member.mention}!",
                 ephemeral=True
             )
 
@@ -259,7 +259,7 @@ class AddXPView(discord.ui.View):
 class FortuneStreakModal(discord.ui.Modal):
     streak = discord.ui.TextInput(
         label="Fortune Streak",
-        placeholder="Enter the streak to set...",
+        placeholder="Enter the streak to set.",
         required=True
     )
 
@@ -273,12 +273,12 @@ class FortuneStreakModal(discord.ui.Modal):
             streak = int(self.streak.value)
             if streak < 0:
                 return await interaction.response.send_message(
-                    "⚠️ Streak cannot be negative.",
+                    "Streak cannot be negative!",
                     ephemeral=True
                 )
         except ValueError:
             return await interaction.response.send_message(
-                "⚠️ Please enter a valid whole number for the streak.",
+                "Please enter a valid **whole** number for the streak!",
                 ephemeral=True
             )
 
@@ -309,7 +309,7 @@ class FortuneStreakModal(discord.ui.Modal):
             await db.commit()
 
         await interaction.response.send_message(
-            f"✅ Restored {self.member.mention}'s fortune streak to "
+            f"Restored {self.member.mention}'s fortune streak to "
             f"**{streak} day{'s' if streak != 1 else ''}**.",
             ephemeral=True
         )
@@ -346,18 +346,18 @@ class ResetTypeSelect(discord.ui.Select):
                 label="XP & Level Only",
                 value="xp",
                 emoji="📈",
-                description="Reset XP and Level; keep economy/profile data."
+                description="Reset XP and Level; keep economy/profile data. **This is a dangerous command!**"
             ),
             discord.SelectOption(
                 label="Complete Account Wipe",
                 value="all",
                 emoji="☢️",
-                description="Permanently delete all Enceladus data."
+                description="Permanently delete all Enceladus data. **This is a dangerous command!**"
             ),
         ]
 
         super().__init__(
-            placeholder="Choose the reset type...",
+            placeholder="Choose the reset type.",
             min_values=1,
             max_values=1,
             options=options
@@ -366,7 +366,7 @@ class ResetTypeSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.admin_user_id:
             await interaction.response.send_message(
-                "❌ This reset panel belongs to another administrator.",
+                "This reset panel belongs to another administrator.",
                 ephemeral=True
             )
             return
@@ -376,9 +376,9 @@ class ResetTypeSelect(discord.ui.Select):
         if reset_type == "xp":
             await interaction.response.send_message(
                 content=(
-                    f"⚠️ Reset **XP and Level only** for "
+                    f"Reset **XP and Level only** for "
                     f"{self.member.mention}?\n\n"
-                    f"💰 Stardust, inventory, pets, profile data, and "
+                    f"Stardust, inventory, pets, profile data, and "
                     f"other progress will remain untouched."
                 ),
                 view=ResetConfirmationView(
@@ -398,7 +398,7 @@ class ResetTypeSelect(discord.ui.Select):
                     f"for {self.member.mention}, including XP, Level, "
                     f"Stardust, profile data, inventory, and pets.\n\n"
                     f"This is a **dangerous** operation and **irreversible!**\n\n"
-                    f"Are you ***absolutely*** sure?"
+                    f"Are you ***absolutely*** sure? ☢️"
                 ),
                 view=ResetConfirmationView(
                     self.admin_cog,
@@ -420,7 +420,7 @@ class ResetConfirmationView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.admin_user_id:
             await interaction.response.send_message(
-                "❌ This reset confirmation belongs to another administrator.",
+                "This reset confirmation belongs to another administrator.",
                 ephemeral=True
             )
             return False
@@ -443,7 +443,7 @@ class ResetConfirmationView(discord.ui.View):
 
         if leveling_cog is None:
             await interaction.edit_original_response(
-                content="❌ The leveling system is currently unavailable.",
+                content="The leveling system is currently unavailable. Please report to staff.",
                 view=None
             )
             return
@@ -473,7 +473,7 @@ class ResetConfirmationView(discord.ui.View):
 
             await interaction.edit_original_response(
                 content=(
-                    f"♻️ **{self.member.name}**'s XP and Level "
+                    f"**{self.member.name}**'s XP and Level "
                     f"have been reset to 0."
                 ),
                 view=None
@@ -568,11 +568,12 @@ class ResetConfirmationView(discord.ui.View):
 
             await interaction.edit_original_response(
                 content=(
-                    f"☢️ **{self.member.name}**'s Enceladus account "
+                    f"**{self.member.name}**'s Enceladus account "
                     f"has been completely wiped.\n"
                     f"All player-owned XP, economy, profile, inventory, pets, "
                     f"achievements, collectibles, purchase limits, minigame, "
-                    f"sword, and Dragon Rider data were deleted."
+                    f"sword, and Dragonrider data were deleted. This cannot be recovered, "
+                    f"unless the bot owner has a backup of the database."
                 ),
                 view=None
             )
@@ -589,7 +590,7 @@ class ResetConfirmationView(discord.ui.View):
         button: discord.ui.Button
     ):
         await interaction.response.edit_message(
-            content="❌ Reset cancelled.",
+            content="Reset cancelled.",
             view=None
         )
         self.stop()
@@ -614,7 +615,7 @@ class ResetMemberView(discord.ui.View):
         self.admin_user_id = admin_user_id
 
         self.member_select = discord.ui.UserSelect(
-            placeholder="Select the member to reset...",
+            placeholder="Select the member to reset.",
             min_values=1,
             max_values=1
         )
@@ -625,7 +626,7 @@ class ResetMemberView(discord.ui.View):
         member = self.member_select.values[0]
 
         await interaction.response.send_message(
-            "♻️ **Reset**\n\n"
+            "**Reset**\n\n"
             "Now choose what kind of reset you want to perform.",
             view=ResetTypeView(
                 self.admin_cog,
@@ -652,47 +653,47 @@ class Admin(commands.Cog):
     @app_commands.choices(
         command=[
             app_commands.Choice(
-                name="🔄 Reset Bump Timer",
+                name="Reset Bump Timer",
                 value="resetbump"
             ),
             app_commands.Choice(
-                name="🔥 Set Fortune Streak",
+                name="Set Fortune Streak",
                 value="setfortunestreak"
             ),
             app_commands.Choice(
-                name="📈 Set XP",
+                name="Set XP",
                 value="setxp"
             ),
             app_commands.Choice(
-                name="⭐ Set Level",
+                name="Set Level",
                 value="setlevel"
             ),
             app_commands.Choice(
-                name="➕ Add XP",
+                name="Add XP",
                 value="addxp"
             ),
             app_commands.Choice(
-                name="🔄 Sync Levels",
+                name="Sync Levels (**This is a dangerous command!**)",
                 value="sync_levels"
             ),
             app_commands.Choice(
-                name="🧹 Purge Left Members",
+                name="Purge Left Members",
                 value="purge_left_members"
             ),
             app_commands.Choice(
-                name="♻️ Reset",
+                name="Reset",
                 value="reset"
             ),
             app_commands.Choice(
-                name="🖼️ Font Preview Setup",
+                name="Font Preview View Panel",
                 value="font_preview_setup"
             ),
             app_commands.Choice(
-                name="🔒 Send Verify Panel",
+                name="Send Verify View Panel",
                 value="sendverifypanel"
             ),
             app_commands.Choice(
-                name="🔞 Send NSFW Verification Panel",
+                name="Send NSFW Verification View Panel",
                 value="sendverificationpanel"
             ),
         ]
@@ -708,13 +709,13 @@ class Admin(commands.Cog):
                 await db.commit()
 
             await interaction.response.send_message(
-                "Bump timer cleared! 🔄",
+                "Bump timer cleared!",
                 ephemeral=True
             )
 
         elif command.value == "setfortunestreak":
             await interaction.response.send_message(
-                "🔥 **Set Fortune Streak**\n\n"
+                "**Set Fortune Streak**\n\n"
                 "Select the member whose fortune streak you want to set below.",
                 view=FortuneStreakView(self),
                 ephemeral=True
@@ -722,7 +723,7 @@ class Admin(commands.Cog):
 
         elif command.value == "setxp":
             await interaction.response.send_message(
-                "📈 **Set XP**\n\n"
+                "**Set XP**\n\n"
                 "Select the member whose XP you want to change below.",
                 view=SetXPView(self),
                 ephemeral=True
@@ -730,7 +731,7 @@ class Admin(commands.Cog):
 
         elif command.value == "setlevel":
             await interaction.response.send_message(
-                "⭐ **Set Level**\n\n"
+                "**Set Level**\n\n"
                 "Select the member whose level you want to change below.",
                 view=SetLevelView(self),
                 ephemeral=True
@@ -738,7 +739,7 @@ class Admin(commands.Cog):
 
         elif command.value == "addxp":
             await interaction.response.send_message(
-                "➕ **Add XP**\n\n"
+                "**Add XP**\n\n"
                 "Select the member who should receive XP below.",
                 view=AddXPView(self),
                 ephemeral=True
@@ -751,13 +752,13 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.followup.send(
-                    "❌ The leveling system is currently unavailable.",
+                    "The leveling system is currently unavailable. Please report to staff.",
                     ephemeral=True
                 )
 
             if interaction.guild is None:
                 return await interaction.followup.send(
-                    "❌ This command can only be used inside a server.",
+                    "This command can only be used inside of a server.",
                     ephemeral=True
                 )
 
@@ -831,7 +832,7 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.followup.send(
-                    "❌ The leveling system is currently unavailable.",
+                    "The leveling system is currently unavailable. Please report to staff.",
                     ephemeral=True
                 )
 
@@ -841,7 +842,7 @@ class Admin(commands.Cog):
 
             if interaction.guild is None:
                 return await interaction.followup.send(
-                    "❌ This command can only be used inside a server.",
+                    "This command can only be used inside of a server.",
                     ephemeral=True
                 )
 
@@ -949,13 +950,13 @@ class Admin(commands.Cog):
                             pass
 
             await interaction.followup.send(
-                f"✅ Cleaned up {deleted_count} former members from the database!",
+                f"Cleaned up {deleted_count} former members from the database.",
                 ephemeral=True
             )
 
         elif command.value == "reset":
             await interaction.response.send_message(
-                "♻️ **Reset**\n\n"
+                "**Reset**\n\n"
                 "Select the member whose data you want to reset below.",
                 view=ResetMemberView(self, interaction.user.id),
                 ephemeral=True
@@ -966,7 +967,7 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.response.send_message(
-                    "❌ The leveling system is currently unavailable.",
+                    "The leveling system is currently unavailable. Please report to staff.",
                     ephemeral=True
                 )
 
@@ -988,7 +989,7 @@ class Admin(commands.Cog):
                 )
 
             await interaction.response.send_message(
-                "✅ Font preview menu deployed!",
+                "Font preview menu deployed successfully.",
                 ephemeral=True
             )
 
@@ -997,7 +998,7 @@ class Admin(commands.Cog):
 
             if moderation_cog is None:
                 return await interaction.response.send_message(
-                    "❌ The moderation system is currently unavailable.",
+                    "The moderation system is currently unavailable. Please report to staff.",
                     ephemeral=True
                 )
 
@@ -1018,7 +1019,7 @@ class Admin(commands.Cog):
                 )
 
             await interaction.response.send_message(
-                "✅ Server verification panel deployed!",
+                "Server verification panel deployed successfully.",
                 ephemeral=True
             )
 
@@ -1027,7 +1028,7 @@ class Admin(commands.Cog):
 
             if verification_cog is None:
                 return await interaction.response.send_message(
-                    "❌ The verification system is currently unavailable.",
+                    "The verification system is currently unavailable. Please report to staff.",
                     ephemeral=True
                 )
 
@@ -1049,7 +1050,7 @@ class Admin(commands.Cog):
                 )
 
             await interaction.response.send_message(
-                "✅ NSFW verification panel deployed!",
+                "NSFW verification panel deployed successfully.",
                 ephemeral=True
             )
 

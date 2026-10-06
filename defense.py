@@ -99,7 +99,7 @@ async def equip_weapon(db, user_id, weapon_id):
 
     if not row:
         await db.rollback()
-        return False, "You don't have an active station profile yet."
+        return False, "You don't have an active profile yet."
 
     try:
         effects = json.loads(row[0] or "{}")
@@ -121,7 +121,7 @@ class Defense(commands.Cog):
         await ctx.defer()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             weapon_id, weapon_chance, pet_chance, combined = await get_defense_info(db, ctx.author.id)
-        embed = discord.Embed(title="🛡️ Defense System", color=discord.Color.blue())
+        embed = discord.Embed(title="Defense System", color=discord.Color.blue())
         if weapon_id:
             weapon = DEFENSE_WEAPONS[weapon_id]
             embed.add_field(name="Equipped Weapon", value=f"{weapon['emoji']} **{weapon['name']}**\n{weapon['desc']}", inline=False)
@@ -129,7 +129,7 @@ class Defense(commands.Cog):
         else:
             embed.add_field(name="Equipped Weapon", value="None", inline=False)
         if pet_chance:
-            embed.add_field(name="⚛️ Atomic Breath", value=f"**{pet_chance * 100:.1f}%**", inline=True)
+            embed.add_field(name="Atomic Breath", value=f"**{pet_chance * 100:.1f}%**", inline=True)
         embed.add_field(name="Combined Defense", value=f"**{combined * 100:.1f}%** (cap {DEFENSE_CAP * 100:.0f}%)", inline=False)
         embed.set_footer(text="Defense prevents a scavenging hazard entirely. Hazard Reduction remains separate.")
         await ctx.send(embed=embed)
@@ -145,10 +145,10 @@ class Defense(commands.Cog):
         weapon_id = weapon_id.lower()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             ok, error = await equip_weapon(db, ctx.author.id, weapon_id)
-            if not ok: return await ctx.send(f"❌ {error}")
+            if not ok: return await ctx.send(f"{error}")
             await db.commit()
         weapon = DEFENSE_WEAPONS[weapon_id]
-        await ctx.send(f"{ctx.author.mention} 🛡️ Equipped **{weapon['emoji']} {weapon['name']}**! Defense chance: **{weapon['chance'] * 100:.1f}%**.")
+        await ctx.send(f"{ctx.author.mention} Equipped **{weapon['emoji']} {weapon['name']}**! Defense chance: **{weapon['chance'] * 100:.1f}%**.")
 
     @equip.autocomplete("weapon_id")
     async def weapon_autocomplete(self, interaction, current):

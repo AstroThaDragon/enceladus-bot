@@ -162,27 +162,27 @@ class Lottery(commands.Cog):
 
         if cycle:
             description = (
-                f"🎟️ **Ticket price:** **{self.TICKET_COST:,} Stardust**\n"
-                f"📦 **Your ticket limit:** **{self.MAX_TICKETS_PER_USER}** active tickets\n"
-                f"🎫 **Tickets in this cycle:** **{active_tickets:,}**\n\n"
-                "Choose **5 different numbers from 1–99** for every ticket. "
+                f"**Ticket price:** **{self.TICKET_COST:,} Stardust**\n"
+                f"**Your ticket limit:** **{self.MAX_TICKETS_PER_USER}** active tickets\n"
+                f"**Tickets in this cycle:** **{active_tickets:,}**\n\n"
+                "Choose **5 different numbers from 1-99** for every ticket. "
                 "You can buy multiple tickets, but each ticket must have its own number combination.\n\n"
                 "**Prize tiers**\n"
                 + "\n".join(
                     f"{matches}/5 matches — **{payout:,} Stardust**"
                     for matches, payout in sorted(self.PRIZES.items())
                 )
-                + f"\n\n🆔 Current cycle: **#{cycle_id}**"
+                + f"\n\nCurrent cycle: **#{cycle_id}**"
             )
-            title = "🎟️ Enceladus Monthly Lottery — OPEN"
+            title = "Enceladus Monthly Lottery — OPEN"
         else:
             description = (
                 "There is no lottery open right now.\n\n"
-                f"🎟️ Ticket price: **{self.TICKET_COST:,} Stardust**\n"
-                f"📦 Maximum active tickets per user: **{self.MAX_TICKETS_PER_USER}**\n\n"
+                f"**Ticket price:** **{self.TICKET_COST:,} Stardust**\n"
+                f"**Maximum active tickets per user:** **{self.MAX_TICKETS_PER_USER}**\n\n"
                 "Staff can start the next cycle with `/lottery open`."
             )
-            title = "🎟️ Enceladus Monthly Lottery"
+            title = "Enceladus' Monthly Lottery"
 
         if last_draw:
             last_cycle_id, winning_numbers, drawn_at, sold, payout = last_draw
@@ -203,7 +203,7 @@ class Lottery(commands.Cog):
             color=discord.Color.from_rgb(0, 229, 255),
         )
         embed.add_field(
-            name="🎁 How to play",
+            name="How to play",
             value="Use `/lottery buy` with your five chosen numbers while a cycle is open.",
             inline=False,
         )
@@ -211,7 +211,7 @@ class Lottery(commands.Cog):
 
     @commands.hybrid_group(
         name="lottery",
-        description="View and participate in the monthly Enceladus lottery."
+        description="View and participate in the monthly lottery."
     )
     async def lottery(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
@@ -236,7 +236,7 @@ class Lottery(commands.Cog):
             cycle = await self.get_active_cycle(db)
             if not cycle:
                 await db.rollback()
-                return False, "🎟️ **There isn't an open lottery right now.**"
+                return False, "**There isn't an open lottery right now. Please check back later when an announcement is made!**"
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -249,7 +249,7 @@ class Lottery(commands.Cog):
             if ticket_count >= self.MAX_TICKETS_PER_USER:
                 await db.rollback()
                 return False, (
-                    f"📦 **Ticket limit reached!** You can only have **{self.MAX_TICKETS_PER_USER}** active tickets in a cycle."
+                    f"**Ticket limit reached!** You can only have **{self.MAX_TICKETS_PER_USER}** active tickets in a cycle."
                 )
 
             async with db.execute(
@@ -261,14 +261,14 @@ class Lottery(commands.Cog):
             if not row:
                 await db.rollback()
                 return False, (
-                    "❌ You don't have an active station profile yet. Run `/profile`, `/scavenge`, or `/mine` first!"
+                    "You don't have an active profile yet. Run `/scavenge` or `/mine` first!"
                 )
 
             stardust = row[0] or 0
             if stardust < self.TICKET_COST:
                 await db.rollback()
                 return False, (
-                    f"💸 **Not enough Stardust!** A lottery ticket costs **{self.TICKET_COST:,}**, "
+                    f"**Not enough Stardust!** A lottery ticket costs **{self.TICKET_COST:,}**, "
                     f"but you only have **{stardust:,}**."
                 )
 
@@ -284,7 +284,7 @@ class Lottery(commands.Cog):
             except aiosqlite.IntegrityError:
                 await db.rollback()
                 return False, (
-                    "⚠️ You already own a ticket with that exact number combination in this cycle. "
+                    "You already own a ticket with that exact number combination in this cycle. "
                     "Pick a different combination!"
                 )
 
@@ -299,10 +299,10 @@ class Lottery(commands.Cog):
             await db.commit()
 
         return True, (
-            f"🎟️ **Lottery Ticket Purchased!**\n\n"
+            f"**Lottery Ticket Purchased!**\n\n"
             f"Numbers: {self.format_numbers(numbers)}\n"
-            f"💰 Cost: **{self.TICKET_COST:,} Stardust**\n"
-            f"📦 Tickets owned this cycle: **{ticket_count + 1}/{self.MAX_TICKETS_PER_USER}**\n\n"
+            f"Cost: **{self.TICKET_COST:,} Stardust**\n"
+            f"Tickets owned this cycle: **{ticket_count + 1}/{self.MAX_TICKETS_PER_USER}**\n\n"
             "Good luck, explorer! 🌌"
         )
 
@@ -319,7 +319,7 @@ class Lottery(commands.Cog):
         numbers = self.normalize_numbers((number1, number2, number3, number4, number5))
         if numbers is None:
             return await ctx.send(
-                "❌ Your ticket must contain **5 different whole numbers from 1 to 99**."
+                "Your ticket must contain **5 different whole numbers from 1 to 99**."
             )
 
         _success, message = await self.purchase_ticket(ctx.author.id, numbers)
@@ -332,7 +332,7 @@ class Lottery(commands.Cog):
             await self.ensure_schema(db)
             cycle = await self.get_active_cycle(db)
             if not cycle:
-                return await ctx.send("🎟️ **There isn't an open lottery right now.**")
+                return await ctx.send("**There isn't an open lottery right now. Please check back later when an announcement is made!**")
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -348,7 +348,7 @@ class Lottery(commands.Cog):
 
         if not rows:
             return await ctx.send(
-                f"🎟️ You don't have any tickets in **Lottery Cycle #{cycle_id}**."
+                f"You don't have any tickets in **Lottery Cycle #{cycle_id}**."
             )
 
         lines = [
@@ -356,7 +356,7 @@ class Lottery(commands.Cog):
             for index, row in enumerate(rows, start=1)
         ]
         embed = discord.Embed(
-            title=f"🎟️ Your Lottery Tickets — Cycle #{cycle_id}",
+            title=f"Your Lottery Tickets — Cycle #{cycle_id}",
             description="\n".join(lines),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -366,7 +366,7 @@ class Lottery(commands.Cog):
     @lottery.command(name="open", description="Open a new monthly lottery cycle. Staff only.")
     async def lottery_open(self, ctx: commands.Context):
         if not self.is_staff(ctx.author):
-            return await ctx.send("🚫 **Staff only.**")
+            return await ctx.send("**Staff only.**")
 
         now = self.eastern_now().isoformat()
         async with aiosqlite.connect(self.db_path) as db:
@@ -375,7 +375,7 @@ class Lottery(commands.Cog):
             active = await self.get_active_cycle(db)
             if active:
                 await db.rollback()
-                return await ctx.send(f"⚠️ **Lottery Cycle #{active[0]} is already open.**")
+                return await ctx.send(f"**Lottery Cycle #{active[0]} is already open.**")
 
             cursor = await db.execute(
                 "INSERT INTO lottery_cycles (status, opened_at, opened_by) VALUES ('open', ?, ?)",
@@ -385,9 +385,9 @@ class Lottery(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🎟️ **Lottery Cycle #{cycle_id} is now OPEN!**\n\n"
+            f"**Lottery Cycle #{cycle_id} is now OPEN!**\n\n"
             f"Tickets cost **{self.TICKET_COST:,} Stardust** each, with a maximum of **{self.MAX_TICKETS_PER_USER}** active tickets per user.\n"
-            "Players choose five different numbers from **1–99**.\n\n"
+            "Players choose five different numbers from **1-99**.\n\n"
             "Staff can run `/lottery draw` when it's time to hold the drawing."
         )
 
@@ -402,12 +402,12 @@ class Lottery(commands.Cog):
         number5: int,
     ):
         if not self.is_staff(ctx.author):
-            return await ctx.send("🚫 **Staff only.**")
+            return await ctx.send("**Staff only.**")
 
         winning_numbers = self.normalize_numbers((number1, number2, number3, number4, number5))
         if winning_numbers is None:
             return await ctx.send(
-                "❌ The winning draw must contain **5 different whole numbers from 1 to 99**."
+                "The winning draw must contain **5 different whole numbers from 1 to 99**."
             )
 
         now = self.eastern_now().isoformat()
@@ -417,7 +417,7 @@ class Lottery(commands.Cog):
             cycle = await self.get_active_cycle(db)
             if not cycle:
                 await db.rollback()
-                return await ctx.send("🎟️ **There isn't an open lottery to draw.**")
+                return await ctx.send("**There isn't an open lottery to draw.**")
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -494,12 +494,13 @@ class Lottery(commands.Cog):
             tier_lines = ["No tickets matched at least one number."]
 
         embed = discord.Embed(
-            title=f"🎉 Lottery Cycle #{cycle_id} — DRAWN!",
+            title=f"Lottery Cycle #{cycle_id} — DRAWN! 🎉",
             description=(
-                f"🎱 **Winning numbers:** {self.format_numbers(winning_numbers)}\n\n"
-                f"🎟️ Tickets drawn: **{len(tickets):,}**\n"
-                f"🏆 Winning users: **{winners:,}**\n"
-                f"💰 Total Stardust paid: **{total_payout:,}**\n\n"
+                f"**Winning numbers:** {self.format_numbers(winning_numbers)}\n\n"
+                f"Tickets drawn: **{len(tickets):,}**\n"
+                f"Winning users: **{winners:,}**\n"
+                f"Total Stardust paid: **{total_payout:,}**\n\n"
+                f"Congratulations to all the winners! 🎊\n\n"
                 + "\n".join(tier_lines)
             ),
             color=discord.Color.from_rgb(0, 229, 255),
@@ -510,7 +511,7 @@ class Lottery(commands.Cog):
     @lottery.command(name="cancel", description="Cancel the active lottery and delete its tickets. Staff only.")
     async def lottery_cancel(self, ctx: commands.Context):
         if not self.is_staff(ctx.author):
-            return await ctx.send("🚫 **Staff only.**")
+            return await ctx.send("**Staff only.**")
 
         async with aiosqlite.connect(self.db_path) as db:
             await self.ensure_schema(db)
@@ -518,7 +519,7 @@ class Lottery(commands.Cog):
             cycle = await self.get_active_cycle(db)
             if not cycle:
                 await db.rollback()
-                return await ctx.send("🎟️ **There isn't an open lottery to cancel.**")
+                return await ctx.send("**There isn't an open lottery to cancel.**")
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -536,7 +537,7 @@ class Lottery(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"🛑 **Lottery Cycle #{cycle_id} cancelled.** {ticket_count:,} ticket{'s' if ticket_count != 1 else ''} cleared."
+            f"**Lottery cycle #{cycle_id} cancelled.** {ticket_count:,} ticket{'s' if ticket_count != 1 else ''} cleared."
         )
 
 

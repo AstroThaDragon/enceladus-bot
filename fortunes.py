@@ -144,8 +144,8 @@ RARITY_PREFIXES = {
     "common": "🥠",
     "uncommon": "✨",
     "rare": "🌙",
-    "legendary": "🌌 **A LEGENDARY FORTUNE APPEARS... (Legendary!)**\n",
-    "void": "💀 **The cookie cracks open incorrectly... (Void!)**\n"
+    "legendary": "**A legendary fortune appears!** 🌌\n",
+    "void": "**The fortune cookie cracks open strangely...**💀\n"
 }
 
 STAT_MOODS = {
@@ -157,18 +157,18 @@ STAT_MOODS = {
 }
 
 EVENT_NOTES = {
-    "halloween": "🎃 **Spooky season twists today's fortune...**\n",
-    "christmas": "🎄 **Holiday magic warms today's fortune...**\n",
-    "valentines": "💘 **Love drifts through today's fortune...**\n",
-    "new_year": "🎆 **A fresh year reshapes today's fortune...**\n",
-    "fourth_of_july": "🎇 **Fireworks spark through today's fortune...**\n",
-    "easter": "🐣 **Springtime energy colors today's fortune...**\n",
-    "thanksgiving": "🦃 **Warm gratitude flavors today's fortune...**\n",
-    "april_fools": "🤡 **Something feels suspicious about today's fortune...**\n",
-    "summer": "☀️ **Summer energy brightens today's fortune...**\n",
-    "winter": "❄️ **Winter calm settles over today's fortune...**\n",
-    "lunar_new_year": "🐉🧧 **Lunar luck coils around today's fortune...**\n",
-    "full_moon": "🌕 **The full moon empowers today's fortune...**\n"
+    "halloween": "**Spooky season twists today's fortune!** 🎃\n",
+    "christmas": "**Holiday magic warms today's fortune!** 🎄\n",
+    "valentines": "**Love drifts through today's fortune!** 💘\n",
+    "new_year": "**A fresh year reshapes today's fortune!** 🎆\n",
+    "fourth_of_july": "**Fireworks spark through today's fortune!** 🎇\n",
+    "easter": "**Springtime energy colors today's fortune!** 🐣\n",
+    "thanksgiving": "**Warm gratitude flavors today's fortune!** 🦃\n",
+    "april_fools": "**Something feels VERY suspicious about today's fortune...** 🤡\n",
+    "summer": "**Summer energy warms up today's fortune!** ☀️\n",
+    "winter": "**Winter cools off over today's fortune!** ❄️\n",
+    "lunar_new_year": "**Lunar luck coils around today's fortune!** 🐉🧧\n",
+    "full_moon": "**The full moon empowers today's fortune!** 🌕\n"
 }
 
 LUNAR_NEW_YEAR_DATES = {
@@ -543,7 +543,7 @@ class Fortunes(commands.Cog):
                     else:
                         if streak >= 3:
                             lost_streak_messages.append(
-                                f"💔 <@{user_id}>'s fortune streak faded away in the night... (`{streak}` days)"
+                                f"<@{user_id}>'s fortune streak faded away... 💔 (streak was `{streak}` days)"
                             )
 
                         await db.execute(
@@ -595,7 +595,7 @@ class Fortunes(commands.Cog):
 
         message = (
             f"{role_mention}\n"
-            "🌙✨ **The cosmic fortune cookies have reset!**\n"
+            "**The cosmic fortune cookies have reset!** 🌌🥠\n"
             "Use `/fortune` to open today's cookie!"
         )
 
@@ -793,8 +793,8 @@ class Fortunes(commands.Cog):
                 reset_timestamp = self.get_next_fortune_reset()
 
                 return await ctx.send(
-                    f"🥠 You've already opened your fortune cookie today!\n"
-                    f"⏳ You can open another <t:{reset_timestamp}:R>."
+                    f"You've already opened your fortune cookie today!\n"
+                    f"You can open another <t:{reset_timestamp}:R>"
                 )
 
             yesterday_et = (
@@ -890,13 +890,13 @@ class Fortunes(commands.Cog):
             f"{event_note}"
             f"{prefix} **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
-            f"🔮 **Lucky Numbers:** `{lucky_nums}`\n"
-            f"\n📊 **Today's Cosmic Stats:**\n{stats_text}\n\n"
-            f"✨ **XP Gained:** `+{total_xp}`\n"
-            f"🔥 **Fortune Streak:** `{current_streak} day{'s' if current_streak != 1 else ''}`"
+            f"**Your lucky mumbers:** *{lucky_nums}*\n 🔮"
+            f"\n**Your stats for today:**\n*{stats_text}*\n\n"
+            f"**XP gained:** +{total_xp}\n"
+            f"**Your fortune streak:** {current_streak} day{'s' if current_streak != 1 else ''} 🔥"
         )
 
-    @commands.hybrid_command(name="usecrystal", description="Use a Dilated Time Crystal to restore a fortune streak missed yesterday (Max 2/month).")
+    @commands.hybrid_command(name="usecrystal", description="Use a Dilated Time Crystal to restore a fortune streak missed yesterday (max 2 per month).")
     async def use_crystal(self, ctx: commands.Context):
         user_id = ctx.author.id
         async with self._get_user_lock(user_id):
@@ -933,7 +933,7 @@ class Fortunes(commands.Cog):
 
                 if not fortune_row:
                     return await ctx.send(
-                        "❌ You don't have an active profile yet! Run `/fortune` first."
+                        "You don't have an active profile yet! Run `/fortune` first."
                     )
 
                 async with economy_db.execute(
@@ -950,7 +950,7 @@ class Fortunes(commands.Cog):
 
                 if not economy_row:
                     return await ctx.send(
-                        "❌ You don't have any Dilated Time Crystals in your inventory."
+                        "You don't have any Dilated Time Crystals in your inventory."
                     )
 
                 crystals, uses_this_month, last_used_month = economy_row
@@ -964,7 +964,7 @@ class Fortunes(commands.Cog):
 
                 if crystals <= 0:
                     return await ctx.send(
-                        "❌ **No Crystals!** You don't have any Dilated Time Crystals in your inventory."
+                        "You don't have any Dilated Time Crystals in your inventory."
                     )
 
                 # Reset monthly limit counter on a new calendar month.
@@ -973,7 +973,7 @@ class Fortunes(commands.Cog):
 
                 if uses_this_month >= 2:
                     return await ctx.send(
-                        "⏳ **Monthly Limit Reached!** You can only use "
+                        "**Monthly limit reached!** You can only use "
                         "**2 Dilated Time Crystals per month**. Try again next month!"
                     )
 
@@ -1007,11 +1007,11 @@ class Fortunes(commands.Cog):
                     await db.commit()
 
                     return await ctx.send(
-                        f"💎 **Dilated Time Crystal Activated!**\n"
-                        f"Time bends backwards! Yesterday's missed fortune was repaired "
-                        f"and your streak has been boosted to 🔥 **{restored_streak} days**!\n\n"
-                        f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • "
-                        f"Crystals Left: {new_crystals}*"
+                        f"**Dilated Time Crystal activated!**\n"
+                        f"Time bends backwards... yesterday's missed fortune was repaired "
+                        f"and your streak has been boosted back to 🔥 **{restored_streak} days**!\n\n"
+                        f"*Monthly uses remaining: {2 - new_uses}/2 • "
+                        f"Crystals left: {new_crystals}*"
                     )
 
                 # Scenario B: User hasn't opened /fortune today yet, but missed
@@ -1048,26 +1048,26 @@ class Fortunes(commands.Cog):
                     await db.commit()
 
                     return await ctx.send(
-                        f"💎 **Dilated Time Crystal Activated!**\n"
-                        f"Time bends backwards! Yesterday's missed fortune has been "
-                        f"repaired. Your 🔥 **{target_streak}-day streak** is intact—"
-                        f"run `/fortune` now to extend it!\n\n"
-                        f"📊 *Monthly Uses Remaining: {2 - new_uses}/2 • "
-                        f"Crystals Left: {new_crystals}*"
+                        f"**Dilated Time Crystal activated!**\n"
+                        f"Time bends backwards... yesterday's missed fortune has been "
+                        f"repaired. Your **{target_streak}-day streak** is intact—"
+                        f"run `/fortune` now to extend it! 🔥\n\n"
+                        f"*Monthly uses remaining: {2 - new_uses}/2 • "
+                        f"Crystals left: {new_crystals}*"
                     )
 
                 # Scenario C: Streak is already intact.
                 if last_streak_date in (yesterday_et, today_et):
                     return await ctx.send(
-                        f"✨ **Streak Active!** Your fortune streak (`{streak}` days) "
+                        f"**Streak active!** Your fortune streak (`{streak}` days) "
                         f"is intact. You don't need to use a Dilated Time Crystal!"
                     )
 
                 # Scenario D: Missed 2 or more days.
                 return await ctx.send(
-                    "❌ **Streak Expired!** You missed more than 1 day. "
+                    "**Streak expired!** You missed more than 1 day. "
                     "Dilated Time Crystals can only restore a streak if "
-                    "**exactly 1 day** was missed."
+                    "exactly **1 day** was missed."
                 )
 
     @commands.hybrid_command(name="setfortunestreak", description="Manually set a user's fortune streak. For restoration purposes only! (Admin only)")
@@ -1080,7 +1080,7 @@ class Fortunes(commands.Cog):
         claimed_today: bool = True
     ):
         if streak < 0:
-            return await ctx.send("⚠️ Streak cannot be negative.")
+            return await ctx.send("Fortune streak cannot be negative.")
 
         async with self._get_user_lock(member.id):
             et_timezone = pytz.timezone("US/Eastern")
@@ -1118,12 +1118,12 @@ class Fortunes(commands.Cog):
 
         status_msg = "already claimed today" if claimed_today else "can claim today"
         await ctx.send(
-            f"✅ Restored {member.mention}'s fortune streak to **{streak} day{'s' if streak != 1 else ''}** ({status_msg})."
+            f"Restored {member.mention}'s fortune streak back to **{streak} day{'s' if streak != 1 else ''}** ({status_msg})."
         )
 
     @set_fortune_streak.error
     async def set_fortune_streak_error(self, ctx: commands.Context, error: Exception):
-        await ctx.send(f"⚠️ Set fortune streak command error: `{error}`")
+        await ctx.send(f"Set fortune streak command error: `{error}`. Please report to staff.")
         raise error
 
 

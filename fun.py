@@ -42,35 +42,31 @@ class Fun(commands.Cog):
 
         self.responses = [
             "Maybe someday.",
-            "Nothing.",
-            "Neither.",
             "I don't think so.",
             "No.",
             "Yes.",
             "Try asking again.",
             "Nah, fam.",
-            "The stars say... no.",
+            "The stars say... nah.",
             "Absolutely not.",
             "Follow the stardust.",
-            "Ask the protogen later.",
-            "The answer is hidden in the void.",
+            "Ask the proot later.",
             "The cosmic winds whisper... maybe.",
             "The universe is undecided on that one.",
             "Ask again when the moon is full.",
             "You can count on it, bru.",
             "Absolutely, my guy.",
-            "Even I don't know that one... and I'm from the astral plane.",
+            "Even I don't know that one... and I'm a proot bot!",
             "Should go ask your mom about that one, ngl.",
             "Do you really want to know the answer? The truth can be harsh, my dude.",
             "The truth is out there...",
-            "Do you kiss your mother with that mouth? Maybe rethink it, fam.",
+            "Do you kiss your mother with that mouth? Maybe rethink what you asked, fam.",
             "You know it, I know it, we all know it. The answer is yes. Definitely yes.",
             "You got it, my guy.",
-            "Why are you asking me that? That's a bit sys, ngl.",
+            "Why are you asking me that? That's a bit sus, ngl.",
             "Signs point to yes.",
             "Looks like a yes from here, brodie.",
             "I don't even have an answer for that one, wtf.",
-            "Someday, somehow, somewhere...",
             "I asked my mom about that. She said no.",
             "I asked my mom about that. She said yes!",
             "You know what? I'm just gonna say yes to that one, why not?",
@@ -82,19 +78,19 @@ class Fun(commands.Cog):
         answer = random.choice(self.responses)
         
         message = (
-            f"🔮 **The Astral Relic stirs...**\n"
+            f"**The Astral Relic awakens...** 🔮\n"
             f"> {question}\n"
-            f"**Answer:** {answer}"
+            f"*Answer: {answer}*"
         )
         
         await interaction.response.send_message(message)
 
-    @app_commands.command(name="jokes", description="Get a random joke to brighten your day!")
+    @app_commands.command(name="jokes", description="Get a random joke to brighten up your day! Or make you cringe!")
     async def jokes(self, interaction: discord.Interaction):
         joke_list = [
             "Why don't scientists trust atoms? Because they make up everything!",
             "What do you call a fake noodle? An impasta!",
-            "Why did the dragon get hired? He was really good at 'firing' people! 🐉",
+            "Why did the dragon get hired? He was really good at 'firing' people!",
             "How does a penguin build its house? Igloos it together!",
             "What do you call a skeleton who won't work? Lazy bones!",
             "Why are dragons such good storytellers? Because they always have a long tail!",
@@ -121,7 +117,7 @@ class Fun(commands.Cog):
         web_search_url = f"https://gamebanana.com/mods/search?_sSearchString={formatted_query}&_idGameRow=8694"
         
         embed = discord.Embed(
-            title=f"🎤 Mods found for {search_query}!",
+            title=f"Mods found for {search_query}!",
             description=f"Beep boop bop! Found a matching mod search for you! Click the button below to view the results on GameBanana!",
             color=discord.Color.from_rgb(255, 0, 77)
         )
@@ -144,7 +140,7 @@ class Fun(commands.Cog):
         youtube_search_url = f"https://www.youtube.com/results?search_query={formatted_query}"
         
         embed = discord.Embed(
-            title=f"🎵 Songs found for {song_name}!",
+            title=f"Songs found for {song_name}!",
             description="Beep boop bop! Found a matching song search for you! Click the button below to view the results on YouTube!",
             color=discord.Color.red() # Changed to Red to match YouTube's branding
         )
@@ -176,26 +172,34 @@ class Fun(commands.Cog):
             return await ctx.send(f"Nice try, {ctx.author.mention}, but I'm too fast for you! 😎")
         
         slap_objects = [
-            "🐟 a large, smelly fish",
-            "🐔 a rubber chicken",
-            "🏊 a foam pool noodle",
-            "🥖 a baguette",
-            "📖 a dictionary",
-            "✋ their own hand",
-            "⌨️ a keyboard",
-            "🔨 a tiny, squeaky hammer",
-            "🖐️ a giant foam finger",
-            "🛏️ a fluffy pillow",
-            "👡 a chancla",
-            "🍕 a slice of pizza",
-            "🧀 a block of cheese",
-            "🍌 a ripe banana",
-            "🧻 a roll of toilet paper",
-            "🧸 a teddy bear",
-            "🥞 a pancake",
-            "🍩 a glazed donut",
-            "👜 a purse",
-            "🦯 a cane"
+            "a large, smelly fish! 🐟",
+            "a rubber chicken! 🐔",
+            "a foam pool noodle! 🏊",
+            "a baguette! 🥖",
+            "a dictionary! 📖",
+            "their own hand! ✋",
+            "a keyboard! ⌨️",
+            "a tiny, squeaky hammer! 🔨",
+            "a giant foam hand! 🖐️",
+            "a fluffy pillow! 🛏️",
+            "a chancla (sandal)! 🩴",
+            "a slice of pizza! 🍕",
+            "a block of cheese! 🧀",
+            "a ripe banana! 🍌",
+            "a roll of toilet paper! 🧻",
+            "a teddy bear! 🧸",
+            "a syrupy pancake! 🥞",
+            "a glazed donut! 🍩",
+            "a purse! 👜",
+            "a cane! 🦯",
+            "pocket sand! ⌛",
+            "a pan! 🍳",
+            "a snowball! ❄️",
+            "a water balloon! 💦",
+            "a quickly thrown book! 📚",
+            "a newspaper! 📰",
+            "a rubber duck! 🦆",
+            "a rubber snake! 🐍"
         ]
         
         random_object = random.choice(slap_objects)
@@ -206,8 +210,8 @@ class Fun(commands.Cog):
     async def coinflip(self, ctx):
         """Flips a cosmic coin."""
         outcomes = [
-            "✨ **SUPERNOVA**! The star explodes in brilliant light! (Heads)",
-            "🕳️ **BLACK HOLE**! Light itself cannot escape the void. (Tails)"
+            "**SUPERNOVA**! The star explodes in brilliant light! (Heads)",
+            "**BLACK HOLE**! Light itself cannot escape the void. (Tails)"
         ]
         
         loading_msgs = [
@@ -220,17 +224,17 @@ class Fun(commands.Cog):
         loading = random.choice(loading_msgs)
         result = random.choice(outcomes)
         
-        await ctx.send(f"🌌 *{loading}*\n{result}")
+        await ctx.send(f"*{loading}* 🌌\n{result}")
 
     @commands.hybrid_command(name="blackhole", description="Suck a message into the void!")
     async def blackhole(self, ctx, text: str):
         distorted = " ".join(list(text)) # Spaced out
-        await ctx.send(f"🕳️ **EVENT HORIZON REACHED**\n`{distorted}`\n*...aaaand it's gone forever.*")
+        await ctx.send(f"**EVENT HORIZON REACHED**\n`{distorted}`\n*...aaaand it's gone forever.*")
 
-    @commands.hybrid_command(name="hug", description="Give someone a warm, fuzzy hug!")
+    @commands.hybrid_command(name="hug", description="Give someone a warm, soft hug!")
     async def hug(self, ctx, member: discord.Member):
         if member == ctx.author:
-            return await ctx.send(f"You're hugging yourself? That's actually wholesome. {ctx.author.mention} gets a hug from... themselves! 💜")
+            return await ctx.send(f"You're hugging yourself? That's actually kinda wholesome. {ctx.author.mention} gets a hug from... themselves! 💜")
             
         await ctx.send(f"**{ctx.author.mention}** gives **{member.mention}** a big, warm hug! How sweet! 💜")
 
@@ -258,10 +262,10 @@ class Fun(commands.Cog):
             return await ctx.send("I can't roll a die with less than 2 sides, Einstein.")
         
         if sides > 20:
-            return await ctx.send("Easy there, high roller! Max die size is **20**. 🎲")
+            return await ctx.send("Easy there, high roller! Max die size is **20.**")
         
         result = random.randint(1, sides)
-        await ctx.send(f"🎲 **{ctx.author.mention}** rolled a **D{sides}** and got: **{result}**")
+        await ctx.send(f"**{ctx.author.mention}** rolled a **D{sides}** and got: **{result}** 🎲")
 
     @commands.hybrid_command(name="spacefact", description="Pull real-time data on a random celestial body!")
     async def spacefact(self, ctx):
@@ -288,7 +292,7 @@ class Fun(commands.Cog):
                             if b.get("gravity") or b.get("discoveredBy")
                         ]
                         if not bodies:
-                            return await ctx.send("📡 The Solar System Database returned no usable celestial bodies right now.")
+                            return await ctx.send("The Solar System Database returned no usable celestial bodies right now.")
                         body = random.choice(bodies)
                         
                         name = body.get('englishName', 'Unknown Entity')
@@ -328,7 +332,7 @@ class Fun(commands.Cog):
                         )
 
                         embed = discord.Embed(
-                            title=f"🔭 Deep Space Scan",
+                            title=f"Deep space scan 🔭",
                             description=f"**Name: {name}**\n{fact_msg}",
                             color=discord.Color.blue()
                         )
@@ -336,11 +340,11 @@ class Fun(commands.Cog):
                         await ctx.send(embed=embed)
                     else:
                         print(f"API Error Status: {response.status}")
-                        await ctx.send("📡 The API uplink rejected our key or is down.")
+                        await ctx.send("The API uplink rejected our key or is down. Please report to staff.")
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             print(f"Space Error: {e}")
-            await ctx.send("🌌 Something went wrong in the asteroid belt.")
+            await ctx.send("Something went wrong in the asteroid belt. Please report to staff.")
     
     @commands.hybrid_command(name="furryrate", description="Check the local fluff levels!")
     async def furryrate(self, ctx, member: discord.Member | None = None):
@@ -348,19 +352,19 @@ class Fun(commands.Cog):
         percent = random.randint(0, 100)
         
         if percent == 0:
-            status = "Purely human. Not a single tuft of fur found. 🚫"
+            status = "Purely human. Not a single tuft of fur found 🚫"
         elif percent < 25:
             status = "Low levels of fluff. Maybe just a fan of The Lion King? 🦁"
         elif percent < 50:
-            status = "Modern furry. Likely owns a tail or a pair of ears. Nothing crazy. 🐾"
+            status = "Modern furry. Likely owns a tail or a pair of ears. Nothing too crazy 🐾"
         elif percent < 75:
-            status = "High-Grade furry. Definitely has a FurAffinity account. 🦊"
+            status = "High-Grade furry. Definitely has a FurAffinity account 🦊"
         elif percent < 100:
-            status = "Maximum floof!! 100% pathOwOgen detected! 🐺"
+            status = "**Maximum floof!** 100% pathOwOgen detected! 🐺"
         else:
-            status = "ASCENDED! Is literally just a giant ball of fluff at this point. 🐶"
+            status = "*ASCENDED!* Is literally just a giant ball of fluff at this point 🐶"
 
-        await ctx.send(f"📊 **Furry Meter for {member.mention}:**\n**[{'█' * (percent // 10)}{'░' * (10 - (percent // 10))}]** {percent}%\n✨ **Diagnosis:** {status}")
+        await ctx.send(f"**Furry Meter for {member.mention}:**\n**[{'█' * (percent // 10)}{'░' * (10 - (percent // 10))}]** {percent}%\n**Results:** {status}")
 
     @commands.hybrid_command(name="freakyrate", description="Check the local freak-o-meter levels!")
     async def freakyrate(self, ctx, member: discord.Member | None = None):
@@ -368,25 +372,25 @@ class Fun(commands.Cog):
         percent = random.randint(0, 100)
         
         if percent == 0:
-            status = "Completely normal. Boringly standard. 🥱"
+            status = "Completely normal. Boringly standard 🥱"
         elif percent < 25:
-            status = "Slightly unhinged. You've thought about it. 🧐"
+            status = "Slightly unhinged. You've thought about things 🧐"
         elif percent < 50:
-            status = "Certified weirdo. You're the reason we have rules. 🤨"
+            status = "Certified weirdo. You're the reason we have rules here 🤨"
         elif percent < 75:
-            status = "The freak is leaking. Dial it back a bit. 🫣"
+            status = "The freak is leaking out. Dial it back a bit 🫣"
         elif percent < 100:
-            status = "FULL FREAK MODE. Seek immediate containment. ⛓️"
+            status = "FREAKY mode. You should seek immediate containment ⛓️"
         else:
-            status = "Freaky ahh 👅"
+            status = "Freaky ahh"
 
         bar = '█' * (percent // 10)
         empty = '░' * (10 - (percent // 10))
 
         await ctx.send(
-            f"👅 **Freaky rate for {member.mention}:**\n"
+            f"**Freaky rate for {member.mention}:** 👅\n"
             f"**[{bar}{empty}]** {percent}%\n"
-            f"**Diagnosis:** {status}"
+            f"**Results:** {status}"
         )
 
     @commands.hybrid_command(name="iqrate", description="Measure your brain power (or lack thereof)!")
@@ -396,27 +400,27 @@ class Fun(commands.Cog):
         iq = random.randint(30, 160)
 
         if iq < 50:
-            status = "Cold fall temperature IQ. You make rocks look smart. 🪨"
+            status = "Cold fall temperature IQ. You make rocks look smart 🪨"
         elif iq < 70:
-            status = "Room temperature IQ. Your brain is essentially a potato. 🥔"
+            status = "Room temperature IQ. Your brain is essentially a potato 🥔"
         elif iq < 90:
-            status = "Below average. You struggle with push doors. 🚪"
+            status = "Below average. You pull on push doors 🚪"
         elif iq < 110:
-            status = "Perfectly average. You are a background character. 😐"
+            status = "Perfectly average. You are a background character 😐"
         elif iq < 130:
-            status = "High intelligence. You actually read the terms of service. 📜"
+            status = "High intelligence. You actually read the rules 📜"
         elif iq < 150:
-            status = "Certified genius. You can solve a Rubik's cube in under a minute. 🧩"
+            status = "Certified genius. You can solve a Rubik's cube in under a minute 🧩"
         else:
-            status = "OMNISCIENT. You can see the code of the universe. 👁️"
+            status = "*OMNISCIENT!* You can see the code of the universe 👁️"
 
         bar = '█' * (iq // 16)
         empty = '░' * (10 - (iq // 16))
 
         await ctx.send(
-            f"🧠 **IQ Analysis for {member.mention}:**\n"
+            f"**IQ analysis for {member.mention}:** 🤓\n"
             f"**[{bar}{empty}]** {iq} IQ\n"
-            f"**Diagnosis:** {status}"
+            f"**Results:** {status}"
         )
 
     @commands.hybrid_command(name="aurarate", description="Calculate your current aura levels with a reason!")
@@ -440,17 +444,17 @@ class Fun(commands.Cog):
                 "sat in silence for 10 minutes and felt at ease",
                 "performed a perfectly average dance move that neither impressed nor embarrassed anyone"
             ])
-            status = "Neutral Aura. Perfectly balanced, as all things should be. ⚪"
+            status = "Neutral Aura. Perfectly balanced, as all things should be! ⚪"
             color = "⚪"
         else: 
             aura = random.randint(-10000, 10000)
         
         negative_reasons = [
             "tripped on a flat surface",
-            "said 'you too' to the waiter",
+            "said 'you too' to the waiter after being told 'enjoy your meal'",
             "posted a meme in the wrong channel",
             "got left on read by a bot",
-            "accidentally liked a photo from 2016",
+            "accidentally liked a photo from 2012",
             "sneezed and nobody said bless you",
             "forgot your own password",
             "typed 'lol' while stone-faced",
@@ -465,7 +469,7 @@ class Fun(commands.Cog):
             "accidentally sent a message to the wrong person and it was awkward",
             "posted a meme that was already posted 5 minutes ago and got called out for it",
             "laughed at your own joke and nobody else did",
-            "tried to do a cool dance move and just looked like you were having a seizure"
+            "tried to do a cool dance move and just looked like you were having a seizure instead"
         ]
         
         positive_reasons = [
@@ -477,8 +481,7 @@ class Fun(commands.Cog):
             "walked through an automatic door and it opened perfectly",
             "ordered water and got a free soda",
             "predicted the future in a dream",
-            "fixed a bug on the first try",
-            "made a joke that made the 'quiet person' laugh",
+            "made a joke that made the quiet person laugh",
             "guest-starred in a popular streamer's video by accident",
             "plugged in a USB correctly on the first attempt",
             "carried the entire team while eating a sandwich",
@@ -492,22 +495,22 @@ class Fun(commands.Cog):
         ]
 
         if aura < 0:
-            status = "Losing Aura. You're cooked, fam. 📉"
+            status = "Losing Aura. You're cooked, fam"
             reason = random.choice(negative_reasons)
             color = "🔴"
         else:
-            status = "Gaining Aura. Main character energy. 📈"
+            status = "Gaining Aura. Main character energy!"
             reason = random.choice(positive_reasons)
             color = "🟢"
 
-        if aura < -9500: status = "Aura Debt. You **owe** the universe respect. Big oof. 💀"
-        if aura > 9500: status = "**GIGACHAD AURA!** The universe bows to you. 🌌"
+        if aura < -9500: status = "Aura Debt. You **owe** the universe respect. Big oof"
+        if aura > 9500: status = "*GIGACHAD!* The universe bows to you!"
 
         await ctx.send(
-            f"✨ **Aura Analysis for {member.mention}:**\n"
-            f"**Current Aura:** `{aura:+,}`\n"
+            f"**Aura analysis for {member.mention}:**\n"
+            f"**Current aura:** `{aura:+,}`\n"
             f"**Reason:** You {reason} ( {aura:+,} aura )\n"
-            f"**Status:** {status} {color}"
+            f"**Results:** {status} {color}"
         )
 
     @commands.hybrid_command(name="cringerate", description="How much did you just make the chat physically recoil?")
@@ -516,32 +519,32 @@ class Fun(commands.Cog):
         percent = random.randint(0, 100)
         
         if percent == 0:
-            reaction = "Pure Based Energy. Everyone is nodding in respect."
-            status = "Unbelievably Based. 🗿"
+            reaction = "Pure based energy. Everyone is nodding in respect."
+            status = "Unbelievably based 🗿"
         elif percent < 30:
             reaction = "A slight nose exhale. We'll allow it."
-            status = "Low Level Cringe. Just a minor slip-up. 🤏"
+            status = "Low level cringe. Just a minor slip-up"
         elif percent < 60:
-            reaction = "The chat has gone silent. Someone is typing '...' as we speak."
-            status = "Standard Cringe. Average Discord user behavior. 😬"
+            reaction = "The chat has gone silent. Someone is typing '...bro' as we speak."
+            status = "Standard cringe. Average Discord user behavior"
         elif percent < 85:
             reaction = "Visible shudders. People are closing the app to take a walk."
-            status = "High-Grade Cringe. This is going in the 'hall of shame'. 💀"
+            status = "High-grade cringe. This one is going in the hall of shame,bro"
         elif percent < 100:
-            reaction = "Physical recoil. People are shielding their eyes and looking away. The second-hand embarrassment is fatal."
-            status = "LETHAL CRINGE. This is the stuff of legends... and nightmares. 😬"
+            reaction = "Physical recoiling. People are shielding their eyes and looking away from you. The second-hand embarrassment is fatal."
+            status = "*LETHAL CRINGE.* This is the stuff of legends... and nightmares..."
         else:
-            reaction = "The universe has reset to 2008. You just posted 'ROFLCOPTER' and said swag."
-            status = "CRINGE SINGULARITY. You have folded space-time. 🌌"
+            reaction = "The universe has reset to 2008. You just posted 'ROFLCOPTER' and said swag many times."
+            status = "*CRINGE SINGULARITY.* You have folded space-time. Good job"
 
         bar = '█' * (percent // 10)
         empty = '░' * (10 - (percent // 10))
 
         await ctx.send(
-            f"😬 **Cringe Analysis for {member.mention}:**\n"
+            f"**Cringe analysis for {member.mention}:**\n"
             f"**[{bar}{empty}]** {percent}%\n"
             f"**Reaction:** *{reaction}*\n"
-            f"**Status:** {status}"
+            f"**Results:** {status}"
         )
 
     @commands.hybrid_command(name="coolrate", description="Check your ice-cold factor!")
@@ -585,7 +588,6 @@ class Fun(commands.Cog):
             "saying 'cool story, bro' in response to literally any story",
             "using 'u' instead of 'you' in a non-texting context",
             "saying 'dab on the haters'",
-            "using the term 'ratio' in 2026",
             "saying 'ROFL' in 2026",
             "reminding the group that 'actually, it's 11:59, not midnight'",
             "using your index fingers to type on a smartphone",
@@ -598,47 +600,47 @@ class Fun(commands.Cog):
         ]
 
         if percent < 40:
-            status = "Lame. You're trying too hard. 🤓"
+            status = "Lame. You're trying too hard"
             trait = random.choice(lame_traits)
         elif percent < 85:
-            status = "Average Joe. You're chill, but not legendary. 👍"
+            status = "Average Joe. You're chill, but not very legendary"
             trait = random.choice(cool_traits)
         elif percent < 100:
-            status = "The Main Character. You own the room. 🔥"
+            status = "Main character energy. You own the room!"
             trait = random.choice(cool_traits)
         else:
-            status = "COSMIC LEGEND. The stars literally want your autograph. 🌌"
+            status = "*COSMIC LEGEND!* The stars themselves want your autograph!"
             trait = "the absolute goat of the server"
 
         if percent == 0:
-            status = "Absolute Zero. Negative drip detected. 🧊"
-            trait = "the definition of a 'NPC'"
+            status = "Absolute zero. Negative drip detected."
+            trait = "the definition of an NPC."
 
         bar = '█' * (percent // 10)
         empty = '░' * (10 - (percent // 10))
 
         await ctx.send(
-            f"😎 **Coolness Analysis for {member.mention}:**\n"
+            f"**Coolness analysis for {member.mention}:**\n"
             f"**[{bar}{empty}]** {percent}%\n"
-            f"**Cool Factor:** You're {trait}.\n"
-            f"**Status:** {status}"
+            f"**Cool factor:** You're {trait}\n"
+            f"**Results:** {status}"
         )
 
     @app_commands.command(name="horoscope", description="Check your daily horoscope!")
     @app_commands.describe(sign="Choose your zodiac sign")
     @app_commands.choices(sign=[
-        app_commands.Choice(name="♈ Aries", value="aries"),
-        app_commands.Choice(name="♉ Taurus", value="taurus"),
-        app_commands.Choice(name="♊ Gemini", value="gemini"),
-        app_commands.Choice(name="♋ Cancer", value="cancer"),
-        app_commands.Choice(name="♌ Leo", value="leo"),
-        app_commands.Choice(name="♍ Virgo", value="virgo"),
-        app_commands.Choice(name="♎ Libra", value="libra"),
-        app_commands.Choice(name="♏ Scorpio", value="scorpio"),
-        app_commands.Choice(name="♐ Sagittarius", value="sagittarius"),
-        app_commands.Choice(name="♑ Capricorn", value="capricorn"),
-        app_commands.Choice(name="♒ Aquarius", value="aquarius"),
-        app_commands.Choice(name="♓ Pisces", value="pisces"),
+        app_commands.Choice(name="Aries ♈", value="aries"),
+        app_commands.Choice(name="Taurus ♉", value="taurus"),
+        app_commands.Choice(name="Gemini ♊", value="gemini"),
+        app_commands.Choice(name="Cancer ♋", value="cancer"),
+        app_commands.Choice(name="Leo ♌", value="leo"),
+        app_commands.Choice(name="Virgo ♍", value="virgo"),
+        app_commands.Choice(name="Libra ♎", value="libra"),
+        app_commands.Choice(name=" Scorpio ♏", value="scorpio"),
+        app_commands.Choice(name="Sagittarius ♐", value="sagittarius"),
+        app_commands.Choice(name="Capricorn ♑", value="capricorn"),
+        app_commands.Choice(name="Aquarius ♒", value="aquarius"),
+        app_commands.Choice(name="Pisces ♓", value="pisces"),
     ])
     async def horoscope(self, interaction: discord.Interaction, sign: app_commands.Choice[str]):
         await interaction.response.defer()
@@ -660,7 +662,7 @@ class Fun(commands.Cog):
                         
                         if horoscope_text:
                             embed = discord.Embed(
-                                title=f"{sign.name} — Daily Reading", 
+                                title=f"{sign.name} — Your daily reading", 
                                 description=horoscope_text,
                                 color=0x6a0dad
                             )
@@ -670,12 +672,12 @@ class Fun(commands.Cog):
                             await interaction.followup.send(embed=embed)
                         else:
                             print(f"DEBUG DATA: {raw_data}")
-                            await interaction.followup.send("The stars are shy... I couldn't find the reading in the response.")
+                            await interaction.followup.send("The stars are shy... I couldn't find the reading in the response. Please report to staff.")
                     else:
                         await interaction.followup.send(f"The cosmic vibrations are distorted. (Status: {response.status})")
         except Exception as e:
             await log_app_command_error(self.bot, interaction, e)
-            await interaction.followup.send("The cosmic connection failed. Please try again later.")
+            await interaction.followup.send("The connection failed. Please try again later and report to staff.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot, "fun.db"))

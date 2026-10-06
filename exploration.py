@@ -312,8 +312,8 @@ class Exploration(commands.Cog):
                     ):
                         try:
                             await channel.send(
-                                f"<@{user_id}> ⛏️ **Your mining cooldown is ready!** "
-                                f"You can use `/mine` again."
+                                f"<@{user_id}> **Your cooldown has ended!** "
+                                f"You can now use `/mine` again!"
                             )
 
                             await db.execute(
@@ -336,8 +336,8 @@ class Exploration(commands.Cog):
                     ):
                         try:
                             await channel.send(
-                                f"<@{user_id}> 🔎 **Your scavenging cooldown is ready!** "
-                                f"You can use `/scavenge` again."
+                                f"<@{user_id}> **Your cooldown has ended!** "
+                                f"You can now use `/scavenge` again!"
                             )
 
                             await db.execute(
@@ -390,13 +390,13 @@ class Exploration(commands.Cog):
     def knockout_message(self, knocked_out_until, mention=None):
         prefix = f"{mention} " if mention else ""
         return (
-            f"{prefix}💀 **You are unconscious.** You can use `/revive` or buy `/shop buy full_revive` "
-            f"to return now; otherwise you will recover at 50% HP on **{knocked_out_until}**."
+            f"{prefix}**You are unconscious!** You can use `/revive` or use `/shop buy` and find a revive item "
+            f"to return now. Otherwise you will recover at 50% HP at **{knocked_out_until}**."
         )
 
     @app_commands.command(
         name="explore",
-        description="Explore Enceladus and its seasonal locations.",
+        description="Explore Enceladus' seasonal portal locations.",
     )
     @app_commands.choices(
         event=[
@@ -420,7 +420,7 @@ class Exploration(commands.Cog):
                 )
             if not halloween_is_active():
                 return await interaction.response.send_message(
-                    "🎃 **Haunted Exploration is currently dormant.",
+                    "Haunted Exploration is currently dormant. Please check back next Halloween!",
                     ephemeral=True,
                 )
 
@@ -438,8 +438,8 @@ class Exploration(commands.Cog):
                 )
             if not halloween_is_active():
                 return await interaction.response.send_message(
-                    "🎃 **Haunted Exploration is currently dormant.**\n"
-                    "This event is only available during the Halloween event.",
+                    "Haunted Exploration is currently dormant.\n"
+                    "This event is only available during the Halloween event. Please check back next Halloween!",
                     ephemeral=True,
                 )
 
@@ -458,7 +458,7 @@ class Exploration(commands.Cog):
 
     def _haunted_location_embed(self, member, profile):
         sanity = sanity_percent(profile["sanity"])
-        state = "☠️ **INSANE**" if is_insane(profile["sanity"]) else "🧠 **Stable**"
+        state = "***INSANE***" if is_insane(profile["sanity"]) else "***Stable***"
         active = profile["active_location"]
 
         description = (
@@ -469,36 +469,36 @@ class Exploration(commands.Cog):
         )
         if active in HAUNTED_LOCATIONS:
             description += (
-                f"\n\n⚠️ You currently have an active run in **{HAUNTED_LOCATIONS[active]['name']}** "
+                f"\n\nYou currently have an active run in **{HAUNTED_LOCATIONS[active]['name']}** "
                 f"(Stage {profile['active_stage']}/{profile['active_total_stages']}). Starting another run will replace it."
             )
 
         embed = discord.Embed(
-            title="🎃 Haunted Exploration",
+            title="*Haunted Exploration*",
             description=description,
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
-            name="👤 Explorer",
+            name="*Explorer*",
             value=member.mention,
             inline=True,
         )
         embed.add_field(
-            name="🧠 Sanity",
+            name="*Sanity*",
             value=f"**{sanity}/100**\n{state}\nRegenerates continuously over time.",
             inline=True,
         )
         embed.add_field(
-            name="🎟️ Daily Attempts",
+            name="*Daily Attempts*",
             value=f"**{profile['attempts']}/{HAUNTED_DAILY_ATTEMPTS}**",
             inline=True,
         )
-        embed.set_footer(text="Choose a portal to enter • Halloween event")
+        embed.set_footer(text="Choose a portal location to enter! | Lair of Frights 👻")
         return embed
 
     def _haunted_info_embed(self):
         embed = discord.Embed(
-            title="📖 Haunted Exploration — Field Guide",
+            title="Haunted Exploration — Field Guide",
             description=(
                 "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
                 "Enceladus. Each portal leads somewhere new - and not everything that comes through them is supposed to be there."
@@ -506,7 +506,7 @@ class Exploration(commands.Cog):
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
-            name="🌀 The Portals",
+            name="The Portals",
             value=(
                 "Enceladus went searching for new locations for Halloween. While using portals to find new areas, "
                 "**something came back through one of them.** It attacked. He tried to fight back... but to no avail."
@@ -514,7 +514,7 @@ class Exploration(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="💻 The Corruption",
+            name="The Corruption",
             value=(
                 "Whatever came through the portal entered Enceladus's system, past his coding, and **corrupted him**. "
                 "He comes and goes, sometimes able to fight through it—almost like he is possessed, but digitally. "
@@ -523,58 +523,49 @@ class Exploration(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="👁️ Sometimes...",
+            name="Sometimes...",
             value=(
-                "There are moments when the corruption pushes through. Enceladus is not always entirely himself. "
+                "There are moments when the corruption pushes through. Enceladus is not entirely himself. "
                 "And sometimes... *something else comes out.*"
             ),
             inline=False,
         )
         embed.add_field(
-            name="🧠 Sanity",
+            name="*Sanity*",
             value=(
-                "Sanity starts at **100** and regenerates continuously. Some choices reduce it. "
-                "At **0 Sanity**, you enter the **Insane** state."
+                "Sanity starts at **100** and regenerates continuously. Most choices reduce it. "
+                "At **0 Sanity**, you enter **Insane** state."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🫥 Losing Your Grip",
+            name="*Losing Your Grip*",
             value=(
                 "Low Sanity makes reality less reliable. The same story can be perceived differently, and at **0 Sanity** the opening perception can become profoundly wrong. Insanity does not randomly replace the story with unrelated encounters."
+                "However, low Sanity or Insanity can cause better reward drops."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🎟️ Attempts",
+            name="*Attempts*",
             value=(
-                f"You get **{HAUNTED_DAILY_ATTEMPTS} attempts per day**. Starting an adventure consumes one attempt. "
-                "The daily reset follows Eastern Time."
+                f"You get **{HAUNTED_DAILY_ATTEMPTS} attempts per day**. Starting an adventure consumes one attempt, even if you run away. "
+                "The daily reset follows Eastern Timezone."
             ),
             inline=False,
         )
         embed.add_field(
-            name="👻 Stages",
+            name="*Stages*",
             value=(
-                "Runs are authored multi-scene adventures. Your choices can change flags, discoveries, pet opportunities, and later story reactions."
+                "Runs are authored multi-scene adventures. Your choices can show different discoveries, pet opportunities, and various story reactions."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🏃 Running Away",
+            name="*Running Away*",
             value=(
                 "You can run away instead of taking an encounter choice. Most escapes work, but there is a small "
-                "chance that something happens while you escape."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="👻 Haunted Content",
-            value=(
-                "Phase 2 adds end-of-adventure rewards, location-specific ingredients, rarity, Candy, Stardust, and "
-                "Haunted-only collectible discoveries. Phase 3 adds location-specific encounters, while universal "
-                "encounters can still appear anywhere. The places beyond the portals are part of Enceladus's search for "
-                "new Halloween locations—and part of whatever followed him back."
+                "chance that something happens while you escape. Running away stops you from earning rewards for that run, but you can always try again."
             ),
             inline=False,
         )
@@ -583,7 +574,7 @@ class Exploration(commands.Cog):
     async def _start_haunted_run(self, interaction: discord.Interaction, location_id: str):
         if not halloween_is_active():
             return await interaction.followup.send(
-                "🎃 **Haunted Exploration is currently dormant.**",
+                "Haunted Exploration is currently dormant. Please check back next Halloween!",
                 ephemeral=True,
             )
 
@@ -595,8 +586,8 @@ class Exploration(commands.Cog):
                 consumed, profile = await consume_attempt(db, user_id)
                 if not consumed:
                     return await interaction.followup.send(
-                        "🎟️ **You're out of Haunted Exploration attempts for today.**\n"
-                        "Come back after the daily reset.",
+                        "You're out of Haunted Exploration attempts for today.\n"
+                        "Come back after the daily reset at 12:00 AM EST!",
                         ephemeral=True,
                     )
                 total_stages = await start_run(db, user_id, location_id, profile["sanity"])
@@ -618,7 +609,7 @@ class Exploration(commands.Cog):
             run = await get_active_run(db, user_id)
             if not run or run["location_id"] != location_id or run["stage"] != stage:
                 return await interaction.followup.send(
-                    "⚠️ **This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
+                    "**This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
                     ephemeral=True,
                 )
 
@@ -655,29 +646,29 @@ class Exploration(commands.Cog):
         sanity = sanity_percent(profile["sanity"])
         scene_text = scene_data["text"]
         if result_text:
-            scene_text = f"⚡ **What happened**\n{result_text}\n\n{scene_text}"
+            scene_text = f"***What happened:***\n{result_text}\n\n{scene_text}"
         if sanity <= 0:
             color = discord.Color.dark_red()
-            sanity_state = "🩸 **INSANE**"
+            sanity_state = "***INSANE***"
         elif sanity <= 25:
             color = discord.Color.dark_red()
-            sanity_state = "🫥 **Reality is becoming unreliable**"
+            sanity_state = "***Reality is becoming unreliable...***"
         else:
             color = discord.Color.dark_purple()
-            sanity_state = "🧠 **Stable enough**"
+            sanity_state = "***Stable***"
 
         embed = discord.Embed(
             title=f"{location['emoji']} {location['name']}",
             description=scene_text,
             color=color,
         )
-        embed.add_field(name="👤 Explorer", value=interaction.user.mention, inline=True)
-        embed.add_field(name="📖 Scene", value=f"**{stage}/{total_stages}**", inline=True)
-        embed.add_field(name="🧠 Sanity", value=f"**{sanity}/100**\n{sanity_state}", inline=True)
+        embed.add_field(name="Explorer", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Scene", value=f"**{stage}/{total_stages}**", inline=True)
+        embed.add_field(name="Sanity", value=f"**{sanity}/100**\n{sanity_state}", inline=True)
 
         if malo_warning:
             embed.add_field(
-                name="👁️ MalO's Warning",
+                name="MalO's Warning",
                 value=(
                     f"MalO is staring at **{malo_warning}**.\n"
                     "*You are not entirely sure why.*"
@@ -711,8 +702,8 @@ class Exploration(commands.Cog):
     ):
         if interaction.user.id != owner_id:
             return await interaction.followup.send(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
-                "These buttons belong to another player's exploration run.",
+                "**This Haunted Exploration isn't yours.**\n"
+                "These buttons belong to another player's exploration run. You can start your own run with `/explore: haunted`.",
                 ephemeral=True,
             )
 
@@ -730,7 +721,7 @@ class Exploration(commands.Cog):
                     or run["total_stages"] != total_stages
                 ):
                     return await interaction.followup.send(
-                        "⚠️ **This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
+                        "**This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
                         ephemeral=True,
                     )
 
@@ -760,14 +751,14 @@ class Exploration(commands.Cog):
                         result_text += "\n\n🐾 **Your Haunted companion sensed the danger and intervened.**"
                     elif effects.pop("haunted_run_block_next_negative", False):
                         sanity_delta = 0
-                        result_text += "\n\n🛡️ **A ward absorbed the supernatural backlash.**"
+                        result_text += "\n\n**A ward absorbed the supernatural backlash.**"
                     elif effects.pop("haunted_run_half_next_negative", False):
                         sanity_delta = int(sanity_delta * 0.5)
-                        result_text += "\n\n🪞 **The Mirror Ward reflects part of the fear away.**"
+                        result_text += "\n\n**The Mirror Ward reflects part of the fear away.**"
                     elif effects.get("haunted_run_flat_protection"):
                         protection = int(effects.pop("haunted_run_flat_protection"))
                         sanity_delta = min(0, sanity_delta + protection)
-                        result_text += "\n\n📺 **The prepared device cushioned the Sanity loss.**"
+                        result_text += "\n\n**The prepared device cushioned the Sanity loss.**"
 
                     multiplier = float(effects.get("haunted_run_sanity_multiplier", 1.0))
                     if multiplier < 1.0 and sanity_delta < 0:
@@ -808,7 +799,7 @@ class Exploration(commands.Cog):
                             new_state["pet_discovery_message"] = pet_discovery_message
                         else:
                             pet_discovery_message = (
-                                "🐾 **Something familiar stirs...**\n"
+                                "**Something familiar appears...**\n"
                                 "You recognize this companion. You've already befriended it, "
                                 "and it disappears back into the darkness."
                             )
@@ -859,8 +850,8 @@ class Exploration(commands.Cog):
                 assert reward is not None
                 reward_lines = [
                     f"{reward['rarity_emoji']} **{reward['rarity_label']} Haul**",
-                    f"✨ **+{reward['stardust']:,} Stardust**",
-                    f"🍬 **+{reward['candy']} Halloween Candy**",
+                    f"**+{reward['stardust']:,} Stardust** ✨",
+                    f"**+{reward['candy']} Halloween Candy** 🍬",
                     f"{reward['ingredient_emoji']} **+{reward['ingredient_added']} {reward['ingredient_name']}**",
                 ]
                 if pet_xp_result:
@@ -872,17 +863,17 @@ class Exploration(commands.Cog):
                     reward_lines.append(xp_line)
                 if reward["candy_overflow"]:
                     reward_lines.append(
-                        f"📦 Candy overflow: **{reward['candy_overflow']}** → **+{reward['overflow_stardust']} Stardust**"
+                        f"Candy overflow: **{reward['candy_overflow']}** → **+{reward['overflow_stardust']} Stardust**"
                     )
                 if reward["ingredient_overflow"]:
                     reward_lines.append(
-                        f"📦 Ingredient overflow: **{reward['ingredient_overflow']}** → **+{reward['ingredient_overflow_stardust']} Stardust**"
+                        f"Ingredient overflow: **{reward['ingredient_overflow']}** → **+{reward['ingredient_overflow_stardust']} Stardust**"
                     )
                 if reward["collectible_found"] and reward["collectible"]:
                     collectible = reward["collectible"]
                     reward_lines.extend([
                         "",
-                        f"🎃 **Halloween Collectible Found: {collectible[2]} {collectible[1]}**",
+                        f"**Halloween collectible Found: {collectible[2]} {collectible[1]}** 🎃",
                         "━━━━━━━━━━━━━━━━━━━━━━━━",
                         f"*{collectible[3]}*",
                     ])
@@ -892,27 +883,27 @@ class Exploration(commands.Cog):
                         if isinstance(use_config, dict) and use_config.get("enabled"):
                             reward_lines.extend([
                                 "",
-                                "💡 **Usable Collectible**",
-                                "Use `/use` → `item` to activate this collectible.",
+                                f"**Usable collectible found!**",
+                                f"Use `/use item: [item name]` to activate this collectible.",
                             ])
 
                 reward_embed = discord.Embed(
                     title=f"{HAUNTED_LOCATIONS[location_id]['emoji']} {HAUNTED_LOCATIONS[location_id]['name']}",
                     description=(
-                        f"**{interaction.user.mention} survived the {HAUNTED_LOCATIONS[location_id]['name']}.**\n\n"
-                        f"⚡ **What happened**\n{result_text}\n\n"
-                        f"🏁 **Adventure Complete**\n"
-                        f"You made it through the authored story."
+                        f"**{interaction.user.mention} explored {HAUNTED_LOCATIONS[location_id]['name']}.**\n\n"
+                        f"**What happened**\n{result_text}\n\n"
+                        f"**Exploration complete**\n"
+                        f"You made it through!"
                     ),
                     color=discord.Color.green(),
                 )
-                reward_embed.add_field(name="👤 Explorer", value=interaction.user.mention, inline=True)
-                reward_embed.add_field(name="📖 Story", value=f"**{total_stages} scenes**", inline=True)
-                reward_embed.add_field(name="🧠 Final Sanity", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
-                reward_embed.add_field(name="🎁 Adventure Rewards", value="\n".join(reward_lines), inline=False)
+                reward_embed.add_field(name="*Explorer*", value=interaction.user.mention, inline=True)
+                reward_embed.add_field(name="*Story*", value=f"**{total_stages} scenes**", inline=True)
+                reward_embed.add_field(name="*Final Sanity*", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
+                reward_embed.add_field(name="*Adventure rewards*", value="\n".join(reward_lines), inline=False)
                 if pet_discovery_message:
-                    reward_embed.add_field(name="🐾 Location Pet Found", value=pet_discovery_message, inline=False)
-                reward_embed.set_footer(text="Adventure complete • The portals remain open...")
+                    reward_embed.add_field(name="*Location-based pet found!*", value=pet_discovery_message, inline=False)
+                reward_embed.set_footer(text="Exploration complete • The portals remain open for now...")
                 await interaction.edit_original_response(content=None, embed=reward_embed, view=None)
                 return
 
@@ -934,7 +925,7 @@ class Exploration(commands.Cog):
     ):
         if interaction.user.id != owner_id:
             return await interaction.followup.send(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )
@@ -947,7 +938,7 @@ class Exploration(commands.Cog):
                 run = await get_active_run(db, user_id)
                 if not run or run["location_id"] != location_id or run["stage"] != stage or run["total_stages"] != total_stages:
                     return await interaction.followup.send(
-                        "⚠️ **This Haunted Exploration is no longer available.**\n""The run may have expired or already been ended. Start a new Haunted Exploration run if needed.",
+                        "**This Haunted Exploration is no longer available.**\n""The run may have expired or already been ended. Start a new Haunted Exploration run if needed.",
                         ephemeral=True,
                     )
 
@@ -970,29 +961,29 @@ class Exploration(commands.Cog):
                     ])
                 await clear_run(db, user_id)
 
-        suffix = "\n\n⚠️ **Something happened while you escaped.**" if rare_escape else ""
+        suffix = "\n\n**Something happened while you escaped.**" if rare_escape else ""
         location = HAUNTED_LOCATIONS[location_id]
         escape_embed = discord.Embed(
             title=f"{location['emoji']} {location['name']}",
             description=f"**{interaction.user.mention} left the {location['name']}.**\n\n{escape_text}{suffix}",
             color=discord.Color.orange(),
         )
-        escape_embed.add_field(name="👤 Explorer", value=interaction.user.mention, inline=True)
-        escape_embed.add_field(name="📖 Run Ended", value=f"Scene **{stage}/{total_stages}**", inline=True)
-        escape_embed.add_field(name="🧠 Sanity", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
-        escape_embed.add_field(name="🎁 Rewards", value="No reward was earned from this run.", inline=False)
+        escape_embed.add_field(name="*Explorer*", value=interaction.user.mention, inline=True)
+        escape_embed.add_field(name="*Run Ended*", value=f"Scene **{stage}/{total_stages}**", inline=True)
+        escape_embed.add_field(name="*Sanity*", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
+        escape_embed.add_field(name="*Rewards*", value="No reward was earned from this run.", inline=False)
         if pet_discovery_message:
-            escape_embed.add_field(name="🐾 Location Pet Found", value=pet_discovery_message, inline=False)
-        escape_embed.set_footer(text="You escaped. The portal remains behind you.")
+            escape_embed.add_field(name="*Location-based pet found!*", value=pet_discovery_message, inline=False)
+        escape_embed.set_footer(text="You've escaped. The portals remain open for now...")
         await interaction.edit_original_response(content=None, embed=escape_embed, view=None)
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
     @app_commands.choices(item=[
-        app_commands.Choice(name="🩹 Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
-        app_commands.Choice(name="🩹 Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
-        app_commands.Choice(name="🧰 Field Trauma Medkit (+100 HP)", value="medkit"),
-        app_commands.Choice(name="🍬 Halloween Candy (+5 HP)", value="halloween_candy"),
-        app_commands.Choice(name="🎃 Trick-or-Treat Bag (+25 HP)", value="trick_or_treat_bag")
+        app_commands.Choice(name="Nanite Stim-Patch (+35 HP)", value="nanite_patch"),
+        app_commands.Choice(name="Makeshift Medkit (+60 HP)", value="makeshift_medkit"),
+        app_commands.Choice(name="Field Trauma Medkit (+100 HP)", value="medkit"),
+        app_commands.Choice(name="Halloween Candy (+5 HP)", value="halloween_candy"),
+        app_commands.Choice(name="Trick-or-Treat Bag (+25 HP)", value="trick_or_treat_bag")
     ])
     async def heal(self, ctx: commands.Context, item: str):
         await ctx.defer()
@@ -1016,7 +1007,7 @@ class Exploration(commands.Cog):
 
         selected = heal_data.get(item)
         if not selected:
-            return await ctx.send("❌ Invalid healing item selected.")
+            return await ctx.send("Invalid healing item selected.")
 
         db_path = self.get_db_path()
 
@@ -1031,7 +1022,7 @@ class Exploration(commands.Cog):
                 row = await cursor.fetchone()
 
             if not row:
-                return await ctx.send("❌ Profile not found!")
+                return await ctx.send("Profile not found.")
 
             current_hp, max_hp, knocked_out_until = row[0] or 0, row[1] or 100, row[2] or ""
 
@@ -1040,7 +1031,7 @@ class Exploration(commands.Cog):
 
             if current_hp >= max_hp:
                 return await ctx.send(
-                    f"❤️ **Full Health!** You are already at max HP (**{max_hp}/{max_hp} HP**)."
+                    f"**You're already at full health!** (**{max_hp}/{max_hp} HP**)."
                 )
 
             if selected.get("inventory"):
@@ -1051,7 +1042,7 @@ class Exploration(commands.Cog):
                     item_row = await cursor.fetchone()
                 item_count = item_row[0] if item_row else 0
                 if item_count <= 0:
-                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
+                    return await ctx.send(f"You don't have any **{selected['name']}s** left!")
                 new_count = item_count - 1
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
@@ -1062,7 +1053,7 @@ class Exploration(commands.Cog):
                 async with db.execute("PRAGMA table_info(users)") as cursor:
                     cols = {row[1] async for row in cursor}
                 if col_name not in cols:
-                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** in your inventory!")
+                    return await ctx.send(f"You don't have any **{selected['name']}s** in your inventory!")
                 async with db.execute(
                     f"SELECT {col_name} FROM users WHERE user_id = ?",
                     (user_id,)
@@ -1070,7 +1061,7 @@ class Exploration(commands.Cog):
                     count_row = await cursor.fetchone()
                 item_count = count_row[0] if count_row else 0
                 if item_count <= 0:
-                    return await ctx.send(f"❌ You don't have any **{selected['name']}s** left!")
+                    return await ctx.send(f"You don't have any **{selected['name']}s** left!")
                 new_count = item_count - 1
                 await db.execute(
                     f"UPDATE users SET {col_name} = ? WHERE user_id = ?",
@@ -1103,13 +1094,13 @@ class Exploration(commands.Cog):
         action = "Chowed down on the candy! 🍬" if item == "halloween_candy" else ("You opened the bag and chowed down on candy! 🍬" if item == "trick_or_treat_bag" else f"Used {selected['name']}!")
         await ctx.send(
             f"{ctx.author.mention} {'🎃' if item in ('halloween_candy', 'trick_or_treat_bag') else '💉'} **{action}**\n"
-            f"Restored **+{healed_by} HP**! Current Health: ❤️ **{new_hp}/{max_hp} HP** "
+            f"Restored **+{healed_by} HP**! Current health: **{new_hp}/{max_hp} HP** "
             f"*(Items Remaining: {new_count})*"
         )
 
     @commands.hybrid_command(
         name="cooldown_alerts",
-        description="Toggle notifications when your mining and scavenging cooldowns finish."
+        description="Toggle notifications when your mining and scavenging cooldowns finish. These are off by default."
     )
     async def cooldown_alerts(self, ctx: commands.Context):
         await ctx.defer()
@@ -1146,9 +1137,9 @@ class Exploration(commands.Cog):
                 await db.commit()
 
                 return await ctx.send(
-                    "🔔 **Cooldown Alerts: ON**\n"
+                    "**Cooldown alerts on!**\n"
                     "You'll be pinged in the Exploration channel "
-                    "when your mining or scavenging cooldown finishes!"
+                    "when your mining or scavenging cooldown finishes.``"
                 )
 
             current = bool(row[0])
@@ -1182,13 +1173,13 @@ class Exploration(commands.Cog):
 
         if new_value:
             await ctx.send(
-                "🔔 **Cooldown Alerts: ON**\n"
+                "**Cooldown alerts on!**\n"
                 "You'll be pinged in the Exploration channel "
                 "when your mining or scavenging cooldown finishes!"
             )
         else:
             await ctx.send(
-                "🔕 **Cooldown Alerts: OFF**\n"
+                "**Cooldown alerts off**\n"
                 "You won't receive mining or scavenging cooldown notifications."
             )
 
@@ -1211,7 +1202,7 @@ class Exploration(commands.Cog):
 
         if row and not row[0]:
             return (
-                "💡 **Want a little heads-up from time-to-time?** You can use `/cooldown_alerts` "
+                "**Want a little heads-up from time-to-time?** You can use `/cooldown_alerts` "
                 "to get pinged when your mining and/or scavenging cooldown finishes!"
             )
 
@@ -1219,7 +1210,7 @@ class Exploration(commands.Cog):
 
 
 
-    @commands.hybrid_command(name="mine", description="Deploy your starship mining laser to scout for Stardust and rare loot!")
+    @commands.hybrid_command(name="mine", description="Deploy your mining laser to scout for Stardust and rare loot!")
     async def mine(self, ctx: commands.Context):
         await ctx.defer()
 
@@ -1305,12 +1296,12 @@ class Exploration(commands.Cog):
                 remaining = int(effective_cooldown - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
-                return await ctx.send(f"{ctx.author.mention} ⚠️ **Mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**.")
+                return await ctx.send(f"{ctx.author.mention} **Your mining laser is recharging!** Next charge ready in **{hours}h {minutes}m**")
 
             if charges <= 0 and not effects.get("fuel_stabilizer"):
                 return await ctx.send(
-                    f"{ctx.author.mention} 🚨 **Laser Depleted!** You are out of fuel charges. "
-                    "Visit the station shop for an emergency refill or wait until daily reset."
+                    f"{ctx.author.mention} **Your laser is depleted!** You are out of fuel charges. "
+                    "Visit the shop for a refill item, or wait until daily reset at 12:00AM EST!"
                 )
 
             # --- TIERED LOOT ROLL ---
@@ -1347,14 +1338,14 @@ class Exploration(commands.Cog):
 
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
-                loot_bonus_note = "\n\n⚛️ **Quantum Battery:** Stardust tripled!"
+                loot_bonus_note = "\n\n**Quantum Battery:** Stardust tripled!"
             else:
                 loot_bonus_note = ""
 
             new_stardust = stardust + found_stardust
             
             loot_description = (
-                f"✨ **Stardust Collected:** **{found_stardust:,}**"
+                f"**Stardust collected:** **{found_stardust:,}**"
                 f"{loot_bonus_note}"
             )
             if pet_effects["stardust_bonus"]:
@@ -1396,12 +1387,12 @@ class Exploration(commands.Cog):
 
             if mining_material_findings:
                 loot_description += (
-                    "\n\n⛏️ **Minerals Recovered:** "
+                    "\n\n**Minerals recovered ⛏️** "
                     + " • ".join(mining_material_findings)
                 )
             if mining_overflow_findings:
                 loot_description += (
-                    "\n\n📦 **Mineral Overflow:** "
+                    "\n\n**Mineral overflow 📦** "
                     + " • ".join(mining_overflow_findings)
                 )
 
@@ -1446,7 +1437,7 @@ class Exploration(commands.Cog):
                     if overflow_glitch > 0:
                         overflow_value = overflow_glitch * MATERIAL_OVERFLOW_VALUES.get(glitch_item_id, 0)
                         new_stardust += overflow_value
-                        loot_description += f"\n📦 Glitched overflow → **+{overflow_value:,} Stardust**"
+                        loot_description += f"\nGlitched overflow 📦 → **+{overflow_value:,} Stardust**"
 
             # Astral Essence is a separate rare mining discovery, independent of
             # the normal rarity table so it does not replace existing loot.
@@ -1456,14 +1447,14 @@ class Exploration(commands.Cog):
                 )
                 if added_essence:
                     loot_description += (
-                        f"\n\n✨ **Astral Discovery:** Recovered **Astral Essence**! "
+                        f"\n\n**Astral Discovery:** Recovered **Astral Essence**! "
                         f"({essence_quantity}/{essence_max})"
                     )
                 else:
                     new_stardust += 2500
                     loot_description += (
-                        "\n\n📦 **Astral Essence Overflow:** Your Essence stack is full "
-                        "and the fragment condensed into **+2,500 Stardust** instead."
+                        "\n\n**Astral Essence overflow:** Your stack is full "
+                        "and it has turned into 2,500 Stardust instead."
                     )
 
             # Halloween bonus resources are independent rolls during the active event.
@@ -1506,7 +1497,7 @@ class Exploration(commands.Cog):
                     candy_overflow_stardust = overflow_candy * 2
                     new_stardust += candy_overflow_stardust
                     seasonal_findings.append(
-                        f"📦 Candy Overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
+                        f"Candy overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
                     )
 
             # Special pet candy is seasonal too, but is separate from ordinary Halloween Candy.
@@ -1526,7 +1517,7 @@ class Exploration(commands.Cog):
                 )
                 if added_pet_candy:
                     seasonal_findings.append(
-                        f"🍬 Halloween Pet Candy ×{added_pet_candy}"
+                        f"Halloween Pet Candy 🍬 ×{added_pet_candy}"
                     )
                 overflow_pet_candy = pet_candy_found - added_pet_candy
                 if overflow_pet_candy:
@@ -1537,13 +1528,13 @@ class Exploration(commands.Cog):
                     )
                     if added_normal_treat:
                         seasonal_findings.append(
-                            f"📦 Halloween Pet Candy Overflow ×{overflow_pet_candy} "
-                            f"→ 🍪 Pet Treat ×{added_normal_treat}"
+                            f"Halloween Pet Candy Overflow ×{overflow_pet_candy} "
+                            f"→ Pet Treat 🍪 ×{added_normal_treat}"
                         )
                     remaining_overflow = overflow_pet_candy - added_normal_treat
                     if remaining_overflow:
                         seasonal_findings.append(
-                            f"📦 Pet Treat Inventory Full: {remaining_overflow} overflow "
+                            f"Pet Treat stack full: {remaining_overflow} overflow "
                             f"could not be stored (cap {normal_treat_max})"
                         )
 
@@ -1562,7 +1553,7 @@ class Exploration(commands.Cog):
                 )
                 if added_pet_candy:
                     seasonal_findings.append(
-                        f"🍬 Halloween Pet Candy ×{added_pet_candy}"
+                        f"Halloween Pet Candy 🍬 ×{added_pet_candy}"
                     )
 
                 overflow_pet_candy = pet_candy_found - added_pet_candy
@@ -1573,7 +1564,7 @@ class Exploration(commands.Cog):
                     remaining_overflow = overflow_pet_candy - added_normal_treat
                     if remaining_overflow:
                         seasonal_findings.append(
-                            f"📦 Halloween Pet Candy Overflow ×{remaining_overflow} → Inventory Full"
+                            f"Halloween Pet Candy Overflow ×{remaining_overflow} → Pet Treat stack full"
                         )
 
             if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
@@ -1586,12 +1577,12 @@ class Exploration(commands.Cog):
                 overflow_plastic = plastic_found - added_plastic
                 if overflow_plastic:
                     new_stardust += overflow_plastic * 2
-                    seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
+                    seasonal_findings.append(f"Plastic overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
 
             if seasonal_findings:
                 seasonal_findings = [line for line in seasonal_findings if line]
                 if seasonal_findings:
-                    loot_description += "\n\n🎃 **Halloween Finds:** " + " • ".join(seasonal_findings)
+                    loot_description += "\n\n**Halloween Findings! 🎃** " + " • ".join(seasonal_findings)
 
             rarity_badge = "common"
 
@@ -1602,7 +1593,7 @@ class Exploration(commands.Cog):
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
                 found_xp = random.randint(100, 500)
-                loot_description += f"\n\n📊 **XP Data Shard:** **+{found_xp} XP**"
+                loot_description += f"\n\n**XP Data Shard found:** **+{found_xp} XP**"
                 rarity_badge = "uncommon"
 
                 # Award XP globally through leveling.py
@@ -1610,7 +1601,7 @@ class Exploration(commands.Cog):
                 if leveling_cog:
                     leveled_up, new_level = await leveling_cog.add_xp(ctx.author, found_xp)
                     if leveled_up:
-                        loot_description += f"\n\n🎉 **Level Up!** Reached **Level {new_level}**!"
+                        loot_description += f"\n\n**Level up!** You've reached **level {new_level}**!"
 
             elif roll < 0.75 + mining_rare_bonus:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
@@ -1624,7 +1615,7 @@ class Exploration(commands.Cog):
 
                 if added_amount == 1:
                     loot_description += (
-                        f"\n\n⛏️ **Rare Ore Extracted:** Refined a "
+                        f"\n\n**Rare Ore Extracted:** Refined a "
                         f"**Titanium Ore Chunk**! ({new_quantity}/{max_quantity})"
                     )
                 else:
@@ -1632,9 +1623,9 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n\n📦 **Inventory Full:** Your Titanium Ore Chunk stack "
+                        f"\n\n**Stack full:** Your Titanium Ore Chunk stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
+                        f"\n\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -1657,7 +1648,7 @@ class Exploration(commands.Cog):
                         (new_token_balance, user_id)
                     )
                     loot_description += (
-                        f"\n\n🪙 **Holodeck Find:** Discovered a shiny "
+                        f"\n\nYou've discovered a shiny "
                         f"**Arcade Token**! ({new_token_balance}/{token_max})"
                     )
                 else:
@@ -1665,9 +1656,9 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n\n📦 **Inventory Full:** Your Arcade Token balance "
+                        f"\n\n**Stack full:** Your Arcade Token balance "
                         f"is already at **{token_max}/{token_max}**!"
-                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
+                        f"\n\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -1697,7 +1688,7 @@ class Exploration(commands.Cog):
                     )
 
                     loot_description += (
-                        f"\n\n💎 **Rare Discovery:** Acquired a stable "
+                        f"\n\nYou've acquired a stable "
                         f"**Dilated Time Crystal**! "
                         f"({current_crystals + 1}/{max_quantity})"
                     )
@@ -1706,9 +1697,9 @@ class Exploration(commands.Cog):
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n\n📦 **Inventory Full:** Your Dilated Time Crystal "
+                        f"\n\n**Stack full:** Your Dilated Time Crystal "
                         f"stack is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
+                        f"\n\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "epic"
@@ -1725,19 +1716,17 @@ class Exploration(commands.Cog):
 
                 if added_amount == 1:
                     loot_description += (
-                        "\n🌟 **Legendary Find:** Recovered an "
+                        "\n**Legendary Find:** You've discovered an "
                         f"**Astral Core**! ({new_quantity}/{max_quantity})"
-                        "\n*Its purpose is currently unknown...*"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("astral_core", 750)
                     new_stardust += overflow_stardust
 
                     loot_description += (
-                        f"\n\n📦 **Inventory Full:** Your Astral Core stack "
+                        f"\n\n**Stack full:** Your Astral Core stack "
                         f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
-                        "\n*The mysterious core was too much for your inventory to contain.*"
+                        f"\n\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "legendary"
@@ -1761,9 +1750,9 @@ class Exploration(commands.Cog):
         }
 
         embed = discord.Embed(
-            title=f"🌌 Starship Mining Log — {ctx.author.display_name}",
+            title=f"Starship Mining Log — {ctx.author.mention}",
             description=(
-                f"Laser beam fired into the debris field...\n\n"
+                f"Your laser beam fired into the debris field...\n\n"
                 f"{loot_description}"
             ),
             color=colors.get(rarity_badge, discord.Color.blue())
@@ -1773,18 +1762,18 @@ class Exploration(commands.Cog):
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: {cooldown_text}")
         if pet_xp_result:
-            pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
+            pet_xp_text = f"**Pet XP:** **+{pet_xp_result['xp_added']} XP**"
             if pet_xp_result["leveled_up"]:
                 pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
             embed.add_field(
-                name="🐾 Companion Progress",
+                name="Companion progress",
                 value=pet_xp_text,
                 inline=False,
             )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
-                name="📅 Daily Reminder",
+                name="Daily reminder!",
                 value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
                 inline=False
             )
@@ -1792,14 +1781,14 @@ class Exploration(commands.Cog):
         cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
         if cooldown_reminder:
             embed.add_field(
-                name="🔔 Cooldown Alerts",
+                name="Cooldown alerts",
                 value=cooldown_reminder,
                 inline=False
             )
 
         await ctx.send(content=ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare finds!")
+    @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare findings!")
     async def scavenge(self, ctx: commands.Context):
         await ctx.defer()
 
@@ -1884,45 +1873,45 @@ class Exploration(commands.Cog):
                 remaining = int(effective_cooldown - elapsed)
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
-                return await ctx.send(f"{ctx.author.mention} ⚠️ **Scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
+                return await ctx.send(f"{ctx.author.mention} **Your scavenge drone is recharging!** Next run ready in **{hours}h {minutes}m**.")
 
             if charges <= 0:
-                return await ctx.send(f"{ctx.author.mention} 🚨 **Drone Depleted!** You are out of scavenge charges. Visit the station shop for a recharge or wait until daily reset.")
+                return await ctx.send(f"{ctx.author.mention} **Your drone battery is depleted!** You are out of scavenge charges. Visit the shop for a recharge item, or wait until daily reset at 12:00AM EST.")
 
             junk_items = {
-                "space_pizza": "🍕 Dehydrated Space Pizza (slightly freezer-burned)",
-                "floppy_disk": "💾 Ancient Alien Floppy Disk (contains mysterious code)",
-                "meteorite": "🪨 Suspiciously Warm Meteorite Chunk (glows faintly)",
-                "rubber_duck": "🐤 Rubber Duck in a Micro-Spacesuit (how cute!)",
-                "rusty_gear": "⚙️ Tarnished Station Gear (still turns, but squeaks)",
-                "tape_deck": "📼 Broken Cassette Player (plays static)",
-                "alien_artifact": "🛸 Miniature Alien Artifact (glows faintly)",
-                "space_boot": "🥾 Singular Space Boot (wonder where the other one went...)",
-                "cosmic_coin": "🪙 Cosmic Coin (give it a flip!)",
-                "holo_poster": "🖼️ Faded Holographic Poster of a Galactic Band",
-                "broken_laser": "🔫 Broken Laser Pistol (sparks occasionally)",
-                "lost_logbook": "📓 Waterlogged Starship Logbook (unreadable)",
-                "left_sock": "🧦 Left Sock (the right one is missing)",
-                "warp_mug": "☕ Leaky Thermal Mug (holds coffee across space-time, leaks in 3D)",
-                "space_pudding": "🍮 Expired Pudding (tastes like dark matter)",
-                "tangled_cables": "🔌 Quantum Cable Knot (physically impossible to untangle)",
-                "screaming_crystal": "💎 Screaming Crystal (relentlessly sings 80s synth-pop)",
-                "moon_cheese": "🧀 Chunk of Moon Cheese (smells like sharp cheddar)",
-                "golden_spatula": "🍳 Golden Spatula (maybe SpongeBob had it?)",
-                "parking_ticket": "📜 Cosmic Parking Ticket (overdue by 400 years! That's a big fine...)",
-                "floating_plant": "🪴 Suspicious Houseplant (stares at you when you turn around...)",
-                "tinted_visor": "🕶️ Broken Solar Visor (now just regular 3D glasses)",
-                "purring_lint": "🧶 Ball of Space Lint (it purrs when you touch it?)",
-                "pet_rock": "🪨 Asteroid Pet Rock (includes tiny glued-on googly eyes)",
-                "haunted_circuit": "⚡ Haunted Circuit Board (sparks every time you whisper near it)",
-                "space_taco": "🌮 Cosmic Taco (the salsa is surprisingly unaffected by zero-G)",
-                "rusty_wrench": "🔧 Rusty Wrench (still works, but squeaks a lot)",
-                "alien_fossil": "🦴 Alien Fossil Fragment (looks like it could bite back)",
-                "big_red_button": "🔴 A Big Red Button (labeled 'do not press', but you pressed it anyway. It did nothing...)",
-                "antique_compass": "🧭 Antique Compass (points to the nearest space anomaly, which is currently a black hole)",
-                "broken_clock": "⏰ Broken Clock (stuck at 3:00AM. Witching hour... spooky)",
-                "perplexing_painting": "🖌️ Perplexing Painting (the eyes seem to follow you, but it's a 2D image)",
-                "cosmic_banana": "🍌 Cosmic Banana (peels itself, but tastes like stardust)"
+                "space_pizza": "Dehydrated Space Pizza (slightly freezer-burned) 🍕",
+                "floppy_disk": "Ancient Alien Floppy Disk (contains mysterious code) 💾",
+                "meteorite": "Suspiciously Warm Meteorite Chunk (glows faintly) ☄️",
+                "rubber_duck": "Rubber Duck in a Micro-Spacesuit (how cute!) 🐤",
+                "rusty_gear": "Tarnished Station Gear (still turns, but squeaks) ⚙️",
+                "tape_deck": "Broken Cassette Player (plays static) 📼",
+                "alien_artifact": "Miniature Alien Artifact (glows faintly) 🛸",
+                "space_boot": "Singular Space Boot (wonder where the other one went...) 🥾",
+                "cosmic_coin": "Cosmic Coin (give it a flip!) 🪙",
+                "holo_poster": "Faded Holographic Poster of a Galactic Band 🖼️",
+                "broken_laser": "Broken Laser Pistol (sparks occasionally) 🔫",
+                "lost_logbook": "Waterlogged Starship Logbook (unreadable) 📓",
+                "left_sock": "Left Sock (the right one is missing) 🧦",
+                "warp_mug": "Leaky Thermal Mug (holds coffee across space-time, leaks in 3D) ☕",
+                "space_pudding": "Expired Pudding (tastes like dark matter) 🍮",
+                "tangled_cables": "Quantum Cable Knot (physically impossible to untangle) 🔌",
+                "screaming_crystal": "Screaming Crystal (relentlessly sings 80s synth-pop) 💎",
+                "moon_cheese": "Chunk of Moon Cheese (smells like sharp cheddar) 🧀",
+                "golden_spatula": "Golden Spatula (maybe SpongeBob had it?) 🍳",
+                "parking_ticket": "Cosmic Parking Ticket (overdue by 400 years! That's a big fine...) 📜",
+                "floating_plant": "Suspicious Houseplant (stares at you when you turn around...) 🪴",
+                "tinted_visor": "Broken Solar Visor (now just regular 3D glasses) 🕶️",
+                "purring_lint": "Ball of Space Lint (it purrs when you touch it?) 🧶",
+                "pet_rock": "Asteroid Pet Rock (includes tiny glued-on googly eyes) 🪨",
+                "haunted_circuit": "Haunted Circuit Board (sparks every time you whisper near it) ⚡",
+                "space_taco": "Cosmic Taco (the salsa is surprisingly unaffected by zero-G) 🌮",
+                "rusty_wrench": "Rusty Wrench (still works, but squeaks a lot) 🔧",
+                "alien_fossil": "Alien Fossil Fragment (looks like it could bite back) 🦴",
+                "big_red_button": "A Big Red Button (labeled 'do not press', but you pressed it anyway. It did nothing...) 🔴",
+                "antique_compass": "Antique Compass (points to the nearest space anomaly, which is currently a black hole) 🧭",
+                "broken_clock": "Broken Clock (stuck at 3:00AM. Witching hour... spooky) ⏰",
+                "perplexing_painting": "Perplexing Painting (the eyes seem to follow you, but it's a 2D image) 🖌️",
+                "cosmic_banana": "Cosmic Banana (peels itself, but tastes like stardust) 🍌"
             }
             
             # --- TIERED SCAVENGING LOOT ROLL ---
@@ -1937,25 +1926,25 @@ class Exploration(commands.Cog):
                 item_name = f"{EMOJIS.get('quantum_battery', '⚛️')} Quantum Battery (legendary)"
                 item_type = "consumable"
                 loot_rarity_note = (
-                    "\n🌟 **Legendary Find:** Recovered a "
+                    "\n**Legendary find:** You've recovered a "
                     "**Quantum Battery**!"
                 )
 
             elif loot_roll < (0.10 if lucky_scanner_active else 0.02) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "revive_kit"
-                item_name = f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit (rare)"
+                item_name = f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
             elif loot_roll < (0.20 if lucky_scanner_active else 0.05) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "laser_charge_cell"
-                item_name = f"{EMOJIS.get('laser_charge_cell', '🔋')} Laser Charge Cell (rare)"
+                item_name = f"{EMOJIS.get('laser_charge_cell', '🔋')} Laser Charge Cell"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
             elif loot_roll < (0.32 if lucky_scanner_active else 0.08) + pet_effects["rare_bonus"] + scavenging_rare_bonus:
                 item_id = "drone_battery"
-                item_name = f"{EMOJIS.get('drone_battery', '🔋')} Drone Battery Pack (rare)"
+                item_name = f"{EMOJIS.get('drone_battery', '🔋')} Drone Battery Pack"
                 item_type = "consumable"
                 loot_rarity_note = ""
 
@@ -1996,9 +1985,9 @@ class Exploration(commands.Cog):
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
                     token_overflow_stardust = overflow_stardust
                     loot_rarity_note += (
-                        f"\n📦 **Arcade Token Overflow:** Your token balance is already "
+                        f"\n**Arcade Token overflow:** Your Arcade Token stack is already "
                         f"at **{token_max}/{token_max}**!"
-                        f"\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
+                        f"\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                     )
 
             effective_scavenge_charge_save = max(
@@ -2023,7 +2012,7 @@ class Exploration(commands.Cog):
 
             if effects.pop("quantum_battery", False):
                 found_stardust *= 3
-                quantum_bonus_note = "\n⚛️ **Quantum Battery:** Stardust tripled!"
+                quantum_bonus_note = "\n**Quantum Battery:** Stardust tripled!"
             else:
                 quantum_bonus_note = ""
 
@@ -2031,7 +2020,7 @@ class Exploration(commands.Cog):
             cache_note = ""
             if random.random() < SCAVENGE_STARDUST_CACHE_CHANCE:
                 cache_payout = random.randint(SCAVENGE_STARDUST_CACHE_MIN, SCAVENGE_STARDUST_CACHE_MAX)
-                cache_note = f"\n\n🎁 **Stardust Cache Found!** **+{cache_payout:,} Stardust**"
+                cache_note = f"\n\n**Stardust cache found!** **+{cache_payout:,} Stardust**"
 
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
 
@@ -2051,7 +2040,7 @@ class Exploration(commands.Cog):
                     overflow_value = (bonus_amount - bonus_added) * LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
                     new_stardust += overflow_value
                     pet_findings.append(
-                        f"📦 Xenomorph loot overflow → **+{overflow_value:,} Stardust**"
+                        f"**Xenomorph loot overflow:** **+{overflow_value:,} Stardust**"
                     )
 
             # 30% Environmental Hazard Chance during Scavenging.
@@ -2071,8 +2060,8 @@ class Exploration(commands.Cog):
                         from defense import DEFENSE_MESSAGES
                         defense_text = DEFENSE_MESSAGES.get(defense_weapon_id, "Your defensive weapon stopped the hazard!")
                     else:
-                        defense_text = "☢️ **ATOMIC BREATH!** Your pet blasted the incoming hazard before it could reach you!"
-                    hazard_note = f"\n\n🛡️ **Defense!** {defense_text}\n**0 HP damage taken.**"
+                        defense_text = "**ATOMIC BREATH! ☢️** Your Godzilla has blasted the incoming hazard before it could reach you!"
+                    hazard_note = f"\n\n**Red Gem defense!** {defense_text}\n**0 HP damage taken thanks to your pet.**"
                 elif pet_effects.get("tails_doll_red_gem", 0.0) and random.random() < pet_effects.get("tails_doll_red_gem", 0.0):
                     benefit_roll = random.random()
                     if benefit_roll < 0.34:
@@ -2106,8 +2095,8 @@ class Exploration(commands.Cog):
                     if random.random() < 0.40:
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'kolossos_hunting_instinct')}\n"
-                            "**Kolossos completely negated the hazard.**\n"
-                            "🍖 **Hunting Instinct:** Your next activity has **+20% loot-finding chance**."
+                            "**Kolossos has completely negated the hazard.**\n"
+                            "**Hunting Instinct:** Your next activity has a **+20% loot-finding chance**."
                         )
                         effects["kolossos_next_loot_bonus"] = 0.20
                     else:
@@ -2117,20 +2106,20 @@ class Exploration(commands.Cog):
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'kolossos_hunting_instinct')}\n"
                             f"**Hazard reduced to -{damage_taken} HP.**\n"
-                            "🍖 **Hunting Instinct:** Your next activity has **+20% loot-finding chance**."
+                            "**Hunting Instinct:** Your next activity has a **+20% loot-finding chance**."
                         )
                 elif pet_effects.get("xenomorph_ambush", 0.0) and random.random() < pet_effects.get("xenomorph_ambush", 0.0):
                     if random.random() < 0.75:
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'xenomorph_ambush')}\n"
-                            "**The hazard was completely stopped.**"
+                            "**The hazard was completely stopped in its tracks.**"
                         )
                     else:
                         base_damage = random.randint(min_damage, max_damage)
                         damage_taken = max(1, int(base_damage * 0.25 * (1 - pet_effects["hazard_reduction"])))
                         hazard_note = (
                             f"\n\n{get_pet_passive_message(pet_effects, 'xenomorph_ambush')}\n"
-                            f"**Hazard reduced to -{damage_taken} HP.**"
+                            f"**Hazard reduced to -{damage_taken}HP.**"
                         )
                     if random.random() < 0.50:
                         xenomorph_bonus_loot_pending = True
@@ -2150,7 +2139,7 @@ class Exploration(commands.Cog):
                             damage_taken = max(1, int(random.randint(halloween_min_damage, halloween_max_damage) * (1 - pet_effects["hazard_reduction"])))
                         else:
                             damage_taken = max(1, int(random.randint(min_damage, max_damage) * (1 - pet_effects["hazard_reduction"])))
-                        hazard_note += f"**You {hazard} and took -{damage_taken} HP.**"
+                        hazard_note += f"**You {hazard} and took -{damage_taken}HP.**"
                 elif pet_effects["scavenge_hazard_avoidance"] and random.random() < pet_effects["scavenge_hazard_avoidance"]:
                     pet_warning = get_pet_passive_message(
                         pet_effects, "scavenge_hazard_avoidance"
@@ -2162,10 +2151,10 @@ class Exploration(commands.Cog):
                     halloween_message, halloween_min_damage, halloween_max_damage = random.choice(HALLOWEEN_DAMAGE_MESSAGES)
                     hazard = halloween_message
                     damage_taken = max(1, int(random.randint(halloween_min_damage, halloween_max_damage) * (1 - pet_effects["hazard_reduction"])))
-                    hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
+                    hazard_note = f"\n\n**Hazard inflicted!** You {hazard} and took **-{damage_taken}HP**."
                 else:
                     damage_taken = max(1, int(random.randint(min_damage, max_damage) * (1 - pet_effects["hazard_reduction"])))
-                    hazard_note = f"\n\n⚠️ **Hazard Warning!** You {hazard} and took **-{damage_taken} HP**."
+                    hazard_note = f"\n\n**Hazard inflicted!** You {hazard} and took **-{damage_taken}HP**."
 
             new_hp = max(0, hp - damage_taken)
             if pet_tails_recovery > 0:
@@ -2184,18 +2173,18 @@ class Exploration(commands.Cog):
                         pet_effects, "scavenge_first_aid"
                     )
                     hazard_note += (
-                        f"\n\n{pet_first_aid} **+{actual_recovery} HP**."
+                        f"\n\n{pet_first_aid} **+{actual_recovery}HP**."
                     )
 
             if new_hp <= 0 and effects.pop("cosmic_insurance", False):
                 new_hp = 1
-                hazard_note += "\n\n📋 **Cosmic Insurance:** Your coverage kept you at **1 HP**."
+                hazard_note += "\n\n**Cosmic Insurance:** Your coverage kept you at **1HP**. Pretty sure this isn't how insurance works..?"
 
             knocked_out_until = ""
             if new_hp <= 0:
                 knocked_out_until = (self.game_date() + timedelta(days=1)).isoformat()
                 knockout_lines = HALLOWEEN_KNOCKOUT_LINES if halloween_is_active() and HALLOWEEN_KNOCKOUT_LINES else self.KNOCKOUT_LINES
-                hazard_note += f"\n\n💀 **Knockout Report:** {random.choice(knockout_lines)}"
+                hazard_note += f"\n\n**Knockout report:** {random.choice(knockout_lines)}"
 
             added_amount, new_quantity, max_quantity = await add_inventory_item(
                 db,
@@ -2263,7 +2252,7 @@ class Exploration(commands.Cog):
                         overflow_value = overflow_glitch * LOOT_OVERFLOW_VALUES.get(glitch_item_id, 10)
                         new_stardust += overflow_value
                         pet_findings.append(
-                            f"📦 Glitched overflow → **+{overflow_value:,} Stardust**"
+                            f"Glitched overflow → **+{overflow_value:,} Stardust**"
                         )
 
             # Seasonal Halloween resources are independent bonus rolls and never
@@ -2296,8 +2285,8 @@ class Exploration(commands.Cog):
                     )
 
                 collectible_lines = [
-                    f"🎃 **Halloween Collectible Found: {collectible_emoji} {collectible_name}"
-                    + (" → Inventory Full" if not added_collectible else "") + "**",
+                    f"**Halloween collectible found! 👻 {collectible_emoji} {collectible_name}"
+                    + (" → inventory full" if not added_collectible else "") + "**",
                     "━━━━━━━━━━━━━━━━━━━━━━━━",
                     f"*{collectible_desc}*",
                 ]
@@ -2310,8 +2299,8 @@ class Exploration(commands.Cog):
                 ):
                     collectible_lines.extend([
                         "",
-                        "💡 **Usable Collectible**",
-                        "Use `/use` → `item` to activate this collectible.",
+                        "**Usable collectible found!**",
+                        "Use `/use item: [item name]` to activate this collectible.",
                     ])
 
                 seasonal_findings.append("\n".join(collectible_lines))
@@ -2339,11 +2328,11 @@ class Exploration(commands.Cog):
                 )
                 if added_egg:
                     pet_findings.append(
-                        f"{egg_info['emoji']} **You've found a {egg_info['name']}!** — use `/incubator start {egg_id}`"
+                        f"{egg_info['emoji']} **You've found a {egg_info['name']}!** — use `/incubator Start incubation:{egg_id} tube:` to hatch it!"
                     )
                 else:
                     pet_findings.append(
-                        f"{egg_info['emoji']} {egg_info['name']} → Inventory Full"
+                        f"{egg_info['emoji']} {egg_info['name']} → inventory full"
                     )
 
             # Halloween resources are independent bonus rolls and never replace normal loot.
@@ -2376,7 +2365,7 @@ class Exploration(commands.Cog):
                     candy_overflow_stardust = overflow_candy * 2
                     new_stardust += candy_overflow_stardust
                     seasonal_findings.append(
-                        f"📦 Candy Overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
+                        f"Candy overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
                     )
 
             if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
@@ -2385,11 +2374,11 @@ class Exploration(commands.Cog):
                     db, user_id, "halloween_plastic", "crafting_material", plastic_found
                 )
                 if added_plastic:
-                    seasonal_findings.append(f"🧴 Halloween Plastic ×{added_plastic}")
+                    seasonal_findings.append(f"Halloween Plastic ×{added_plastic}")
                 overflow_plastic = plastic_found - added_plastic
                 if overflow_plastic:
                     new_stardust += overflow_plastic * 2
-                    seasonal_findings.append(f"📦 Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
+                    seasonal_findings.append(f"Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
 
             # A Trick-or-Treat Bag is an especially rare direct seasonal find.
             if halloween_active and random.random() < HALLOWEEN_BAG_CHANCE:
@@ -2397,9 +2386,9 @@ class Exploration(commands.Cog):
                     db, user_id, "trick_or_treat_bag", "consumable", 1
                 )
                 if added_bag:
-                    seasonal_findings.append(f"🎃 Trick-or-Treat Bag ×{added_bag}")
+                    seasonal_findings.append(f"Trick-or-Treat Bag ×{added_bag}")
                 else:
-                    seasonal_findings.append("🎃 Trick-or-Treat Bag → Inventory Full")
+                    seasonal_findings.append("Trick-or-Treat Bag → inventory full")
 
             # Scavenging can recover multiple types of crafting material in one run.
             # Incubator materials yield 1–2 units and are capped at two
@@ -2528,9 +2517,9 @@ class Exploration(commands.Cog):
 
                 loot_name_with_quantity = (
                     f"{item_name}\n"
-                    f"📦 **Inventory Full:** Stack is already "
+                    f"**Inventory full:** stack is already "
                     f"**{max_quantity}/{max_quantity}**!"
-                    f"\n✨ **Converted to:** **+{overflow_stardust:,} Stardust**"
+                    f"\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
                 )
 
             # Group bonus discoveries into readable single-line sections rather than
@@ -2543,19 +2532,19 @@ class Exploration(commands.Cog):
             bonus_sections = []
             if salvage_material_findings:
                 bonus_sections.append(
-                    "🧰 **Salvage Materials:** " + " • ".join(salvage_material_findings)
+                    "**Salvage materials:** " + " • ".join(salvage_material_findings)
                 )
             if medical_supply_findings:
                 bonus_sections.append(
-                    "🩹 **Medical Supplies:** " + " • ".join(medical_supply_findings)
+                    "**Medical supplies:** " + " • ".join(medical_supply_findings)
                 )
             if bonus_mineral_findings:
                 bonus_sections.append(
-                    "⛏️ **Bonus Minerals:** " + " • ".join(bonus_mineral_findings)
+                    "**Bonus minerals:** " + " • ".join(bonus_mineral_findings)
                 )
             if seasonal_findings:
                 bonus_sections.append(
-                        "🎃 **Halloween Find:** " + "\n\n".join(seasonal_findings)
+                        "**Halloween item:** " + "\n\n".join(seasonal_findings)
                 )
             if pet_stardust_message:
                 bonus_sections.append(pet_stardust_message)
@@ -2574,7 +2563,7 @@ class Exploration(commands.Cog):
                 )
             if bonus_overflow_findings:
                 bonus_sections.append(
-                    "📦 **Overflow:** " + " • ".join(bonus_overflow_findings)
+                    "**Overflow:** " + " • ".join(bonus_overflow_findings)
                 )
 
             bonus_material_text = "\n\n" + "\n\n".join(bonus_sections) if bonus_sections else ""
@@ -2589,16 +2578,16 @@ class Exploration(commands.Cog):
 
             await db.commit()
 
-        status_text = f"❤️ **Health:** **{new_hp}/{max_hp} HP**" if new_hp > 0 else f"💀 **Knocked Out!** Use `/revive`, buy `/shop buy full_revive`, or recover at 50% HP on **{knocked_out_until}**."
+        status_text = f"**Health:** **{new_hp}/{max_hp}HP**" if new_hp > 0 else f"**Knocked out!** Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{knocked_out_until}**."
 
         embed = discord.Embed(
-            title=f"🛰️ Derelict Salvage Log — {ctx.author.display_name}",
+            title=f"Derelict Salvage Log — {ctx.author.mention}",
             description=(
                 f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
-                f"✨ **Found Stardust:** **{found_stardust:,}**"
+                f"**Stardust Found:** **{found_stardust:,}**"
                 f"{quantum_bonus_note}"
                 f"{cache_note}\n\n"
-                f"🛸 **Salvaged Item:** **{loot_name_with_quantity}**"
+                f"**Salvaged item:** **{loot_name_with_quantity}**"
                 f"{loot_rarity_note}"
                 f"{bonus_material_text}"
                 f"{hazard_note}\n\n"
@@ -2609,9 +2598,9 @@ class Exploration(commands.Cog):
         cooldown_total_seconds = max(0, int(round(effective_cooldown)))
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
-        embed.set_footer(text=f"Drone Charges Remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
+        embed.set_footer(text=f"Drone charges remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
         if pet_xp_result:
-            pet_xp_text = f"🐾 **Pet XP:** **+{pet_xp_result['xp_added']} XP**"
+            pet_xp_text = f"**Pet XP:** **+{pet_xp_result['xp_added']}XP**"
             if pet_xp_result["leveled_up"]:
                 pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
             embed.add_field(
@@ -2622,7 +2611,7 @@ class Exploration(commands.Cog):
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
-                name="📅 Daily Reminder",
+                name="Daily reminder",
                 value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
                 inline=False
             )
@@ -2630,7 +2619,7 @@ class Exploration(commands.Cog):
         cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
         if cooldown_reminder:
             embed.add_field(
-                name="🔔 Cooldown Alerts",
+                name="Cooldown alerts",
                 value=cooldown_reminder,
                 inline=False
             )
@@ -2665,14 +2654,14 @@ class Exploration(commands.Cog):
 
             if not user:
                 return await ctx.send(
-                    f"{ctx.author.mention} ❌ Profile not found! Explore Enceladus first."
+                    f"{ctx.author.mention} Profile not found!"
                 )
 
             hp, max_hp = user[0] or 0, user[1] or 100
 
             if hp > 0:
                 return await ctx.send(
-                    f"{ctx.author.mention} ⚠️ You are already conscious and do not need a revival."
+                    f"{ctx.author.mention} You are already conscious and do not need a revival."
                 )
 
             async with db.execute(
@@ -2746,7 +2735,7 @@ class Exploration(commands.Cog):
             ):
                 if interaction.user.id != user_id:
                     return await interaction.response.send_message(
-                        "❌ This revival menu belongs to someone else.",
+                        "This revival menu belongs to someone else.",
                         ephemeral=True
                     )
 
@@ -2765,7 +2754,7 @@ class Exploration(commands.Cog):
 
                     if not user_row:
                         return await interaction.followup.send(
-                            "❌ Profile not found!",
+                            "Profile not found!",
                             ephemeral=True
                         )
 
@@ -2776,7 +2765,7 @@ class Exploration(commands.Cog):
 
                     if current_hp > 0:
                         return await interaction.followup.send(
-                            "⚠️ You are already conscious!",
+                            "You are already conscious!",
                             ephemeral=True
                         )
 
@@ -2799,7 +2788,7 @@ class Exploration(commands.Cog):
                         }.get(item_id, item_id)
 
                         return await interaction.followup.send(
-                            f"❌ You don't have an **{item_name}**!",
+                            f"You don't have an **{item_name}**!",
                             ephemeral=True
                         )
 
@@ -2852,15 +2841,15 @@ class Exploration(commands.Cog):
 
                 if heal_percent >= 1.0:
                     message = (
-                        f"🚑 **Full Revival complete!**\n"
+                        f"**Full revival complete!**\n"
                         f"Your **{item_name}** restored you to "
-                        f"❤️ **{recovered_hp}/{max_hp} HP**!"
+                        f"❤️ **{recovered_hp}/{max_hp}HP**!"
                     )
                 else:
                     message = (
-                        f"💉 **Revival complete!**\n"
+                        f"**Revival complete!**\n"
                         f"Your **{item_name}** restored you to "
-                        f"❤️ **{recovered_hp}/{max_hp} HP**!"
+                        f"❤️ **{recovered_hp}/{max_hp}HP**!"
                     )
 
                 await interaction.edit_original_response(
@@ -2870,13 +2859,13 @@ class Exploration(commands.Cog):
 
         if not available:
             return await ctx.send(
-                "❌ You don't have any revival items.\n"
+                "You don't have any revival items.\n"
                 "You can buy an **Emergency Full Revival** from "
-                "`/shop buy full_revive`, or recover automatically tomorrow."
+                "`/shop buy`, or recover automatically at 12:00AM EST."
             )
 
         embed = discord.Embed(
-            title=f"💀 {ctx.author.display_name} — Revival Required",
+            title=f"{ctx.author.mention} — Revival required!",
             description=(
                 "You are currently unconscious.\n\n"
                 "Choose a revival method:"
@@ -2891,7 +2880,7 @@ class Exploration(commands.Cog):
         embed.add_field(
             name=f"{EMOJIS.get('revive', '⚕️')} Revival Kit",
             value=(
-                "Restores **35% HP**\n"
+                "Restores **35%HP**\n"
                 f"Owned: **{revive_count}**"
             ),
             inline=True
@@ -2900,7 +2889,7 @@ class Exploration(commands.Cog):
         embed.add_field(
             name=f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit",
             value=(
-                "Restores **50% HP**\n"
+                "Restores **50%HP**\n"
                 f"Owned: **{kit_count}**"
             ),
             inline=True
@@ -2909,7 +2898,7 @@ class Exploration(commands.Cog):
         embed.add_field(
             name=f"{EMOJIS.get('full_revive', '🚑')} Emergency Full Revival",
             value=(
-                "Restores **100% HP**\n"
+                "Restores **100%HP**\n"
                 f"Owned: **{full_count}**"
             ),
             inline=True
@@ -2936,7 +2925,7 @@ class HauntedLocationView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )
@@ -2946,7 +2935,7 @@ class HauntedLocationView(discord.ui.View):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("🎃 Haunted Exploration is currently dormant.", ephemeral=True)
+            await interaction.response.send_message("Haunted Exploration is currently dormant. Please check back next Halloween!", ephemeral=True)
             return False
         return True
 
@@ -2966,7 +2955,7 @@ class HauntedLocationButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )
@@ -3041,7 +3030,7 @@ class HauntedStoryView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )
@@ -3051,7 +3040,7 @@ class HauntedStoryView(discord.ui.View):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("🎃 Haunted Exploration is currently dormant.", ephemeral=True)
+            await interaction.response.send_message("Haunted Exploration is currently dormant. Please check back next Halloween!", ephemeral=True)
             return False
         return True
 
@@ -3076,7 +3065,7 @@ class HauntedStoryChoiceButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )
@@ -3112,7 +3101,7 @@ class HauntedRunButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "⚠️ **This Haunted Exploration isn't yours.**\n"
+                "**This Haunted Exploration isn't yours.**\n"
                 "These buttons belong to another player's exploration run.",
                 ephemeral=True,
             )

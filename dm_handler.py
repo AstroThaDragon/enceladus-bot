@@ -93,7 +93,7 @@ class DMHandler(commands.Cog):
         if self.is_rate_limited(user.id):
             await self.safe_send(
                 user,
-                "⚠️ Please slow down a little. Your messages are still important, but I need a moment to process them!",
+                "Please slow down a little. Your messages are still important, but I need a moment to process them!",
             )
 
             return
@@ -114,7 +114,7 @@ class DMHandler(commands.Cog):
 
         if should_forward and log_channel:
             embed = discord.Embed(
-                title="📨 New DM to Enceladus",
+                title="New DM to Enceladus",
                 color=discord.Color.blurple(),
                 timestamp=discord.utils.utcnow()
             )
@@ -141,7 +141,7 @@ class DMHandler(commands.Cog):
                 )
 
             if any(word in lowered for word in URGENT_KEYWORDS):
-                embed.title = "🚨 Urgent DM to Enceladus"
+                embed.title = "Urgent DM to Enceladus"
                 embed.color = discord.Color.red()
 
             try:
@@ -153,14 +153,14 @@ class DMHandler(commands.Cog):
         if session_active:
             await self.safe_send(
                 user,
-                "🌌 Added to your active support session. Your message has been forwarded to staff.",
+                "Added to your active support session. Your message has been forwarded to staff.",
             )
 
         elif any(word in lowered for word in ["appeal", "appeals", "ban", "banned", "unban"]):
             active_sessions[user.id] = time.time()
             await self.safe_send(
                 user,
-                "🌌 If this is about a ban or verification appeal, please reply here with:\n\n"
+                "If this is about a ban or verification appeal, please reply here with:\n\n"
                 "• Your Discord username\n"
                 "• Why you were removed or banned\n"
                 "• Any relevant screenshots/details\n"
@@ -172,7 +172,7 @@ class DMHandler(commands.Cog):
             active_sessions[user.id] = time.time()
             await self.safe_send(
                 user,
-                "🌌 Thanks for reaching out. Your message has been forwarded to staff.\n\n"
+                "Thanks for reaching out. Your message has been forwarded to staff.\n\n"
                 "If this is about verification, appeals, reports, or server support, please include as much detail as you can. Your messages here will be forwarded to staff for the next 15 minutes.",
             )
 
@@ -180,14 +180,14 @@ class DMHandler(commands.Cog):
             active_sessions[user.id] = time.time()
             await self.safe_send(
                 user,
-                "🚨 Your message looks urgent, so it has been forwarded to staff right away.\n\n"
+                "Your message looks urgent, so it has been forwarded to staff right away.\n\n"
                 "Please stay safe and include any extra details that may help. Your messages here will be forwarded to staff for the next 15 minutes.",
             )
             
         else:
             await self.safe_send(
                 user,
-                "🌌 Hello! Message received!\n\n"
+                "Hello! Message received!\n\n"
                 "If you need help, reports, appeals, bans, or verification support, please say that clearly so I can forward it to staff.",
             )
 

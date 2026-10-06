@@ -19,14 +19,14 @@ class BirthdayCog(commands.Cog):
     def cog_unload(self):
         self.check_birthdays.cancel()  # type: ignore
 
-    @app_commands.command(name="set_birthday", description="Set your birthday (Month/Day)!")
+    @app_commands.command(name="set_birthday", description="Set your birthday (Month/Day) to be celebrated in the server annually!")
     @app_commands.describe(month="Month (1-12)", day="Day (1-31)")
     async def set_birthday(self, interaction: discord.Interaction, month: int, day: int):
         try:
             date(2000, month, day)
         except ValueError:
             return await interaction.response.send_message(
-                "Please provide a valid Month and Day!",
+                "Please provide a valid Month and Day.",
                 ephemeral=True
             )
 
@@ -61,7 +61,7 @@ class BirthdayCog(commands.Cog):
 
         if not rows:
             return await interaction.response.send_message(
-                "No birthdays have been registered yet!",
+                "No birthdays have been registered yet.",
                 ephemeral=True
             )
 
@@ -100,7 +100,7 @@ class BirthdayCog(commands.Cog):
 
         if not upcoming:
             return await interaction.response.send_message(
-                "No valid birthdays found!",
+                "No valid birthdays found.",
                 ephemeral=True
             )
 
@@ -110,23 +110,23 @@ class BirthdayCog(commands.Cog):
 
         for days_until, name, month, day in upcoming[:10]:
             if days_until == 0:
-                countdown = "🎉 Today!"
+                countdown = "Today! 🎉"
             elif days_until == 1:
-                countdown = "⏳ 1 day away"
+                countdown = "1 day away"
             else:
-                countdown = f"⏳ {days_until} days away"
+                countdown = f"{days_until} days away!"
 
             birthday_lines.append(
                 f"**{name}** — `{month}/{day}` • {countdown}"
             )
 
         embed = discord.Embed(
-            title="🎂 Upcoming Birthdays",
+            title="Upcoming Birthdays 🎂",
             description="\n".join(birthday_lines),
             color=discord.Color.from_rgb(114, 0, 225)
         )
 
-        embed.set_footer(text="Cosmic birthday tracker ✨")
+        embed.set_footer(text="Cosmic Birthday Tracker | Enceladus")
 
         await interaction.response.send_message(
             embed=embed,
@@ -198,12 +198,12 @@ class BirthdayCog(commands.Cog):
 
             if channel:
                 shoutout_embed = discord.Embed(
-                    title="🎂 Birthday Celebration!",
+                    title="Server Birthday Celebration!",
                     description=(
                         f"Today we have some very special stars shining bright!\n\n"
                         f"**Happy Birthday to:**\n{', '.join(birthday_members)}\n\n"
-                        f"Everyone give a warm birthday wish to our special birthday stars! "
-                        f"You can do so by mentioning the Happy Birthday role! 🎂✨"
+                        f"Everyone give a warm birthday wish to our special birthday stars today!\n\n"
+                        f"You can do so by mentioning the Happy Birthday role! 🎂🎉"
                     ),
                     color=discord.Color.from_rgb(114, 0, 225)
                 )
@@ -218,7 +218,7 @@ class BirthdayCog(commands.Cog):
 
                 try:
                     await channel.send(
-                        content=f"Happy birthday, {', '.join(birthday_members)}! 🎉🎂✨",
+                        content=f"Happy birthday, {', '.join(birthday_members)}! 🎂🎉",
                         embed=shoutout_embed
                     )
                 except Exception as e:

@@ -61,7 +61,7 @@ class Enceladus(commands.Bot):
         await init_db()
         await init_bump_db()
         await init_fun_db()
-        print("🌌 Databases initialized and ready!")
+        print("Databases initialized and ready!")
 
         # 2. Load the cogs
         await self.load_extension('leveling')
@@ -93,11 +93,11 @@ class Enceladus(commands.Bot):
         await self.load_extension("defense")
         await self.load_extension("admin")
         await self.load_extension("debug")
-        print("🌌 All cogs loaded!")
+        print("All cogs loaded!")
 
         # Install the rare Halloween-only corruption layer on public commands.
         halloween_flavor_count = install_halloween_flavor(self)
-        print(f"🎃 Halloween flavor layer installed on {halloween_flavor_count} public commands.")
+        print(f"Halloween flavor layer installed on {halloween_flavor_count} public commands.")
 
         # 3. Register the persistent views (Buttons/Dropdowns)
         self.add_view(PersistentColorView())
@@ -114,7 +114,7 @@ class Enceladus(commands.Bot):
         # 4. Global Sync
         try:
             await self.tree.sync()
-            print(f"🌌 {self.user} has successfully synced commands globally!")
+            print(f"{self.user} has successfully synced commands globally!")
         except Exception as e:
             print(f"Error syncing tree: {e}")
             await log_task_error(self, "setup_hook / tree.sync", e)
@@ -288,9 +288,9 @@ async def check_bump_timer():
 
             reminder_embed = discord.Embed(
                 description=(
-                    f"# It's time to bump!\n\n"
-                    f"Two hours have passed since the last bump! You may now bump our server by typing `/bump`! "
-                    f"It helps us a lot by gaining more noticability! "
+                    f"# *Loud alarm clock noises*\n\n"
+                    f"Two hours have passed since the last bump! You can now bump our server by typing `/bump`! "
+                    f"It helps us a lot by gaining more noticeability! "
                     f"<a:RedHearts:1109768412382642266> <a:PurpleHearts:1109768355390431323> "
                 ),
                 color=discord.Color.from_rgb(114, 0, 225)
@@ -361,12 +361,12 @@ async def stargazing_alert():
                         description = re.sub('<[^<]+?>', '', item['description'])[:300] + "..."
 
                         embed = discord.Embed(
-                            title="🌌 🔭 Tonight's Cosmic Event!",
+                            title="Tonight's Cosmic Event 🌌🔭",
                             description=f"**{title}**\n\n{description}\n\n🔗 [View Event Details]({link})",
                             color=discord.Color.dark_purple()
                         )
                         embed.set_thumbnail(url="https://i.imgur.com/83S8Z6H.png")
-                        embed.set_footer(text="Source: In-The-Sky.org | Keep looking up, Stargazers! 🔭")
+                        embed.set_footer(text="Source: in-the-sky.org | Keep looking up, Stargazers! 🔭")
                         
 
                         if isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
@@ -629,7 +629,7 @@ async def on_member_remove(member):
     if channel:
         content_text = f"Sorry to see you go, {member.name}!"
         embed = discord.Embed(
-            title="We're sorry to see you go! 😔",
+            title="We're sorry to see you go... 😔",
             description=(
                 f"It looks like {member.mention} has left the server. "
                 f"We hope to see you again soon, and please be safe out there!"
@@ -650,7 +650,7 @@ async def on_member_remove(member):
     # Internal log — keep the leveling snapshot here so it is preserved for staff.
     if log_channel:
         snapshot_embed = discord.Embed(
-            title="📊 Member Leveling Snapshot",
+            title="Member Leveling Snapshot",
             description=f"**{member.name}** ({member.mention}) has left the server.",
             color=discord.Color.from_rgb(114, 0, 225)
         )
@@ -695,8 +695,8 @@ async def on_member_update(before, after):
             embed = discord.Embed(
                 title="Wooo! We have a new booster! 💜",
                 description=(
-                    f"Thank you so much, {after.name}!! You have received our supporter role! "
-                    f"We are now at {boost_count} boosts! 🐉❤️"
+                    f"Thank you so much, {after.name}! You have received our supporter role! "
+                    f"We are now at {boost_count} boosts! 🌌💜"
                 ),
                 color=discord.Color.from_rgb(114, 0, 225)
             )
@@ -791,7 +791,7 @@ async def on_raw_reaction_add(payload):
             if message.attachments:
                 embed.set_image(url=message.attachments[0].url)
 
-            embed.set_footer(text=f"ID: {message.id} • The Vault")
+            embed.set_footer(text=f"ID: {message.id} | Enceladus Vault")
 
             try:
                 if isinstance(vault_channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
@@ -832,7 +832,7 @@ async def nasa(interaction: discord.Interaction):
                     desc = desc[:297] + "..."
 
                 embed = discord.Embed(
-                    title=f"🚀 {title}", 
+                    title=f"{title} 🌌", 
                     description=f"{desc}\n\n🔗 [View on NASA APOD]({page_url})", 
                     color=discord.Color.blue()
                 )
@@ -844,7 +844,7 @@ async def nasa(interaction: discord.Interaction):
                 elif img_url:
                     embed.set_image(url=img_url)
                 
-                embed.set_footer(text="Provided by NASA APOD API")
+                embed.set_footer(text="Provided by NASA APOD API | Keep looking up, Stargazers! 🔭")
                 await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="bing", description="View today's Bing wallpaper!")
@@ -858,7 +858,7 @@ async def bing(interaction: discord.Interaction):
                 images = data.get('images') or []
                 if not images:
                     await interaction.response.send_message(
-                        "❌ Bing didn't return a wallpaper right now. Please try again later.",
+                        "Bing didn't return a wallpaper right now. Please try again later and report to staff if the issue persists.",
                         ephemeral=True
                     )
                     return
@@ -867,7 +867,7 @@ async def bing(interaction: discord.Interaction):
                 img_path = image.get('url')
                 if not img_path:
                     await interaction.response.send_message(
-                        "❌ Bing returned an incomplete wallpaper result.",
+                        "Bing returned an incomplete wallpaper result. Please try again later and report to staff if the issue persists.",
                         ephemeral=True
                     )
                     return
@@ -877,7 +877,7 @@ async def bing(interaction: discord.Interaction):
                 copyright_link = image.get('copyrightlink', 'https://www.bing.com/')
 
                 embed = discord.Embed(
-                    title="🌍 Today's Bing Wallpaper", 
+                    title="Today's Bing Wallpaper", 
                     description=f"{copyright_info}\n\n🔗 [Explore Location]({copyright_link})", 
                     color=discord.Color.green()
                 )
@@ -894,7 +894,7 @@ async def moon(interaction: discord.Interaction):
                 phase_emoji = await response.text()
                 await interaction.response.send_message(f"The current moon phase is: **{phase_emoji}**")
             else:
-                await interaction.response.send_message("Can't see the moon right now! ☁️")
+                await interaction.response.send_message("Can't see the moon right now! Please report to staff if the issue persists. ☁️")
 
 @bot.tree.command(name="weather", description="Get the current weather for a specific city!")
 async def weather(interaction: discord.Interaction, city: str):
@@ -906,7 +906,7 @@ async def weather(interaction: discord.Interaction, city: str):
                 weather_report = await response.text()
                 await interaction.response.send_message(f"**Current Weather:**\n{weather_report}")
             else:
-                await interaction.response.send_message(f"I couldn't find the weather for '{city}'.")
+                await interaction.response.send_message(f"Couldn't find the weather for '{city}'. Please report to staff if the issue persists.")
 
 @bot.tree.command(name="iss", description="Track the International Space Station's current location!")
 async def iss(interaction: discord.Interaction):
@@ -924,7 +924,7 @@ async def iss(interaction: discord.Interaction):
                     maps_url = f"https://www.google.com/maps?q={lat},{lon}&t=k"
                     
                     embed = discord.Embed(
-                        title="🛰️ ISS Current Location",
+                        title="ISS Current Location",
                         description=f"The ISS is flying over:\n\n🔗 [View on Live Map]({maps_url})",
                         color=discord.Color.dark_blue()
                     )
@@ -934,7 +934,7 @@ async def iss(interaction: discord.Interaction):
                     await interaction.followup.send(embed=embed)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as e:
             print(f"[ISS ERROR]: {type(e).__name__}: {e}")
-            await interaction.followup.send("❌ The ISS service is unavailable right now. Please try again later.")
+            await interaction.followup.send("The ISS service is unavailable right now. Please try again later and report to staff if the issue persists.")
 
 def get_next_midnight_reset():
     et = pytz.timezone("US/Eastern")
@@ -972,7 +972,7 @@ async def resetbump(ctx):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM bump_timer WHERE id = 1")
         await db.commit()
-    await ctx.send("Bump timer cleared! 🔄")
+    await ctx.send("Bump timer cleared!")
 
 class HelpView(discord.ui.View):
     def __init__(self, bot_instance, author, pages):
@@ -992,13 +992,13 @@ class HelpView(discord.ui.View):
 
     def build_embed(self):
         embed = self.pages[self.current_page]
-        embed.set_footer(text=f"Enceladus' Station • Page {self.current_page + 1}/{self.max_pages} | Powered by the Astral Plane! 🌌")
+        embed.set_footer(text=f"Enceladus Station • Page {self.current_page + 1}/{self.max_pages} | Use /help or -protocols to open your own command directory.")
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.author.id:
             return True
-        await interaction.response.send_message("This isn't your protocol command! Use `/help` or `-protocols` to open your own.", ephemeral=True)
+        await interaction.response.send_message("This isn't your protocol command. Use `/help` or `-protocols` to open your own.", ephemeral=True)
         return False
 
     @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.secondary)
@@ -1037,28 +1037,28 @@ async def help_command(ctx):
 
     pages = [
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Leveling & Social**",
-            description="Use `/help` or `-protocols` for help on available commands. All commands work below with `-` or `/`, so use whatever you prefer! 🌌",
+            title="**Enceladus Command Directory — Leveling & Social**",
+            description="Level up, socialize, and customize your rank card with these commands!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__ ⭐ Leveling & Social__",
+            name="__Leveling & Social__",
             value=(
-                "`/customize <bar_color> [bg_url]` - Personalize your rank card aesthetics!\n"
-                "`/hug <member>` - Give a warm, fuzzy cosmic hug!\n"
+                "`/customize <bar_color> [bg_url] <font> <glow>` - Personalize your rank card aesthetics!\n"
+                "`/hug <member>` - Give a warm, soft hug!\n"
                 "`/rank <member>` - View your level, XP, and rank card.\n"
                 "`/slap <member>` - Slap someone with a random object!\n"
-                f"`/set_birthday <month> <day>` - Register your birthday for a special cake icon and ping on your special day! Daily checks at <t:{daily_reset}:t>.\n"
-                "`/upcoming_birthdays` - See upcoming server birthdays!\n"
-                "`/leaderboard` `-levelscores` - View top members and scroll through active users!"
+                f"`/set_birthday <month> <day>` - Register your birthday for a special role and ping on your special day! Daily checks at <t:{daily_reset}:t>.\n"
+                "`/upcoming_birthdays` - See upcoming server birthdays.\n"
+                "`/leaderboard` `-levelscores` - View top members and scroll through active users."
             ),
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Fun & Games (1)**",
-            description="Explore the cosmic playground and space tools! 🪐",
+            title="**Enceladus Command Directory — Fun & Games (1)**",
+            description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__ 🎮 Fun & Cosmic Games (1)__",
+            name="__Fun & Games (1)__",
             value=(
                 "`/aurarate` - Check you or a member's aura.\n"
                 "`/bing` - View today's Bing wallpaper.\n"
@@ -1072,11 +1072,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Fun & Games (2)**",
-            description="Fortunes, music searches, and cosmic tracking! 🎶",
+            title="**Enceladus Command Directory — Fun & Games (2)**",
+            description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__ 🎮 Fun & Cosmic Games (2) & Rhythm__",
+            name="__Fun & Games (2)__",
             value=(
                 "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
                 "`/fnfsong <song>` - Find FNF tracks on YouTube.\n"
@@ -1092,11 +1092,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Fun & Games (3)**",
-            description="More cosmic games and tools! ✨",
+            title="**Enceladus Command Directory — Fun & Games (3)**",
+            description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__ 🎮 Fun & Cosmic Games (3)__",
+            name="__Fun & Games (3)__",
             value=(
                 "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
                 "`/moon` - Check the current moon phase.\n"
@@ -1110,38 +1110,38 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Station Economy & Exploration**",
-            description="Manage your station profile, explore the outer rims, collect salvage, and spend your Stardust! 🚀",
+            title="**Enceladus Command Directory — Economy & Exploration**",
+            description="Manage your profile, explore the outer rims of the galaxy, collect salvage, and spend your hard-earned Stardust!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__🚀 Station & Exploration__",
+            name="__Exploration & Profile__",
             value=(
-                "`/background <background_id>` - Equip an unlocked background voucher for your profile card.\n"
-                "`/bio <text>` - Set the biography displayed on your Station profile.\n"
+                "`/background equip <background>` - Equip an unlocked background for your profile.\n"
+                "`/bio <text>` - Set the biography displayed on your profile.\n"
                 "`/heal <item>` - Use a healing item to restore HP.\n"
-                "`/mine` - Deploy your starship mining laser to collect Stardust and discover rare loot.\n"
-                "`/profile [member]` - View your Station personnel record, level, XP, Stardust, companion, and environment.\n"
-                "`/revive` - Use an Emergency Revival Kit to return at half health.\n"
-                "`/scavenge` - Search derelict wreckage for salvage, Stardust, and rare finds.\n"
-                "`/status` - Check your health, exploration charges, and cooldowns.\n"
+                "`/mine` - Deploy your mining laser to collect Stardust and discover rare loot.\n"
+                "`/profile [member]` - View your profile, level, XP, Stardust, companion, and environment.\n"
+                "`/revive` - Use any revival item to return at half health or full health.\n"
+                "`/scavenge` - Search derelict wreckage for salvage, Stardust, and rare findings.\n"
+                "`/status` - Check your health, exploration charges, cooldowns and more.\n"
             ),
             inline=False
         ).add_field(
-            name="__💰 Station Economy & Inventory__",
+            name="__Economy & Inventory__",
             value=(
-                "`/claimlegacy` - Claim your one-time legacy Stardust payout from before the Shop & Exploration update.\n"
-                "`/inventory` - Open your storage locker and view collected items, minerals, salvage, and vouchers.\n"
-                "`/item <category> <item>` - Inspect an item from the Station catalog.\n"
-                "`/shop` - Browse the Enceladus Station Trading Post.\n"
-                "`/shop buy <item_id>` - Purchase an item from the Station shop.\n"
+                "`/claimlegacy` - Claim your one-time legacy Stardust payout from before the **Frontier update.**\n"
+                "`/inventory` - Open your inventory and view collected items, materials, salvage, vouchers and more.\n"
+                "`/item <category> <item>` - Inspect an item from the catalog.\n"
+                "`/shop` - Browse the Trading Post.\n"
+                "`/shop buy <item_id>` - Purchase an item from the shop.\n"
                 "`/shop sell <item>` - Sell salvaged space junk for Stardust.\n"
                 "`/use <item_id> [target]` - Use a consumable or activate an item from your inventory.\n"
             ),
             inline=False
         ),
         discord.Embed(
-            title="**🛰️ Enceladus Command Directory — Server Tools**",
-            description="Community tags and utility commands! 🛠️",
+            title="**Enceladus Command Directory — Misc. Server Tools**",
+            description="Community tags and utility commands!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
             name="__ 🛠️ Server Tools__",
@@ -1159,24 +1159,24 @@ async def help_command(ctx):
     if ctx.author.guild_permissions.administrator:
          pages.append(
             discord.Embed(
-                title="**🛰️ Enceladus Command Directory — Lair Admin**",
-                description="Administrative controls for authorized staff. 🛡️",
+                title="**Enceladus Command Directory — Admin Tools**",
+                description="Administrative controls for authorized staff.",
                 color=discord.Color.from_rgb(138, 43, 226)
             ).add_field(
-                name="__ 🛡️ Lair Admin (Admin Staff Only)__",
+                name="__ Lair Admin (Admins Only!)__",
                 value=(
                     "`/admin` - Open the administrator control panel and choose from all available administrative actions below:\n"
-                    "🔄 Reset Bump Timer\n"
-                    "🔥 Set Fortune Streak\n"
-                    "📈 Set XP\n"
-                    "⭐ Set Level\n"
-                    "➕ Add XP\n"
-                    "🔄 Sync Levels\n"
-                    "🧹 Purge Left Members\n"
-                    "♻️ Reset\n"
-                    "🖼️ Font Preview Setup\n"
-                    "🔒 Send Verify Panel\n"
-                    "🔞 Send NSFW Verification Panel"
+                    "Reset Bump Timer\n"
+                    "Set Fortune Streak\n"
+                    "Set XP\n"
+                    "Set Level\n"
+                    "Add XP\n"
+                    "Sync Levels\n"
+                    "Purge Left Members\n"
+                    "Reset\n"
+                    "Font Preview Setup\n"
+                    "Send Verify Panel\n"
+                    "Send NSFW Verification Panel"
                 ),
                 inline=False
             )
@@ -1212,7 +1212,7 @@ async def main():
         if token:
             await bot.start(token)
         else:
-            print("❌ ERROR: No bot token found in environment variables!")
+            print("No bot token found in environment variables! Please set 'DEV_TOKEN' or 'DISCORD_TOKEN`.")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -24,95 +24,95 @@ ACHIEVEMENTS = {
         "name": "[ERROR3D_COLLECTOR]",
         "emoji": "💾",
         "description": "Collect all 6 pets from the Glitched Egg.",
-        "reward": "15,000 Stardust + Exclusive profile title",
+        "reward": "15,000 Stardust + Profile title",
     },
     "glitched_missingno": {
         "name": "[ERROR://CORRUPTED_DATA]",
         "emoji": "👾",
         "description": "Hatch MissingNo.",
-        "reward": "Exclusive profile title",
+        "reward": "Profile title",
     },
 
     "halloween_half": {
         "name": "Haunted Collector",
         "emoji": "🎃",
         "description": "Collect at least 50% of the Halloween collectibles.",
-        "reward": "Permanent profile background: Haunted Halloween",
+        "reward": "Profile background: Haunted Halloween",
     },
     "halloween_full": {
         "name": "Horror Enthusiast",
         "emoji": "👻",
         "description": "Collect 100% of the Halloween collectibles.",
-        "reward": "Permanent profile title: Horror Enthusiast",
+        "reward": "Profile title: Horror Enthusiast",
     },
 
     "halloween_bag_crafter": {
         "name": "Trick-or-Treater",
         "emoji": "🎃",
         "description": "Craft 25 Trick-or-Treat Bags.",
-        "reward": "Permanent profile background: Trick-or-Treat",
+        "reward": "Profile background: Trick-or-Treat",
     },
 
     "candy_background": {
         "name": "Candy Collector",
         "emoji": "🍬",
         "description": "Consume 100 pieces of Halloween Candy. Each Trick-or-Treat Bag consumed counts as 25 pieces of candy.",
-        "reward": "Permanent profile background: Candy Collector",
+        "reward": "Profile background: Candy Collector",
     },
     "candy_nommer": {
         "name": "Candy Nommer",
         "emoji": "🍫",
         "description": "Consume 250 or more pieces of Halloween Candy. Each Trick-or-Treat Bag consumed counts as 25 pieces of candy. Diabeetus.",
-        "reward": "Permanent profile title: Candy Nommer",
+        "reward": "Profile title: Candy Nommer",
     },
 
     "halloween_hatch": {
         "name": "Haunting Friend",
         "emoji": "🐣",
         "description": "Hatch a Halloween Egg.",
-        "reward": "Permanent profile background: Haunting Friend",
+        "reward": "Profile background: Haunting Friend",
     },
     "halloween_wine_cabinet": {
         "name": "Seal Breaker",
         "emoji": "🍷",
         "description": "Break the seal on the Cursed Wine Cabinet. You were warned.",
-        "reward": "Permanent profile title: Seal Breaker",
+        "reward": "Profile title: Seal Breaker",
     },
 
 
     # -----------------------------------------------------------------------
     # Haunted Exploration discovery achievements
     # -----------------------------------------------------------------------
-    "haunted_asylum": {"name": "Patient Zero", "emoji": "🏥", "description": "Discover every rare discovery in the Abandoned Asylum.", "reward": "Permanent profile title: Patient Zero"},
-    "haunted_graveyard": {"name": "Six Feet Under", "emoji": "🪦", "description": "Discover every rare discovery in the Forgotten Graveyard.", "reward": "Permanent profile background: The Graveyard"},
-    "haunted_house": {"name": "Housebroken", "emoji": "🏚️", "description": "Discover every rare discovery in the Haunted House.", "reward": "Permanent profile title: Housebroken"},
-    "haunted_church": {"name": "Forgive Me", "emoji": "⛪", "description": "Discover every rare discovery in the Abandoned Church.", "reward": "Permanent profile background: Abandoned Sanctuary"},
-    "haunted_witch_woods": {"name": "Into the Woods", "emoji": "🌲", "description": "Discover every rare discovery in Witch's Woods.", "reward": "Permanent profile title: Into the Woods"},
-    "haunted_pizzeria": {"name": "Five Nights Wasn't Enough", "emoji": "🍕", "description": "Discover every rare discovery in the Dilapidated Pizzeria.", "reward": "Permanent profile background: Midnight Pizzeria"},
-    "haunted_toy_workshop": {"name": "Playtime Is Over", "emoji": "🧸", "description": "Discover every rare discovery in the Abandoned Toy Workshop.", "reward": "Permanent profile title: Playtime Is Over"},
-    "haunted_broadcast": {"name": "You're Live", "emoji": "📡", "description": "Discover every rare discovery in the Abandoned Broadcast Station.", "reward": "Permanent profile background: Dead Air"},
-    "haunted_hotel": {"name": "No Vacancy", "emoji": "🏨", "description": "Discover every rare discovery in the Endless Hotel.", "reward": "Permanent profile title: No Vacancy"},
-    "haunted_fogbound": {"name": "Population: ???", "emoji": "🌫️", "description": "Discover every rare discovery in Fogbound Town.", "reward": "Permanent profile background: Fogbound"},
-    "haunted_research": {"name": "It Saw You Too", "emoji": "🧪", "description": "Discover all four rare discoveries in the Derelict Research Facility.", "reward": "Permanent profile title: It Saw You Too"},
-    "haunted_yellow_halls": {"name": "Lost, Actually", "emoji": "🟨", "description": "Discover every rare discovery in the Yellow Halls.", "reward": "Permanent profile title: Lost, Actually"},
-    "haunted_highway": {"name": "Wrong Turn", "emoji": "🛣️", "description": "Discover every rare discovery on the Dead-End Highway.", "reward": "Permanent profile background: Dead-End"},
-    "haunted_drowned": {"name": "Mind the Water", "emoji": "🌊", "description": "Discover every rare discovery in the Drowned Station.", "reward": "Permanent profile title: Mind the Water"},
-    "haunted_campground": {"name": "Don't Look Behind You", "emoji": "🌲", "description": "Discover every rare discovery in the Silent Campground.", "reward": "Permanent profile background: Watched From the Trees"},
-    "haunted_first_discovery": {"name": "I Was Curious", "emoji": "👁️", "description": "Discover your first rare Haunted discovery.", "reward": "Permanent profile title: Haunted Explorer"},
-    "haunted_impossible": {"name": "That Wasn't There Before", "emoji": "👁️", "description": "Discover an impossible environmental anomaly.", "reward": "Permanent profile title: Something Is Very Wrong"},
-    "haunted_worth_it": {"name": "Worth It", "emoji": "🩸", "description": "Survive a rare discovery that causes a major Sanity loss.", "reward": "Permanent profile title: Worth It"},
-    "haunted_unwell": {"name": "Unwell", "emoji": "🫥", "description": "Reach 0 Sanity after triggering a rare discovery.", "reward": "Permanent profile title: Unwell"},
-    "haunted_other_side": {"name": "The Other Side", "emoji": "👁️", "description": "Discover a rare event while at 0 Sanity.", "reward": "Permanent profile title: The Other Side"},
-    "haunted_all_discoveries": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "description": "Discover every rare discovery across all Haunted locations.", "reward": "Permanent profile title: I Shouldn't Have Looked"},
+    "haunted_asylum": {"name": "Patient Zero", "emoji": "🏥", "description": "Discover every rare discovery in the Abandoned Asylum.", "reward": "Profile title: Patient Zero"},
+    "haunted_graveyard": {"name": "Six Feet Under", "emoji": "🪦", "description": "Discover every rare discovery in the Forgotten Graveyard.", "reward": "Profile background: The Graveyard"},
+    "haunted_house": {"name": "Housebroken", "emoji": "🏚️", "description": "Discover every rare discovery in the Haunted House.", "reward": "Profile title: Housebroken"},
+    "haunted_church": {"name": "Forgive Me", "emoji": "⛪", "description": "Discover every rare discovery in the Abandoned Church.", "reward": "Profile background: Abandoned Sanctuary"},
+    "haunted_witch_woods": {"name": "Into the Woods", "emoji": "🌲", "description": "Discover every rare discovery in Witch's Woods.", "reward": "Profile title: Into the Woods"},
+    "haunted_pizzeria": {"name": "Five Nights Wasn't Enough", "emoji": "🍕", "description": "Discover every rare discovery in the Dilapidated Pizzeria.", "reward": "Profile background: Midnight Pizzeria"},
+    "haunted_toy_workshop": {"name": "Playtime Is Over", "emoji": "🧸", "description": "Discover every rare discovery in the Abandoned Toy Workshop.", "reward": "Profile title: Playtime Is Over"},
+    "haunted_broadcast": {"name": "You're Live", "emoji": "📡", "description": "Discover every rare discovery in the Abandoned Broadcast Station.", "reward": "Profile background: Dead Air"},
+    "haunted_hotel": {"name": "No Vacancy", "emoji": "🏨", "description": "Discover every rare discovery in the Endless Hotel.", "reward": "Profile title: No Vacancy"},
+    "haunted_fogbound": {"name": "Population: ???", "emoji": "🌫️", "description": "Discover every rare discovery in Fogbound Town.", "reward": "Profile background: Fogbound"},
+    "haunted_research": {"name": "It Saw You Too", "emoji": "🧪", "description": "Discover all four rare discoveries in the Derelict Research Facility.", "reward": "Profile title: It Saw You Too"},
+    "haunted_yellow_halls": {"name": "Lost, Actually", "emoji": "🟨", "description": "Discover every rare discovery in the Yellow Halls.", "reward": "Profile title: Lost, Actually"},
+    "haunted_highway": {"name": "Wrong Turn", "emoji": "🛣️", "description": "Discover every rare discovery on the Dead-End Highway.", "reward": "Profile background: Dead-End"},
+    "haunted_drowned": {"name": "Mind the Water", "emoji": "🌊", "description": "Discover every rare discovery in the Drowned Station.", "reward": "Profile title: Mind the Water"},
+    "haunted_campground": {"name": "Don't Look Behind You", "emoji": "🌲", "description": "Discover every rare discovery in the Silent Campground.", "reward": "Profile background: Watched From the Trees"},
+    "haunted_first_discovery": {"name": "I Was Curious", "emoji": "👁️", "description": "Discover your first rare Haunted discovery.", "reward": "Profile title: Haunted Explorer"},
+    "haunted_impossible": {"name": "That Wasn't There Before", "emoji": "👁️", "description": "Discover an impossible environmental anomaly.", "reward": "Profile title: Something Is Very Wrong"},
+    "haunted_worth_it": {"name": "Worth It", "emoji": "🩸", "description": "Survive a rare discovery that causes a major Sanity loss.", "reward": "Profile title: Worth It"},
+    "haunted_unwell": {"name": "Unwell", "emoji": "🫥", "description": "Reach 0 Sanity after triggering a rare discovery.", "reward": "Profile title: Unwell"},
+    "haunted_other_side": {"name": "The Other Side", "emoji": "👁️", "description": "Discover a rare event while at 0 Sanity.", "reward": "Profile title: The Other Side"},
+    "haunted_all_discoveries": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "description": "Discover every rare discovery across all Haunted locations.", "reward": "Profile title: I Shouldn't Have Looked"},
 
     # Haunted crafting achievements
-    "haunted_cauldron_first": {"name": "Brewed Something Questionable", "emoji": "🧪", "description": "Craft your first item using the Haunted Cauldron.", "reward": "Permanent profile title: Practiced Alchemist"},
-    "haunted_cauldron_five": {"name": "Alchemist", "emoji": "🧪", "description": "Craft 5 items using the Haunted Cauldron.", "reward": "Permanent profile title: Alchemist"},
-    "haunted_workshop_first": {"name": "Made With Whatever Was Lying Around", "emoji": "🛠️", "description": "Craft your first item using the Haunted Workshop.", "reward": "Permanent profile title: Improvised Engineer"},
-    "haunted_workshop_five": {"name": "I Can Fix It", "emoji": "🛠️", "description": "Craft 5 items using the Haunted Workshop.", "reward": "Permanent profile title: Haunted Handyman"},
-    "haunted_ritual_first": {"name": "Something Answered", "emoji": "🕯️", "description": "Craft your first item using the Ritual Table.", "reward": "Permanent profile title: Occult Hobbyist"},
-    "haunted_ritual_five": {"name": "Occultist", "emoji": "🕯️", "description": "Craft 5 items using the Ritual Table.", "reward": "Permanent profile title: Occultist"},
-    "haunted_item_collector": {"name": "Haunted Item Collector", "emoji": "🔧", "description": "Craft all 23 location-based Haunted collectibles.", "reward": "Permanent profile title: Haunted Item Collector + 50,000 Stardust + exclusive profile background"},
+    "haunted_cauldron_first": {"name": "Brewed Something Questionable", "emoji": "🧪", "description": "Craft your first item using the Haunted Cauldron.", "reward": "Profile title: Practiced Alchemist"},
+    "haunted_cauldron_five": {"name": "Alchemist", "emoji": "🧪", "description": "Craft 5 items using the Haunted Cauldron.", "reward": "Profile title: Alchemist"},
+    "haunted_workshop_first": {"name": "Made With Whatever Was Lying Around", "emoji": "🛠️", "description": "Craft your first item using the Haunted Workshop.", "reward": "Profile title: Improvised Engineer"},
+    "haunted_workshop_five": {"name": "I Can Fix It", "emoji": "🛠️", "description": "Craft 5 items using the Haunted Workshop.", "reward": "Profile title: Haunted Handyman"},
+    "haunted_ritual_first": {"name": "Something Answered", "emoji": "🕯️", "description": "Craft your first item using the Ritual Table.", "reward": "Profile title: Occult Hobbyist"},
+    "haunted_ritual_five": {"name": "Occultist", "emoji": "🕯️", "description": "Craft 5 items using the Ritual Table.", "reward": "Profile title: Occultist"},
+    "haunted_item_collector": {"name": "Haunted Item Collector", "emoji": "🔧", "description": "Craft all 23 location-based Haunted collectibles.", "reward": "Profile title: Haunted Item Collector + 50,000 Stardust + exclusive profile background"},
 
     # Future one-time Halloween item achievements.
     # These remain locked/inactive until their corresponding item is enabled
@@ -121,55 +121,55 @@ ACHIEVEMENTS = {
         "name": "Drowned in Code",
         "emoji": "💾",
         "description": "Use the Glitched Cartridge.",
-        "reward": "Permanent profile title: Drowned in Code",
+        "reward": "Profile title: Drowned in Code",
     },
     "halloween_smile_photo": {
         "name": "Spread the Word",
         "emoji": "📸",
         "description": "Use the Hyper-realistic Dog Photo.",
-        "reward": "Permanent profile title: Spread the Word",
+        "reward": "Profile title: Spread the Word",
     },
     "halloween_red_pokeball": {
         "name": "Red's Shadow",
         "emoji": "🔴",
         "description": "Use the Glitched Red Pokeball.",
-        "reward": "Permanent profile title: Red's Shadow",
+        "reward": "Profile title: Red's Shadow",
     },
     "halloween_hazmat_suit": {
         "name": "Boundary Breaker",
         "emoji": "☣️",
         "description": "Use the Yellow Hazmat Suit.",
-        "reward": "Permanent profile title: Boundary Breaker",
+        "reward": "Profile title: Boundary Breaker",
     },
     "halloween_glow_chalk": {
         "name": "Otherworld Passenger",
         "emoji": "🖍️",
         "description": "Use the Glow-in-the-dark Chalk.",
-        "reward": "Permanent profile title: Otherworld Passenger",
+        "reward": "Profile title: Otherworld Passenger",
     },
     "halloween_ouija_board": {
         "name": "Spirit Communicator",
         "emoji": "🔮",
         "description": "Use the Ouija Board.",
-        "reward": "Permanent profile title: Spirit Communicator",
+        "reward": "Profile title: Spirit Communicator",
     },
     "halloween_marker": {
         "name": "Unitologist",
         "emoji": "👽",
         "description": "Use the Unknown Alien Artifact.",
-        "reward": "Permanent profile title: Unitologist",
+        "reward": "Profile title: Unitologist",
     },
     "halloween_tails": {
         "name": "Glowing Gem",
         "emoji": "💎",
         "description": "Use the Doll of Tails.",
-        "reward": "Permanent profile background: Glowing Gem",
+        "reward": "Profile background: Glowing Gem",
     },
     "halloween_malo": {
         "name": "MalO",
         "emoji": "📱",
         "description": "Use the Hacked Phone.",
-        "reward": "Permanent profile background: MalO",
+        "reward": "Profile background: MalO",
     },
 
     # -----------------------------------------------------------------------
@@ -179,7 +179,7 @@ ACHIEVEMENTS = {
         "name": "First Upgrade",
         "emoji": "🧪",
         "description": "Upgrade an incubator tube for the first time.",
-        "reward": "5,000 Stardust + starter incubator material bundle",
+        "reward": "5,000 Stardust + a starter incubator material bundle",
     },
     "incubator_tube_1_mastered": {
         "name": "Tube I Mastered",
@@ -191,19 +191,19 @@ ACHIEVEMENTS = {
         "name": "Tube II Mastered",
         "emoji": "🔬",
         "description": "Max every upgrade on Incubator Tube II.",
-        "reward": "100,000 Stardust + Permanent profile title: Genetic Engineer",
+        "reward": "100,000 Stardust + Profile title: Genetic Engineer",
     },
     "incubator_tube_3_mastered": {
         "name": "Tube III Mastered",
         "emoji": "🧬",
         "description": "Max every upgrade on Incubator Tube III.",
-        "reward": "250,000 Stardust + Permanent profile title: Incubator Architect + exclusive profile background: Quantum Genesis",
+        "reward": "250,000 Stardust + Profile title: Incubator Architect + exclusive profile background: Quantum Genesis",
     },
     "incubator_complete_mastery": {
         "name": "Complete Incubator Mastery",
         "emoji": "🌌",
         "description": "Max every upgrade on all three incubator tubes.",
-        "reward": "500,000 Stardust + Permanent profile title: Astral Geneticist + exclusive profile background: The Astral Foundry",
+        "reward": "500,000 Stardust + Profile title: Astral Geneticist + exclusive profile background: The Astral Foundry",
     },
 }
 
@@ -420,12 +420,12 @@ class Achievements(commands.Cog):
             if not achievement:
                 continue
             embed = discord.Embed(
-                title="🏆 Achievement Unlocked!",
+                title="Achievement Unlocked! 🏆",
                 description=(
                     f"<@{int(user_id)}> {achievement['emoji']} **{achievement['name']}**\n"
                     f"*{achievement['description']}*\n\n"
-                    f"🎁 Reward: **{achievement['reward']}**"
-                    + ("\n\n🎨 Use `/background collection` to view your unlocked backgrounds, or `/background equip` to equip one." if "background" in achievement["reward"].lower() else "")
+                    f"Reward: **{achievement['reward']}**"
+                    + ("\n\nUse `/background collection` to view your unlocked backgrounds, or `/background equip` to equip one." if "background" in achievement["reward"].lower() else "")
                 ),
                 color=discord.Color.gold(),
             )
@@ -1160,15 +1160,15 @@ class Achievements(commands.Cog):
                 found = row[0] if row else 0
 
             embed = discord.Embed(
-                title=f"🏆 {ctx.author.display_name}'s Achievements",
-                description="Complete seasonal milestones to earn permanent cosmetics.\n",
+                title=f"{ctx.author.mention}'s Achievements",
+                description="Complete seasonal milestones to earn profile cosmetics!\n",
                 color=discord.Color.gold(),
             )
     
             half_needed = math.ceil(total * 0.5) if total else 0
 
             # All current achievements belong to the Halloween event.
-            category_name = "🎃 Lair of Frights - Halloween Event"
+            category_name = "Lair of Frights - Halloween Event 👻"
             category_fields = []
 
             haunted_crafting_ids = {
@@ -1289,13 +1289,13 @@ class Achievements(commands.Cog):
                 else:
                     progress = f"Progress: **{found}/{total}**"
 
-                status = "✅ **Unlocked**" if is_unlocked else "🔒 **Locked**"
+                status = "**Unlocked**" if is_unlocked else "**Locked**"
                 field = {
                     "name": f"{achievement['emoji']} {achievement['name']} — {status}",
                     "value": (
                         f"{achievement['description']}\n"
                         f"{progress}\n"
-                        f"🎁 Reward: **{achievement['reward']}**\n"
+                        f"Reward: **{achievement['reward']}**\n"
                         "\u200b"
                     ),
                     "inline": False,
@@ -1314,10 +1314,10 @@ class Achievements(commands.Cog):
                 page_number = (page_start // fields_per_page) + 1
 
                 page_embed = discord.Embed(
-                    title=f"🏆 {ctx.author.display_name}'s Achievements",
+                    title=f"{ctx.author.mention}'s Achievements",
                     description=(
                         f"**{category_name}**\n"
-                        "Complete seasonal milestones to earn permanent cosmetics."
+                        "Complete seasonal milestones to earn profile cosmetics."
                     ),
                     color=discord.Color.gold(),
                 )

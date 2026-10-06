@@ -24,7 +24,7 @@ class ResetConfirm(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.admin_id:
             await interaction.response.send_message(
-                "❌ This reset confirmation belongs to another administrator.",
+                "This reset confirmation belongs to another admin.",
                 ephemeral=True
             )
             return False
@@ -44,7 +44,7 @@ class ResetConfirm(discord.ui.View):
         await self.cog._update_member_roles(self.member, 0)
 
         await interaction.response.edit_message(
-            content=f"♻️ **{self.member.name}**'s XP and Level have been reset to 0.",
+            content=f"**{self.member.name}**'s XP and Level have been reset to 0.",
             view=None
         )
         self.stop()
@@ -52,7 +52,7 @@ class ResetConfirm(discord.ui.View):
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="❌ Reset cancelled.",
+            content="Reset cancelled.",
             view=None
         )
         self.stop()
@@ -67,13 +67,13 @@ class FullResetConfirm(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.admin_id:
             await interaction.response.send_message(
-                "❌ This reset confirmation belongs to another administrator.",
+                "This reset confirmation belongs to another admin.",
                 ephemeral=True
             )
             return False
         return True
 
-    @discord.ui.button(label="☢️ Confirm Full Wipe", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="☢️ Confirm Full Wipe ☢️", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         from database import ECONOMY_DB_NAME
 
@@ -105,9 +105,9 @@ class FullResetConfirm(discord.ui.View):
 
         await interaction.response.edit_message(
             content=(
-                f"☢️ **{self.member.name}**'s Enceladus account has been "
-                f"completely wiped.\n"
-                f"XP, Level, economy, profile data, inventory, and pets were deleted."
+                f"**{self.member.name}**'s Enceladus account has been "
+                f"completely wiped!\n"
+                f"XP, Level, economy, profile data, inventory, and pets were deleted. This is irreversible unless a database backup is available."
             ),
             view=None
         )
@@ -116,7 +116,7 @@ class FullResetConfirm(discord.ui.View):
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="❌ Full wipe cancelled.",
+            content="Full wipe cancelled.",
             view=None
         )
         self.stop()
@@ -146,7 +146,7 @@ class LeaderboardView(discord.ui.View):
         page_entries = self.entries[start_idx:end_idx]
 
         embed = discord.Embed(
-            title="🏆 Server XP Leaderboard",
+            title="Server XP Leaderboard 🏆",
             color=discord.Color.from_rgb(114, 0, 225),
             timestamp=discord.utils.utcnow()
         )
@@ -173,7 +173,7 @@ class LeaderboardView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.author.id:
             return True
-        await interaction.response.send_message("This leaderboard isn't for you! Use `/leaderboard` to view your own.", ephemeral=True)
+        await interaction.response.send_message("This leaderboard isn't for you. Use `/leaderboard` to view your own.", ephemeral=True)
         return False
 
     @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.primary, row=0)
@@ -222,7 +222,7 @@ async def load_custom_image(url):
                 data = await response.read()
                 return io.BytesIO(data)
             else:
-                print(f"Image Load Failed: Status {response.status}")
+                print(f"Image load failed. Status: {response.status}")
                 return None
 
 class FontPreviewSelect(discord.ui.Select):
@@ -256,7 +256,7 @@ class FontPreviewSelect(discord.ui.Select):
             discord.SelectOption(label="Ubuntu", value="ubuntu"),
         ]
         super().__init__(
-            placeholder="Choose a font to preview...",
+            placeholder="Choose a font to preview.",
             min_values=1,
             max_values=1,
             options=options,
@@ -457,7 +457,7 @@ class FontPreviewSelect(discord.ui.Select):
         background.text((830, 238), f"Total: {xp} XP", font=font_small, color="#d3d3d3", align="right", stroke_width=st_width, stroke_fill=st_col)
 
         file = discord.File(fp=background.image_bytes, filename="preview.png")
-        await interaction.edit_original_response(content=f"🎨 Previewing font: **{self.values[0]}**", attachments=[file])
+        await interaction.edit_original_response(content=f"Previewing font: **{self.values[0]}**", attachments=[file])
 
 class FontView(discord.ui.View):
     def __init__(self, cog):
@@ -564,8 +564,8 @@ class Leveling(commands.Cog):
                     announcement_channel = self.bot.get_channel(self.ANNOUNCEMENT_CHANNEL_ID)
                     if announcement_channel:
                         await announcement_channel.send(
-                            f"🌌 **Congratulations, {member.mention}!** "
-                            f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring! 🚀"
+                            f"**Congratulations, {member.mention}!** "
+                            f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring! 🚀🌌"
                         )
             
             roles_to_remove = [
@@ -780,7 +780,7 @@ class Leveling(commands.Cog):
                 ) as cursor:
                     result = await cursor.fetchone()
             
-            if not result: return await ctx.send("This user hasn't earned any XP yet!")
+            if not result: return await ctx.send("This user hasn't earned any XP yet! They need to chat in order to get started.")
 
             xp, level, bar_color, bg_url, fortune_streak, font_choice, booster_glow = result
             streak_number = fortune_streak or 0
@@ -1011,7 +1011,7 @@ class Leveling(commands.Cog):
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             print(f"Error: {e}")
-            await ctx.send("There was an error generating the rank card.")
+            await ctx.send("There was an error generating the rank card. Please report to staff.")
 
     @commands.hybrid_command(name="leaderboard", aliases=["levelscores"], description="View the server XP leaderboard!")
     async def leaderboard(self, ctx):
@@ -1090,13 +1090,13 @@ class Leveling(commands.Cog):
             if glow_toggle:
                 await db.execute("UPDATE users SET booster_glow = ? WHERE user_id = ?", (glow_toggle.value, ctx.author.id))
             await db.commit()
-        await ctx.send("✅ Rank card updated!", ephemeral=True)
+        await ctx.send("Your rank card is now updated! Use `/rank` to check it out!", ephemeral=True)
 
     @app_commands.command(name="setxp", description="Manually set a user's XP (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if amount < 0:
-            return await interaction.response.send_message("❌ XP cannot be negative.", ephemeral=True)
+            return await interaction.response.send_message("XP cannot be negative.", ephemeral=True)
 
         temp_level = 0
         while amount >= self.get_xp_for_level(temp_level + 1):
@@ -1112,13 +1112,13 @@ class Leveling(commands.Cog):
             await db.commit()
 
         await self._update_member_roles(member, temp_level)
-        await interaction.response.send_message(f"✅ Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
+        await interaction.response.send_message(f"Set {member.name}'s XP to {amount} (Level {temp_level}).", ephemeral=True)
 
     @app_commands.command(name="setlevel", description="Manually set a user's level (Admin only)")
     @commands.has_permissions(administrator=True)
     async def setlevel(self, interaction: discord.Interaction, member: discord.Member, level: int):
         if level < 0:
-            return await interaction.response.send_message("❌ Level cannot be negative.", ephemeral=True)
+            return await interaction.response.send_message("Level cannot be negative.", ephemeral=True)
 
         new_xp = self.get_xp_for_level(level)
         
@@ -1132,13 +1132,13 @@ class Leveling(commands.Cog):
             await db.commit()
 
         await self._update_member_roles(member, level)
-        await interaction.response.send_message(f"✅ Set {member.mention} to **Level {level}** ({new_xp} XP).", ephemeral=True)
+        await interaction.response.send_message(f"Set {member.mention} to **Level {level}** ({new_xp}XP).", ephemeral=True)
 
     @app_commands.command(name="addxp", description="Add XP to a user's current total (Admin only)")
     @commands.has_permissions(administrator=True)
     async def addxp(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if amount <= 0:
-            return await interaction.response.send_message("❌ XP to add must be greater than 0.", ephemeral=True)
+            return await interaction.response.send_message("XP to add must be greater than 0!", ephemeral=True)
 
         await self.add_xp(member, amount)
         
@@ -1148,11 +1148,11 @@ class Leveling(commands.Cog):
                 
         if result:
             new_xp, new_level = result
-            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}! They now have **{new_xp} XP** (Level {new_level}).")
+            await interaction.response.send_message(f"Successfully added {amount}XP to {member.mention}! They now have **{new_xp}XP** (Level {new_level}).")
         else:
-            await interaction.response.send_message(f"✅ Added {amount} XP to {member.mention}!")
+            await interaction.response.send_message(f"Successfully added {amount}XP to {member.mention}. They now have a total of **{amount}XP**.")
 
-    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles without resetting progress. (Admin only!)")
+    @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on current roles only and ignoring XP totals. (Admin only. This is a dangerous command!)")
     @commands.has_permissions(administrator=True)
     async def sync_levels(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -1193,7 +1193,7 @@ class Leveling(commands.Cog):
                     synced_count += 1
                 
             await db.commit()
-        await interaction.followup.send(f"✅ Sync complete! Calibrated {synced_count} members.", ephemeral=True)
+        await interaction.followup.send(f"Server sync complete! Calibrated {synced_count} members.", ephemeral=True)
 
     @app_commands.command(name="purge_left_members", description="Removes users from the DB who are no longer in the server (Admin only)")
     @commands.has_permissions(administrator=True)
@@ -1245,9 +1245,9 @@ class Leveling(commands.Cog):
             await db.commit()
             await db.execute("DETACH DATABASE economy")
 
-        await interaction.followup.send(f"✅ Cleaned up {deleted_count} former members from the database!", ephemeral=True)
+        await interaction.followup.send(f"Server cleanup complete! Removed {deleted_count} former members from the database.", ephemeral=True)
 
-    @commands.hybrid_command(name="reset", description="Reset a user's Enceladus data.")
+    @commands.hybrid_command(name="reset", description="Reset a user's Enceladus data. (Admin only. This is a dangerous command!)")
     @commands.has_permissions(administrator=True)
     @app_commands.describe(
         reset_type="Choose what data to reset.",
@@ -1266,8 +1266,8 @@ class Leveling(commands.Cog):
         if reset_type.value == "xp":
             await ctx.send(
                 content=(
-                    f"⚠️ Reset **XP and Level only** for {member.mention}?\n"
-                    f"💰 Stardust, inventory, pets, profile data, and other progress "
+                    f"Reset **XP and Level only** for {member.mention}?\n"
+                    f"Stardust, inventory, pets, profile data, and other progress "
                     f"will remain untouched."
                 ),
                 view=ResetConfirm(self, member, ctx.author.id),
@@ -1277,11 +1277,11 @@ class Leveling(commands.Cog):
         elif reset_type.value == "all":
             await ctx.send(
                 content=(
-                    f"☢️ **DANGER — COMPLETE ACCOUNT WIPE**\n\n"
+                    f"☢️ **DANGER - COMPLETE ACCOUNT WIPE!** ☢️\n\n"
                     f"This will permanently delete **ALL Enceladus data** for "
                     f"{member.mention}, including XP, Level, Stardust, profile data, "
                     f"inventory, and pets. This is a **dangerous** operation and "
-                    f"**irreversible!**\n\n"
+                    f"**irreversible unless a backup is available before the operation!**\n\n"
                     f"Are you ***absolutely*** sure?"
                 ),
                 view=FullResetConfirm(self, member, ctx.author.id),
@@ -1299,9 +1299,9 @@ class Leveling(commands.Cog):
 
         if isinstance(interaction.channel, discord.abc.Messageable):
             await interaction.channel.send(embed=embed, view=FontView(self))
-            await interaction.response.send_message("✅ Font preview menu deployed!", ephemeral=True)
+            await interaction.response.send_message("Font preview view panel deployed!", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Unable to send messages in this channel.", ephemeral=True)
+            await interaction.response.send_message("Unable to send messages in this channel.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))

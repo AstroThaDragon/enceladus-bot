@@ -25,26 +25,26 @@ from database import ECONOMY_DB_NAME
 # ``enabled`` controls whether the item can currently be used with /use.
 # Keep future ideas disabled until their effect is implemented below.
 HAUNTED_CRAFTED_USE_ITEMS = {
-    "ghost_radio": {"name": "Ghost Radio", "emoji": "📻", "effect": "haunted_ghost_radio", "message": "📻 **Ghost Radio activated!** Your next Haunted run will tune into a transmission that overrides the normal encounter roll."},
-    "mascot_tracker": {"name": "Mascot Tracker", "emoji": "📡", "effect": "haunted_mascot_tracker", "message": "📡 **Mascot Tracker activated!** Your next Haunted run has an improved chance of uncovering a Halloween collectible."},
-    "room_314_key": {"name": "Room 314 Key", "emoji": "🗝️", "effect": "haunted_room_314_key", "message": "🗝️ **Room 314 Key ready!** Your next Endless Hotel run can unlock a shortcut through the impossible hotel."},
-    "fog_lantern": {"name": "Fog Lantern", "emoji": "🏮", "effect": "haunted_fog_lantern", "message": "🏮 **Fog Lantern lit!** Your next Fogbound Town run will blunt supernatural Sanity loss."},
-    "spectral_receiver": {"name": "Spectral Receiver", "emoji": "📡", "effect": "haunted_spectral_receiver", "message": "📡 **Spectral Receiver tuned!** Your next Haunted run has an improved collectible discovery chance."},
-    "security_monitor": {"name": "Security Monitor", "emoji": "📺", "effect": "haunted_security_monitor", "message": "📺 **Security Monitor online!** Your next Haunted run gets one burst of protection from a Sanity hit."},
-    "warding_sigil": {"name": "Warding Sigil", "emoji": "🕯️", "effect": "haunted_warding_sigil", "message": "🕯️ **Warding Sigil prepared!** It will completely block the first negative Sanity choice of your next Haunted run."},
-    "mirror_ward": {"name": "Mirror Ward", "emoji": "🪞", "effect": "haunted_mirror_ward", "message": "🪞 **Mirror Ward prepared!** It will halve the first negative Sanity choice of your next Haunted run."},
-    "dead_air_charm": {"name": "Dead-Air Charm", "emoji": "📡", "effect": "haunted_dead_air_charm", "message": "📡 **Dead-Air Charm prepared!** Your next Broadcast Station run will suppress part of its supernatural Sanity drain."},
-    "empty_room_token": {"name": "Empty Room Token", "emoji": "🪙", "effect": "haunted_empty_room_token", "message": "🪙 **Empty Room Token prepared!** Your next Endless Hotel run will ignore its first negative Sanity choice."},
-    "watchers_eye": {"name": "Watcher’s Eye", "emoji": "👁️", "effect": "haunted_watchers_eye", "message": "👁️ **Watcher’s Eye awakened!** Your next Haunted run will reveal a location-specific encounter instead of a random universal one at its first stage."},
-    "containment_mark": {"name": "Containment Mark", "emoji": "⛓️", "effect": "haunted_containment_mark", "message": "⛓️ **Containment Mark prepared!** Your next Research Facility run will heavily reduce supernatural Sanity loss."},
-    "yellow_halls_beacon": {"name": "Yellow Halls Beacon", "emoji": "💡", "effect": "haunted_yellow_halls_beacon", "message": "💡 **Yellow Halls Beacon prepared!** Your next Yellow Halls run will blunt supernatural Sanity loss."},
-    "yellow_halls_unmarked_key": {"name": "Unmarked Door Key", "emoji": "🗝️", "effect": "haunted_yellow_halls_unmarked_key", "message": "🗝️ **Unmarked Door Key prepared!** Your next Yellow Halls run will ignore its first negative Sanity choice."},
-    "highway_payphone_kit": {"name": "Payphone Repair Kit", "emoji": "☎️", "effect": "haunted_highway_payphone_kit", "message": "☎️ **Payphone Repair Kit prepared!** Your next Dead-End Highway run will force a strange roadside signal encounter."},
-    "highway_motel_ward": {"name": "Motel Room Ward", "emoji": "🚪", "effect": "haunted_highway_motel_ward", "message": "🚪 **Motel Room Ward prepared!** Your next Dead-End Highway run will ignore its first negative Sanity choice."},
-    "drowned_flood_lamp": {"name": "Flood Lamp", "emoji": "🔦", "effect": "haunted_drowned_flood_lamp", "message": "🔦 **Flood Lamp prepared!** Your next Drowned Station run will blunt supernatural Sanity loss."},
-    "drowned_last_stop_ticket": {"name": "Last Stop Ticket", "emoji": "🎫", "effect": "haunted_drowned_last_stop_ticket", "message": "🎫 **Last Stop Ticket prepared!** Your next Drowned Station run can take a shorter route through the station."},
-    "campground_static_filter": {"name": "Static Filter", "emoji": "📻", "effect": "haunted_campground_static_filter", "message": "📻 **Static Filter prepared!** Your next Silent Campground run will suppress some supernatural Sanity loss."},
-    "campground_tendril_ward": {"name": "Tendril Ward", "emoji": "🖤", "effect": "haunted_campground_tendril_ward", "message": "🖤 **Tendril Ward prepared!** Your next Silent Campground run will make rare Halloween finds easier to uncover."},
+    "ghost_radio": {"name": "Ghost Radio", "emoji": "📻", "effect": "haunted_ghost_radio", "message": "**Ghost Radio activated! 📻**\nYour next Haunted run will tune into a transmission that overrides the normal encounter roll."},
+    "mascot_tracker": {"name": "Mascot Tracker", "emoji": "📡", "effect": "haunted_mascot_tracker", "message": "**Mascot Tracker activated! 📡**\nYour next Haunted run has an improved chance of uncovering a Halloween collectible."},
+    "room_314_key": {"name": "Room 314 Key", "emoji": "🗝️", "effect": "haunted_room_314_key", "message": "**Room 314 Key ready! 🗝️**\nYour next Endless Hotel run can unlock a shortcut through the impossible hotel."},
+    "fog_lantern": {"name": "Fog Lantern", "emoji": "🏮", "effect": "haunted_fog_lantern", "message": "**Fog Lantern lit! 🏮**\nYour next Fogbound Town run will blunt supernatural Sanity loss."},
+    "spectral_receiver": {"name": "Spectral Receiver", "emoji": "📡", "effect": "haunted_spectral_receiver", "message": "**Spectral Receiver tuned! 📡**\nYour next Haunted run has an improved collectible discovery chance."},
+    "security_monitor": {"name": "Security Monitor", "emoji": "📺", "effect": "haunted_security_monitor", "message": "**Security Monitor online! 📺**\nYour next Haunted run gets one burst of protection from a Sanity hit."},
+    "warding_sigil": {"name": "Warding Sigil", "emoji": "🕯️", "effect": "haunted_warding_sigil", "message": "**Warding Sigil prepared! 🕯️**\nIt will completely block the first negative Sanity choice of your next Haunted run."},
+    "mirror_ward": {"name": "Mirror Ward", "emoji": "🪞", "effect": "haunted_mirror_ward", "message": "**Mirror Ward prepared! 🪞**\nIt will halve the first negative Sanity choice of your next Haunted run."},
+    "dead_air_charm": {"name": "Dead-Air Charm", "emoji": "📡", "effect": "haunted_dead_air_charm", "message": "**Dead-Air Charm prepared! 📡**\nYour next Broadcast Station run will suppress part of its supernatural Sanity drain."},
+    "empty_room_token": {"name": "Empty Room Token", "emoji": "🪙", "effect": "haunted_empty_room_token", "message": "**Empty Room Token prepared! 🪙**\nYour next Endless Hotel run will ignore its first negative Sanity choice."},
+    "watchers_eye": {"name": "Watcher's Eye", "emoji": "👁️", "effect": "haunted_watchers_eye", "message": "**Watcher's Eye awakened! 👁️**\nYour next Haunted run will reveal a location-specific encounter instead of a random universal one at its first stage."},
+    "containment_mark": {"name": "Containment Mark", "emoji": "⛓️", "effect": "haunted_containment_mark", "message": "**Containment Mark prepared! ⛓️**\nYour next Research Facility run will heavily reduce supernatural Sanity loss."},
+    "yellow_halls_beacon": {"name": "Yellow Halls Beacon", "emoji": "💡", "effect": "haunted_yellow_halls_beacon", "message": "**Yellow Halls Beacon prepared! 💡**\nYour next Yellow Halls run will blunt supernatural Sanity loss."},
+    "yellow_halls_unmarked_key": {"name": "Unmarked Door Key", "emoji": "🗝️", "effect": "haunted_yellow_halls_unmarked_key", "message": "**Unmarked Door Key prepared! 🗝️**\nYour next Yellow Halls run will ignore its first negative Sanity choice."},
+    "highway_payphone_kit": {"name": "Payphone Repair Kit", "emoji": "☎️", "effect": "haunted_highway_payphone_kit", "message": "**Payphone Repair Kit prepared! ☎️**\nYour next Dead-End Highway run will force a strange roadside signal encounter."},
+    "highway_motel_ward": {"name": "Motel Room Ward", "emoji": "🚪", "effect": "haunted_highway_motel_ward", "message": "**Motel Room Ward prepared! 🚪**\nYour next Dead-End Highway run will ignore its first negative Sanity choice."},
+    "drowned_flood_lamp": {"name": "Flood Lamp", "emoji": "🔦", "effect": "haunted_drowned_flood_lamp", "message": "**Flood Lamp prepared! 🔦**\nYour next Drowned Station run will blunt supernatural Sanity loss."},
+    "drowned_last_stop_ticket": {"name": "Last Stop Ticket", "emoji": "🎫", "effect": "haunted_drowned_last_stop_ticket", "message": "**Last Stop Ticket prepared! 🎫**\nYour next Drowned Station run can take a shorter route through the station."},
+    "campground_static_filter": {"name": "Static Filter", "emoji": "📻", "effect": "haunted_campground_static_filter", "message": "**Static Filter prepared! 📻**\nYour next Silent Campground run will suppress some supernatural Sanity loss."},
+    "campground_tendril_ward": {"name": "Tendril Ward", "emoji": "🖤", "effect": "haunted_campground_tendril_ward", "message": "**Tendril Ward prepared! 🖤**\nYour next Silent Campground run will make rare Halloween finds easier to uncover."},
 }
 
 
@@ -594,30 +594,30 @@ async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
 
 
 INVENTORY_CATEGORY_INFO = {
-    "Space Junk": ("🛰️", "Space Junk", "Salvaged debris and station junk."),
-    "Mineral": ("💎", "Minerals", "Ores and minerals recovered during exploration."),
-    "Crafting Material": ("🔧", "Crafting Materials", "Materials used for crafting and station projects."),
-    "Medical Supply": ("⚕️", "Medical Supplies", "Medical supplies and emergency equipment."),
-    "Upgrade Component": ("🛠️", "Upgrade Components", "Components used for station upgrades."),
-    "Defense Weapon": ("🛡️", "Defense Weapons", "Weapons and defensive equipment."),
-    "Consumable": ("🧪", "Consumables", "Items that can be used from your inventory."),
-    "Pet Treat": ("🐾", "Pet Treats", "Treats and items for your active pet."),
-    "Pet Egg": ("🥚", "Pet Eggs", "Eggs waiting to be incubated."),
-    "Healing": ("❤️", "Healing", "Items used for restoring health."),
-    "Voucher": ("🎟️", "Vouchers", "Vouchers and permanent unlock items."),
-    "Currency": ("💰", "Currencies", "Special currencies stored in your inventory."),
-    "Special": ("✨", "Special", "Rare items and unique materials used for special station systems."),
-    "Event Items": ("🎉", "Event Items", "Seasonal items grouped by event."),
+    "Space Junk": ("Space Junk", "🛰️", "Salvaged debris and station junk."),
+    "Mineral": ("Minerals", "💎", "Ores and minerals recovered during exploration."),
+    "Crafting Material": ("Crafting Materials", "🔧", "Materials used for crafting and station projects."),
+    "Medical Supply": ("Medical Supplies", "⚕️", "Medical supplies and emergency equipment."),
+    "Upgrade Component": ("Upgrade Components", "🛠️", "Components used for station upgrades."),
+    "Defense Weapon": ("Defense Weapons", "🛡️", "Weapons and defensive equipment."),
+    "Consumable": ("Consumables", "🧪", "Items that can be used from your inventory."),
+    "Pet Treat": ("Pet Treats", "🐾", "Treats and items for your active pet."),
+    "Pet Egg": ("Pet Eggs", "🥚", "Eggs waiting to be incubated."),
+    "Healing": ("Healing", "❤️", "Items used for restoring health."),
+    "Voucher": ("Vouchers", "🎟️", "Vouchers and permanent unlock items."),
+    "Currency": ("Currencies", "💰", "Special currencies stored in your inventory."),
+    "Special": ("Special", "✨", "Rare items and unique materials used for special station systems."),
+    "Event Items": ("Event Items", "🎉", "Seasonal items grouped by event."),
 }
 
 EVENT_CATEGORY_INFO = {
-    "halloween": ("🎃", "Halloween", "Seasonal items and discoveries from the Halloween event."),
+    "halloween": ("Halloween", "🎃", "Seasonal items and discoveries from the Halloween event."),
 }
 
 EVENT_SUBCATEGORY_INFO = {
-    "Halloween Junk": ("🎃", "Halloween Junk", "Seasonal haunted salvage."),
-    "Haunted Ingredient": ("👻", "Haunted Ingredients", "Ingredients recovered from haunted locations."),
-    "Location-Based Collectible": ("🧸", "Location-Based Collectibles", "Unique collectibles discovered at specific exploration locations."),
+    "Halloween Junk": ("Halloween Junk", "🎃", "Seasonal haunted salvage."),
+    "Haunted Ingredient": ("Haunted Ingredients", "👻", "Ingredients recovered from haunted locations."),
+    "Location-Based Collectible": ("Location-Based Collectibles", "🧸", "Unique collectibles discovered at specific exploration locations."),
 }
 
 EVENT_SUBCATEGORY_TO_EVENT = {
@@ -627,10 +627,10 @@ EVENT_SUBCATEGORY_TO_EVENT = {
 }
 
 
-class InventorySearchModal(discord.ui.Modal, title="🔎 Search Inventory"):
+class InventorySearchModal(discord.ui.Modal, title="Search inventory"):
     search = discord.ui.TextInput(
         label="Search",
-        placeholder="Type an item name or keyword...",
+        placeholder="Type an item name or keyword.",
         required=False,
         max_length=100,
     )
@@ -657,8 +657,8 @@ class InventoryCategorySelect(discord.ui.Select):
                 emoji, label, description = INVENTORY_CATEGORY_INFO[category]
                 value = "__event_items__"
             else:
-                emoji, label, description = INVENTORY_CATEGORY_INFO.get(
-                    category, ("📦", category, "Inventory category")
+                label, emoji, description = INVENTORY_CATEGORY_INFO.get(
+                    category, (category, "📦", "Inventory category")
                 )
                 value = category
             options.append(
@@ -671,7 +671,7 @@ class InventoryCategorySelect(discord.ui.Select):
             )
 
         super().__init__(
-            placeholder="📂 Select an inventory category...",
+            placeholder="Select an inventory category.",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -698,8 +698,8 @@ class InventoryEventSelect(discord.ui.Select):
         self.inventory_view = inventory_view
         options = []
         for event_key in inventory_view.available_events:
-            emoji, label, description = EVENT_CATEGORY_INFO.get(
-                event_key, ("🎉", event_key.title(), "Seasonal event items.")
+            label, emoji, description = EVENT_CATEGORY_INFO.get(
+                event_key, (event_key.title(), "🎉", "Seasonal event items.")
             )
             options.append(
                 discord.SelectOption(
@@ -734,8 +734,8 @@ class InventoryEventSubcategorySelect(discord.ui.Select):
         self.inventory_view = inventory_view
         options = []
         for category in inventory_view.available_event_subcategories:
-            emoji, label, description = EVENT_SUBCATEGORY_INFO.get(
-                category, ("📦", category, "Event items.")
+            label, emoji, description = EVENT_SUBCATEGORY_INFO.get(
+                category, (category, "📦", "Event items.")
             )
             options.append(
                 discord.SelectOption(
@@ -747,7 +747,7 @@ class InventoryEventSubcategorySelect(discord.ui.Select):
             )
 
         super().__init__(
-            placeholder="📂 Select an event category...",
+            placeholder="Select an event category.",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -871,8 +871,8 @@ class InventoryView(discord.ui.View):
     def _category_embed(self):
         lines = []
         for category in self.available_top_categories:
-            emoji, label, description = INVENTORY_CATEGORY_INFO.get(
-                category, ("📦", category, "Inventory category")
+            label, emoji, description = INVENTORY_CATEGORY_INFO.get(
+                category, (category, "📦", "Inventory category")
             )
             lines.append(f"{emoji} **{label}** — {description}")
 
@@ -903,9 +903,9 @@ class InventoryView(discord.ui.View):
         if self.category == "__search__":
             return "🔎 Search Results"
         if self.category in EVENT_SUBCATEGORY_INFO:
-            emoji, label, _ = EVENT_SUBCATEGORY_INFO[self.category]
+            label, emoji, _ = EVENT_SUBCATEGORY_INFO[self.category]
             return f"{emoji} {label}"
-        emoji, label, _ = INVENTORY_CATEGORY_INFO.get(
+        label, emoji, _ = INVENTORY_CATEGORY_INFO.get(
             self.category or "", ("📦", "Inventory", "")
         )
         return f"{emoji} {label}"
@@ -937,13 +937,13 @@ class InventoryView(discord.ui.View):
 
         lines = []
         for event in self.available_events:
-            emoji, label, description = EVENT_CATEGORY_INFO.get(
-                event, ("🎉", event.title(), "Seasonal event items.")
+            label, emoji, description = EVENT_CATEGORY_INFO.get(
+                event, (event.title(), "🎉", "Seasonal event items.")
             )
             lines.append(f"{emoji} **{label}** — {description}")
 
         embed = discord.Embed(
-            title="📦 Storage Locker — Event Items",
+            title="Storage locker — Event items",
             description=(
                 "Choose an event to browse its inventory.\n\n"
                 + "\n".join(lines)
@@ -970,13 +970,13 @@ class InventoryView(discord.ui.View):
         back.callback = back_callback
         self.add_item(back)
 
-        event_emoji, event_label, event_description = EVENT_CATEGORY_INFO.get(
-            self.event or "", ("🎉", "Event", "Seasonal event items.")
+        event_label, event_emoji, event_description = EVENT_CATEGORY_INFO.get(
+            self.event or "", ("Event", "🎉", "Seasonal event items.")
         )
         lines = []
         for category in self.available_event_subcategories:
-            emoji, label, description = EVENT_SUBCATEGORY_INFO.get(
-                category, ("📦", category, "Event items.")
+            label, emoji, description = EVENT_SUBCATEGORY_INFO.get(
+                category, (category, "📦", "Event items.")
             )
             lines.append(f"{emoji} **{label}** — {description}")
 
@@ -984,7 +984,7 @@ class InventoryView(discord.ui.View):
             title=f"{event_emoji} Storage Locker — {event_label}",
             description=(
                 f"{event_description}\n\n"
-                "**Available Categories**\n" + "\n".join(lines)
+                "**Available categories**\n" + "\n".join(lines)
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -1004,7 +1004,7 @@ class InventoryView(discord.ui.View):
             page_text += f" • Search: `{self.search_query}`"
 
         embed = discord.Embed(
-            title=f"📦 Inventory — {self._category_title()}",
+            title=f"Your inventory — {self._category_title()}",
             description=(
                 f"**{page_text}**\n"
                 f"{len(entries):,} item{'s' if len(entries) != 1 else ''} found."
@@ -1018,14 +1018,14 @@ class InventoryView(discord.ui.View):
                 embed.add_field(
                     name=f"{info.get('emoji', '📦')} {entry['name']}",
                     value=(
-                        f"📦 **{entry['quantity']:,} / {entry['max_quantity']:,}**\n"
-                        f"📖 {info.get('desc', 'No description available.') }"
+                        f"**{entry['quantity']:,} / {entry['max_quantity']:,}**\n"
+                        f"{info.get('desc', 'No description available.') }"
                     ),
                     inline=False,
                 )
                 self.add_item(InventoryItemButton(self, entry, row=0))
         else:
-            embed.description = (embed.description or "") + "\n\n❌ No items match that search."
+            embed.description = (embed.description or "") + "\n\nNo items match that search."
 
         previous = discord.ui.Button(
             label="Previous", emoji="◀️", style=discord.ButtonStyle.secondary,
@@ -1177,7 +1177,7 @@ class Inventory(commands.Cog):
         if not current or "none" in current:
             choices.append(
                 app_commands.Choice(
-                    name="❌ Unequip current title",
+                    name="Unequip current title",
                     value="none"
                 )
             )
@@ -1244,7 +1244,7 @@ class Inventory(commands.Cog):
                     await db.commit()
 
                     return await ctx.send(
-                        f"{ctx.author.mention} ❌ **Title unequipped.** Your profile is now title-free."
+                        f"{ctx.author.mention} **Title unequipped.** Your profile now has no title."
                     )
 
                 # Make sure the player actually owns this title.
@@ -1263,8 +1263,8 @@ class Inventory(commands.Cog):
 
                 if not owned:
                     return await ctx.send(
-                        "🔒 **You don't own that title!** "
-                        "Purchase it from the rotating shop first."
+                        "**You don't own that title!** "
+                        "Purchase it from the rotating shop first or earn it through `/achievements`"
                     )
 
                 await db.execute(
@@ -1276,11 +1276,11 @@ class Inventory(commands.Cog):
             display_name = title.removeprefix("title_").replace("_", " ").title()
 
             await ctx.send(
-                f"{ctx.author.mention} 🏷️ **Title Equipped!** Your profile title is now "
-                f"**{display_name}**."
+                f"{ctx.author.mention} **Title Equipped!** Your profile title is now "
+                f"**{display_name}**"
             )
 
-    @commands.hybrid_command(name="inventory", description="Open your station storage locker to view collected items and vouchers.")
+    @commands.hybrid_command(name="inventory", description="Open your inventory to view collected items.")
     async def inventory(self, ctx: commands.Context):
         await ctx.defer()
         user_id = ctx.author.id
@@ -1360,7 +1360,7 @@ class Inventory(commands.Cog):
 
         if not entries:
             return await ctx.send(
-                "📦 **Your storage locker is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!"
+                "**Your inventory is completely empty!** Head out with `/mine` or `/scavenge` to fill it up!"
             )
 
         view = InventoryView(self, user_id, entries)
@@ -1490,7 +1490,7 @@ class Inventory(commands.Cog):
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             return await ctx.send(
-                "❌ Something went wrong while using that item. Please try again."
+                "Something went wrong while using that item. Please try again and report to staff if the issue persists."
             )
 
 
@@ -1524,7 +1524,7 @@ class Inventory(commands.Cog):
                 "message": normalize_discord_text(
                     config.get(
                         "already_used_message",
-                        "🚫 This item has already been used.",
+                        "This item has already been used.",
                     )
                 ),
             }
@@ -1577,21 +1577,21 @@ class Inventory(commands.Cog):
                     effect_note = f"\\n\\n💀 {knockout_message}"
                 else:
                     effect_note = (
-                        f"\\n\\n💀 **You've been knocked unconscious.**"
-                        f"\\nYou lost **{amount:,} HP**."
+                        f"\\n\\n**You've been knocked unconscious!**"
+                        f"\\nYou lost **{amount:,}HP**."
                     )
             else:
                 effect_note = (
-                    f"\\n\\n❤️ **-{amount} HP**"
-                    f"\\nCurrent Health: **{hp}/{max_hp} HP**"
+                    f"\n\n**-{amount}HP**"
+                    f"\nCurrent health: **{hp}/{max_hp}HP**"
                 )
 
         if hp <= 0:
             return {
                 "success": False,
                 "message": (
-                    "💀 You're already unconscious. You can't use this "
-                    "collectible until you've recovered."
+                    "You're already unconscious. You can't use this "
+                    "collectible until you've recovered!"
                 ),
             }
 
@@ -1622,8 +1622,8 @@ class Inventory(commands.Cog):
                 (user_id,),
             )
             effect_note = (
-                f"\\n\\n💀 {config.get('knockout_message', 'You have been knocked unconscious.')}"
-                f"\\n🎁 **A free Emergency Full Revival was added to your inventory.**"
+                f"\n\n{config.get('knockout_message', 'You have been knocked unconscious.')}"
+                f"\n**A free Emergency Full Revival was added to your inventory as compensation.**"
             )
 
         elif item_id == "glitched_cartridge":
@@ -1660,7 +1660,7 @@ class Inventory(commands.Cog):
         else:
             return {
                 "success": False,
-                "message": "⚠️ This Halloween item has not had its effect implemented yet.",
+                "message": "This Halloween item has not had its effect implemented yet. Please report this to staff.",
             }
 
         # Permanently record the one-time use before the transaction commits.
@@ -1710,12 +1710,12 @@ class Inventory(commands.Cog):
         if item_id == "time_crystal":
             fortune_cog = self.bot.get_cog("Fortunes") or self.bot.get_cog("Fortune")
             if fortune_cog is None:
-                return await ctx.send("❌ The Fortune system is currently unavailable. Please try again later.")
+                return await ctx.send("The fortune system is currently unavailable. Please try again later and report to staff if the issue persists.")
             return await fortune_cog._use_crystal_impl(ctx, already_deferred=True)
 
         if item_id not in valid:
             return await ctx.send(
-                "❌ That item cannot be used here. Use `/revive` for an Emergency Revival Kit."
+                "That item cannot be used here. Use `/revive` to revive yourself from consciousness."
             )
 
         item_info = ITEM_REGISTRY.get(item_id, {})
@@ -1752,7 +1752,7 @@ class Inventory(commands.Cog):
                     item_display = f"`{item_id}`"
 
                 return await ctx.send(
-                    f"❌ You do not have {item_display} in your inventory."
+                    f"You do not have {item_display} in your inventory."
                 )
 
             async with db.execute(
@@ -1768,7 +1768,7 @@ class Inventory(commands.Cog):
 
             if not user:
                 return await ctx.send(
-                    "❌ Profile not found! Explore Enceladus first."
+                    "Profile not found! Explore Enceladus' commands first."
                 )
 
             hp, max_hp, mining, scavenging, last_mined, last_scavenged, effects_raw = user
@@ -1782,7 +1782,7 @@ class Inventory(commands.Cog):
                 effect_key = config["effect"]
                 if effects.get(effect_key):
                     return await ctx.send(
-                        f"⚠️ **{config['name']}** is already prepared. Start a Haunted run first."
+                        f"**{config['name']}** is already prepared. Start a Haunted Exploration run first!"
                     )
 
                 effects[effect_key] = True
@@ -1920,11 +1920,11 @@ class Inventory(commands.Cog):
 
                     await db.commit()
                     if effect_type == "sanity_restore":
-                        sanity_text = f"🧠 {change_label} **{change_prefix}{applied_amount:.0f} Sanity**"
+                        sanity_text = f"{change_label} **{change_prefix}{applied_amount:.0f} Sanity** 🧠"
                     else:
-                        sanity_text = f"🧠 {change_label} **{change_prefix}{applied_amount:.0f} Sanity**"
+                        sanity_text = f"{change_label} **{change_prefix}{applied_amount:.0f} Sanity** 🧠"
                     bonus_text = (
-                        f"\n🎃 Collectible chance: **+{collectible_bonus * 100:.0f} percentage points** on your next Haunted run."
+                        f"\nCollectible chance: **+{collectible_bonus * 100:.0f} percentage points** on your next Haunted run. 🎃"
                         if collectible_bonus > 0 else ""
                     )
                     return await ctx.send(
@@ -1994,7 +1994,7 @@ class Inventory(commands.Cog):
                 if effect_key:
                     if effects.get(effect_key):
                         return await ctx.send(
-                            f"⚠️ **{potion_info['name']}** is already prepared. Start a Haunted run first."
+                            f"**{potion_info['name']}** is already prepared. Start a Haunted Exploration run first."
                         )
 
                     effects[effect_key] = amount
@@ -2020,15 +2020,15 @@ class Inventory(commands.Cog):
 
                     await db.commit()
                     effect_messages = {
-                        "run_protection": "🛡️ Its protection will apply to your next Haunted run.",
-                        "encounter_insight": "👁️ Your perception will be sharpened during your next Haunted run.",
-                        "rare_encounter_bias": "🎃 Strange encounters should be easier to notice on your next Haunted run.",
-                        "sanity_guard": "🧠 Its ward will soften supernatural Sanity loss on your next Haunted run.",
-                        "curse_protection": "🛡️ It will block the first negative Sanity choice of your next Haunted run.",
+                        "run_protection": "Its protection will apply to your next Haunted Exploration run.",
+                        "encounter_insight": "Your perception will be sharpened during your next Haunted Exploration run.",
+                        "rare_encounter_bias": "Strange encounters should be easier to notice on your next Haunted Exploration run.",
+                        "sanity_guard": "Its ward will soften supernatural Sanity loss on your next Haunted Exploration run.",
+                        "curse_protection": "It will block the first negative Sanity choice of your next Haunted Exploration run.",
                     }
                     return await ctx.send(
                         f"{ctx.author.mention} {potion_info['emoji']} **{potion_info['name']} prepared!**\n"
-                        f"{effect_messages.get(effect_type, 'Its effect is ready for your next Haunted run.')}"
+                        f"{effect_messages.get(effect_type, 'Its effect is ready for your next Haunted Exploration run.')}"
                     )
 
             # Halloween Space Junk effects are handled separately from the normal
@@ -2106,7 +2106,7 @@ class Inventory(commands.Cog):
                             "halloween_", ""
                         ).replace("_", " ").title()
                         unlock_note += (
-                            f"\\n\\n🏆 **Achievement Unlocked: {achievement_name}!**"
+                            f"\n\n**Achievement unlocked! 🏆\n{achievement_name}!**"
                         )
 
                     title_id = special_result.get("title_id")
@@ -2120,8 +2120,8 @@ class Inventory(commands.Cog):
 
                         if achievement_unlocked:
                             unlock_note += (
-                                f"\n🏅 **Title Unlocked: {title_name}** — "
-                                f"use `/equip title` to equip it."
+                                f"\n\n**Title unlocked! 🏅\n{title_name}** — "
+                                f"use `/equip title` to equip it!"
                             )
 
                     background_id = special_result.get("background_id")
@@ -2135,7 +2135,7 @@ class Inventory(commands.Cog):
 
                         if background_unlocked:
                             unlock_note += (
-                                f"\n🖼️ **Background Unlocked: {background_name}** — "
+                                f"\n\n**Background unlocked! 🖼️\n{background_name}** — "
                                 f"use `/background` to equip it."
                             )
 
@@ -2154,7 +2154,7 @@ class Inventory(commands.Cog):
             if item_id == "laser_charge_cell":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
                 mining = min(max_mining_charges, (mining or 0) + 2)
@@ -2164,12 +2164,12 @@ class Inventory(commands.Cog):
                     (mining, user_id)
                 )
 
-                message = f"🔋 Mining laser charges restored to **{mining}/{max_mining_charges}**."
+                message = f"Your mining laser charges are now restored to **{mining}/{max_mining_charges}**!"
 
             elif item_id == "laser_power_cell":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
                 mining = min(max_mining_charges, (mining or 0) + 5)
@@ -2179,12 +2179,12 @@ class Inventory(commands.Cog):
                     (mining, user_id)
                 )
 
-                message = f"⚡ Mining laser charges restored to **{mining}/{max_mining_charges}**."
+                message = f"Your mining laser charges are now restored to **{mining}/{max_mining_charges}**!"
 
             elif item_id == "fuel_refill":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"⚠️ Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
                     )
 
                 mining = max_mining_charges
@@ -2194,12 +2194,12 @@ class Inventory(commands.Cog):
                     (mining, user_id)
                 )
 
-                message = f"🌌 Mining laser fully recharged to **{max_mining_charges}/{max_mining_charges}**."
+                message = f"Your mining laser charges are now fully recharged to **{max_mining_charges}/{max_mining_charges}**!"
 
             elif item_id == "drone_battery":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
                 scavenging = min(max_scavenge_charges, (scavenging or 0) + 2)
@@ -2209,12 +2209,12 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"🔋 Scavenge drone charges restored to **{scavenging}/{max_scavenge_charges}**."
+                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}**!"
 
             elif item_id == "drone_power_cell":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
                 scavenging = min(max_scavenge_charges, (scavenging or 0) + 5)
@@ -2224,12 +2224,12 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"⚡ Scavenge drone charges restored to **{scavenging}/{max_scavenge_charges}**."
+                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}**!"
 
             elif item_id == "drone_quantum_battery":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"⚠️ Your scavenge drone charges are already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
                     )
 
                 scavenging = max_scavenge_charges
@@ -2239,12 +2239,12 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"🌌 Scavenge drone fully recharged to **{max_scavenge_charges}/{max_scavenge_charges}**."
+                message = f"Your scavenge drone battery is now fully recharged to **{max_scavenge_charges}/{max_scavenge_charges}**."
 
             elif item_id == "station_rations":
                 if (hp or 0) <= 0:
                     return await ctx.send(
-                        "💀 Rations cannot revive an unconscious explorer."
+                        "Rations cannot revive an unconscious explorer! Nice try, though. Use `/revive` to restore consciousness first."
                     )
 
                 old_hp = hp or 0
@@ -2253,7 +2253,7 @@ class Inventory(commands.Cog):
 
                 if restored <= 0:
                     return await ctx.send(
-                        "⚠️ Your HP is already full!"
+                        "Your HP is already full! Don't be a glutton."
                     )
 
                 await db.execute(
@@ -2262,14 +2262,14 @@ class Inventory(commands.Cog):
                 )
 
                 message = (
-                    f"🥫 **Station Rations Used!** Restored **{restored} HP**. "
+                    f"**Station Rations Used!** Restored **{restored}HP**. "
                     f"Current health: **{hp}/{max_hp or 100}**."
                 )
 
             elif item_id == "quantum_battery":
                 if effects.get("quantum_battery"):
                     return await ctx.send(
-                        "⚠️ You already have a Quantum Battery active! "
+                        "You already have a Quantum Battery active! "
                         "Use `/mine` or `/scavenge` first."
                     )
 
@@ -2288,10 +2288,10 @@ class Inventory(commands.Cog):
                 )
 
                 message = (
-                    "⚛️ **Quantum Battery Activated!**\n"
-                    f"🔫 Mining laser: **+{mining_added}** charges → **{new_mining}/{max_mining_charges}**\n"
-                    f"🤖 Scavenging drone: **+{scavenge_added}** charges → **{new_scavenge}/{max_scavenge_charges}**\n"
-                    "✨ Your next mining or scavenging run will produce **3x Stardust**!"
+                    "**Quantum Battery activated!**\n"
+                    f"Mining laser: **+{mining_added}** charges → **{new_mining}/{max_mining_charges}**\n"
+                    f"Scavenging drone: **+{scavenge_added}** charges → **{new_scavenge}/{max_scavenge_charges}**\n"
+                    "Your next mining or scavenging run will produce **3x Stardust**!"
                 )
 
             else:
@@ -2307,7 +2307,7 @@ class Inventory(commands.Cog):
                     }
 
                     return await ctx.send(
-                        f"⚠️ **{labels.get(item_id, item_id.replace('_', ' ').title())}** "
+                        f"**{labels.get(item_id, item_id.replace('_', ' ').title())}** "
                         "is already active! Use the affected action first."
                     )
 
@@ -2329,7 +2329,7 @@ class Inventory(commands.Cog):
                 }
 
                 message = (
-                    f"✅ **{item_id.replace('_', ' ').title()} activated:** "
+                    f"**{item_id.replace('_', ' ').title()} activated:** "
                     f"your {labels[item_id]}."
                 )
 
@@ -2370,7 +2370,7 @@ class Inventory(commands.Cog):
                 row = await cursor.fetchone()
 
         if not row:
-            return await ctx.send("❌ No station profile found yet. Run `/mine` or `/scavenge` first!")
+            return await ctx.send("No profile found. Run `/mine` or `/scavenge` first!")
 
         hp, max_hp, mining, scavenging, last_mined, last_scavenged, knocked_out_until, effects_raw = row
 
@@ -2409,22 +2409,22 @@ class Inventory(commands.Cog):
             seconds = remaining % 60
             return f"{minutes}m {seconds}s"
 
-        embed = discord.Embed(title=f"📟 {ctx.author.display_name}'s Expedition Status", color=discord.Color.teal())
+        embed = discord.Embed(title=f"📟 {ctx.author.mention}'s Expedition Status", color=discord.Color.teal())
         hp_value = hp or 0
         max_hp_value = max_hp or 100
 
         if hp_value <= 0:
-            health_status = "💀 **Unconscious**"
+            health_status = "**Unconscious** 💀"
         else:
-            health_status = "🟢 **Conscious**"
+            health_status = "**Conscious** 🟢"
 
         embed.add_field(
-            name="❤️ Health",
-            value=f"`{hp_value}/{max_hp_value}` HP\n{health_status}",
+            name="Health ❤️",
+            value=f"{hp_value}/{max_hp_value}HP\n{health_status}",
             inline=True
         )
-        embed.add_field(name="⛏️ Mining", value=f"`{mining or 0}/{max_mining_charges}` charges\n{cooldown(last_mined)}", inline=True)
-        embed.add_field(name="🛠️ Scavenging", value=f"`{scavenging or 0}/{max_scavenge_charges}` charges\n{cooldown(last_scavenged)}", inline=True)
+        embed.add_field(name="Mining ⛏️", value=f"{mining or 0}/{max_mining_charges} charges\n{cooldown(last_mined)}", inline=True)
+        embed.add_field(name="Scavenging 🛠️", value=f"{scavenging or 0}/{max_scavenge_charges} charges\n{cooldown(last_scavenged)}", inline=True)
         # Haunted Sanity is only shown while the Halloween event is active.
         # Keep the Haunted import local to avoid the inventory/haunted import cycle.
         if halloween_season.is_active():
@@ -2442,15 +2442,15 @@ class Inventory(commands.Cog):
                     sanity_value = sanity_percent(haunted_profile["sanity"])
 
                 sanity_label = (
-                    "💀 **Critical**"
+                    "**Critical!** 💀"
                     if sanity_value <= 25
-                    else "🟡 **Unsteady**"
+                    else "**Unsteady** 🟡"
                     if sanity_value <= 50
-                    else "🟢 **Stable**"
+                    else "**Stable** 🟢"
                 )
                 embed.add_field(
-                    name="🧠 Sanity",
-                    value=f"`{sanity_value}/100`\n{sanity_label}",
+                    name="Sanity",
+                    value=f"{sanity_value}/100\n{sanity_label}",
                     inline=True,
                 )
             except Exception:
@@ -2460,10 +2460,10 @@ class Inventory(commands.Cog):
             recovery_date = knocked_out_until or "revived"
 
             embed.add_field(
-                name="💀 Recovery",
+                name="Recovery 💀",
                 value=(
-                    f"Unconscious until `{recovery_date}`\n"
-                    f"💉 Use `/revive` to check your available revival options."
+                    f"Unconscious until {recovery_date}\n"
+                    f"Use `/revive` to check your available revival options."
                 ),
                 inline=False
             )
@@ -2484,21 +2484,21 @@ class Inventory(commands.Cog):
             defense_value = (
                 f"{weapon['emoji']} **{weapon['name']}**"
                 + chr(10)
-                + f"🛡️ Weapon Protection: **{weapon_chance * 100:.1f}%**"
+                + f"Weapon Protection:\n**{weapon_chance * 100:.1f}%**"
                 + chr(10)
-                + f"🛡️ Combined Defense: **{combined_defense * 100:.1f}%** "
+                + f"*Combined Defense:*\n**{combined_defense * 100:.1f}%** "
                 + f"(cap {DEFENSE_CAP * 100:.0f}%)"
             )
         else:
             defense_value = (
-                "None equipped"
+                "None equipped!"
                 + chr(10)
-                + f"🛡️ Combined Defense: **{combined_defense * 100:.1f}%** "
+                + f"*Combined Defense:*\n**{combined_defense * 100:.1f}%** "
                 + f"(cap {DEFENSE_CAP * 100:.0f}%)"
             )
 
         embed.add_field(
-            name="🛡️ Defense",
+            name="Defense 🛡️",
             value=defense_value,
             inline=False,
         )
@@ -2511,14 +2511,14 @@ class Inventory(commands.Cog):
         }
         if other_effects:
             embed.add_field(
-                name="✨ Active Effects",
+                name="Active effects ✨",
                 value=chr(10).join(
                     f"• {name.replace('_', ' ').title()}" for name in other_effects
                 ),
                 inline=False,
             )
 
-        embed.set_footer(text="Use /inventory for items, /shop rotating for today's offers, and /revive if unconscious.")
+        embed.set_footer(text="Use `/inventory` for items, `/shop rotating` for today's offers, and `/revive` if unconscious!")
         await ctx.send(embed=embed)
 
 async def setup(bot):

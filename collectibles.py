@@ -222,10 +222,10 @@ class Collectibles(commands.Cog):
 
     @commands.hybrid_command(
         name="collectibles",
-        description="View your permanent seasonal collectible collection.",
+        description="View your personal collectibles collection.",
     )
     @app_commands.describe(
-        info="View a collectible you have permanently discovered.",
+        info="View a collectible you have discovered.",
     )
     async def collectibles(
         self,
@@ -260,7 +260,7 @@ class Collectibles(commands.Cog):
 
             if collectible not in discovered:
                 return await ctx.send(
-                    "❌ **You haven't discovered that collectible yet.**\n"
+                    "You haven't discovered that collectible yet!\n"
                     "Only collectibles you've found can be viewed here.",
                     ephemeral=True,
                 )
@@ -268,7 +268,7 @@ class Collectibles(commands.Cog):
             data = collectible_map.get(collectible)
             if not data:
                 return await ctx.send(
-                    "❌ **That collectible is no longer available in the current collection.**",
+                    "That collectible is no longer available in the current collection.",
                     ephemeral=True,
                 )
 
@@ -319,7 +319,7 @@ class Collectibles(commands.Cog):
                     use_message = use_message.replace("\\n", "\n")
 
                 embed.add_field(
-                    name="🖐️ When Used",
+                    name="**When Used**",
                     value=use_message if already_used else "???",
                     inline=False,
                 )
@@ -328,11 +328,11 @@ class Collectibles(commands.Cog):
                 # has actually been used.
                 if already_used:
                     embed.add_field(
-                        name="🔁 Already Used",
+                        name="**Already Used**",
                         value=(
                             use_config.get(
                                 "already_used_message",
-                                "🚫 This item has already been used.",
+                                "This item has already been used.",
                             ).replace("\\n", "\n")
                         ),
                         inline=False,
@@ -355,8 +355,8 @@ class Collectibles(commands.Cog):
                 owned = {row[0] for row in await cursor.fetchall()}
 
         categories = {
-            "🎃 Halloween - Lair of Frights Items": get_halloween_collectibles(),
-            "🔧 Halloween - Location-Based Collectibles": LOCATION_BASED_COLLECTIBLE_ENTRIES,
+            "Halloween - Lair of Frights Collectibles": get_halloween_collectibles(),
+            "Halloween - Haunted Location Collectibles": LOCATION_BASED_COLLECTIBLE_ENTRIES,
         }
 
         pages = []
@@ -382,7 +382,7 @@ class Collectibles(commands.Cog):
                         lines.append("❓ **???**")
 
                 embed = discord.Embed(
-                    title=f"📚 {ctx.author.display_name}'s Collectibles",
+                    title=f"{ctx.author.mention}'s Collectibles",
                     description=(
                         f"**{category}** • Part **{page_number}/{total_pages}**\n"
                         f"Collected: **{found}/{total}** ({found / total * 100:.0f}%)\n\n"
@@ -394,7 +394,7 @@ class Collectibles(commands.Cog):
                 pages.append(embed)
 
         if not pages:
-            return await ctx.send("📚 **There are no seasonal collectibles available yet!**")
+            return await ctx.send("There are no seasonal collectibles available yet!")
 
         class CollectiblesView(discord.ui.View):
             def __init__(self, owner_id, embeds):
@@ -413,7 +413,7 @@ class Collectibles(commands.Cog):
             async def interaction_check(self, interaction: discord.Interaction):
                 if interaction.user.id != self.owner_id:
                     await interaction.response.send_message(
-                        "❌ This collectibles menu belongs to someone else.", ephemeral=True
+                        "This collectible menu belongs to someone else.", ephemeral=True
                     )
                     return False
                 return True

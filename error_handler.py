@@ -312,9 +312,9 @@ async def send_error_log(
 async def send_member_error_message(target, error_id):
     """Give the affected member a safe support ID without exposing diagnostics."""
     message = (
-        "❌ Something went wrong while processing your request.\n"
+        "Something went wrong while processing your request.\n"
         f"**Error ID:** `{error_id}`\n"
-        "Please give this ID to a server administrator if you report the issue."
+        "Please give this ID to staff when reporting the issue."
     )
 
     try:

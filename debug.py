@@ -27,13 +27,13 @@ class Debug(commands.Cog):
     async def require_access(self, ctx):
         if await self.is_authorized(ctx):
             return True
-        await ctx.send("🔒 Debug access is locked. Use `/debug unlock <code>` first.", ephemeral=True)
+        await ctx.send("**Debug access is locked.** Use `/debug unlock <code>` first.", ephemeral=True)
         return False
 
     @commands.hybrid_group(name="debug", description="Private diagnostic and administration tools.")
     async def debug(self, ctx):
         if ctx.invoked_subcommand is None:
-            await ctx.send("Use `/debug unlock <code>` to start a temporary admin session.", ephemeral=True)
+            await ctx.send("Use `/debug unlock <code>` to start a temporary debug session.", ephemeral=True)
 
     @debug.command(name="unlock", description="Unlock debug tools for 30 minutes with the server secret.")
     @commands.has_permissions(administrator=True)
@@ -41,19 +41,19 @@ class Debug(commands.Cog):
         secret = os.getenv("DEBUG_ACCESS_CODE")
         if not secret:
             return await ctx.send(
-                "⚠️ Debug access is not configured. Add `DEBUG_ACCESS_CODE` to the bot environment.",
+                "Debug access is not configured. Please set the `DEBUG_ACCESS_CODE` environment variable.",
                 ephemeral=True
             )
 
         if not code or not hmac.compare_digest(code, secret):
             return await ctx.send(
-                "❌ Invalid debug access code.",
+                "Invalid debug access code.",
                 ephemeral=True
             )
 
         self.sessions[ctx.author.id] = time.time() + self.SESSION_SECONDS
         await ctx.send(
-            "🔓 Debug access enabled for 30 minutes. This session resets if the bot restarts.",
+            "**Debug access enabled for 30 minutes!** This session resets if the bot restarts before expiration.",
             ephemeral=True
         )
 
@@ -64,7 +64,7 @@ class Debug(commands.Cog):
             return
         remaining = max(0, int(self.sessions.get(ctx.author.id, time.time()) - time.time()))
         owner_note = "Bot-owner access" if await self.bot.is_owner(ctx.author) else f"{remaining // 60} minutes remaining"
-        await ctx.send(f"🛠️ Debug session active: **{owner_note}**.", ephemeral=True)
+        await ctx.send(f"Debug session active: **{owner_note}**.", ephemeral=True)
 
     @debug.command(name="lock", description="End your temporary debug session.")
     @commands.has_permissions(administrator=True)
@@ -73,7 +73,7 @@ class Debug(commands.Cog):
             return
 
         self.sessions.pop(ctx.author.id, None)
-        await ctx.send("🔒 Debug session ended.", ephemeral=True)
+        await ctx.send("Debug session ended.", ephemeral=True)
 
     @debug.command(name="stardust", description="Check, grant, or reduce a member's Stardust for testing.")
     @commands.has_permissions(administrator=True)
@@ -95,7 +95,7 @@ class Debug(commands.Cog):
             return
 
         if amount is not None and (amount <= 0 or amount > 1_000_000):
-            return await ctx.send("❌ Choose an amount from 1 to 1,000,000.", ephemeral=True)
+            return await ctx.send("Choose an amount from 1 to 1,000,000.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
@@ -115,7 +115,7 @@ class Debug(commands.Cog):
             if amount is None:
                 await db.commit()
                 return await ctx.send(
-                    f"💫 **{member.display_name}** currently has **{current_balance:,} Stardust**.",
+                    f"**{member.display_name}** currently has **{current_balance:,} Stardust**.",
                     ephemeral=ephemeral,
                 )
 
@@ -130,7 +130,7 @@ class Debug(commands.Cog):
                 await db.commit()
 
                 await ctx.send(
-                    f"➖ Reduced **{actual_reduction:,} Stardust** from {member.mention}. "
+                    f"Reduced **{actual_reduction:,} Stardust** from {member.display_name}. "
                     f"Their new balance is **{new_balance:,} Stardust**.",
                     ephemeral=ephemeral,
                 )
@@ -144,7 +144,7 @@ class Debug(commands.Cog):
                 await db.commit()
 
                 await ctx.send(
-                    f"✨ Granted **{amount:,} Stardust** to {member.mention} for testing. "
+                    f"Granted **{amount:,} Stardust** to {member.display_name} for testing. "
                     f"Their new balance is **{new_balance:,} Stardust**.",
                     ephemeral=ephemeral,
                 )
@@ -157,9 +157,9 @@ class Debug(commands.Cog):
         from inventory import ITEM_REGISTRY
         item_id = item_id.lower().strip()
         if item_id not in ITEM_REGISTRY:
-            return await ctx.send("❌ Unknown item ID. Check `/item <item_id>` or the item registry.", ephemeral=True)
+            return await ctx.send("Unknown item. Check the item registry.", ephemeral=True)
         if quantity <= 0 or quantity > 100:
-            return await ctx.send("❌ Choose a quantity from 1 to 100.", ephemeral=True)
+            return await ctx.send("Choose a quantity from 1 to 100.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
         item_type = ITEM_REGISTRY[item_id]["type"].lower().replace(" ", "_")
@@ -172,7 +172,7 @@ class Debug(commands.Cog):
                     quantity = quantity + excluded.quantity
             """, (member.id, item_id, item_type, quantity))
             await db.commit()
-        await ctx.send(f"📦 Granted **{quantity}× {ITEM_REGISTRY[item_id]['name']}** to {member.mention} for testing.", ephemeral=True)
+        await ctx.send(f"Granted **{quantity}× {ITEM_REGISTRY[item_id]['name']}** to {member.display_name} for testing.", ephemeral=True)
 
     @debug.command(name="pet", description="Grant a configured pet to a member for testing.")
     @commands.has_permissions(administrator=True)
@@ -185,16 +185,16 @@ class Debug(commands.Cog):
         pet_type = pet_type.lower().strip()
         if pet_type not in ALL_PETS:
             return await ctx.send(
-                "❌ Unknown pet type. Use the pet's configured ID, such as `space_cat`.",
+                "Unknown pet type. Use the pet's configured ID, such as `space_cat`.",
                 ephemeral=True,
             )
 
         if level < 1 or level > 100:
-            return await ctx.send("❌ Choose a pet level from 1 to 100.", ephemeral=True)
+            return await ctx.send("Choose a pet level from 1 to 100.", ephemeral=True)
 
         definition = get_pet_definition(pet_type)
         if not definition:
-            return await ctx.send("❌ That pet is not currently configured.", ephemeral=True)
+            return await ctx.send("That pet is not currently configured.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
@@ -238,13 +238,13 @@ class Debug(commands.Cog):
             return
         activity = activity.lower().strip()
         if activity not in {"mine", "scavenge"}:
-            return await ctx.send("❌ Activity must be `mine` or `scavenge`.", ephemeral=True)
+            return await ctx.send("Activity must be `mine` or `scavenge`.", ephemeral=True)
         column = "last_mined" if activity == "mine" else "last_scavenged"
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
             await db.execute(f"UPDATE users SET {column} = 0 WHERE user_id = ?", (member.id,))
             await db.commit()
-        await ctx.send(f"⏱️ Cleared {activity} cooldown for {member.mention}.", ephemeral=True)
+        await ctx.send(f"Cleared {activity} cooldown for {member.display_name}.", ephemeral=True)
 
     @debug.command(name="hazard", description="Force the next scavenging run to roll a hazard.")
     @commands.has_permissions(administrator=True)
@@ -259,7 +259,7 @@ class Debug(commands.Cog):
             effects["force_hazard"] = True
             await db.execute("UPDATE users SET active_effects = ? WHERE user_id = ?", (json.dumps(effects), member.id))
             await db.commit()
-        await ctx.send(f"⚠️ The next scavenging run for {member.mention} will trigger a hazard.", ephemeral=True)
+        await ctx.send(f"The next scavenging run for {member.display_name} will trigger a hazard.", ephemeral=True)
 
     @debug.command(name="health", description="Set a member's HP for testing.")
     @commands.has_permissions(administrator=True)
@@ -267,12 +267,12 @@ class Debug(commands.Cog):
         if not await self.require_access(ctx):
             return
         if hp < 1 or hp > 100:
-            return await ctx.send("❌ Choose an HP value from 1 to 100.", ephemeral=True)
+            return await ctx.send("Choose an HP value from 1 to 100.", ephemeral=True)
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
             await db.execute("UPDATE users SET hp = ?, max_hp = MAX(COALESCE(max_hp, 100), ?) WHERE user_id = ?", (hp, hp, member.id))
             await db.commit()
-        await ctx.send(f"❤️ Set {member.mention}'s HP to **{hp}** for testing.", ephemeral=True)
+        await ctx.send(f"Set {member.display_name}'s HP to **{hp}** for testing.", ephemeral=True)
 
 
 async def setup(bot):
