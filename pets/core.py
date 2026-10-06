@@ -117,6 +117,19 @@ async def grant_haunted_pet(db, user_id: int, location_id: str):
     }
 
 
+# ============================================================================
+# PET PASSIVE FLAVOR TEXT
+# ============================================================================
+# Edit the messages below to change what players see when a pet passive
+# actually triggers. Each effect ID matches the passive IDs used by the
+# pet definitions. Add or remove alternate lines freely; one line is
+# selected at random when the effect triggers.
+#
+# Keep the text here focused on the pet's action/reaction. The code that
+# applies the passive effect lives elsewhere and should not need to be
+# changed just to rewrite its flavor text.
+# ============================================================================
+
 PET_PASSIVE_DIALOGUES = {
     "kolossos_hunting_instinct": [
         "lunged between you and the hazard, forcing it back!",
