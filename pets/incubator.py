@@ -292,7 +292,10 @@ class PetIncubatorMixin:
 
             missing = []
             for item_id, amount in requirements:
-                async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id)) as cursor:
+                async with db.execute(
+                    "SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE user_id = ? AND item_id = ?",
+                    (user_id, item_id),
+                ) as cursor:
                     row = await cursor.fetchone()
                 owned = int(row[0] or 0) if row else 0
                 if owned < amount:
@@ -311,14 +314,48 @@ class PetIncubatorMixin:
                 return {"ok": False, "message": "❌ You don't have the required materials.\n" + "\n".join(bits)}
 
             for item_id, amount in requirements:
-                await db.execute(
-                    "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
-                    (amount, user_id, item_id),
-                )
-                await db.execute(
-                    "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
+                remaining = amount
+                async with db.execute(
+                    """SELECT rowid, quantity
+                       FROM inventory
+                       WHERE user_id = ? AND item_id = ?
+                       ORDER BY rowid""",
                     (user_id, item_id),
-                )
+                ) as cursor:
+                    inventory_rows = await cursor.fetchall()
+
+                for rowid, quantity in inventory_rows:
+                    if remaining <= 0:
+                        break
+
+                    quantity = int(quantity or 0)
+                    take = min(quantity, remaining)
+                    if take <= 0:
+                        continue
+
+                    new_quantity = quantity - take
+                    if new_quantity > 0:
+                        await db.execute(
+                            "UPDATE inventory SET quantity = ? WHERE rowid = ?",
+                            (new_quantity, rowid),
+                        )
+                    else:
+                        await db.execute(
+                            "DELETE FROM inventory WHERE rowid = ?",
+                            (rowid,),
+                        )
+
+                    remaining -= take
+
+                if remaining > 0:
+                    # This should be impossible because the requirement check
+                    # above already verified the aggregate quantity. Keep the
+                    # transaction safe if inventory changes unexpectedly.
+                    await db.rollback()
+                    return {
+                        "ok": False,
+                        "message": "❌ Your inventory changed while processing the upgrade. Please try again.",
+                    }
             levels[category] = next_level
             await db.execute(
                 """INSERT INTO incubator_upgrades (user_id, tube_id, speed, detection, luck, analysis)

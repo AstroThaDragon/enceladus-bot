@@ -1178,7 +1178,10 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             owned = {}
             item_ids = {value[0] for value in UPGRADE_COSTS[category].values()} | {"astral_essence"}
             for item_id in item_ids:
-                async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?", (user_id, item_id)) as cursor:
+                async with db.execute(
+                    "SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE user_id = ? AND item_id = ?",
+                    (user_id, item_id),
+                ) as cursor:
                     item_row = await cursor.fetchone()
                 owned[item_id] = int(item_row[0] or 0) if item_row else 0
 
