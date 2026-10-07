@@ -844,12 +844,17 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
 
     def _pet_group_key(self, pet):
-        """Group only exact pet + variant + level matches for collection display."""
+        """Group copies by the same pet and variant, regardless of level."""
         return (
             pet.get("pet_type"),
             pet.get("variant_id") or "",
-            int(pet.get("level") or 1),
         )
+
+
+    def _bundle_count_for_pet(self, pets, pet):
+        """Return the total owned copies matching this pet and variant."""
+        key = self._pet_group_key(pet)
+        return sum(1 for other in pets if self._pet_group_key(other) == key)
 
 
     def _group_owned_pets(self, pets, category):
@@ -910,7 +915,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             total = sum(1 for pet in pets if self._pet_collection_category(pet) == category)
             unique = len(self._group_owned_pets(pets, category))
             if total:
-                lines.append(f"{label} — **{unique} unique** / **{total} copies**\n-# {description}")
+                lines.append(f"{label} — **{unique} unique** / **{total} owned**\n-# {description}")
             else:
                 lines.append(f"{label} — **None yet**\n-# {description}")
 
@@ -919,13 +924,13 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             description=(
                 "⭐ **Active Companion**\n"
                 f"{active_text}\n\n"
-                "Choose a category below. Copies are bundled only when they share the "
-                "same pet, variant, and level.\n\n"
+                "Choose a category below. Matching pets are bundled when they share the "
+                "same pet and variant, regardless of level.\n\n"
                 + "\n\n".join(lines)
             ),
             color=discord.Color.from_rgb(120, 140, 160),
         )
-        embed.set_footer(text="Different levels or variants remain separate entries.")
+        embed.set_footer(text="Different variants remain separate entries; levels are shown per representative copy.")
         return embed
 
 
@@ -950,8 +955,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
 
         description = (
-            "Copies are bundled only when the pet, variant, and level all match. "
-            "Different levels or variants remain separate.\n\n"
+            "Matching pets are bundled when the pet and variant match, regardless of level. "
+            "Different variants remain separate.\n\n"
             + ("\n".join(lines) if lines else "No pets in this category yet.")
         )
         embed = discord.Embed(
@@ -984,7 +989,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         # handle navigation through the rest of the collection.
         index = next((i for i, pet in enumerate(pets) if pet["is_active"]), 0)
         view = PetManagementView(self, ctx.author.id, ctx, pets, index)
-        await ctx.send(embed=self._pet_embed(ctx, pets[index], index, len(pets)), view=view)
+        bundle_count = self._bundle_count_for_pet(pets, pets[index])
+        await ctx.send(embed=self._pet_embed(ctx, pets[index], index, len(pets), bundle_count=bundle_count), view=view)
 
 
     async def _refresh_pet_view(self, message, user_id, pet_id, allow_missing=False, ctx=None):
@@ -1005,7 +1011,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         index = next((i for i, pet in enumerate(pets) if pet["pet_id"] == pet_id), min(len(pets) - 1, 0))
         view = PetManagementView(self, user_id, ctx, pets, index)
         try:
-            await message.edit(embed=self._pet_embed(ctx, pets[index], index, len(pets)), view=view)
+            bundle_count = self._bundle_count_for_pet(pets, pets[index])
+            await message.edit(embed=self._pet_embed(ctx, pets[index], index, len(pets), bundle_count=bundle_count), view=view)
         except discord.HTTPException:
             pass
 
