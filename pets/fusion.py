@@ -43,7 +43,7 @@ class PetFusionMixin:
 
             async with db.execute(
                 """
-                SELECT pet_id, pet_type, nickname, level, xp, variant_id, fusion_level, is_favorite
+                SELECT pet_id, pet_type, pet_stage, nickname, level, xp, variant_id, fusion_level, is_favorite
                 FROM pets
                 WHERE user_id = ? AND pet_id = ?
                 LIMIT 1
@@ -56,16 +56,16 @@ class PetFusionMixin:
                 await db.rollback()
                 return await ctx.send("❌ You don't own that pet.")
 
-            pet_type = target[1] or ""
+            pet_type = target[1] or target[2] or ""
             if pet_type not in PETS and pet_type not in HALLOWEEN_PETS and pet_type not in GLITCHED_PET_TYPES:
                 await db.rollback()
                 return await ctx.send(
                     "❌ This pet cannot be fused. Haunted location pets are unique companions."
                 )
 
-            level = int(target[3] or 1)
-            fusion_level = int(target[6] or 0)
-            variant_id = target[5] or ""
+            level = int(target[4] or 1)
+            fusion_level = int(target[7] or 0)
+            variant_id = target[6] or ""
 
             if fusion_level < 5:
                 next_fusion = fusion_level + 1
@@ -91,8 +91,8 @@ class PetFusionMixin:
                 FROM pets
                 WHERE user_id = ?
                   AND pet_id != ?
-                  AND pet_type = ?
-                  AND COALESCE(variant_id, '') = ?
+                  AND LOWER(TRIM(COALESCE(NULLIF(pet_type, ''), pet_stage, ''))) = LOWER(TRIM(?))
+                  AND LOWER(TRIM(COALESCE(variant_id, ''))) = LOWER(TRIM(?))
                   AND COALESCE(is_favorite, 0) = 0
                 ORDER BY pet_id
                 LIMIT {duplicate_requirement}

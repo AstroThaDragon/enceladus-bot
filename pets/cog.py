@@ -452,13 +452,12 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         display_name = pet["nickname"] or pet["name"]
         active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
 
-        bundle_suffix = f" ×{bundle_count}" if bundle_count > 1 else ""
-        pet_name_line = f"{pet['emoji']} **{display_name}**"
+        pet_name_line = f"{pet['emoji']} **{pet['name']}"
         if bundle_count > 1:
-            if pet["nickname"]:
-                pet_name_line += f" • **{pet['name']} ×{bundle_count}**"
-            else:
-                pet_name_line = f"{pet['emoji']} **{pet['name']} ×{bundle_count}**"
+            pet_name_line += f" ×{bundle_count}"
+        pet_name_line += "**"
+        if pet["nickname"]:
+            pet_name_line += f" • {display_name}"
 
         embed = discord.Embed(
             title=f"🐾 {ctx.author.display_name}'s Pet",
@@ -642,23 +641,31 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 continue
 
             # Count matching, non-favorited duplicates available to consume.
-            matching_duplicates = sum(
-                1
-                for (
-                    other_id,
-                    other_type,
-                    other_stage,
-                    _nickname,
-                    _level,
-                    other_variant_id,
-                    _fusion,
-                    other_favorite,
-                ) in rows
-                if other_id != pet_id
-                and (other_type or other_stage) == pet_type_id
-                and (other_variant_id or "") == (variant_id or "")
-                and str(other_favorite).strip().lower() not in {"1", "true", "yes", "on"}
-            )
+            # Fusion matching intentionally ignores level: any matching pet/variant
+            # can be consumed, as long as it is not the target and is unfavorited.
+            target_type_key = str(pet_type_id or "").strip().lower()
+            target_variant_key = str(variant_id or "").strip().lower()
+            matching_duplicates = 0
+            for (
+                other_id,
+                other_type,
+                other_stage,
+                _nickname,
+                _level,
+                other_variant_id,
+                _fusion,
+                other_favorite,
+            ) in rows:
+                other_type_key = str(other_type or other_stage or "").strip().lower()
+                other_variant_key = str(other_variant_id or "").strip().lower()
+                favorite_key = str(other_favorite or "").strip().lower()
+                if (
+                    other_id != pet_id
+                    and other_type_key == target_type_key
+                    and other_variant_key == target_variant_key
+                    and favorite_key not in {"1", "true", "yes", "on"}
+                ):
+                    matching_duplicates += 1
 
             display_name = nickname or definition["name"]
             level = int(level or 1)
@@ -844,10 +851,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
 
     def _pet_group_key(self, pet):
-        """Group copies by the same pet and variant, regardless of level."""
+        """Group inventory copies by the same pet, variant, and level."""
         return (
-            pet.get("pet_type"),
+            pet.get("pet_type") or pet.get("pet_stage") or "",
             pet.get("variant_id") or "",
+            int(pet.get("level") or 1),
         )
 
 
@@ -905,32 +913,24 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             active_text = "No active companion is equipped. Choose a pet below and use **Equip Pet** to set one."
 
         category_meta = (
-            ("normal", "🥚 Normal Eggs", "Standard Egg companions"),
-            ("glitched", "💾 Glitched Eggs", "Companions hatched from Glitched Eggs"),
-            ("halloween", "🎃 Halloween Eggs", "Companions hatched from Halloween Eggs"),
-            ("haunted", "👻 Haunted Pets", "Unique companions discovered during Haunted explorations"),
+            ("normal", "🥚 Normal Eggs"),
+            ("glitched", "💾 Glitched Eggs"),
+            ("halloween", "🎃 Halloween Eggs"),
+            ("haunted", "👻 Haunted Pets"),
         )
-        lines = []
-        for category, label, description in category_meta:
-            total = sum(1 for pet in pets if self._pet_collection_category(pet) == category)
-            unique = len(self._group_owned_pets(pets, category))
-            if total:
-                lines.append(f"{label} — **{unique} unique** / **{total} owned**\n-# {description}")
-            else:
-                lines.append(f"{label} — **None yet**\n-# {description}")
+        lines = [label for _category, label in category_meta]
 
         embed = discord.Embed(
             title=f"🐾 {ctx.author.display_name}'s Pet Collection",
             description=(
                 "⭐ **Active Companion**\n"
                 f"{active_text}\n\n"
-                "Choose a category below. Matching pets are bundled when they share the "
-                "same pet and variant, regardless of level.\n\n"
+                "Choose a category below. Matching pets at the same level are bundled together.\n\n"
                 + "\n\n".join(lines)
             ),
             color=discord.Color.from_rgb(120, 140, 160),
         )
-        embed.set_footer(text="Different variants remain separate entries; levels are shown per representative copy.")
+        embed.set_footer(text="Different variants and levels remain separate entries.")
         return embed
 
 
@@ -955,8 +955,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
 
         description = (
-            "Matching pets are bundled when the pet and variant match, regardless of level. "
-            "Different variants remain separate.\n\n"
+            "Matching pets are bundled when the pet, variant, and level match. "
+            "Different variants and levels remain separate.\n\n"
             + ("\n".join(lines) if lines else "No pets in this category yet.")
         )
         embed = discord.Embed(
