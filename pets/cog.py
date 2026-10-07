@@ -32,7 +32,7 @@ from .views import (
 )
 from .management import PetManagementMixin
 from .fusion import PetFusionMixin
-from .incubator import (PetIncubatorMixin, INCUBATOR_UPGRADE_CAPS, UPGRADE_COSTS, UPGRADE_LABELS, UPGRADE_DESCRIPTIONS, SPEED_REDUCTIONS, DETECTION_BONUSES, LUCK_OCCURRENCE_BONUSES)
+from .incubator import (PetIncubatorMixin, INCUBATOR_UPGRADE_CAPS, UPGRADE_COSTS, UPGRADE_LABELS, UPGRADE_DESCRIPTIONS, SPEED_REDUCTIONS, DETECTION_BONUSES, LUCK_OCCURRENCE_BONUSES, _get_upgrade_cost)
 
 class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     def __init__(self, bot):
@@ -1199,7 +1199,13 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
         if current < cap:
             next_level = current + 1
-            material_id, material_amount, essence_amount, cost = UPGRADE_COSTS[category][next_level]
+            # Use the tube-specific cost calculation here so the preview matches
+            # the actual upgrade requirements for this tube. UPGRADE_COSTS contains
+            # the base material amount/cost; _get_upgrade_cost applies the tube's
+            # material scaling and Stardust multiplier.
+            material_id, material_amount, essence_amount, cost = _get_upgrade_cost(
+                tube_id, category, next_level
+            )
             material_info = ITEM_REGISTRY.get(material_id, {"name": material_id, "emoji": "📦"})
             req = f"{material_info['emoji']} **{material_info['name']} ×{material_amount}**\n"
             if essence_amount:

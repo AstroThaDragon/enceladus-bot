@@ -290,17 +290,29 @@ class PetIncubatorMixin:
             if essence_amount:
                 requirements.append(("astral_essence", essence_amount))
 
+            # Read each required inventory item once inside the same locked
+            # transaction that will perform the deduction. This keeps the
+            # displayed/validated quantity consistent and avoids having the
+            # validation and deduction use separate inventory snapshots.
+            inventory_rows_by_item = {}
             missing = []
+
             for item_id, amount in requirements:
                 async with db.execute(
-                    "SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE user_id = ? AND item_id = ?",
+                    """SELECT rowid, quantity
+                       FROM inventory
+                       WHERE user_id = ? AND item_id = ?
+                       ORDER BY rowid""",
                     (user_id, item_id),
                 ) as cursor:
-                    row = await cursor.fetchone()
-                owned = int(row[0] or 0) if row else 0
+                    inventory_rows = await cursor.fetchall()
+
+                inventory_rows_by_item[item_id] = inventory_rows
+                owned = sum(int(row[1] or 0) for row in inventory_rows)
 
                 if owned < amount:
                     missing.append((item_id, amount - owned))
+
             if stardust < cost:
                 missing.append(("stardust", cost - stardust))
             if missing:
@@ -316,14 +328,7 @@ class PetIncubatorMixin:
 
             for item_id, amount in requirements:
                 remaining = amount
-                async with db.execute(
-                    """SELECT rowid, quantity
-                       FROM inventory
-                       WHERE user_id = ? AND item_id = ?
-                       ORDER BY rowid""",
-                    (user_id, item_id),
-                ) as cursor:
-                    inventory_rows = await cursor.fetchall()
+                inventory_rows = inventory_rows_by_item.get(item_id, [])
 
                 for rowid, quantity in inventory_rows:
                     if remaining <= 0:
