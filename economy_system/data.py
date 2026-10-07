@@ -101,14 +101,14 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
     "wiring",
 }
 
-SELLABLE_ITEM_IDS = {'analysis_module', 'astral_lens', 'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'mutation_catalyst', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'quantum_coil', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
+SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
                      }
 
 SHOP_CATEGORY_INFO = {
     "healing": ("❤️", "Healing", "Medical supplies and revival items."),
     "recharge": ("🔋", "Recharge", "Mining laser and scavenging drone power."),
+    "consumables": ("🧪", "Consumables", "Usable supplies for exploration and station equipment."),
     "upgrades": ("🛠️", "Upgrades", "Permanent equipment and station expansions."),
-    "upgrade_materials": ("🧬", "Upgrade Materials", "Materials used to upgrade incubator tubes and systems."),
     "pet_items": ("🐾", "Pet Items", "Items for your station companion."),
     "special": ("✨", "Special", "Rare and unusual station items."),
     "lottery": ("🎟️", "Lottery", "Monthly Stardust lottery tickets."),
@@ -132,10 +132,12 @@ SHOP_BUY_CATEGORY_ITEMS = {
         "drone_battery", "drone_power_cell", "drone_quantum_battery",
     ],
     "upgrades": [
-        "incubator_2", "incubator_3", "vault_expansion", "vault_expansion_2",
+        "incubator_2", "incubator_3", "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module", "vault_expansion", "vault_expansion_2",
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
     ],
-    "upgrade_materials": ["quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module"],
+    "consumables": [
+        "station_rations", "ore_magnet", "cosmic_insurance", "fate_anchor",
+    ],
     "pet_items": ["pet_snack"],
     "special": ["time_crystal", "astral_essence"],
     "lottery": ["lottery_ticket"],
@@ -145,8 +147,8 @@ SHOP_BUY_CATEGORY_ITEMS = {
 SHOP_BUY_CATEGORY_CHOICES = [
     ("❤️ Healing", "healing"),
     ("🔋 Recharge", "recharge"),
+    ("🧪 Consumables", "consumables"),
     ("🛠️ Upgrades", "upgrades"),
-    ("🧬 Upgrade Materials", "upgrade_materials"),
     ("🐾 Pet Items", "pet_items"),
     ("✨ Special", "special"),
     ("🎟️ Lottery", "lottery"),
@@ -157,7 +159,6 @@ SHOP_SELL_CATEGORY_CHOICES = [
     ("🧹 Sell All", "sell_all"),
     ("🗑️ Space Junk", "space_junk"),
     ("🔧 Ores & Materials", "materials"),
-    ("🧬 Upgrade Materials", "upgrade_materials"),
     ("❤️ Healing", "healing"),
     ("🧪 Consumables", "consumables"),
     ("🛠️ Upgrade Kits", "upgrade_kits"),
@@ -178,9 +179,6 @@ SELL_ITEM_CATEGORY_IDS = {
         # Temporary utility items are consumables, not upgrade kits.
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "ore_magnet",
         "prototype_drill_bit", "cosmic_insurance", "fate_anchor",
-    },
-    "upgrade_materials": {
-        "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module",
     },
     "upgrade_kits": set(),  # Populated dynamically from crafting recipes below.
     "defense_weapons": {
