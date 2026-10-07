@@ -91,7 +91,7 @@ INCUBATOR_MATERIAL_COSTS = {
     },
     "luck": {
         1: [1, 2, 2],
-        2: [2, 4, 5],
+        2: [2, 2, 5],
         3: [4, 6, 8],
         4: [6, 9, 11],
         5: [8, 12, 15],
@@ -298,26 +298,6 @@ class PetIncubatorMixin:
                 ) as cursor:
                     row = await cursor.fetchone()
                 owned = int(row[0] or 0) if row else 0
-
-                # Temporary diagnostic logging for incubator material checks.
-                # This lets us verify exactly what the upgrade transaction sees
-                # when the inventory UI shows the required material.
-                print(
-                    f"[INCUBATOR DEBUG] user_id={user_id} "
-                    f"db={ECONOMY_DB_NAME!r} item_id={item_id!r} "
-                    f"required={amount} owned={owned}"
-                )
-                async with db.execute(
-                    """
-                    SELECT rowid, user_id, item_id, item_type, quantity
-                    FROM inventory
-                    WHERE user_id = ? AND item_id = ?
-                    ORDER BY rowid
-                    """,
-                    (user_id, item_id),
-                ) as cursor:
-                    debug_rows = await cursor.fetchall()
-                print(f"[INCUBATOR DEBUG] inventory_rows={debug_rows!r}")
 
                 if owned < amount:
                     missing.append((item_id, amount - owned))
