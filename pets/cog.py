@@ -657,7 +657,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 if other_id != pet_id
                 and (other_type or other_stage) == pet_type_id
                 and (other_variant_id or "") == (variant_id or "")
-                and not other_favorite
+                and str(other_favorite).strip().lower() not in {"1", "true", "yes", "on"}
             )
 
             display_name = nickname or definition["name"]
