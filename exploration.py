@@ -299,7 +299,7 @@ EXPLORATION_TEXT = {
     },
     "mining": {
         "title": "*Starship Mining Log - {display_name}* 🚀",
-        "description": "Your laser beam fired into the debris field...\n\n" + EXPLORATION_SEPARATOR + "\n\n{loot_description}",
+        "description": "*Your laser beam fired into the debris field...*\n\n" + EXPLORATION_SEPARATOR + "\n\n{loot_description}",
         "footer": "Fuel charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}",
         "pet_progress": "Companion progress",
         "pet_xp": "Pet XP: **+{xp}XP**",
@@ -311,7 +311,7 @@ EXPLORATION_TEXT = {
     "scavenging": {
         "title": "*Derelict Salvage Log - {display_name}* 🔩",
         "description": (
-            "Your scavenge drone has been deployed into abandoned sector wreckage...\n\n"
+            "*Your scavenge drone has been deployed into abandoned sector wreckage...*\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
             "Stardust found: **{stardust:,}**{quantum_note}{cache_note}\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
@@ -1561,12 +1561,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             if mining_material_findings:
                 loot_description += (
-                    "\n\n" + EXPLORATION_SEPARATOR + "\n\nMinerals recovered ⛏️: "
+                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n⛏️ Minerals recovered: "
                     + " • ".join(mining_material_findings)
                 )
             if mining_overflow_findings:
                 loot_description += (
-                    "\n\n" + EXPLORATION_SEPARATOR + "\n\nMineral overflow 📦: "
+                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n⛏️ Mineral overflow: "
                     + " • ".join(mining_overflow_findings)
                 )
 
@@ -1751,12 +1751,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 overflow_plastic = plastic_found - added_plastic
                 if overflow_plastic:
                     new_stardust += overflow_plastic * 2
-                    seasonal_findings.append(f"Plastic overflow: **×{overflow_plastic} → +{overflow_plastic * 2} Stardust**")
+                    seasonal_findings.append(f"**🧴 Plastic overflow: **×{overflow_plastic} → +{overflow_plastic * 2} Stardust**")
 
             if seasonal_findings:
                 seasonal_findings = [line for line in seasonal_findings if line]
                 if seasonal_findings:
-                    loot_description += "\n\n" + EXPLORATION_SEPARATOR + "\n\n**Halloween Findings! 🎃** " + " • ".join(seasonal_findings)
+                    loot_description += "\n\n" + EXPLORATION_SEPARATOR + "\n\n🎃**Halloween items!** " + " • ".join(seasonal_findings)
 
             rarity_badge = "common"
 
@@ -2149,7 +2149,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         (token_quantity, user_id)
                     )
                     loot_rarity_note += (
-                        f"\nBonus find: Discovered an **Arcade Token**! 🪙 "
+                        f"\nBonus find: discovered an **Arcade Token**! 🪙 "
                         f"({token_quantity}/{token_max})"
                     )
                 else:
@@ -2719,7 +2719,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
             if seasonal_findings:
                 bonus_sections.append(
-                        "Halloween findings: " + "\n\n".join(seasonal_findings)
+                        "Halloween items: " + "\n\n".join(seasonal_findings)
                 )
             if pet_stardust_message:
                 bonus_sections.append(pet_stardust_message)
@@ -2741,7 +2741,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     "Overflow: " + " • ".join(f"**{finding}**" for finding in bonus_overflow_findings)
                 )
 
-            bonus_material_text = f"\n\n{EXPLORATION_SEPARATOR}\n\n".join(bonus_sections) if bonus_sections else ""
+            bonus_material_text = (
+                f"\n\n{EXPLORATION_SEPARATOR}\n\n"
+                + f"\n\n{EXPLORATION_SEPARATOR}\n\n".join(bonus_sections)
+                if bonus_sections
+                else ""
+            )
 
             pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
 
