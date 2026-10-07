@@ -1526,13 +1526,20 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             new_stardust = stardust + found_stardust
             
+            # Keep the already-generated passive flavor message so the same
+            # trigger produces one consistent message instead of rolling the
+            # random flavor line a second time during embed construction.
             mining_stardust_notes = []
             if loot_bonus_note:
                 mining_stardust_notes.append(loot_bonus_note.lstrip("\n"))
-            if pet_effects["stardust_bonus"]:
-                mining_stardust_notes.append(get_pet_passive_message(pet_effects, "stardust_bonus"))
+            if pet_stardust_message:
+                mining_stardust_notes.append(pet_stardust_message)
             if mining_charge_saved:
-                mining_stardust_notes.append(get_pet_passive_message(pet_effects, "charge_save"))
+                charge_save_message = get_pet_passive_message(
+                    pet_effects, "charge_save"
+                )
+                if charge_save_message:
+                    mining_stardust_notes.append(charge_save_message)
 
             mining_item_findings = []
             mining_special_findings = []
