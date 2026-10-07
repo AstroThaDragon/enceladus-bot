@@ -1,10 +1,12 @@
 import re
+import aiosqlite
 from typing import Any, Optional, cast
 
 import discord
 from discord import app_commands
 
 from inventory import ITEM_REGISTRY
+from pets import get_active_pet_effects
 
 from ..data import *
 
@@ -613,6 +615,23 @@ class ShopTransactionView(discord.ui.View):
             ]
             if self.selected_item in self.cog.SHOP_ITEMS and self.selected_item in self.cog.daily_rotation():
                 lines.insert(1, "🏷️ **15% Daily Discount**")
+
+            # The Void Merchant's free-purchase effect is rolled when the
+            # transaction is confirmed, so this screen cannot know whether
+            # this specific purchase will proc. Make that possibility explicit
+            # whenever the active pet has the effect available.
+            try:
+                db_path = self.cog.get_db_path()
+                async with aiosqlite.connect(db_path) as db:
+                    pet_effects = await get_active_pet_effects(db, self.user_id)
+                if float(pet_effects.get("shop_free_purchase", 0.0)) > 0:
+                    lines.append(
+                        "🕳️ **Void Merchant:** This purchase has a chance to be **FREE**."
+                    )
+            except Exception:
+                # The confirmation UI should never fail because the optional
+                # Void Merchant preview could not be loaded.
+                pass
         else:
             unit_price = self._sell_unit_price()
             owned = entry.get("owned", 0)
