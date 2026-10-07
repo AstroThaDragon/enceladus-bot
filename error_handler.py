@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime, timezone
 
 import discord
+from discord.ext import commands
 
 
 # Set ERROR_LOG_CHANNEL_ID in Railway/environment variables to the channel where
@@ -352,7 +353,7 @@ async def log_command_error(bot, ctx, error):
     # Missing required arguments are normal command-usage mistakes, not bot
     # failures. Individual commands can provide their own friendly error
     # handlers, so do not duplicate those mistakes in the centralized log.
-    if isinstance(error, discord.ext.commands.MissingRequiredArgument):
+    if isinstance(error, commands.MissingRequiredArgument):
         return None
 
     # Discord formatting such as "-#" can be interpreted by the prefix
