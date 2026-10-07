@@ -299,7 +299,12 @@ EXPLORATION_TEXT = {
     },
     "mining": {
         "title": "*Starship Mining Log - {display_name}* 🚀",
-        "description": "*Your laser beam fired into the debris field...*\n\n" + EXPLORATION_SEPARATOR + "\n\n{loot_description}",
+        "description": (
+            "*Your laser beam fired into the debris field...*\n\n"
+            + EXPLORATION_SEPARATOR + "\n\n"
+            "Stardust collected: **{stardust:,}**{stardust_notes}"
+            "{result_sections}"
+        ),
         "footer": "Fuel charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}",
         "pet_progress": "Companion progress",
         "pet_xp": "Pet XP: **+{xp}XP**",
@@ -313,10 +318,13 @@ EXPLORATION_TEXT = {
         "description": (
             "*Your scavenge drone has been deployed into abandoned sector wreckage...*\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
-            "Stardust found: **{stardust:,}**{quantum_note}{cache_note}\n\n"
-            + EXPLORATION_SEPARATOR + "\n\n"
-            "Salvaged items: {loot}{rarity_note}{bonus_materials}{hazard_note}\n\n"
-            + EXPLORATION_SEPARATOR + "\n\n"
+            "Stardust found: **{stardust:,}**{quantum_note}{cache_note}"
+            "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
+            "Salvaged items: {loot}\n"
+            "{materials_and_supplies}"
+            "{special_findings}"
+            "{hazard_note}"
+            "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
             "{status}"
         ),
         "footer": "*Drone charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}*",
@@ -1518,18 +1526,16 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             new_stardust = stardust + found_stardust
             
-            loot_description = (
-                f"Stardust collected: **{found_stardust:,}**"
-                f"{loot_bonus_note}"
-            )
+            mining_stardust_notes = []
+            if loot_bonus_note:
+                mining_stardust_notes.append(loot_bonus_note.lstrip("\n"))
             if pet_effects["stardust_bonus"]:
-                loot_description += (
-                    "\n\n" + get_pet_passive_message(pet_effects, "stardust_bonus")
-                )
+                mining_stardust_notes.append(get_pet_passive_message(pet_effects, "stardust_bonus"))
             if mining_charge_saved:
-                loot_description += (
-                    "\n\n" + get_pet_passive_message(pet_effects, "charge_save")
-                )
+                mining_stardust_notes.append(get_pet_passive_message(pet_effects, "charge_save"))
+
+            mining_item_findings = []
+            mining_special_findings = []
 
             # Mining can uncover multiple types of raw mineral in one run.
             # Each successful find yields 1–5 units; Astral Core remains a separate
@@ -1541,8 +1547,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     amount_found = random.randint(1, 5)
                     if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
                         amount_found += 1
-                        loot_description += (
-                            "\n\n" + get_pet_passive_message(pet_effects, "material_bonus")
+                        mining_special_findings.append(
+                            get_pet_passive_message(pet_effects, "material_bonus")
                         )
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "mineral", amount_found
@@ -1559,16 +1565,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"{material_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
                         )
 
-            if mining_material_findings:
-                loot_description += (
-                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n⛏️ Minerals recovered: "
-                    + " • ".join(mining_material_findings)
-                )
-            if mining_overflow_findings:
-                loot_description += (
-                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n⛏️ Mineral overflow: "
-                    + " • ".join(mining_overflow_findings)
-                )
+            # Material findings are rendered together in the final result layout.
 
             # MissingNo. rarely corrupts the reward data of the current activity.
             if pet_effects.get("missingno_error", 0.0) and random.random() < pet_effects.get("missingno_error", 0.0):
@@ -1585,8 +1582,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
                 if glitch_kind == "stardust":
                     new_stardust += glitch_amount
-                    loot_description += (
-                        "\n\n" + get_pet_passive_message(pet_effects, "missingno_error_stardust")
+                    mining_special_findings.append(
+                        get_pet_passive_message(pet_effects, "missingno_error_stardust")
                         + f" **+{glitch_amount:,} Stardust**"
                     )
                 else:
@@ -1600,9 +1597,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     )
                     overflow_glitch = glitch_amount - added_glitch
                     if added_glitch:
-                        loot_description += (
-                            "\n\n"
-                            + get_pet_passive_message(
+                        mining_special_findings.append(
+                            get_pet_passive_message(
                                 pet_effects,
                                 "missingno_error_small" if glitch_kind == "small" else "missingno_error_major",
                             )
@@ -1611,7 +1607,9 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     if overflow_glitch > 0:
                         overflow_value = overflow_glitch * MATERIAL_OVERFLOW_VALUES.get(glitch_item_id, 0)
                         new_stardust += overflow_value
-                        loot_description += f"\nGlitched overflow 📦 → **+{overflow_value:,} Stardust**"
+                        mining_special_findings.append(
+                            f"Glitched overflow 📦 → **+{overflow_value:,} Stardust**"
+                        )
 
             # Astral Essence is a separate rare mining discovery, independent of
             # the normal rarity table so it does not replace existing loot.
@@ -1620,15 +1618,13 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     db, user_id, "astral_essence", "special", 1
                 )
                 if added_essence:
-                    loot_description += (
-                        f"\n\nAstral Discovery: Recovered **Astral Essence**! "
-                        f"({essence_quantity}/{essence_max})"
+                    mining_item_findings.append(
+                        f"Astral Essence **({essence_quantity}/{essence_max})**"
                     )
                 else:
                     new_stardust += 2500
-                    loot_description += (
-                        "\n\nAstral Essence overflow: Your stack is full "
-                        "and it has turned into 2,500 Stardust instead."
+                    mining_special_findings.append(
+                        "Astral Essence overflow: **+2,500 Stardust**"
                     )
 
             # Halloween bonus resources are independent rolls during the active event.
@@ -1753,10 +1749,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     new_stardust += overflow_plastic * 2
                     seasonal_findings.append(f"**🧴 Plastic overflow: **×{overflow_plastic} → +{overflow_plastic * 2} Stardust**")
 
-            if seasonal_findings:
-                seasonal_findings = [line for line in seasonal_findings if line]
-                if seasonal_findings:
-                    loot_description += "\n\n" + EXPLORATION_SEPARATOR + "\n\n🎃**Halloween items!** " + " • ".join(seasonal_findings)
+            seasonal_findings = [line for line in seasonal_findings if line]
 
             rarity_badge = "common"
 
@@ -1767,7 +1760,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
                 found_xp = random.randint(100, 500)
-                loot_description += f"\n\n{EXPLORATION_SEPARATOR}\n\nXP Data Shard found: **+{found_xp} XP**"
+                mining_item_findings.append(f"XP Data Shard: **+{found_xp} XP**")
                 rarity_badge = "uncommon"
 
                 # Award XP globally through leveling.py
@@ -1775,7 +1768,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 if leveling_cog:
                     leveled_up, new_level = await leveling_cog.add_xp(ctx.author, found_xp)
                     if leveled_up:
-                        loot_description += f"\n\n{EXPLORATION_SEPARATOR}\n\n**Level up!** You've reached **level {new_level}!**"
+                        mining_special_findings.append(f"**Level up!** You've reached **level {new_level}!**")
 
             elif roll < 0.75 + mining_rare_bonus:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
@@ -1788,18 +1781,15 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
 
                 if added_amount == 1:
-                    loot_description += (
-                        f"\n\nRare Ore Extracted: Refined a "
-                        f"**Titanium Ore Chunk**! ({new_quantity}/{max_quantity})"
+                    mining_item_findings.append(
+                        f"Titanium Ore Chunk **({new_quantity}/{max_quantity})**"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("titanium_chunk", 75)
                     new_stardust += overflow_stardust
 
-                    loot_description += (
-                        f"\n\nStack full: Your Titanium Ore Chunk stack "
-                        f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\nIt has been converted to: **+{overflow_stardust:,} Stardust**"
+                    mining_special_findings.append(
+                        f"Titanium Ore Chunk stack full: **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -1821,18 +1811,15 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
                         (new_token_balance, user_id)
                     )
-                    loot_description += (
-                        f"\n\nYou've discovered a shiny "
-                        f"**Arcade Token**! ({new_token_balance}/{token_max})"
+                    mining_item_findings.append(
+                        f"Arcade Token **({new_token_balance}/{token_max})**"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
                     new_stardust += overflow_stardust
 
-                    loot_description += (
-                        f"\n\nStack full: Your Arcade Token balance "
-                        f"is already at **{token_max}/{token_max}**!"
-                        f"\n\nIt has been converted to: **+{overflow_stardust:,} Stardust**"
+                    mining_special_findings.append(
+                        f"Arcade Token stack full: **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "rare"
@@ -1861,19 +1848,15 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         (user_id,)
                     )
 
-                    loot_description += (
-                        f"\n\nYou've acquired a stable "
-                        f"**Dilated Time Crystal**! "
-                        f"({current_crystals + 1}/{max_quantity})"
+                    mining_item_findings.append(
+                        f"Dilated Time Crystal **({current_crystals + 1}/{max_quantity})**"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("time_crystal", 350)
                     new_stardust += overflow_stardust
 
-                    loot_description += (
-                        f"\n\nStack full: Your Dilated Time Crystal "
-                        f"stack is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\nIt has been converted to: **+{overflow_stardust:,} Stardust**"
+                    mining_special_findings.append(
+                        f"Dilated Time Crystal stack full: **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "epic"
@@ -1889,18 +1872,15 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
 
                 if added_amount == 1:
-                    loot_description += (
-                        "\nLegendary Find: You've discovered an "
-                        f"**Astral Core**! ({new_quantity}/{max_quantity})"
+                    mining_item_findings.append(
+                        f"Astral Core **({new_quantity}/{max_quantity})**"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("astral_core", 750)
                     new_stardust += overflow_stardust
 
-                    loot_description += (
-                        f"\n\nStack full: Your Astral Core stack "
-                        f"is already at **{max_quantity}/{max_quantity}**!"
-                        f"\n\nIt has been converted to: **+{overflow_stardust:,} Stardust**"
+                    mining_special_findings.append(
+                        f"Astral Core stack full: **+{overflow_stardust:,} Stardust**"
                     )
 
                 rarity_badge = "legendary"
@@ -1923,9 +1903,52 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             "legendary": discord.Color.from_rgb(255, 215, 0)
         }
 
+        mining_sections = []
+        if mining_item_findings:
+            mining_sections.append(
+                "Mined items: " + " • ".join(mining_item_findings)
+            )
+        if mining_material_findings or mining_overflow_findings:
+            material_lines = []
+            if mining_material_findings:
+                material_lines.append(
+                    " • ".join(f"**{finding}**" for finding in mining_material_findings)
+                )
+            if mining_overflow_findings:
+                material_lines.append(
+                    "Overflow: " + " • ".join(f"**{finding}**" for finding in mining_overflow_findings)
+                )
+            mining_sections.append(
+                "Mined materials: " + "\n".join(material_lines)
+            )
+        all_mining_special_findings = [
+            *seasonal_findings,
+            *mining_special_findings,
+        ]
+        if all_mining_special_findings:
+            mining_sections.append(
+                "Special findings: " + " • ".join(all_mining_special_findings)
+            )
+
+        mining_result_sections = (
+            "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
+            + "\n\n".join(mining_sections)
+            if mining_sections
+            else ""
+        )
+        mining_stardust_notes_text = (
+            "\n" + "\n".join(mining_stardust_notes)
+            if mining_stardust_notes
+            else ""
+        )
+
         embed = discord.Embed(
             title=EXPLORATION_TEXT["mining"]["title"].format(display_name=ctx.author.display_name),
-            description=EXPLORATION_TEXT["mining"]["description"].format(loot_description=loot_description),
+            description=EXPLORATION_TEXT["mining"]["description"].format(
+                stardust=found_stardust,
+                stardust_notes=mining_stardust_notes_text,
+                result_sections=mining_result_sections,
+            ),
             color=colors.get(rarity_badge, discord.Color.blue())
         )
         cooldown_total_seconds = max(0, int(round(effective_cooldown)))
@@ -2130,6 +2153,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             # Arcade Tokens are an independent bonus roll during scavenging.
             # This keeps the normal scavenging loot table intact instead of
             # replacing another find when a token appears.
+            bonus_discovery_findings = []
             scavenging_token_found = False
             token_overflow_stardust = 0
             if random.random() < 0.25:
@@ -2148,17 +2172,14 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         "UPDATE users SET arcade_coins = ? WHERE user_id = ?",
                         (token_quantity, user_id)
                     )
-                    loot_rarity_note += (
-                        f"\nBonus find: discovered an **Arcade Token**! 🪙 "
-                        f"({token_quantity}/{token_max})"
+                    bonus_discovery_findings.append(
+                        f"Arcade Token 🪙 **({token_quantity}/{token_max})**"
                     )
                 else:
                     overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
                     token_overflow_stardust = overflow_stardust
-                    loot_rarity_note += (
-                        f"\nArcade Token overflow: Your Arcade Token stack is already "
-                        f"at **{token_max}/{token_max}**!"
-                        f"\nIt has been converted to: **+{overflow_stardust:,} Stardust**"
+                    bonus_discovery_findings.append(
+                        f"Arcade Token overflow: **+{overflow_stardust:,} Stardust**"
                     )
 
             effective_scavenge_charge_save = max(
@@ -2704,47 +2725,47 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 if pet_effects["stardust_bonus"]
                 else ""
             )
-            bonus_sections = []
+            materials_and_supplies = []
             if salvage_material_findings:
-                bonus_sections.append(
-                    "Salvaged materials: " + " • ".join(f"**{finding}**" for finding in salvage_material_findings)
-                )
+                materials_and_supplies.extend(salvage_material_findings)
             if medical_supply_findings:
-                bonus_sections.append(
-                    "Medical supplies: " + " • ".join(f"**{finding}**" for finding in medical_supply_findings)
-                )
+                materials_and_supplies.extend(medical_supply_findings)
             if bonus_mineral_findings:
-                bonus_sections.append(
-                    "Bonus minerals: " + " • ".join(f"**{finding}**" for finding in bonus_mineral_findings)
-                )
-            if seasonal_findings:
-                bonus_sections.append(
-                        "Halloween items: " + "\n\n".join(seasonal_findings)
+                materials_and_supplies.extend(bonus_mineral_findings)
+
+            special_findings = []
+            if bonus_discovery_findings:
+                special_findings.extend(bonus_discovery_findings)
+            if loot_rarity_note:
+                special_findings.extend(
+                    line for line in loot_rarity_note.split("\n") if line
                 )
             if pet_stardust_message:
-                bonus_sections.append(pet_stardust_message)
+                special_findings.append(pet_stardust_message)
             if pet_findings:
-                bonus_sections.append(
-                    "\n".join(line for line in pet_findings if line)
-                )
+                special_findings.extend(line for line in pet_findings if line)
             if scavenge_charge_saved:
                 charge_effect_id = (
                     "scavenge_charge_save"
                     if pet_effects["scavenge_charge_save"]
                     else "charge_save"
                 )
-                bonus_sections.append(
-                    get_pet_passive_message(pet_effects, charge_effect_id)
-                )
+                special_findings.append(get_pet_passive_message(pet_effects, charge_effect_id))
+            if seasonal_findings:
+                special_findings.extend(line for line in seasonal_findings if line)
             if bonus_overflow_findings:
-                bonus_sections.append(
-                    "Overflow: " + " • ".join(f"**{finding}**" for finding in bonus_overflow_findings)
-                )
+                special_findings.extend(bonus_overflow_findings)
 
-            bonus_material_text = (
-                f"\n\n{EXPLORATION_SEPARATOR}\n\n"
-                + f"\n\n{EXPLORATION_SEPARATOR}\n\n".join(bonus_sections)
-                if bonus_sections
+            materials_and_supplies_text = (
+                "Salvaged materials & supplies: "
+                + " • ".join(f"**{finding}**" for finding in materials_and_supplies)
+                if materials_and_supplies
+                else ""
+            )
+            special_findings_text = (
+                "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
+                + "Special findings: " + " • ".join(special_findings)
+                if special_findings
                 else ""
             )
 
@@ -2772,7 +2793,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 cache_note=cache_note,
                 loot=loot_name_with_quantity,
                 rarity_note=loot_rarity_note,
-                bonus_materials=bonus_material_text,
+                materials_and_supplies=materials_and_supplies_text,
+                special_findings=special_findings_text,
                 hazard_note=hazard_note,
                 status=status_text,
             ),
