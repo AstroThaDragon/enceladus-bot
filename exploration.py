@@ -159,7 +159,7 @@ EXPLORATION_TEXT = {
             "with 50HP at **{knocked_out_until}**"
         ),
         "cooldown_finished": (
-            "<@{user_id}> *Your cooldown has ended!*\n"
+            "<@{user_id}> **Your cooldown has ended!**\n"
             "You can now use `/{command}` again!"
         ),
         "daily_reminder": "*You didn't claim your daily yet!*\nUse `/daily` to claim your Stardust reward!",
