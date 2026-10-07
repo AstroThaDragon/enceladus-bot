@@ -419,18 +419,27 @@ class Achievements(commands.Cog):
             achievement = ACHIEVEMENTS.get(achievement_id)
             if not achievement:
                 continue
+            reward_extra = (
+                "\n\nUse `/background collection` to view your unlocked backgrounds, or `/background equip` to equip one."
+                if "background" in achievement["reward"].lower()
+                else ""
+            )
+            separator = "────────────────────────"
             embed = discord.Embed(
                 title="Achievement Unlocked! 🏆",
                 description=(
-                    f"<@{int(user_id)}> {achievement['emoji']} **{achievement['name']}**\n"
+                    f"**{achievement['name']} {achievement['emoji']}**\n"
+                    f"{separator}\n"
                     f"*{achievement['description']}*\n\n"
-                    f"Reward: **{achievement['reward']}**"
-                    + ("\n\nUse `/background collection` to view your unlocked backgrounds, or `/background equip` to equip one." if "background" in achievement["reward"].lower() else "")
+                    "Reward:\n"
+                    f"{separator}\n"
+                    f"**{achievement['reward']}**"
+                    f"{reward_extra}"
                 ),
                 color=discord.Color.gold(),
             )
             try:
-                await channel.send(embed=embed)
+                await channel.send(content=f"<@{int(user_id)}>", embed=embed)
             except (discord.Forbidden, discord.HTTPException):
                 continue
 
