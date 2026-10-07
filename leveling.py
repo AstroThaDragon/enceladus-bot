@@ -755,7 +755,16 @@ class Leveling(commands.Cog):
 
         user_id = message.author.id
         current_time = time.time()
-        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60: return
+
+        # Keep the cooldown store resilient across cog reloads/reinitialization.
+        # Normally this is created in __init__, but initializing it here as a
+        # fallback prevents on_message from crashing if an older/stale cog
+        # instance is still alive during a reload.
+        if not hasattr(self, "cooldowns"):
+            self.cooldowns = {}
+
+        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60:
+            return
         self.cooldowns[user_id] = current_time
 
         leveled_up = False
