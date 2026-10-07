@@ -1317,7 +1317,7 @@ class Exploration(commands.Cog):
             
             pet_effects = await get_active_pet_effects(db, user_id)
             found_stardust = int(
-                random.randint(150, 1250)
+                random.randint(80, 550)
                 * mining_upgrade["stardust_mult"]
                 * (
                     1
@@ -2001,7 +2001,7 @@ class Exploration(commands.Cog):
                 new_charges = charges - 1
                 scavenge_charge_saved = False
             found_stardust = int(
-                random.randint(250, 1000)
+                random.randint(50, 450)
                 * scavenging_upgrade["stardust_mult"]
                 * (
                     1
