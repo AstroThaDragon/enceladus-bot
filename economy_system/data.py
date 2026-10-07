@@ -109,6 +109,7 @@ SHOP_CATEGORY_INFO = {
     "recharge": ("🔋", "Recharge", "Mining laser and scavenging drone power."),
     "consumables": ("🧪", "Consumables", "Usable supplies for exploration and station equipment."),
     "upgrades": ("🛠️", "Upgrades", "Permanent equipment and station expansions."),
+    "upgrade_materials": ("🧬", "Upgrade Materials", "Materials used to improve your incubator tubes."),
     "pet_items": ("🐾", "Pet Items", "Items for your station companion."),
     "special": ("✨", "Special", "Rare and unusual station items."),
     "lottery": ("🎟️", "Lottery", "Monthly Stardust lottery tickets."),
@@ -120,7 +121,6 @@ SHOP_CATEGORY_INFO = {
     "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
     "collectibles": ("🎃", "Collectibles", "Sell discovered collectible items."),
     "halloween": ("👻", "Halloween", "Sell eligible seasonal items."),
-    "consumables": ("🧪", "Consumables", "Usable supplies for exploration and station equipment."),
     "upgrade_kits": ("🛠️", "Upgrade Kits", "Actual crafted kits used for permanent upgrades."),
     "defense_weapons": ("🛡️", "Defense Weapons", "Items that can help protect you from scavenging hazards."),
 }
@@ -131,12 +131,15 @@ SHOP_BUY_CATEGORY_ITEMS = {
         "laser_charge_cell", "laser_power_cell", "fuel_refill",
         "drone_battery", "drone_power_cell", "drone_quantum_battery",
     ],
-    "upgrades": [
-        "incubator_2", "incubator_3", "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module", "vault_expansion", "vault_expansion_2",
+    "consumables": [
+        "station_rations", "ore_magnet", "fate_anchor", "cosmic_insurance",
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
     ],
-    "consumables": [
-        "station_rations", "ore_magnet", "cosmic_insurance", "fate_anchor",
+    "upgrades": [
+        "incubator_2", "incubator_3", "vault_expansion", "vault_expansion_2",
+    ],
+    "upgrade_materials": [
+        "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module",
     ],
     "pet_items": ["pet_snack"],
     "special": ["time_crystal", "astral_essence"],
@@ -149,6 +152,7 @@ SHOP_BUY_CATEGORY_CHOICES = [
     ("🔋 Recharge", "recharge"),
     ("🧪 Consumables", "consumables"),
     ("🛠️ Upgrades", "upgrades"),
+    ("🧬 Upgrade Materials", "upgrade_materials"),
     ("🐾 Pet Items", "pet_items"),
     ("✨ Special", "special"),
     ("🎟️ Lottery", "lottery"),
