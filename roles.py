@@ -77,7 +77,7 @@ class ColorSelect(discord.ui.Select):
 
             if not interaction.guild or not isinstance(interaction.user, discord.Member):
                 return await interaction.followup.send(
-                    "This action can only be performed in a server.",
+                    "❌ This action can only be performed in a server.",
                     ephemeral=True
                 )
 
@@ -93,7 +93,7 @@ class ColorSelect(discord.ui.Select):
                 if self.values[0] == "remove":
                     if not member_roles:
                         return await interaction.followup.send(
-                            "You don't have a color role to remove!",
+                            "❌ You don't have a color role to remove!",
                             ephemeral=True
                         )
 
@@ -102,12 +102,12 @@ class ColorSelect(discord.ui.Select):
                     except (discord.Forbidden, discord.HTTPException) as e:
                         print(f"[ROLE ERROR] Failed to remove color roles from {member}: {e}")
                         return await interaction.followup.send(
-                            "❌ I couldn't remove your color role(s). Please try again.",
+                            "❌ I couldn't remove your color role(s). Please try again and report to staff if the issue persists.",
                             ephemeral=True
                         )
 
                     return await interaction.followup.send(
-                        "All cosmic colors have been stripped.",
+                        "All colors have been stripped.",
                         ephemeral=True
                     )
 
@@ -116,13 +116,13 @@ class ColorSelect(discord.ui.Select):
 
                 if new_role is None:
                     return await interaction.followup.send(
-                        "❌ That color role no longer exists. Please let the server staff know.",
+                        "❌ That color role no longer exists. Please report to staff.",
                         ephemeral=True
                     )
 
                 if guild.me is None or guild.me.top_role <= new_role:
                     return await interaction.followup.send(
-                        "I can't assign this role! Move my 'Enceladus' role higher in settings.",
+                        "❌ I can't assign this role! Move my 'Enceladus' role higher in Server Settings.",
                         ephemeral=True
                     )
 
@@ -141,19 +141,19 @@ class ColorSelect(discord.ui.Select):
                                 print(f"[ROLE ERROR] Failed to roll back new color role for {member}: {rollback_error}")
                             print(f"[ROLE ERROR] Failed to remove old color roles from {member}: {remove_error}")
                             return await interaction.followup.send(
-                                "❌ I couldn't finish changing your color. "
-                                "Your previous color should remain active; please try again.",
+                                "I couldn't finish changing your color. "
+                                "Your previous color should remain active; please try again and report to staff if the issue persists.",
                                 ephemeral=True
                             )
                 except (discord.Forbidden, discord.HTTPException) as e:
                     print(f"[ROLE ERROR] Failed to assign color role to {member}: {e}")
                     return await interaction.followup.send(
-                        "❌ I couldn't assign that color role. Please try again.",
+                        "❌ I couldn't assign that color role. Please try again and report to staff if the issue persists.",
                         ephemeral=True
                     )
 
                 await interaction.followup.send(
-                    f"Your color is now **{new_role.name}**!",
+                    f"Your color is now **{new_role.name}**! 🎨",
                     ephemeral=True
                 )
 
@@ -201,7 +201,7 @@ class PersistentColorView(discord.ui.View):
             discord.SelectOption(label="Bright White", value="941487675721007195"),
             discord.SelectOption(label="Void Black", value="941487725222170715"),
             discord.SelectOption(label="Gray", value="941487911260532826"),
-            discord.SelectOption(label="❌ Remove Color", value="remove", description="Reset to default")
+            discord.SelectOption(label="Remove Color ❌", value="remove", description="Reset to default")
         ]
         self.add_item(ColorSelect("Cosmic Palette: Page 2", p2_options, custom_id="color_select_p2"))
 
@@ -229,7 +229,7 @@ class GradientColorSelect(discord.ui.Select):
             discord.SelectOption(label="Ringed Giant", value="1512320030908612668", emoji="🪐"),
             discord.SelectOption(label="Celestial Peacock", value="1512320127184404480", emoji="🦚"),
             discord.SelectOption(label="Voidwalker", value="1512320224530141184", emoji="🕳️"),
-            discord.SelectOption(label="❌ Remove Color", value="remove", description="Reset to default"),
+            discord.SelectOption(label="Remove Color ❌", value="remove", description="Reset to default"),
         ]
         super().__init__(
             placeholder="Level 10+ Gradient Colors",
@@ -244,7 +244,7 @@ class GradientColorSelect(discord.ui.Select):
 
             if not interaction.guild or not isinstance(interaction.user, discord.Member):
                 return await interaction.followup.send(
-                    "This action can only be performed in a server.",
+                    "❌ This action can only be performed in a server.",
                     ephemeral=True
                 )
 
@@ -268,7 +268,7 @@ class GradientColorSelect(discord.ui.Select):
                     except (discord.Forbidden, discord.HTTPException) as e:
                         print(f"[ROLE ERROR] Failed to remove gradient/color roles from {member}: {e}")
                         return await interaction.followup.send(
-                            "❌ I couldn't remove your color role(s). Please try again.",
+                            "❌ I couldn't remove your color role(s). Please try again and report to staff if the issue persists.",
                             ephemeral=True
                         )
                     return await interaction.followup.send(
@@ -278,7 +278,7 @@ class GradientColorSelect(discord.ui.Select):
 
                 if not any(role.id in LEVEL_UNLOCK_ROLES for role in member.roles):
                     return await interaction.followup.send(
-                        "🌈 You must be **Level 10 or higher** to use gradient color roles!",
+                        "You must be **Level 10 or higher** to use gradient color roles! 🎨",
                         ephemeral=True
                     )
 
@@ -287,13 +287,13 @@ class GradientColorSelect(discord.ui.Select):
 
                 if new_role is None:
                     return await interaction.followup.send(
-                        "❌ That gradient color role no longer exists. Please let the server staff know.",
+                        "❌ That gradient color role no longer exists. Please report to staff.",
                         ephemeral=True
                     )
 
                 if guild.me is None or guild.me.top_role <= new_role:
                     return await interaction.followup.send(
-                        "I can't assign this role! Move my 'Enceladus' role higher in settings.",
+                        "❌ I can't assign this role! Move my 'Enceladus' role higher in Server Settings.",
                         ephemeral=True
                     )
 
@@ -311,18 +311,18 @@ class GradientColorSelect(discord.ui.Select):
                             print(f"[ROLE ERROR] Failed to remove old color roles from {member}: {remove_error}")
                             return await interaction.followup.send(
                                 "❌ I couldn't finish changing your gradient color. "
-                                "Your previous color should remain active; please try again.",
+                                "Your previous color should remain active; please try again and report to staff if the issue persists.",
                                 ephemeral=True
                             )
                 except (discord.Forbidden, discord.HTTPException) as e:
                     print(f"[ROLE ERROR] Failed to assign gradient role to {member}: {e}")
                     return await interaction.followup.send(
-                        "❌ I couldn't assign that gradient color role. Please try again.",
+                        "❌ I couldn't assign that gradient color role. Please try again and report to staff if the issue persists.",
                         ephemeral=True
                     )
 
                 await interaction.followup.send(
-                    f"Your gradient color is now **{new_role.name}**!",
+                    f"Your gradient color is now **{new_role.name}**! 🎨",
                     ephemeral=True
                 )
 
@@ -336,7 +336,7 @@ class GradientColorView(discord.ui.View):
 async def toggle_role(interaction: discord.Interaction, role_id: int):
     if not interaction.guild or not isinstance(interaction.user, discord.Member):
         return await interaction.response.send_message(
-            "This action can only be performed in a server.",
+            "❌ This action can only be performed in a server.",
             ephemeral=True
         )
 
@@ -347,13 +347,13 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
         role = guild.get_role(role_id)
         if not role:
             return await interaction.response.send_message(
-                "Role not found! Check the code IDs.",
+                "❌ Role not found! Please report to staff.",
                 ephemeral=True
             )
 
         if guild.me is None or guild.me.top_role <= role:
             return await interaction.response.send_message(
-                f"I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in settings.",
+                f"❌ I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in Server Settings.",
                 ephemeral=True
             )
 
@@ -373,7 +373,7 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
         except (discord.Forbidden, discord.HTTPException) as e:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "❌ I couldn't manage that role. Please try again.",
+                    "❌ I couldn't manage that role. Please try again and report to staff if the issue persists.",
                     ephemeral=True
                 )
             print(f"[ROLE ERROR] Failed to manage role {role_id} for {member}: {e}")
@@ -402,7 +402,7 @@ class RoleRemovalConfirmView(discord.ui.View):
     ):
         if not interaction.guild or not isinstance(interaction.user, discord.Member):
             return await interaction.response.edit_message(
-                content="This action can only be performed in a server.",
+                content="❌ This action can only be performed in a server.",
                 view=None
             )
 
@@ -411,13 +411,13 @@ class RoleRemovalConfirmView(discord.ui.View):
 
         if role is None:
             return await interaction.response.edit_message(
-                content="❌ That role no longer exists.",
+                content="❌ That role no longer exists. Please report to staff.",
                 view=None
             )
 
         if interaction.guild.me is None or interaction.guild.me.top_role <= role:
             return await interaction.response.edit_message(
-                content=f"I can't remove the **{role.name}** role! Move my 'Enceladus' role higher in settings.",
+                content=f"❌ I can't remove the **{role.name}** role! Move my 'Enceladus' role higher in Server Settings.",
                 view=None
             )
 
@@ -437,7 +437,7 @@ class RoleRemovalConfirmView(discord.ui.View):
             except (discord.Forbidden, discord.HTTPException) as e:
                 print(f"[ROLE ERROR] Failed to remove role {self.role_id} from {member}: {e}")
                 await interaction.response.edit_message(
-                    content="❌ I couldn't remove that role. Please try again.",
+                    content="❌ I couldn't remove that role. Please try again and report to staff if the issue persists.",
                     view=None
                 )
 
@@ -472,7 +472,7 @@ class RoleSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
             if not isinstance(interaction.user, discord.Member):
                 return await interaction.response.send_message(
-                    "This action can only be performed in a server.",
+                    "❌ This action can only be performed in a server.",
                     ephemeral=True
                 )
 
@@ -496,7 +496,7 @@ class RoleSelect(discord.ui.Select):
                     except (discord.Forbidden, discord.HTTPException) as e:
                         print(f"[ROLE ERROR] Failed to remove color roles from {member}: {e}")
                         return await interaction.response.send_message(
-                            "❌ I couldn't remove your color role(s). Please try again.",
+                            "❌ I couldn't remove your color role(s). Please try again and report to staff if the issue persists.",
                             ephemeral=True
                         )
 
@@ -707,7 +707,7 @@ class RoleCog(commands.Cog):
         await channel.send(embed=emb_color, view=PersistentColorView())
 
         # 11. Post Gradient Colors
-        emb_gradient = discord.Embed(title="🌈 Gradient Color Roles", description="Pick a gradient color for your name! ✨\n\n🔒 Requires **Level 10 or higher**", color=0x6a0dad)
+        emb_gradient = discord.Embed(title="🌈 Gradient Color Roles", description="Pick a gradient color for your name! ✨\n\nRequires **Level 10 or higher** 🔒", color=0x6a0dad)
         await channel.send(embed=emb_gradient, view=GradientColorView())
 
     @app_commands.command(name="edit_platform_roles", description="Updates the existing platform role panel")
@@ -715,7 +715,7 @@ class RoleCog(commands.Cog):
     async def edit_platform_roles(self, interaction: discord.Interaction):
         if not interaction.guild:
             return await interaction.response.send_message(
-                "This command can only be used in a server.",
+                "❌ This command can only be used in a server.",
                 ephemeral=True
             )
 
@@ -730,13 +730,13 @@ class RoleCog(commands.Cog):
                 channel = await guild.fetch_channel(CHANNEL_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return await interaction.response.send_message(
-                    "Could not find or access the channel!",
+                    "❌ Could not find or access the channel!",
                     ephemeral=True
                 )
 
         if not isinstance(channel, discord.TextChannel):
             return await interaction.response.send_message(
-                "The target channel is not a text channel!",
+                "❌ The target channel is not a text channel!",
                 ephemeral=True
             )
 
@@ -745,7 +745,7 @@ class RoleCog(commands.Cog):
         except Exception as e:
             await log_app_command_error(self.bot, interaction, e)
             return await interaction.response.send_message(
-                f"Failed to fetch message: {e}",
+                f"❌ Failed to fetch message: {e}",
                 ephemeral=True
             )
 
@@ -758,16 +758,16 @@ class RoleCog(commands.Cog):
         await message.edit(embed=emb_platform, view=PlatformView())
 
         await interaction.response.send_message(
-            "Platform role panel updated!",
+            "Platform role view panel updated!",
             ephemeral=True
         )
 
-    @app_commands.command(name="edit_ping_roles", description="Updates the existing ping role panel")
+    @app_commands.command(name="edit_ping_roles", description="Updates the existing ping roles view panel")
     @app_commands.checks.has_permissions(administrator=True)
     async def edit_ping_roles(self, interaction: discord.Interaction):
         if not interaction.guild:
             return await interaction.response.send_message(
-                "This command can only be used in a server.",
+                "❌ This command can only be used in a server.",
                 ephemeral=True
             )
 
@@ -782,7 +782,7 @@ class RoleCog(commands.Cog):
                 channel = await guild.fetch_channel(CHANNEL_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return await interaction.response.send_message(
-                    "Could not find or access the channel!",
+                    "❌ Could not find or access the channel!",
                     ephemeral=True
                 )
 
@@ -797,7 +797,7 @@ class RoleCog(commands.Cog):
         except Exception as e:
             await log_app_command_error(self.bot, interaction, e)
             return await interaction.response.send_message(
-                f"Failed to fetch message: {e}",
+                f"❌ Failed to fetch message: {e}",
                 ephemeral=True
             )
 
@@ -810,7 +810,7 @@ class RoleCog(commands.Cog):
         await message.edit(embed=emb_ping, view=PingView())
 
         await interaction.response.send_message(
-            "Ping role panel updated!",
+            "Ping role view panel updated!",
             ephemeral=True
         )
 

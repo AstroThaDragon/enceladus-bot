@@ -145,7 +145,7 @@ class CancelConfirmView(View):
     )
     async def nevermind(self, interaction, button):
         await interaction.response.edit_message(
-            content="✅ Cancelled the cancellation.",
+            content="Cancelled the cancellation.",
             view=None
         )
 
@@ -286,7 +286,7 @@ class VerificationReviewView(View):
         # Catch-all just in case someone slips through the interaction_check
         if not is_applicant and not is_staff:
             return await interaction.response.send_message(
-                "❌🪲 You do not have permission to cancel this verification request. If you're seeing this, it is an error! Please inform staff!",
+                "❌ You do not have permission to cancel this verification request. If you're seeing this, it is an error! Please report to staff.",
                 ephemeral=True
             )
 
@@ -300,7 +300,7 @@ class VerificationReviewView(View):
         # Response for staff/owner
         else:
             await interaction.response.send_message(
-                f"⚠️ **Staff Action:** Are you sure you want to forcibly cancel {self.member.display_name}'s verification request?",
+                f"⚠️ **Staff action:** are you sure you want to forcibly cancel {self.member.display_name}'s verification request?",
                 view=CancelConfirmView(self),
                 ephemeral=True
             )
@@ -365,14 +365,14 @@ class VerificationDropdown(Select):
             ),
             discord.SelectOption(
                 label="NSFW+ Access",
-                description="Gain access to 'spicier' NSFW channels.",
+                description="Gain access to spicier NSFW channels.",
                 emoji="🔥",
                 value="nsfw_plus"
             )
         ]
 
         super().__init__(
-            placeholder="Choose a verification type...",
+            placeholder="Choose a verification type.",
             min_values=1,
             max_values=1,
             options=options,
@@ -392,7 +392,7 @@ class VerificationDropdown(Select):
         lock = self.cog.get_application_lock(guild.id, member.id)
         if lock.locked():
             return await interaction.response.send_message(
-                "⚠️ You already have a verification request being created. Please wait a moment.",
+                "You already have a verification request being created. Please wait a moment.",
                 ephemeral=True
             )
 
@@ -414,12 +414,12 @@ class VerificationDropdown(Select):
 
                 if interaction.response.is_done():
                     await interaction.followup.send(
-                        "❌ I couldn't create your verification request. No application was finalized; please try again in a moment.",
+                        "❌ I couldn't create your verification request. No application was finalized; please try again in a moment and report to staff if the issue persists.",
                         ephemeral=True
                     )
                 else:
                     await interaction.response.send_message(
-                        "❌ I couldn't create your verification request. No application was created; please try again in a moment.",
+                        "❌ I couldn't create your verification request. No application was created; please try again in a moment and report to staff if the issue persists.",
                         ephemeral=True
                     )
 
@@ -440,7 +440,7 @@ class VerificationDropdown(Select):
         if current_time < cooldown_end:
             reason_text = "a recent denial" if reason == "denial" else "cancelling your previous request"
             return await interaction.response.send_message(
-                f"❌ You are on a cooldown due to {reason_text}. You can apply again <t:{int(cooldown_end)}:R>.",
+                f"❌ You are on a cooldown due to {reason_text}. You can apply again <t:{int(cooldown_end)}:R>",
                 ephemeral=True
             )
 
@@ -470,7 +470,7 @@ class VerificationDropdown(Select):
 
             if level is None:
                 return await interaction.response.send_message(
-                    "⚠️ I couldn't verify your level right now. Please try again in a moment.",
+                    "⚠️ I couldn't verify your level right now. Please try again in a moment and report to staff if the issue persists.",
                     ephemeral=True
                 )
 
@@ -486,7 +486,7 @@ class VerificationDropdown(Select):
 
         if pending_role is None:
             return await interaction.followup.send(
-                "⚠️ The verification system is missing its Pending Verification role. Please contact staff.",
+                "⚠️ The verification system is missing its Pending Verification role. Please report to staff.",
                 ephemeral=True
             )
 
@@ -507,14 +507,14 @@ class VerificationDropdown(Select):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 await member.remove_roles(pending_role, reason="Verification channel unavailable")
                 return await interaction.followup.send(
-                    "⚠️ The verification channel could not be found or accessed. Please contact staff.",
+                    "⚠️ The verification channel could not be found or accessed. Please report to staff.",
                     ephemeral=True
                 )
 
         if not isinstance(verification_channel, discord.TextChannel):
             await member.remove_roles(pending_role, reason="Verification channel invalid")
             return await interaction.followup.send(
-                "⚠️ The verification channel is not a text channel. Please contact staff.",
+                "⚠️ The verification channel is not a text channel. Please report to staff.",
                 ephemeral=True
             )
 
@@ -535,13 +535,13 @@ class VerificationDropdown(Select):
         await thread.add_user(member)
 
         await interaction.followup.send(
-            f"✅ Your verification thread has been created. A staff member will be with you shortly: {thread.mention}",
+            f"Your verification thread has been created. A staff member will be with you shortly: {thread.mention}",
             ephemeral=True
         )
 
         try:
             await member.send(
-                f"✅ Your **{application_name}** request has been opened in **{guild.name}**.\n\n"
+                f"Your **{application_name}** request has been opened in **{guild.name}**.\n\n"
                 f"Please continue in your verification thread here: {thread.mention}\n\n"
                 "A verification team member will review your request as soon as possible."
             )
@@ -557,7 +557,7 @@ class VerificationDropdown(Select):
         await thread.send(
             f"Welcome {member.mention}!\n\n"
             f"Please answer the questions below and upload your verification images here.\n\n"
-            f"⚠️ **Cover sensitive information. Only DOB and photo should remain visible!**"
+            f"⚠️ **Cover sensitive information. Only DOB and photo should remain visible!** ⚠️"
         )
 
         # 18+ applications use the same plain-text verification style,
@@ -712,12 +712,12 @@ class Verification(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def sendverificationpanel(self, ctx):
         embed = discord.Embed(
-            title="🔞 Verification Center",
+            title="Verification Center 🔞",
             description=(
                 "Select the type of verification you want below.\n\n"
                 "Verification is manually reviewed by staff.\n"
                 "Please follow all instructions carefully!\n\n"
-                "**Please note: You must be level 5 (Planetary Pioneer) or higher to apply for NSFW and NSFW+ access.**"
+                "⚠️ **Please note: You must be level 5 (Planetary Pioneer) or higher to apply for NSFW and NSFW+ access.** ⚠️"
             ),
             color=discord.Color.red()
         )
@@ -754,7 +754,7 @@ class Verification(commands.Cog):
         async with lock:
             if getattr(interaction.channel, "locked", False) or getattr(interaction.channel, "archived", False):
                 return await interaction.followup.send(
-                    "ℹ️ This verification request has already been processed.",
+                    "This verification request has already been processed.",
                     ephemeral=True
                 )
             return await self._finish_verification_locked(
@@ -791,7 +791,7 @@ class Verification(commands.Cog):
 
             if missing_roles:
                 return await interaction.followup.send(
-                    "❌ This application cannot be approved because one or more required verification roles are missing or below Enceladus' role hierarchy. Please contact the server owner.",
+                    "❌ This application cannot be approved because one or more required verification roles are missing or below Enceladus' role hierarchy. Please report to staff.",
                     ephemeral=True
                 )
 
@@ -809,12 +809,12 @@ class Verification(commands.Cog):
                         pass
                 print(f"[VERIFICATION ROLE ERROR] {e}")
                 return await interaction.followup.send(
-                    "❌ I couldn't safely assign all required verification roles. No approval was finalized; please try again or contact staff.",
+                    "❌ I couldn't safely assign all required verification roles. No approval was finalized; please try again and report to staff if the issue persists.",
                     ephemeral=True
                 )
 
             message = (
-                f"✅ You have been approved for **{APPLICATION_TYPES[application_key]['label']}**."
+                f"You have been approved for **{APPLICATION_TYPES[application_key]['label']}**! ✅"
             )
 
             if reason:
@@ -826,11 +826,11 @@ class Verification(commands.Cog):
                 pass
 
             await interaction.followup.send(
-                f"✅ {member.mention} approved.")
+                f"{member.mention} approved. ✅")
 
             if log_channel:
                 await log_channel.send(
-                    f"✅ {member.mention} approved for **{APPLICATION_TYPES[application_key]['label']}**"
+                    f"{member.mention} approved for **{APPLICATION_TYPES[application_key]['label']}** ✅"
                 )
 
         else:

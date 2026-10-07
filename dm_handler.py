@@ -93,7 +93,7 @@ class DMHandler(commands.Cog):
         if self.is_rate_limited(user.id):
             await self.safe_send(
                 user,
-                "Please slow down a little. Your messages are still important, but I need a moment to process them!",
+                "❌ Please slow down a little. Your messages are still important, but I need a moment to process them!",
             )
 
             return

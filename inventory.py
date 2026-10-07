@@ -711,7 +711,7 @@ class InventoryEventSelect(discord.ui.Select):
             )
 
         super().__init__(
-            placeholder="🎉 Select an event...",
+            placeholder="Select an event.",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -801,7 +801,7 @@ class InventoryView(discord.ui.View):
     async def check_owner(self, interaction):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
-                "⚠️ This inventory menu belongs to the person who opened it.",
+                "This inventory menu belongs to the person who opened it.",
                 ephemeral=True,
             )
             return False
@@ -927,10 +927,10 @@ class InventoryView(discord.ui.View):
             label="Categories", emoji="↩️", style=discord.ButtonStyle.secondary, row=1
         )
 
-        async def back_callback(i):
-            if not await self.check_owner(i):
+        async def back_callback(interaction):
+            if not await self.check_owner(interaction):
                 return
-            await self.show_category(i)
+            await self.show_category(interaction)
 
         back.callback = back_callback
         self.add_item(back)
@@ -961,11 +961,11 @@ class InventoryView(discord.ui.View):
             label="Events", emoji="↩️", style=discord.ButtonStyle.secondary, row=1
         )
 
-        async def back_callback(i):
-            if not await self.check_owner(i):
+        async def back_callback(interaction):
+            if not await self.check_owner(interaction):
                 return
             self.category = "__event_items__"
-            await self.show_event_categories(i)
+            await self.show_event_categories(interaction)
 
         back.callback = back_callback
         self.add_item(back)
@@ -1042,23 +1042,23 @@ class InventoryView(discord.ui.View):
             label="Categories", emoji="↩️", style=discord.ButtonStyle.secondary, row=2,
         )
 
-        async def previous_callback(i):
-            if not await self.check_owner(i): return
+        async def previous_callback(interaction):
+            if not await self.check_owner(interaction): return
             self.page -= 1
-            await self.show_items(i)
+            await self.show_items(interaction)
 
-        async def next_callback(i):
-            if not await self.check_owner(i): return
+        async def next_callback(interaction):
+            if not await self.check_owner(interaction): return
             self.page += 1
-            await self.show_items(i)
+            await self.show_items(interaction)
 
-        async def search_callback(i):
-            if not await self.check_owner(i): return
-            await i.response.send_modal(InventorySearchModal(self))
+        async def search_callback(interaction):
+            if not await self.check_owner(interaction): return
+            await interaction.response.send_modal(InventorySearchModal(self))
 
-        async def categories_callback(i):
-            if not await self.check_owner(i): return
-            await self.show_category(i)
+        async def categories_callback(interaction):
+            if not await self.check_owner(interaction): return
+            await self.show_category(interaction)
 
         previous.callback = previous_callback
         next_button.callback = next_callback
@@ -1090,9 +1090,9 @@ class InventoryView(discord.ui.View):
         self.clear_items()
         back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary)
 
-        async def back_callback(i):
-            if not await self.check_owner(i): return
-            await self.show_items(i)
+        async def back_callback(interaction):
+            if not await self.check_owner(interaction): return
+            await self.show_items(interaction)
 
         back.callback = back_callback
         self.add_item(back)
@@ -1490,7 +1490,7 @@ class Inventory(commands.Cog):
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             return await ctx.send(
-                "Something went wrong while using that item. Please try again and report to staff if the issue persists."
+                "❌ Something went wrong while using that item. Please try again and report to staff if the issue persists."
             )
 
 
@@ -1574,7 +1574,7 @@ class Inventory(commands.Cog):
                     (knocked_out_until, user_id),
                 )
                 if knockout_message:
-                    effect_note = f"\\n\\n💀 {knockout_message}"
+                    effect_note = f"\\n\\n{knockout_message} 💀"
                 else:
                     effect_note = (
                         f"\\n\\n**You've been knocked unconscious!**"
@@ -1639,7 +1639,6 @@ class Inventory(commands.Cog):
             await apply_damage(35)
 
         elif item_id == "twigs_bundle":
-            # No gameplay effect has been specified in the current config.
             pass
 
         elif item_id == "glow_chalk":
@@ -1710,7 +1709,7 @@ class Inventory(commands.Cog):
         if item_id == "time_crystal":
             fortune_cog = self.bot.get_cog("Fortunes") or self.bot.get_cog("Fortune")
             if fortune_cog is None:
-                return await ctx.send("The fortune system is currently unavailable. Please try again later and report to staff if the issue persists.")
+                return await ctx.send("❌ The fortune system is currently unavailable. Please try again later and report to staff if the issue persists.")
             return await fortune_cog._use_crystal_impl(ctx, already_deferred=True)
 
         if item_id not in valid:
@@ -2106,7 +2105,7 @@ class Inventory(commands.Cog):
                             "halloween_", ""
                         ).replace("_", " ").title()
                         unlock_note += (
-                            f"\n\n**Achievement unlocked! 🏆\n{achievement_name}!**"
+                            f"\n\n**Achievement unlocked!** 🏆\n{achievement_name}!"
                         )
 
                     title_id = special_result.get("title_id")
@@ -2120,7 +2119,7 @@ class Inventory(commands.Cog):
 
                         if achievement_unlocked:
                             unlock_note += (
-                                f"\n\n**Title unlocked! 🏅\n{title_name}** — "
+                                f"\n\n**Title unlocked!** 🏅\n{title_name} - "
                                 f"use `/equip title` to equip it!"
                             )
 
@@ -2135,7 +2134,7 @@ class Inventory(commands.Cog):
 
                         if background_unlocked:
                             unlock_note += (
-                                f"\n\n**Background unlocked! 🖼️\n{background_name}** — "
+                                f"\n\n**Background unlocked!** 🖼️\n{background_name} - "
                                 f"use `/background` to equip it."
                             )
 
@@ -2154,7 +2153,7 @@ class Inventory(commands.Cog):
             if item_id == "laser_charge_cell":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"**Your mining laser charges are already full!** ({max_mining_charges}/{max_mining_charges})"
                     )
 
                 mining = min(max_mining_charges, (mining or 0) + 2)
@@ -2169,7 +2168,7 @@ class Inventory(commands.Cog):
             elif item_id == "laser_power_cell":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"**Your mining laser charges are already full!** ({max_mining_charges}/{max_mining_charges})"
                     )
 
                 mining = min(max_mining_charges, (mining or 0) + 5)
@@ -2179,12 +2178,12 @@ class Inventory(commands.Cog):
                     (mining, user_id)
                 )
 
-                message = f"Your mining laser charges are now restored to **{mining}/{max_mining_charges}**!"
+                message = f"Your mining laser charges are now restored to **{mining}/{max_mining_charges}!**"
 
             elif item_id == "fuel_refill":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
-                        f"Your mining laser charges are already full (`{max_mining_charges}/{max_mining_charges}`)!"
+                        f"**Your mining laser charges are already full!** ({max_mining_charges}/{max_mining_charges})"
                     )
 
                 mining = max_mining_charges
@@ -2194,12 +2193,12 @@ class Inventory(commands.Cog):
                     (mining, user_id)
                 )
 
-                message = f"Your mining laser charges are now fully recharged to **{max_mining_charges}/{max_mining_charges}**!"
+                message = f"Your mining laser charges are now fully recharged to **{max_mining_charges}/{max_mining_charges}!**"
 
             elif item_id == "drone_battery":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"**Your scavenge drone battery is already full!** ({max_scavenge_charges}/{max_scavenge_charges})"
                     )
 
                 scavenging = min(max_scavenge_charges, (scavenging or 0) + 2)
@@ -2209,12 +2208,12 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}**!"
+                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}!**"
 
             elif item_id == "drone_power_cell":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"**Your scavenge drone battery is already full!** ({max_scavenge_charges}/{max_scavenge_charges})"
                     )
 
                 scavenging = min(max_scavenge_charges, (scavenging or 0) + 5)
@@ -2224,12 +2223,12 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}**!"
+                message = f"Your scavenge drone battery is now restored to **{scavenging}/{max_scavenge_charges}!**"
 
             elif item_id == "drone_quantum_battery":
                 if (scavenging or 0) >= max_scavenge_charges:
                     return await ctx.send(
-                        f"Your scavenge drone battery is already full (`{max_scavenge_charges}/{max_scavenge_charges}`)!"
+                        f"**Your scavenge drone battery is already full!** ({max_scavenge_charges}/{max_scavenge_charges})"
                     )
 
                 scavenging = max_scavenge_charges
@@ -2239,7 +2238,7 @@ class Inventory(commands.Cog):
                     (scavenging, user_id)
                 )
 
-                message = f"Your scavenge drone battery is now fully recharged to **{max_scavenge_charges}/{max_scavenge_charges}**."
+                message = f"Your scavenge drone battery is now fully recharged to **{max_scavenge_charges}/{max_scavenge_charges}!**"
 
             elif item_id == "station_rations":
                 if (hp or 0) <= 0:
@@ -2262,14 +2261,14 @@ class Inventory(commands.Cog):
                 )
 
                 message = (
-                    f"**Station Rations Used!** Restored **{restored}HP**. "
-                    f"Current health: **{hp}/{max_hp or 100}**."
+                    f"**Station Rations Used!** Restored **{restored}HP** "
+                    f"Current health: **{hp}/{max_hp or 100}**"
                 )
 
             elif item_id == "quantum_battery":
                 if effects.get("quantum_battery"):
                     return await ctx.send(
-                        "You already have a Quantum Battery active! "
+                        "**You already have a Quantum Battery active!** "
                         "Use `/mine` or `/scavenge` first."
                     )
 
@@ -2370,7 +2369,7 @@ class Inventory(commands.Cog):
                 row = await cursor.fetchone()
 
         if not row:
-            return await ctx.send("No profile found. Run `/mine` or `/scavenge` first!")
+            return await ctx.send("❌ No profile found. Run `/mine` or `/scavenge` first!")
 
         hp, max_hp, mining, scavenging, last_mined, last_scavenged, knocked_out_until, effects_raw = row
 
@@ -2409,7 +2408,7 @@ class Inventory(commands.Cog):
             seconds = remaining % 60
             return f"{minutes}m {seconds}s"
 
-        embed = discord.Embed(title=f"📟 {ctx.author.mention}'s Expedition Status", color=discord.Color.teal())
+        embed = discord.Embed(title=f"{ctx.author.mention}'s Expedition Status 📟", color=discord.Color.teal())
         hp_value = hp or 0
         max_hp_value = max_hp or 100
 
@@ -2462,7 +2461,7 @@ class Inventory(commands.Cog):
             embed.add_field(
                 name="Recovery 💀",
                 value=(
-                    f"Unconscious until {recovery_date}\n"
+                    f"Unconscious until **{recovery_date}**\n"
                     f"Use `/revive` to check your available revival options."
                 ),
                 inline=False
@@ -2484,17 +2483,17 @@ class Inventory(commands.Cog):
             defense_value = (
                 f"{weapon['emoji']} **{weapon['name']}**"
                 + chr(10)
-                + f"Weapon Protection:\n**{weapon_chance * 100:.1f}%**"
+                + f"Weapon Protection:\n**{weapon_chance * 100:.1f}%** ⚔️ "
                 + chr(10)
-                + f"*Combined Defense:*\n**{combined_defense * 100:.1f}%** "
-                + f"(cap {DEFENSE_CAP * 100:.0f}%)"
+                + f"*Combined Defense:*\n**{combined_defense * 100:.1f}%** 🛡️\n "
+                + f"*(cap {DEFENSE_CAP * 100:.0f}%)*"
             )
         else:
             defense_value = (
                 "None equipped!"
                 + chr(10)
-                + f"*Combined Defense:*\n**{combined_defense * 100:.1f}%** "
-                + f"(cap {DEFENSE_CAP * 100:.0f}%)"
+                + f"Combined Defense:\n**{combined_defense * 100:.1f}%** 🛡️ "
+                + f"*(cap {DEFENSE_CAP * 100:.0f}%)*"
             )
 
         embed.add_field(

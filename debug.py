@@ -27,7 +27,7 @@ class Debug(commands.Cog):
     async def require_access(self, ctx):
         if await self.is_authorized(ctx):
             return True
-        await ctx.send("**Debug access is locked.** Use `/debug unlock <code>` first.", ephemeral=True)
+        await ctx.send("**Debug access is locked.** 🔒\nUse `/debug unlock <code>` first.", ephemeral=True)
         return False
 
     @commands.hybrid_group(name="debug", description="Private diagnostic and administration tools.")
@@ -41,19 +41,19 @@ class Debug(commands.Cog):
         secret = os.getenv("DEBUG_ACCESS_CODE")
         if not secret:
             return await ctx.send(
-                "Debug access is not configured. Please set the `DEBUG_ACCESS_CODE` environment variable.",
+                "❌ Debug access is not configured. Please set the `DEBUG_ACCESS_CODE` environment variable.",
                 ephemeral=True
             )
 
         if not code or not hmac.compare_digest(code, secret):
             return await ctx.send(
-                "Invalid debug access code.",
+                "❌ Invalid debug access code.",
                 ephemeral=True
             )
 
         self.sessions[ctx.author.id] = time.time() + self.SESSION_SECONDS
         await ctx.send(
-            "**Debug access enabled for 30 minutes!** This session resets if the bot restarts before expiration.",
+            "**Debug access enabled for 30 minutes!** 🔓\nThis session resets if the bot restarts before expiration.",
             ephemeral=True
         )
 
@@ -185,7 +185,7 @@ class Debug(commands.Cog):
         pet_type = pet_type.lower().strip()
         if pet_type not in ALL_PETS:
             return await ctx.send(
-                "Unknown pet type. Use the pet's configured ID, such as `space_cat`.",
+                "❌ Unknown pet type. Use the pet's configured ID, such as `space_cat`.",
                 ephemeral=True,
             )
 
@@ -194,7 +194,7 @@ class Debug(commands.Cog):
 
         definition = get_pet_definition(pet_type)
         if not definition:
-            return await ctx.send("That pet is not currently configured.", ephemeral=True)
+            return await ctx.send("❌ That pet is not currently configured.", ephemeral=True)
 
         db_path = ECONOMY_DB_NAME
         async with aiosqlite.connect(db_path) as db:
@@ -226,7 +226,7 @@ class Debug(commands.Cog):
 
         active_note = " and equipped it" if active else ""
         await ctx.send(
-            f"🐾 Granted **{definition['emoji']} {definition['name']}** "
+            f"Granted **{definition['emoji']} {definition['name']}** "
             f"(level {level}) to {member.mention}{active_note} for testing.",
             ephemeral=True,
         )

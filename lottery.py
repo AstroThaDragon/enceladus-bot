@@ -236,7 +236,7 @@ class Lottery(commands.Cog):
             cycle = await self.get_active_cycle(db)
             if not cycle:
                 await db.rollback()
-                return False, "**There isn't an open lottery right now. Please check back later when an announcement is made!**"
+                return False, "**There isn't an open lottery right now.** Please check back later when an announcement is made!"
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -261,7 +261,7 @@ class Lottery(commands.Cog):
             if not row:
                 await db.rollback()
                 return False, (
-                    "You don't have an active profile yet. Run `/scavenge` or `/mine` first!"
+                    "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!"
                 )
 
             stardust = row[0] or 0
@@ -332,7 +332,7 @@ class Lottery(commands.Cog):
             await self.ensure_schema(db)
             cycle = await self.get_active_cycle(db)
             if not cycle:
-                return await ctx.send("**There isn't an open lottery right now. Please check back later when an announcement is made!**")
+                return await ctx.send("**There isn't an open lottery right now.** Please check back later when an announcement is made!")
 
             cycle_id = cycle[0]
             async with db.execute(
@@ -348,7 +348,7 @@ class Lottery(commands.Cog):
 
         if not rows:
             return await ctx.send(
-                f"You don't have any tickets in **Lottery Cycle #{cycle_id}**."
+                f"❌ You don't have any tickets in **lottery cycle #{cycle_id}**."
             )
 
         lines = [

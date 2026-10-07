@@ -543,7 +543,7 @@ class Fortunes(commands.Cog):
                     else:
                         if streak >= 3:
                             lost_streak_messages.append(
-                                f"<@{user_id}>'s fortune streak faded away... 💔 (streak was `{streak}` days)"
+                                f"<@{user_id}>'s fortune streak faded away... 💔 (streak was **{streak}** days)"
                             )
 
                         await db.execute(
@@ -881,8 +881,8 @@ class Fortunes(commands.Cog):
         event_note = EVENT_NOTES.get(active_event or "", "")
         
         stats_text = "\n".join(
-            f"{stat}: `{value}%`" if isinstance(value, int)
-            else f"{stat}: `{value}`"
+            f"{stat}: **{value}%**" if isinstance(value, int)
+            else f"{stat}: **{value}**"
             for stat, value in stats.items()
         )
 
@@ -933,7 +933,7 @@ class Fortunes(commands.Cog):
 
                 if not fortune_row:
                     return await ctx.send(
-                        "You don't have an active profile yet! Run `/fortune` first."
+                        "❌ You don't have an active profile yet! Run `/fortune` first."
                     )
 
                 async with economy_db.execute(
@@ -1059,7 +1059,7 @@ class Fortunes(commands.Cog):
                 # Scenario C: Streak is already intact.
                 if last_streak_date in (yesterday_et, today_et):
                     return await ctx.send(
-                        f"**Streak active!** Your fortune streak (`{streak}` days) "
+                        f"**Streak active!** Your fortune streak ({streak} days) "
                         f"is intact. You don't need to use a Dilated Time Crystal!"
                     )
 
@@ -1123,7 +1123,7 @@ class Fortunes(commands.Cog):
 
     @set_fortune_streak.error
     async def set_fortune_streak_error(self, ctx: commands.Context, error: Exception):
-        await ctx.send(f"Set fortune streak command error: `{error}`. Please report to staff.")
+        await ctx.send(f"Set fortune streak command error: {error}. Please report to staff.")
         raise error
 
 

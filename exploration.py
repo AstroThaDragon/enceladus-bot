@@ -125,9 +125,229 @@ LOOT_OVERFLOW_VALUES = {
 }
 
 
-SCAVENGE_STARDUST_CACHE_CHANCE = 0.05
+SCAVENGE_STARDUST_CACHE_CHANCE = 0.04
 SCAVENGE_STARDUST_CACHE_MIN = 500
-SCAVENGE_STARDUST_CACHE_MAX = 3500
+SCAVENGE_STARDUST_CACHE_MAX = 2500
+
+
+# ============================================================================
+# EXPLORATION TEXT
+# ============================================================================
+# This is the main editing area for user-facing Exploration text.
+#
+# The sections below cover the text presented by the Haunted Exploration,
+# Mining, Scavenging, and Revival embeds, plus the reusable messages that feed
+# those embeds. Dynamic values use {placeholders}; the code supplies those
+# values when the message is displayed.
+#
+# Haunted story scene text and choice labels are intentionally NOT duplicated
+# here. Those are authored in seasonal_updates/halloween/haunted_system.py so
+# there is still one source of truth for the actual story.
+#
+# Mechanics, rewards, database behavior, and calculations remain below. You
+# should normally only need to edit this section when changing wording.
+# ============================================================================
+
+EXPLORATION_SEPARATOR = "────────────────────────────"
+
+EXPLORATION_TEXT = {
+    "common": {
+        "separator": EXPLORATION_SEPARATOR,
+        "knockout_message": (
+            "*You are unconscious!*\n\nYou can use `/revive` or use `/shop buy` "
+            "and find a revive item. Otherwise, you will recover "
+            "with 50HP at **{knocked_out_until}**"
+        ),
+        "cooldown_finished": (
+            "<@{user_id}> *Your cooldown has ended!*\n"
+            "You can now use `/{command}` again!"
+        ),
+        "daily_reminder": "*You didn't claim your daily yet!*\nUse `/daily` to claim your Stardust reward!",
+    },
+    "haunted": {
+        "location_title": "*Lair of Frights - Haunted Exploration 👻*",
+        "location_description": (
+            "Enceladus opened a series of portals while searching for new places to explore for Halloween. "
+            "Something came back through one of them. Whatever happened next left the portals - and Enceladus himself - changed.\n\n────────────────────────────\n\n"
+            "The destinations beyond these portals are waiting. Choose one below and step through. "
+            "Each location is a coherent multi-scene story with meaningful choices, secrets, and dangers."
+        ),
+        "active_run_note": (
+            "\n\nYou currently have an active run in **{location_name}** "
+            "(Stage {stage}/{total_stages}). Starting another run will replace it."
+        ),
+        "location_footer": "Choose a portal location to enter. | Lair of Frights 👻",
+        "field_explorer": "*Explorer*",
+        "field_sanity": "*Sanity*",
+        "field_daily_attempts": "*Daily Attempts*",
+        "sanity_field": "**{sanity}/100**\n{state}\nRegenerates continuously over time.",
+        "info_title": "Haunted Exploration — Field Guide",
+        "info_description": (
+            "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
+            "Enceladus. Each portal leads somewhere new - and not everything that comes through them is supposed to be there."
+        ),
+        "info_portals": (
+            "Enceladus went searching for new locations for Halloween. While using portals to find new areas, "
+            "**something came back through one of them.** It attacked. He tried to fight back... but to no avail."
+        ),
+        "info_corruption": (
+            "Whatever came through the portal entered Enceladus's system, past his coding, and **corrupted him**. "
+            "He comes and goes, sometimes able to fight through it—almost like he is possessed, but digitally. "
+            "There is nothing we can do... **for now.**"
+        ),
+        "info_sometimes": (
+            "There are moments when the corruption pushes through. Enceladus is not entirely himself. "
+            "And sometimes... *something else comes out.*"
+        ),
+        "info_sanity": (
+            "Sanity starts at **100** and regenerates continuously. Most choices reduce it. "
+            "At **0 Sanity**, you enter **Insane** state."
+        ),
+        "info_grip": (
+            "Low Sanity makes reality less reliable. The same story can be perceived differently, and at **0 Sanity** "
+            "the opening perception can become profoundly wrong. Insanity does not randomly replace the story with unrelated encounters."
+            "However, low Sanity or Insanity can cause better reward drops."
+        ),
+        "info_attempts": (
+            "You get **{attempts} attempts per day**. Starting an adventure consumes one attempt, even if you run away. "
+            "The daily reset is 12:00AM EST."
+        ),
+        "info_stages": (
+            "Runs are authored multi-scene adventures. Your choices can show different discoveries, pet opportunities, and various story reactions."
+        ),
+        "info_running_away": (
+            "You can run away instead of taking an encounter choice. Most escapes work, but there is a small "
+            "chance that something happens while you escape. Running away stops you from earning rewards for that run, but you can always try again."
+        ),
+        "scene_title": "*{location_name} {emoji}*",
+        "scene_result_prefix": "**What happened:**\n{result_text}\n\n" + EXPLORATION_SEPARATOR + "\n\n",
+        "scene_explorer": "*Explorer*",
+        "scene_scene": "*Scene*",
+        "scene_sanity": "*Sanity*",
+        "scene_sanity_insane": "***INSANITY***",
+        "scene_sanity_unreliable": "***Reality is becoming unreliable...***",
+        "scene_sanity_stable": "***Stable***",
+        "malo_warning": "MalO is staring at **{choice}**.\n*You are not entirely sure why.*",
+        "scene_footer": "Choose carefully. Or run.",
+        "wrong_owner": (
+            "**This Haunted Exploration isn't yours.**\n"
+            "These buttons belong to another player's exploration run. You can start your own run with `/explore: haunted`!"
+        ),
+        "scene_unavailable": (
+            "**This Haunted Exploration scene is no longer available.**\n"
+            "The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed."
+        ),
+        "run_unavailable": (
+            "**This Haunted Exploration is no longer available.**\n"
+            "The run may have expired or already been ended. Start a new Haunted Exploration run if needed."
+        ),
+        "dormant_short": "*Haunted Exploration is currently dormant until October. Please check back next Halloween!*",
+        "dormant_long": (
+            "**Haunted Exploration is currently dormant.**\n"
+            "This event is only available during the Lair of Frights event in October. Please check back next Halloween!"
+        ),
+        "out_of_attempts": (
+            "**You're out of Haunted Exploration attempts for today!**\n"
+            "Come back after the daily reset at 12:00 AM EST!"
+        ),
+        "pet_already_found": (
+            "**Something familiar appears**\n"
+            "You recognize this companion. You've already befriended it, "
+            "and it disappears back into the darkness, waiting for another to find it."
+        ),
+        "completion_description": (
+            "**{mention} explored {location_name}.**\n\n"
+            "**What happened**\n{result_text}\n\n"
+            + EXPLORATION_SEPARATOR + "\n\n"
+            "**Exploration complete**\n"
+            "You've made it through! 🎉"
+        ),
+        "completion_explorer": "*Explorer*",
+        "completion_story": "*Story*",
+        "completion_sanity": "*Final Sanity*",
+        "completion_rewards": "*Adventure rewards*\n────────────────────────────\n",
+        "completion_pet": "**Location-based pet found!**",
+        "completion_footer": "Exploration complete • The portals remain open for now...",
+        "escape_rare": [
+            "You bolt for the exit. The door slams shut behind you by itself. Something follows you for three steps before disappearing.",
+            "You run. Your footsteps keep going after you stop. You decide not to investigate.",
+            "You make it out—then realize the hallway outside has one extra door. You do not go back.",
+        ],
+        "escape_normal": [
+            "You decide you've had enough and make a very respectable tactical retreat.",
+            "Nope. Absolutely not. You turn around and leave.",
+            "You retreat before whatever is lurking here gets the chance to introduce itself.",
+        ],
+        "escape_suffix": "\n\n**Something happened while you escaped...**",
+        "escape_description": "**{mention} left the {location_name}.**\n\n{escape_text}{suffix}",
+        "escape_explorer": "*Explorer*",
+        "escape_run_ended": "*Run Ended*",
+        "escape_sanity": "*Sanity*",
+        "escape_rewards": "*Rewards*",
+        "escape_no_reward": "No reward was earned from this run.",
+        "escape_footer": "You've escaped. The portals remain open for now...",
+        "reward_stardust": "**+{amount:,} Stardust** ✨",
+        "reward_candy": "**+{amount} Halloween Candy** 🍬",
+        "reward_ingredient": "{emoji} **+{amount} {name}**",
+        "reward_pet_xp": "**+{amount} Pet XP** 🐾",
+        "reward_pet_home_bonus": " *(+{amount} home-location bonus)*",
+        "reward_pet_level": " • **Pet Level {level}!** 🎉",
+        "reward_candy_overflow": "Candy overflow: **{amount}** → **+{stardust} Stardust**",
+        "reward_ingredient_overflow": "Ingredient overflow: **{amount}** → **+{stardust} Stardust**",
+        "reward_collectible": "**Halloween collectible found! {emoji} {name}** \n" + EXPLORATION_SEPARATOR + "\n*{description}*",
+        "reward_usable_collectible": "**Usable collectible found!**\nUse `/use item: [item name]` to activate this collectible.",
+    },
+    "mining": {
+        "title": "*Starship Mining Log - {display_name}* 🚀",
+        "description": "Your laser beam fired into the debris field...\n\n" + EXPLORATION_SEPARATOR + "\n\n{loot_description}",
+        "footer": "Fuel charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}",
+        "pet_progress": "Companion progress",
+        "pet_xp": "*Pet XP:* **+{xp}XP**",
+        "pet_level": " • **Level {level}!** 🎉",
+        "daily_name": "*Daily reminder!*",
+        "daily_value": "You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+        "cooldown_name": "*Cooldown alerts*",
+    },
+    "scavenging": {
+        "title": "*Derelict Salvage Log - {display_name}* 🔩",
+        "description": (
+            "Your scavenge drone has been deployed into abandoned sector wreckage...\n\n"
+            + EXPLORATION_SEPARATOR + "\n\n"
+            "*Stardust found:* **{stardust:,}**{quantum_note}{cache_note}\n\n"
+            + EXPLORATION_SEPARATOR + "\n\n"
+            "*Salvaged items:* **{loot}**{rarity_note}{bonus_materials}{hazard_note}\n\n"
+            + EXPLORATION_SEPARATOR + "\n\n"
+            "{status}"
+        ),
+        "footer": "*Drone charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}*",
+        "pet_progress": "Companion Progress 🐾",
+        "pet_xp": "*Pet XP:* **+{xp}XP**",
+        "pet_level": " • **Level {level}!** 🎉",
+        "daily_name": "*Daily reminder!*",
+        "daily_value": "You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+        "cooldown_name": "*Cooldown alerts*",
+        "health_status": "*Health:* **{hp}/{max_hp}HP**",
+        "knocked_out_status": "*Knocked out!* Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{until}**.",
+        "materials": "*Salvaged materials:* {findings}",
+    },
+    "revival": {
+        "title": "{mention} - Revival required!",
+        "description": "You are currently unconscious.\n\nChoose a revival method:",
+        "no_items": (
+            "You don't have any revival items.\n"
+            "You can buy an **Emergency Full Revival** from `/shop buy`, other revival kits, or recover automatically at 12:00AM EST."
+        ),
+        "already_conscious": "*{mention} You are already conscious and do not need a revival.*",
+        "profile_missing": "{mention} Profile not found!",
+        "expired_footer": "This revival menu will expire in 60 seconds.",
+        "revive_kit_name": "Revival Kit",
+        "revive_kit_value": "Restores **35%HP**\nOwned: **{count}**",
+        "emergency_kit_name": "Emergency Revival Kit",
+        "emergency_kit_value": "Restores **50%HP**\nOwned: **{count}**",
+        "full_revive_name": "Emergency Full Revival",
+        "full_revive_value": "Restores **100%HP**\nOwned: **{count}**",
+    },
+}
 
 
 class Exploration(commands.Cog):
@@ -312,8 +532,7 @@ class Exploration(commands.Cog):
                     ):
                         try:
                             await channel.send(
-                                f"<@{user_id}> **Your cooldown has ended!** "
-                                f"You can now use `/mine` again!"
+EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command="mine")
                             )
 
                             await db.execute(
@@ -336,8 +555,7 @@ class Exploration(commands.Cog):
                     ):
                         try:
                             await channel.send(
-                                f"<@{user_id}> **Your cooldown has ended!** "
-                                f"You can now use `/scavenge` again!"
+EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command="scavenge")
                             )
 
                             await db.execute(
@@ -389,9 +607,8 @@ class Exploration(commands.Cog):
 
     def knockout_message(self, knocked_out_until, mention=None):
         prefix = f"{mention} " if mention else ""
-        return (
-            f"{prefix}**You are unconscious!** You can use `/revive` or use `/shop buy` and find a revive item "
-            f"to return now. Otherwise you will recover at 50% HP at **{knocked_out_until}**."
+        return prefix + EXPLORATION_TEXT["common"]["knockout_message"].format(
+            knocked_out_until=knocked_out_until
         )
 
     @app_commands.command(
@@ -420,7 +637,7 @@ class Exploration(commands.Cog):
                 )
             if not halloween_is_active():
                 return await interaction.response.send_message(
-                    "Haunted Exploration is currently dormant. Please check back next Halloween!",
+                    EXPLORATION_TEXT["haunted"]["dormant_short"],
                     ephemeral=True,
                 )
 
@@ -438,8 +655,7 @@ class Exploration(commands.Cog):
                 )
             if not halloween_is_active():
                 return await interaction.response.send_message(
-                    "Haunted Exploration is currently dormant.\n"
-                    "This event is only available during the Halloween event. Please check back next Halloween!",
+                    EXPLORATION_TEXT["haunted"]["dormant_long"],
                     ephemeral=True,
                 )
 
@@ -461,112 +677,81 @@ class Exploration(commands.Cog):
         state = "***INSANE***" if is_insane(profile["sanity"]) else "***Stable***"
         active = profile["active_location"]
 
-        description = (
-            "Enceladus opened a series of portals while searching for new places to explore for Halloween. "
-            "Something came back through one of them. Whatever happened next left the portals—and Enceladus himself—changed.\n\n"
-            "The destinations beyond these portals are waiting. Choose one below and step through. "
-            "Each location is a coherent multi-scene story with meaningful choices, secrets, and dangers."
-        )
+        description = EXPLORATION_TEXT["haunted"]["location_description"]
         if active in HAUNTED_LOCATIONS:
-            description += (
-                f"\n\nYou currently have an active run in **{HAUNTED_LOCATIONS[active]['name']}** "
-                f"(Stage {profile['active_stage']}/{profile['active_total_stages']}). Starting another run will replace it."
+            description += EXPLORATION_TEXT["haunted"]["active_run_note"].format(
+                location_name=HAUNTED_LOCATIONS[active]["name"],
+                stage=profile["active_stage"],
+                total_stages=profile["active_total_stages"],
             )
 
         embed = discord.Embed(
-            title="*Haunted Exploration*",
+            title=EXPLORATION_TEXT["haunted"]["location_title"],
             description=description,
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
-            name="*Explorer*",
+            name=EXPLORATION_TEXT["haunted"]["field_explorer"],
             value=member.mention,
             inline=True,
         )
         embed.add_field(
-            name="*Sanity*",
-            value=f"**{sanity}/100**\n{state}\nRegenerates continuously over time.",
+            name=EXPLORATION_TEXT["haunted"]["field_sanity"],
+            value=EXPLORATION_TEXT["haunted"]["sanity_field"].format(sanity=sanity, state=state),
             inline=True,
         )
         embed.add_field(
-            name="*Daily Attempts*",
+            name=EXPLORATION_TEXT["haunted"]["field_daily_attempts"],
             value=f"**{profile['attempts']}/{HAUNTED_DAILY_ATTEMPTS}**",
             inline=True,
         )
-        embed.set_footer(text="Choose a portal location to enter! | Lair of Frights 👻")
+        embed.set_footer(text=EXPLORATION_TEXT["haunted"]["location_footer"])
         return embed
 
     def _haunted_info_embed(self):
         embed = discord.Embed(
-            title="Haunted Exploration — Field Guide",
-            description=(
-                "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
-                "Enceladus. Each portal leads somewhere new - and not everything that comes through them is supposed to be there."
-            ),
+            title=EXPLORATION_TEXT["haunted"]["info_title"],
+            description=EXPLORATION_TEXT["haunted"]["info_description"],
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
             name="The Portals",
-            value=(
-                "Enceladus went searching for new locations for Halloween. While using portals to find new areas, "
-                "**something came back through one of them.** It attacked. He tried to fight back... but to no avail."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_portals"],
             inline=False,
         )
         embed.add_field(
             name="The Corruption",
-            value=(
-                "Whatever came through the portal entered Enceladus's system, past his coding, and **corrupted him**. "
-                "He comes and goes, sometimes able to fight through it—almost like he is possessed, but digitally. "
-                "There is nothing we can do... **for now.**"
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_corruption"],
             inline=False,
         )
         embed.add_field(
             name="Sometimes...",
-            value=(
-                "There are moments when the corruption pushes through. Enceladus is not entirely himself. "
-                "And sometimes... *something else comes out.*"
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_sometimes"],
             inline=False,
         )
         embed.add_field(
             name="*Sanity*",
-            value=(
-                "Sanity starts at **100** and regenerates continuously. Most choices reduce it. "
-                "At **0 Sanity**, you enter **Insane** state."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_sanity"],
             inline=False,
         )
         embed.add_field(
             name="*Losing Your Grip*",
-            value=(
-                "Low Sanity makes reality less reliable. The same story can be perceived differently, and at **0 Sanity** the opening perception can become profoundly wrong. Insanity does not randomly replace the story with unrelated encounters."
-                "However, low Sanity or Insanity can cause better reward drops."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_grip"],
             inline=False,
         )
         embed.add_field(
             name="*Attempts*",
-            value=(
-                f"You get **{HAUNTED_DAILY_ATTEMPTS} attempts per day**. Starting an adventure consumes one attempt, even if you run away. "
-                "The daily reset follows Eastern Timezone."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_attempts"].format(attempts=HAUNTED_DAILY_ATTEMPTS),
             inline=False,
         )
         embed.add_field(
             name="*Stages*",
-            value=(
-                "Runs are authored multi-scene adventures. Your choices can show different discoveries, pet opportunities, and various story reactions."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_stages"],
             inline=False,
         )
         embed.add_field(
             name="*Running Away*",
-            value=(
-                "You can run away instead of taking an encounter choice. Most escapes work, but there is a small "
-                "chance that something happens while you escape. Running away stops you from earning rewards for that run, but you can always try again."
-            ),
+            value=EXPLORATION_TEXT["haunted"]["info_running_away"],
             inline=False,
         )
         return embed
@@ -574,7 +759,7 @@ class Exploration(commands.Cog):
     async def _start_haunted_run(self, interaction: discord.Interaction, location_id: str):
         if not halloween_is_active():
             return await interaction.followup.send(
-                "Haunted Exploration is currently dormant. Please check back next Halloween!",
+                EXPLORATION_TEXT["haunted"]["dormant_short"],
                 ephemeral=True,
             )
 
@@ -586,8 +771,7 @@ class Exploration(commands.Cog):
                 consumed, profile = await consume_attempt(db, user_id)
                 if not consumed:
                     return await interaction.followup.send(
-                        "You're out of Haunted Exploration attempts for today.\n"
-                        "Come back after the daily reset at 12:00 AM EST!",
+                        EXPLORATION_TEXT["haunted"]["out_of_attempts"],
                         ephemeral=True,
                     )
                 total_stages = await start_run(db, user_id, location_id, profile["sanity"])
@@ -609,7 +793,7 @@ class Exploration(commands.Cog):
             run = await get_active_run(db, user_id)
             if not run or run["location_id"] != location_id or run["stage"] != stage:
                 return await interaction.followup.send(
-                    "**This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
+                    EXPLORATION_TEXT["haunted"]["scene_unavailable"],
                     ephemeral=True,
                 )
 
@@ -646,37 +830,34 @@ class Exploration(commands.Cog):
         sanity = sanity_percent(profile["sanity"])
         scene_text = scene_data["text"]
         if result_text:
-            scene_text = f"***What happened:***\n{result_text}\n\n{scene_text}"
+            scene_text = EXPLORATION_TEXT["haunted"]["scene_result_prefix"].format(result_text=result_text) + scene_text
         if sanity <= 0:
             color = discord.Color.dark_red()
-            sanity_state = "***INSANE***"
+            sanity_state = EXPLORATION_TEXT["haunted"]["scene_sanity_insane"]
         elif sanity <= 25:
             color = discord.Color.dark_red()
-            sanity_state = "***Reality is becoming unreliable...***"
+            sanity_state = EXPLORATION_TEXT["haunted"]["scene_sanity_unreliable"]
         else:
             color = discord.Color.dark_purple()
-            sanity_state = "***Stable***"
+            sanity_state = EXPLORATION_TEXT["haunted"]["scene_sanity_stable"]
 
         embed = discord.Embed(
-            title=f"{location['emoji']} {location['name']}",
+            title=EXPLORATION_TEXT["haunted"]["scene_title"].format(emoji=location["emoji"], location_name=location["name"]),
             description=scene_text,
             color=color,
         )
-        embed.add_field(name="Explorer", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Scene", value=f"**{stage}/{total_stages}**", inline=True)
-        embed.add_field(name="Sanity", value=f"**{sanity}/100**\n{sanity_state}", inline=True)
+        embed.add_field(name=EXPLORATION_TEXT["haunted"]["scene_explorer"], value=interaction.user.mention, inline=True)
+        embed.add_field(name=EXPLORATION_TEXT["haunted"]["scene_scene"], value=f"**{stage}/{total_stages}**", inline=True)
+        embed.add_field(name=EXPLORATION_TEXT["haunted"]["scene_sanity"], value=f"**{sanity}/100**\n{sanity_state}", inline=True)
 
         if malo_warning:
             embed.add_field(
                 name="MalO's Warning",
-                value=(
-                    f"MalO is staring at **{malo_warning}**.\n"
-                    "*You are not entirely sure why.*"
-                ),
+                value=EXPLORATION_TEXT["haunted"]["malo_warning"].format(choice=malo_warning),
                 inline=False,
             )
 
-        embed.set_footer(text="Choose carefully. Or run.")
+        embed.set_footer(text=EXPLORATION_TEXT["haunted"]["scene_footer"])
         await interaction.edit_original_response(
             content=None,
             embed=embed,
@@ -702,8 +883,7 @@ class Exploration(commands.Cog):
     ):
         if interaction.user.id != owner_id:
             return await interaction.followup.send(
-                "**This Haunted Exploration isn't yours.**\n"
-                "These buttons belong to another player's exploration run. You can start your own run with `/explore: haunted`.",
+                EXPLORATION_TEXT["haunted"]["wrong_owner"],
                 ephemeral=True,
             )
 
@@ -721,7 +901,7 @@ class Exploration(commands.Cog):
                     or run["total_stages"] != total_stages
                 ):
                     return await interaction.followup.send(
-                        "**This Haunted Exploration scene is no longer available.**\n""The scene may have expired or already been advanced. Start a new Haunted Exploration run if needed.",
+                        EXPLORATION_TEXT["haunted"]["scene_unavailable"],
                         ephemeral=True,
                     )
 
@@ -799,9 +979,7 @@ class Exploration(commands.Cog):
                             new_state["pet_discovery_message"] = pet_discovery_message
                         else:
                             pet_discovery_message = (
-                                "**Something familiar appears...**\n"
-                                "You recognize this companion. You've already befriended it, "
-                                "and it disappears back into the darkness."
+                                EXPLORATION_TEXT["haunted"]["pet_already_found"]
                             )
                             new_state["pet_discovery_message"] = pet_discovery_message
                     new_state["pet_opportunity_taken"] = True
@@ -889,21 +1067,20 @@ class Exploration(commands.Cog):
 
                 reward_embed = discord.Embed(
                     title=f"{HAUNTED_LOCATIONS[location_id]['emoji']} {HAUNTED_LOCATIONS[location_id]['name']}",
-                    description=(
-                        f"**{interaction.user.mention} explored {HAUNTED_LOCATIONS[location_id]['name']}.**\n\n"
-                        f"**What happened**\n{result_text}\n\n"
-                        f"**Exploration complete**\n"
-                        f"You made it through!"
+                    description=EXPLORATION_TEXT["haunted"]["completion_description"].format(
+                        mention=interaction.user.mention,
+                        location_name=HAUNTED_LOCATIONS[location_id]["name"],
+                        result_text=result_text,
                     ),
                     color=discord.Color.green(),
                 )
-                reward_embed.add_field(name="*Explorer*", value=interaction.user.mention, inline=True)
-                reward_embed.add_field(name="*Story*", value=f"**{total_stages} scenes**", inline=True)
-                reward_embed.add_field(name="*Final Sanity*", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
-                reward_embed.add_field(name="*Adventure rewards*", value="\n".join(reward_lines), inline=False)
+                reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_explorer"], value=interaction.user.mention, inline=True)
+                reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_story"], value=f"**{total_stages} scenes**", inline=True)
+                reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_sanity"], value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
+                reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_rewards"], value="\n".join(reward_lines), inline=False)
                 if pet_discovery_message:
-                    reward_embed.add_field(name="*Location-based pet found!*", value=pet_discovery_message, inline=False)
-                reward_embed.set_footer(text="Exploration complete • The portals remain open for now...")
+                    reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_pet"], value=pet_discovery_message, inline=False)
+                reward_embed.set_footer(text=EXPLORATION_TEXT["haunted"]["completion_footer"])
                 await interaction.edit_original_response(content=None, embed=reward_embed, view=None)
                 return
 
@@ -938,7 +1115,7 @@ class Exploration(commands.Cog):
                 run = await get_active_run(db, user_id)
                 if not run or run["location_id"] != location_id or run["stage"] != stage or run["total_stages"] != total_stages:
                     return await interaction.followup.send(
-                        "**This Haunted Exploration is no longer available.**\n""The run may have expired or already been ended. Start a new Haunted Exploration run if needed.",
+                        EXPLORATION_TEXT["haunted"]["run_unavailable"],
                         ephemeral=True,
                     )
 
@@ -947,34 +1124,31 @@ class Exploration(commands.Cog):
                 if rare_escape:
                     sanity_loss = random.randint(4, 10)
                     new_sanity = await update_sanity(db, user_id, -sanity_loss)
-                    escape_text = random.choice([
-                        "You bolt for the exit. The door slams shut behind you by itself. Something follows you for three steps before disappearing.",
-                        "You run. Your footsteps keep going after you stop. You decide not to investigate.",
-                        "You make it out—then realize the hallway outside has one extra door. You do not go back.",
-                    ])
+                    escape_text = random.choice(EXPLORATION_TEXT["haunted"]["escape_rare"])
                 else:
                     new_sanity = await update_sanity(db, user_id, 0)
-                    escape_text = random.choice([
-                        "You decide you've had enough and make a very respectable tactical retreat.",
-                        "Nope. Absolutely not. You turn around and leave.",
-                        "You retreat before whatever is lurking here gets the chance to introduce itself.",
-                    ])
+                    escape_text = random.choice(EXPLORATION_TEXT["haunted"]["escape_normal"])
                 await clear_run(db, user_id)
 
-        suffix = "\n\n**Something happened while you escaped.**" if rare_escape else ""
+        suffix = EXPLORATION_TEXT["haunted"]["escape_suffix"] if rare_escape else ""
         location = HAUNTED_LOCATIONS[location_id]
         escape_embed = discord.Embed(
-            title=f"{location['emoji']} {location['name']}",
-            description=f"**{interaction.user.mention} left the {location['name']}.**\n\n{escape_text}{suffix}",
+            title=EXPLORATION_TEXT["haunted"]["scene_title"].format(emoji=location["emoji"], location_name=location["name"]),
+            description=EXPLORATION_TEXT["haunted"]["escape_description"].format(
+                mention=interaction.user.mention,
+                location_name=location["name"],
+                escape_text=escape_text,
+                suffix=suffix,
+            ),
             color=discord.Color.orange(),
         )
-        escape_embed.add_field(name="*Explorer*", value=interaction.user.mention, inline=True)
-        escape_embed.add_field(name="*Run Ended*", value=f"Scene **{stage}/{total_stages}**", inline=True)
-        escape_embed.add_field(name="*Sanity*", value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
-        escape_embed.add_field(name="*Rewards*", value="No reward was earned from this run.", inline=False)
+        escape_embed.add_field(name=EXPLORATION_TEXT["haunted"]["escape_explorer"], value=interaction.user.mention, inline=True)
+        escape_embed.add_field(name=EXPLORATION_TEXT["haunted"]["escape_run_ended"], value=f"Scene **{stage}/{total_stages}**", inline=True)
+        escape_embed.add_field(name=EXPLORATION_TEXT["haunted"]["escape_sanity"], value=f"**{sanity_percent(new_sanity)}/100**", inline=True)
+        escape_embed.add_field(name=EXPLORATION_TEXT["haunted"]["escape_rewards"], value=EXPLORATION_TEXT["haunted"]["escape_no_reward"], inline=False)
         if pet_discovery_message:
             escape_embed.add_field(name="*Location-based pet found!*", value=pet_discovery_message, inline=False)
-        escape_embed.set_footer(text="You've escaped. The portals remain open for now...")
+        escape_embed.set_footer(text=EXPLORATION_TEXT["haunted"]["escape_footer"])
         await interaction.edit_original_response(content=None, embed=escape_embed, view=None)
 
     @commands.hybrid_command(name="heal", description="Use a healing item from your inventory to restore HP.")
@@ -1387,12 +1561,12 @@ class Exploration(commands.Cog):
 
             if mining_material_findings:
                 loot_description += (
-                    "\n\n**Minerals recovered ⛏️** "
+                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n**Minerals recovered ⛏️** "
                     + " • ".join(mining_material_findings)
                 )
             if mining_overflow_findings:
                 loot_description += (
-                    "\n\n**Mineral overflow 📦** "
+                    "\n\n" + EXPLORATION_SEPARATOR + "\n\n**Mineral overflow 📦** "
                     + " • ".join(mining_overflow_findings)
                 )
 
@@ -1582,7 +1756,7 @@ class Exploration(commands.Cog):
             if seasonal_findings:
                 seasonal_findings = [line for line in seasonal_findings if line]
                 if seasonal_findings:
-                    loot_description += "\n\n**Halloween Findings! 🎃** " + " • ".join(seasonal_findings)
+                    loot_description += "\n\n" + EXPLORATION_SEPARATOR + "\n\n**Halloween Findings! 🎃** " + " • ".join(seasonal_findings)
 
             rarity_badge = "common"
 
@@ -1593,7 +1767,7 @@ class Exploration(commands.Cog):
             elif roll < 0.60:
                 # Tier 2: Uncommon (Stardust + XP Data Shard)
                 found_xp = random.randint(100, 500)
-                loot_description += f"\n\n**XP Data Shard found:** **+{found_xp} XP**"
+                loot_description += f"\n\n{EXPLORATION_SEPARATOR}\n\n**XP Data Shard found:** **+{found_xp} XP**"
                 rarity_badge = "uncommon"
 
                 # Award XP globally through leveling.py
@@ -1601,7 +1775,7 @@ class Exploration(commands.Cog):
                 if leveling_cog:
                     leveled_up, new_level = await leveling_cog.add_xp(ctx.author, found_xp)
                     if leveled_up:
-                        loot_description += f"\n\n**Level up!** You've reached **level {new_level}**!"
+                        loot_description += f"\n\n{EXPLORATION_SEPARATOR}\n\n**Level up!** You've reached **level {new_level}!**"
 
             elif roll < 0.75 + mining_rare_bonus:
                 # Tier 3: Rare Mineral (Titanium Ore Chunk)
@@ -1750,38 +1924,35 @@ class Exploration(commands.Cog):
         }
 
         embed = discord.Embed(
-            title=f"Starship Mining Log — {ctx.author.display_name}",
-            description=(
-                f"Your laser beam fired into the debris field...\n\n"
-                f"{loot_description}"
-            ),
+            title=EXPLORATION_TEXT["mining"]["title"].format(display_name=ctx.author.display_name),
+            description=EXPLORATION_TEXT["mining"]["description"].format(loot_description=loot_description),
             color=colors.get(rarity_badge, discord.Color.blue())
         )
         cooldown_total_seconds = max(0, int(round(effective_cooldown)))
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
-        embed.set_footer(text=f"Fuel Charges Remaining: {new_charges}/{max_mining_charges} • Cooldown: {cooldown_text}")
+        embed.set_footer(text=EXPLORATION_TEXT["mining"]["footer"].format(charges=new_charges, max_charges=max_mining_charges, cooldown=cooldown_text))
         if pet_xp_result:
-            pet_xp_text = f"**Pet XP:** **+{pet_xp_result['xp_added']} XP**"
+            pet_xp_text = EXPLORATION_TEXT["mining"]["pet_xp"].format(xp=pet_xp_result["xp_added"])
             if pet_xp_result["leveled_up"]:
-                pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
+                pet_xp_text += EXPLORATION_TEXT["mining"]["pet_level"].format(level=pet_xp_result["new_level"])
             embed.add_field(
-                name="Companion progress",
+                name=EXPLORATION_TEXT["mining"]["pet_progress"],
                 value=pet_xp_text,
                 inline=False,
             )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
-                name="Daily reminder!",
-                value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+                name=EXPLORATION_TEXT["mining"]["daily_name"],
+                value=EXPLORATION_TEXT["mining"]["daily_value"],
                 inline=False
             )
 
         cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
         if cooldown_reminder:
             embed.add_field(
-                name="Cooldown alerts",
+                name=EXPLORATION_TEXT["mining"]["cooldown_name"],
                 value=cooldown_reminder,
                 inline=False
             )
@@ -2369,7 +2540,7 @@ class Exploration(commands.Cog):
                     candy_overflow_stardust = overflow_candy * 2
                     new_stardust += candy_overflow_stardust
                     seasonal_findings.append(
-                        f"Candy overflow ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
+                        f"*Candy overflow!* ×{overflow_candy} → +{candy_overflow_stardust} Stardust"
                     )
 
             if halloween_active and random.random() < HALLOWEEN_PLASTIC_CHANCE:
@@ -2378,11 +2549,11 @@ class Exploration(commands.Cog):
                     db, user_id, "halloween_plastic", "crafting_material", plastic_found
                 )
                 if added_plastic:
-                    seasonal_findings.append(f"Halloween Plastic ×{added_plastic}")
+                    seasonal_findings.append(f"*Halloween Plastic* ×{added_plastic}")
                 overflow_plastic = plastic_found - added_plastic
                 if overflow_plastic:
                     new_stardust += overflow_plastic * 2
-                    seasonal_findings.append(f"Plastic Overflow ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
+                    seasonal_findings.append(f"*Plastic overflow!* ×{overflow_plastic} → +{overflow_plastic * 2} Stardust")
 
             # A Trick-or-Treat Bag is an especially rare direct seasonal find.
             if halloween_active and random.random() < HALLOWEEN_BAG_CHANCE:
@@ -2390,9 +2561,9 @@ class Exploration(commands.Cog):
                     db, user_id, "trick_or_treat_bag", "consumable", 1
                 )
                 if added_bag:
-                    seasonal_findings.append(f"Trick-or-Treat Bag ×{added_bag}")
+                    seasonal_findings.append(f"**Trick-or-Treat Bag** ×{added_bag}")
                 else:
-                    seasonal_findings.append("Trick-or-Treat Bag → inventory full")
+                    seasonal_findings.append(f"**Trick-or-Treat Bag** → inventory full")
 
             # Scavenging can recover multiple types of crafting material in one run.
             # Incubator materials yield 1–2 units and are capped at two
@@ -2521,9 +2692,9 @@ class Exploration(commands.Cog):
 
                 loot_name_with_quantity = (
                     f"{item_name}\n"
-                    f"**Inventory full:** stack is already "
+                    f"*Inventory full!* stack is already "
                     f"**{max_quantity}/{max_quantity}**!"
-                    f"\n**It has been converted to:** **+{overflow_stardust:,} Stardust**"
+                    f"\n*It has been converted to:* **+{overflow_stardust:,} Stardust**"
                 )
 
             # Group bonus discoveries into readable single-line sections rather than
@@ -2536,19 +2707,19 @@ class Exploration(commands.Cog):
             bonus_sections = []
             if salvage_material_findings:
                 bonus_sections.append(
-                    "**Salvage materials:** " + " • ".join(salvage_material_findings)
+                    "*Salvaged materials:* " + " • ".join(salvage_material_findings)
                 )
             if medical_supply_findings:
                 bonus_sections.append(
-                    "**Medical supplies:** " + " • ".join(medical_supply_findings)
+                    "*Medical supplies:* " + " • ".join(medical_supply_findings)
                 )
             if bonus_mineral_findings:
                 bonus_sections.append(
-                    "**Bonus minerals:** " + " • ".join(bonus_mineral_findings)
+                    "*Bonus minerals:* " + " • ".join(bonus_mineral_findings)
                 )
             if seasonal_findings:
                 bonus_sections.append(
-                        "**Halloween item:** " + "\n\n".join(seasonal_findings)
+                        "*Halloween findings:* " + "\n\n".join(seasonal_findings)
                 )
             if pet_stardust_message:
                 bonus_sections.append(pet_stardust_message)
@@ -2567,10 +2738,10 @@ class Exploration(commands.Cog):
                 )
             if bonus_overflow_findings:
                 bonus_sections.append(
-                    "**Overflow:** " + " • ".join(bonus_overflow_findings)
+                    "*Overflow:* " + " • ".join(bonus_overflow_findings)
                 )
 
-            bonus_material_text = "\n\n" + "\n\n".join(bonus_sections) if bonus_sections else ""
+            bonus_material_text = f"\n\n{EXPLORATION_SEPARATOR}\n\n".join(bonus_sections) if bonus_sections else ""
 
             pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
 
@@ -2582,48 +2753,51 @@ class Exploration(commands.Cog):
 
             await db.commit()
 
-        status_text = f"**Health:** **{new_hp}/{max_hp}HP**" if new_hp > 0 else f"**Knocked out!** Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{knocked_out_until}**."
+        status_text = (
+            EXPLORATION_TEXT["scavenging"]["health_status"].format(hp=new_hp, max_hp=max_hp)
+            if new_hp > 0
+            else EXPLORATION_TEXT["scavenging"]["knocked_out_status"].format(until=knocked_out_until)
+        )
 
         embed = discord.Embed(
-            title=f"Derelict Salvage Log — {ctx.author.display_name}",
-            description=(
-                f"Scavenge drone deployed into abandoned sector wreckage...\n\n"
-                f"**Stardust Found:** **{found_stardust:,}**"
-                f"{quantum_bonus_note}"
-                f"{cache_note}\n\n"
-                f"**Salvaged item:** **{loot_name_with_quantity}**"
-                f"{loot_rarity_note}"
-                f"{bonus_material_text}"
-                f"{hazard_note}\n\n"
-                f"{status_text}"
+            title=EXPLORATION_TEXT["scavenging"]["title"].format(display_name=ctx.author.display_name),
+            description=EXPLORATION_TEXT["scavenging"]["description"].format(
+                stardust=found_stardust,
+                quantum_note=f"*{quantum_bonus_note}*",
+                cache_note=cache_note,
+                loot=loot_name_with_quantity,
+                rarity_note=f"*{loot_rarity_note}*",
+                bonus_materials=f"*{bonus_material_text}*",
+                hazard_note=hazard_note,
+                status=status_text,
             ),
             color=discord.Color.dark_gold()
         )
         cooldown_total_seconds = max(0, int(round(effective_cooldown)))
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
-        embed.set_footer(text=f"Drone charges remaining: {new_charges}/{max_scavenge_charges} • Cooldown: {cooldown_text}")
+        embed.set_footer(text=EXPLORATION_TEXT["scavenging"]["footer"].format(charges=new_charges, max_charges=max_scavenge_charges, cooldown=cooldown_text))
         if pet_xp_result:
-            pet_xp_text = f"**Pet XP:** **+{pet_xp_result['xp_added']}XP**"
+            pet_xp_text = EXPLORATION_TEXT["scavenging"]["pet_xp"].format(xp=pet_xp_result["xp_added"])
             if pet_xp_result["leveled_up"]:
-                pet_xp_text += f" • 🎉 **Level {pet_xp_result['new_level']}!**"
+                pet_xp_text += EXPLORATION_TEXT["scavenging"]["pet_level"].format(level=pet_xp_result["new_level"])
             embed.add_field(
-                name="🐾 Companion Progress",
+                name=EXPLORATION_TEXT["scavenging"]["pet_progress"],
                 value=pet_xp_text,
                 inline=False,
             )
 
         if random.random() < 0.25 and await self.daily_unclaimed(user_id):
             embed.add_field(
-                name="Daily reminder",
-                value="You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
+                name=EXPLORATION_TEXT["scavenging"]["daily_name"],
+                value=EXPLORATION_TEXT["scavenging"]["daily_value"],
                 inline=False
             )
 
         cooldown_reminder = await self.maybe_suggest_cooldown_alerts(ctx)
         if cooldown_reminder:
             embed.add_field(
-                name="Cooldown alerts",
+                name=EXPLORATION_TEXT["scavenging"]["cooldown_name"],
                 value=cooldown_reminder,
                 inline=False
             )
@@ -2869,11 +3043,8 @@ class Exploration(commands.Cog):
             )
 
         embed = discord.Embed(
-            title=f"{ctx.author.mention} — Revival required!",
-            description=(
-                "You are currently unconscious.\n\n"
-                "Choose a revival method:"
-            ),
+            title=EXPLORATION_TEXT["revival"]["title"].format(mention=ctx.author.mention),
+            description=EXPLORATION_TEXT["revival"]["description"],
             color=discord.Color.red()
         )
 
@@ -2882,34 +3053,25 @@ class Exploration(commands.Cog):
         full_count = available.get("full_revive", 0)
 
         embed.add_field(
-            name=f"{EMOJIS.get('revive', '⚕️')} Revival Kit",
-            value=(
-                "Restores **35%HP**\n"
-                f"Owned: **{revive_count}**"
-            ),
+            name=f"{EMOJIS.get('revive', '⚕️')} " + EXPLORATION_TEXT["revival"]["revive_kit_name"],
+            value=EXPLORATION_TEXT["revival"]["revive_kit_value"].format(count=revive_count),
             inline=True
         )
 
         embed.add_field(
-            name=f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit",
-            value=(
-                "Restores **50%HP**\n"
-                f"Owned: **{kit_count}**"
-            ),
+            name=f"{EMOJIS.get('revive_kit', '💉')} " + EXPLORATION_TEXT["revival"]["emergency_kit_name"],
+            value=EXPLORATION_TEXT["revival"]["emergency_kit_value"].format(count=kit_count),
             inline=True
         )
 
         embed.add_field(
-            name=f"{EMOJIS.get('full_revive', '🚑')} Emergency Full Revival",
-            value=(
-                "Restores **100%HP**\n"
-                f"Owned: **{full_count}**"
-            ),
+            name=f"{EMOJIS.get('full_revive', '🚑')} " + EXPLORATION_TEXT["revival"]["full_revive_name"],
+            value=EXPLORATION_TEXT["revival"]["full_revive_value"].format(count=full_count),
             inline=True
         )
 
         embed.set_footer(
-            text="This revival menu will expire in 60 seconds."
+            text=EXPLORATION_TEXT["revival"]["expired_footer"]
         )
 
         await ctx.send(
@@ -2939,7 +3101,7 @@ class HauntedLocationView(discord.ui.View):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("Haunted Exploration is currently dormant. Please check back next Halloween!", ephemeral=True)
+            await interaction.response.send_message(EXPLORATION_TEXT["haunted"]["dormant_short"], ephemeral=True)
             return False
         return True
 
@@ -3044,7 +3206,7 @@ class HauntedStoryView(discord.ui.View):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("Haunted Exploration is currently dormant. Please check back next Halloween!", ephemeral=True)
+            await interaction.response.send_message(EXPLORATION_TEXT["haunted"]["dormant_short"], ephemeral=True)
             return False
         return True
 

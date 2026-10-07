@@ -1317,7 +1317,7 @@ class Achievements(commands.Cog):
                     title=f"{ctx.author.mention}'s Achievements",
                     description=(
                         f"**{category_name}**\n"
-                        "Complete seasonal milestones to earn profile cosmetics."
+                        "Complete milestones to earn profile cosmetics."
                     ),
                     color=discord.Color.gold(),
                 )

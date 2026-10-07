@@ -26,7 +26,7 @@ class BirthdayCog(commands.Cog):
             date(2000, month, day)
         except ValueError:
             return await interaction.response.send_message(
-                "Please provide a valid Month and Day.",
+                "Please provide a valid month and day!",
                 ephemeral=True
             )
 
@@ -38,7 +38,7 @@ class BirthdayCog(commands.Cog):
             await db.commit()
 
         await interaction.response.send_message(
-            f"Registered! I'll give you the role and ping you on **{month}/{day}**!"
+            f"Registered! I'll give you the role and ping you on **{month}/{day}**! 🎉"
         )
 
     @app_commands.command(name="upcoming_birthdays", description="View upcoming server birthdays!")
@@ -166,7 +166,7 @@ class BirthdayCog(commands.Cog):
             try:
                 await member.remove_roles(
                     role,
-                    reason="Birthday day ended."
+                    reason="Birthday ended."
                 )
             except Exception as e:
                 await log_task_error(self.bot, "check_birthdays / remove old role", e, context=f"member_id={member.id}")
@@ -223,7 +223,7 @@ class BirthdayCog(commands.Cog):
                     )
                 except Exception as e:
                     await log_task_error(self.bot, "check_birthdays / announcement", e)
-                    print(f"[BIRTHDAY ANNOUNCEMENT ERROR]: {e}")
+                    print(f"❌ [BIRTHDAY ANNOUNCEMENT ERROR]: {e}")
 
         self.last_birthday_run = today
 

@@ -288,8 +288,9 @@ async def check_bump_timer():
 
             reminder_embed = discord.Embed(
                 description=(
-                    f"# *Loud alarm clock noises*\n\n"
-                    f"Two hours have passed since the last bump! You can now bump our server by typing `/bump`! "
+                    f"## *Loud alarm clock noises*\n\n"
+                    f"*Two hours have passed since the last bump!*\n\n "
+                    f"You can now bump our server by typing `/bump`!\n "
                     f"It helps us a lot by gaining more noticeability! "
                     f"<a:RedHearts:1109768412382642266> <a:PurpleHearts:1109768355390431323> "
                 ),
@@ -527,7 +528,7 @@ async def on_message(message):
             if add_xp_func:
                 await add_xp_func(user_obj, 400)
             else:
-                print("Leveling cog not found, couldn't award bump XP.")
+                print("❌ Leveling cog not found. Couldn't award bump XP.")
 
         remind_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
 
@@ -695,7 +696,7 @@ async def on_member_update(before, after):
             embed = discord.Embed(
                 title="Wooo! We have a new booster! 💜",
                 description=(
-                    f"Thank you so much, {after.name}! You have received our supporter role! "
+                    f"Thank you so much, {after.name}! You have received our supporter role!\n\n "
                     f"We are now at {boost_count} boosts! 🌌💜"
                 ),
                 color=discord.Color.from_rgb(114, 0, 225)
@@ -858,7 +859,7 @@ async def bing(interaction: discord.Interaction):
                 images = data.get('images') or []
                 if not images:
                     await interaction.response.send_message(
-                        "Bing didn't return a wallpaper right now. Please try again later and report to staff if the issue persists.",
+                        "❌ Bing didn't return a wallpaper right now. Please try again later and report to staff if the issue persists.",
                         ephemeral=True
                     )
                     return
@@ -867,7 +868,7 @@ async def bing(interaction: discord.Interaction):
                 img_path = image.get('url')
                 if not img_path:
                     await interaction.response.send_message(
-                        "Bing returned an incomplete wallpaper result. Please try again later and report to staff if the issue persists.",
+                        "❌ Bing returned an incomplete wallpaper result. Please try again later and report to staff if the issue persists.",
                         ephemeral=True
                     )
                     return
@@ -894,7 +895,7 @@ async def moon(interaction: discord.Interaction):
                 phase_emoji = await response.text()
                 await interaction.response.send_message(f"The current moon phase is: **{phase_emoji}**")
             else:
-                await interaction.response.send_message("Can't see the moon right now! Please report to staff if the issue persists. ☁️")
+                await interaction.response.send_message("❌ Can't see the moon right now! Please report to staff if the issue persists. ☁️")
 
 @bot.tree.command(name="weather", description="Get the current weather for a specific city!")
 async def weather(interaction: discord.Interaction, city: str):
@@ -906,7 +907,7 @@ async def weather(interaction: discord.Interaction, city: str):
                 weather_report = await response.text()
                 await interaction.response.send_message(f"**Current Weather:**\n{weather_report}")
             else:
-                await interaction.response.send_message(f"Couldn't find the weather for '{city}'. Please report to staff if the issue persists.")
+                await interaction.response.send_message(f"❌ Couldn't find the weather for '{city}'. Please report to staff if the issue persists.")
 
 @bot.tree.command(name="iss", description="Track the International Space Station's current location!")
 async def iss(interaction: discord.Interaction):
@@ -934,7 +935,7 @@ async def iss(interaction: discord.Interaction):
                     await interaction.followup.send(embed=embed)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as e:
             print(f"[ISS ERROR]: {type(e).__name__}: {e}")
-            await interaction.followup.send("The ISS service is unavailable right now. Please try again later and report to staff if the issue persists.")
+            await interaction.followup.send("❌ The ISS service is unavailable right now. Please try again later and report to staff if the issue persists.")
 
 def get_next_midnight_reset():
     et = pytz.timezone("US/Eastern")
@@ -1037,11 +1038,11 @@ async def help_command(ctx):
 
     pages = [
         discord.Embed(
-            title="**Enceladus Command Directory — Leveling & Social**",
+            title="*Enceladus Command Directory - Leveling & Social* 💬",
             description="Level up, socialize, and customize your rank card with these commands!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__Leveling & Social__",
+            name="### ***Leveling & Social*** 💬",
             value=(
                 "`/customize <bar_color> [bg_url] <font> <glow>` - Personalize your rank card aesthetics!\n"
                 "`/hug <member>` - Give a warm, soft hug!\n"
@@ -1054,11 +1055,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**Enceladus Command Directory — Fun & Games (1)**",
+            title="*Enceladus Command Directory - Fun & Games (1)* 👾",
             description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__Fun & Games (1)__",
+            name="### ***Fun & Games (1)*** 👾",
             value=(
                 "`/aurarate` - Check you or a member's aura.\n"
                 "`/bing` - View today's Bing wallpaper.\n"
@@ -1072,11 +1073,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**Enceladus Command Directory — Fun & Games (2)**",
+            title="*Enceladus Command Directory - Fun & Games (2)* 👾",
             description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__Fun & Games (2)__",
+            name="### ***Fun & Games (2)*** 👾",
             value=(
                 "`/fnfmod <query>` - Search GameBanana for FNF mods.\n"
                 "`/fnfsong <song>` - Find FNF tracks on YouTube.\n"
@@ -1092,11 +1093,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**Enceladus Command Directory — Fun & Games (3)**",
+            title="*Enceladus Command Directory - Fun & Games (3)* 👾",
             description="Fun rating commands, fortune cookies, and other random tools!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__Fun & Games (3)__",
+            name="### ***Fun & Games (3)*** 👾",
             value=(
                 "`/mock <text>` - mAkE yOuR tExT lOoK lIkE tHiS.\n"
                 "`/moon` - Check the current moon phase.\n"
@@ -1110,11 +1111,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**Enceladus Command Directory — Economy & Exploration**",
+            title="*Enceladus Command Directory - Economy & Exploration* 🚀",
             description="Manage your profile, explore the outer rims of the galaxy, collect salvage, and spend your hard-earned Stardust!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__Exploration & Profile__",
+            name="### ***Exploration & Profile*** 🚀",
             value=(
                 "`/background equip <background>` - Equip an unlocked background for your profile.\n"
                 "`/bio <text>` - Set the biography displayed on your profile.\n"
@@ -1127,7 +1128,7 @@ async def help_command(ctx):
             ),
             inline=False
         ).add_field(
-            name="__Economy & Inventory__",
+            name="### ***Economy & Inventory*** 💰",
             value=(
                 "`/claimlegacy` - Claim your one-time legacy Stardust payout from before the **Frontier update.**\n"
                 "`/inventory` - Open your inventory and view collected items, materials, salvage, vouchers and more.\n"
@@ -1140,11 +1141,11 @@ async def help_command(ctx):
             inline=False
         ),
         discord.Embed(
-            title="**Enceladus Command Directory — Misc. Server Tools**",
+            title="*Enceladus Command Directory - Misc. Server Tools* 🛠️",
             description="Community tags and utility commands!",
             color=discord.Color.from_rgb(138, 43, 226)
         ).add_field(
-            name="__ 🛠️ Server Tools__",
+            name="### ***Server Tools*** 🛠️",
             value=(
                 "`-list` - List all available community tags to use in chats.\n"
                 "`-[tagname]` - View a saved community tag.\n"
@@ -1159,11 +1160,11 @@ async def help_command(ctx):
     if ctx.author.guild_permissions.administrator:
          pages.append(
             discord.Embed(
-                title="**Enceladus Command Directory — Admin Tools**",
+                title="*Enceladus Command Directory - Admin Tools* 🔨",
                 description="Administrative controls for authorized staff.",
                 color=discord.Color.from_rgb(138, 43, 226)
             ).add_field(
-                name="__ Lair Admin (Admins Only!)__",
+                name="### ***Admin Tools***",
                 value=(
                     "`/admin` - Open the administrator control panel and choose from all available administrative actions below:\n"
                     "Reset Bump Timer\n"

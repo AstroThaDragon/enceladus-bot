@@ -167,7 +167,7 @@ class LeaderboardView(discord.ui.View):
             description_lines.append(f"{medal} <@{user_id}> • Level **{level}** ({xp:,} XP)")
 
         embed.description = "\n".join(description_lines) if description_lines else "No active members found."
-        embed.set_footer(text=f"Page {self.current_page + 1} / {self.max_pages} • Total Active Members: {len(self.entries)}")
+        embed.set_footer(text=f"Page {self.current_page + 1} / {self.max_pages} • Total members: {len(self.entries)}")
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -565,7 +565,7 @@ class Leveling(commands.Cog):
                     if announcement_channel:
                         await announcement_channel.send(
                             f"**Congratulations, {member.mention}!** "
-                            f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring! 🚀🌌"
+                            f"You've reached level {new_level} and earned the **{new_role.name}** role! Keep soaring through the stars! 🚀🌌"
                         )
             
             roles_to_remove = [
@@ -1011,7 +1011,7 @@ class Leveling(commands.Cog):
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             print(f"Error: {e}")
-            await ctx.send("There was an error generating the rank card. Please report to staff.")
+            await ctx.send("❌ There was an error generating the rank card. Please report to staff.")
 
     @commands.hybrid_command(name="leaderboard", aliases=["levelscores"], description="View the server XP leaderboard!")
     async def leaderboard(self, ctx):
@@ -1030,7 +1030,7 @@ class Leveling(commands.Cog):
         ]
 
         if not filtered_entries:
-            return await ctx.send("No members found on the leaderboard yet!")
+            return await ctx.send("❌ No members found on the leaderboard yet. Please report to staff.")
 
         view = LeaderboardView(self, ctx.author, filtered_entries)
         embed = view.build_embed()
@@ -1148,9 +1148,9 @@ class Leveling(commands.Cog):
                 
         if result:
             new_xp, new_level = result
-            await interaction.response.send_message(f"Successfully added {amount}XP to {member.mention}! They now have **{new_xp}XP** (Level {new_level}).")
+            await interaction.response.send_message(f"Successfully added **{amount}XP** to **{member.mention}**! They now have **{new_xp}XP** *(Level {new_level})*")
         else:
-            await interaction.response.send_message(f"Successfully added {amount}XP to {member.mention}. They now have a total of **{amount}XP**.")
+            await interaction.response.send_message(f"Successfully added **{amount}XP** to **{member.mention}!** They now have a total of **{amount}XP**")
 
     @app_commands.command(name="sync_levels", description="Syncs everyone's levels based on roles only and ignoring XP. (This is a dangerous command!)")
     @commands.has_permissions(administrator=True)
@@ -1266,9 +1266,10 @@ class Leveling(commands.Cog):
         if reset_type.value == "xp":
             await ctx.send(
                 content=(
-                    f"Reset **XP and Level only** for {member.mention}?\n"
+                    f"⚠️ Reset **XP and level only** for {member.mention}?\n\n"
                     f"Stardust, inventory, pets, profile data, and other progress "
-                    f"will remain untouched."
+                    f"will remain untouched. **This is a dangerous operation and "
+                    f"irreversible unless a backup is available before the operation!** ⚠️"
                 ),
                 view=ResetConfirm(self, member, ctx.author.id),
                 ephemeral=True
@@ -1282,7 +1283,7 @@ class Leveling(commands.Cog):
                     f"{member.mention}, including XP, Level, Stardust, profile data, "
                     f"inventory, and pets. This is a **dangerous** operation and "
                     f"**irreversible unless a backup is available before the operation!**\n\n"
-                    f"Are you ***absolutely*** sure?"
+                    f"Are you __**absolutely**__ sure about this?"
                 ),
                 view=FullResetConfirm(self, member, ctx.author.id),
                 ephemeral=True
@@ -1301,7 +1302,7 @@ class Leveling(commands.Cog):
             await interaction.channel.send(embed=embed, view=FontView(self))
             await interaction.response.send_message("Font preview view panel deployed!", ephemeral=True)
         else:
-            await interaction.response.send_message("Unable to send messages in this channel.", ephemeral=True)
+            await interaction.response.send_message("❌ Unable to send messages in this channel.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Leveling(bot))

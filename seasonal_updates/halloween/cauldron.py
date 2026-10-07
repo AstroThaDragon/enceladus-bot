@@ -311,7 +311,7 @@ class CauldronView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This cauldron belongs to someone else.",
+                "This cauldron belongs to someone else.",
                 ephemeral=True,
             )
             return False
@@ -320,7 +320,7 @@ class CauldronView(discord.ui.View):
             return False
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 The Cauldron is dormant outside the Halloween season.",
+                "The Cauldron is dormant outside the Halloween season.",
                 ephemeral=True,
             )
             return False
@@ -391,7 +391,7 @@ class CauldronRecipeBookView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This recipe book belongs to someone else.", ephemeral=True
+                "This recipe book belongs to someone else.", ephemeral=True
             )
             return False
         if not is_halloween_channel(interaction.channel):
@@ -399,7 +399,7 @@ class CauldronRecipeBookView(discord.ui.View):
             return False
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 The Cauldron is dormant outside the Halloween season.", ephemeral=True
+                "The Cauldron is dormant outside the Halloween season.", ephemeral=True
             )
             return False
         return True
@@ -473,7 +473,7 @@ class RecipeSelect(discord.ui.Select):
         ]
 
         super().__init__(
-            placeholder="Choose a brew...",
+            placeholder="Choose a brew.",
             min_values=1,
             max_values=1,
             options=options,
@@ -482,14 +482,14 @@ class RecipeSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This brewing menu belongs to someone else.",
+                "This brewing menu belongs to someone else.",
                 ephemeral=True,
             )
             return
 
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 The Cauldron is dormant outside the Halloween season.",
+                "The Cauldron is dormant outside the Halloween season.",
                 ephemeral=True,
             )
             return
@@ -510,13 +510,13 @@ class RecipeSelectView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("❌ This brewing menu belongs to someone else.", ephemeral=True)
+            await interaction.response.send_message("This brewing menu belongs to someone else.", ephemeral=True)
             return False
         if not is_halloween_channel(interaction.channel):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("🎃 The Cauldron is dormant outside the Halloween season.", ephemeral=True)
+            await interaction.response.send_message("The Cauldron is dormant outside the Halloween season.", ephemeral=True)
             return False
         return True
 
@@ -530,7 +530,7 @@ class SeasonalCraftingView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This seasonal crafting menu belongs to someone else.",
+                "This seasonal crafting menu belongs to someone else.",
                 ephemeral=True,
             )
             return False
@@ -539,7 +539,7 @@ class SeasonalCraftingView(discord.ui.View):
             return False
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 Seasonal Crafting is dormant outside the Halloween season.",
+                "Seasonal Crafting is dormant outside the Halloween season.",
                 ephemeral=True,
             )
             return False
@@ -555,7 +555,7 @@ class SeasonalCraftingView(discord.ui.View):
         if cog:
             await cog.show_menu(interaction)
         else:
-            await interaction.response.send_message("❌ The Haunted Workshop is not loaded.", ephemeral=True)
+            await interaction.response.send_message("❌ The Haunted Workshop is not loaded. Please report to staff.", ephemeral=True)
 
     @discord.ui.button(label="Ritual Table", emoji="🕯️", style=discord.ButtonStyle.secondary, row=0)
     async def ritual_button(self, interaction, button):
@@ -563,7 +563,7 @@ class SeasonalCraftingView(discord.ui.View):
         if cog:
             await cog.show_menu(interaction)
         else:
-            await interaction.response.send_message("❌ The Ritual Table is not loaded.", ephemeral=True)
+            await interaction.response.send_message("❌ The Ritual Table is not loaded. Please report to staff.", ephemeral=True)
 
     @discord.ui.button(label="Close", emoji="❌", style=discord.ButtonStyle.danger, row=1)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -581,29 +581,29 @@ class Cauldron(commands.Cog):
 
     async def show_seasonal_hub(self, interaction):
         embed = discord.Embed(
-            title="🎃 Seasonal Crafting",
+            title="Seasonal Crafting 🎉",
             description=(
                 "The Halloween crafting stations are all gathered in one place.\n\n"
-                "🧙 **Witch's Cauldron** — Brew tonics, elixirs, incense, and other strange mixtures.\n"
-                "🔧 **Haunted Workshop** — Assemble devices, tools, and salvaged machinery.\n"
-                "🕯️ **Ritual Table** — Create wards, charms, and occult objects."
+                "**Witch's Cauldron** 🧙 - Brew tonics, elixirs, incense, and other strange mixtures.\n"
+                "**Haunted Workshop** 🔧 - Assemble devices, tools, and salvaged machinery.\n"
+                "**Ritual Table** 🕯️ - Create wards, charms, and occult objects."
             ),
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text="Halloween Seasonal System")
+        embed.set_footer(text="Enceladus' Seasonal System")
         view = SeasonalCraftingView(self, interaction.user.id)
         await interaction.response.edit_message(embed=embed, view=view)
 
     async def show_cauldron_menu(self, interaction):
         embed = discord.Embed(
-            title="🧙 The Witch's Cauldron",
+            title="Witch's Cauldron 🧙",
             description=(
                 "*Something bubbles ominously inside...*\n\n"
-                "Turn your Haunted Ingredients into strange brews and ritual mixtures."
+                "Turn your Haunted Ingredients into strange brews and ritual mixtures!"
             ),
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text="Halloween Seasonal System")
+        embed.set_footer(text="Enceladus' Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
             view=CauldronView(self, interaction.user.id),
@@ -638,7 +638,7 @@ class Cauldron(commands.Cog):
         ephemeral: bool = False,
     ):
         if not halloween_is_active():
-            message = "🎃 The Cauldron is dormant outside the Halloween season."
+            message = "The Cauldron is dormant outside the Halloween season."
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=ephemeral)
             else:
@@ -646,19 +646,19 @@ class Cauldron(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="🧙 The Witch's Cauldron",
+            title="Witch's Cauldron 🧙",
             description=(
                 "*Something bubbles ominously inside...*\n"
-                "*Something beneath the surface knocks three times.*\n\n"
+                "*Something beneath the surface knocks three times...*\n\n"
                 "Turn your Haunted Ingredients into strange brews and "
-                "ritual supplies.\n\n"
-                "🧪 **Brew** — Choose something to make\n"
-                "📖 **Recipes** — Browse every known recipe\n"
-                "🎒 **Ingredients** — Check your Haunted Ingredients"
+                "ritual supplies!\n\n"
+                "**Brew** - Choose something to make 🧪\n"
+                "**Recipes** - Browse every known recipe 📖\n"
+                "**Ingredients** - Check your Haunted Ingredients list 🎒"
             ),
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text="Halloween Seasonal System")
+        embed.set_footer(text="Enceladus' Seasonal System")
 
         view = CauldronView(self, interaction.user.id)
 
@@ -673,10 +673,10 @@ class Cauldron(commands.Cog):
 
     async def show_brew_menu(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="🧪 Brew at the Cauldron",
+            title="Brew at the Cauldron 🧪",
             description=(
                 "*The liquid inside bubbles without any heat.*\n\n"
-                "Choose a recipe below. You will choose the quantity after selecting a recipe. Your ingredients are checked again "
+                "Choose a recipe below! You will choose the quantity after selecting a recipe. Your ingredients are checked again "
                 "when you brew, so you cannot spend the same ingredients twice."
             ),
             color=discord.Color.dark_purple(),
@@ -694,11 +694,11 @@ class Cauldron(commands.Cog):
         pages = ["\n\n──────────────\n\n".join(recipes[i:i + 3]) for i in range(0, len(recipes), 3)]
 
         embed = discord.Embed(
-            title="📖 Cauldron Recipe Book",
+            title="Cauldron Recipe Book 📖",
             description=pages[0],
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text=f"Page 1/{len(pages)} • Halloween Seasonal System")
+        embed.set_footer(text=f"Page 1/{len(pages)} • Enceladus' Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
             view=CauldronRecipeBookView(self, interaction.user.id, pages),
@@ -727,8 +727,8 @@ class Cauldron(commands.Cog):
 
         if not lines:
             description = (
-                "You don't have any of the ingredients needed for the "
-                "currently known recipes.\n\n"
+                "**You don't have any of the ingredients needed for the "
+                "currently known recipes.**\n\n"
                 "Head into **Haunted Exploration** and search the locations "
                 "for more ingredients!"
             )
@@ -736,7 +736,7 @@ class Cauldron(commands.Cog):
             description = "\n".join(lines)
 
         embed = discord.Embed(
-            title="🎒 Haunted Ingredients",
+            title="Haunted Ingredients List 🎒",
             description=description,
             color=discord.Color.dark_purple(),
         )
@@ -777,7 +777,7 @@ class Cauldron(commands.Cog):
                 await db.rollback()
                 if current_result >= result_max:
                     message = (
-                        f"❌ Your **{recipe['name']}** inventory is full. "
+                        f"Your **{recipe['name']}** stack is full. "
                         f"You currently have **{current_result}/{result_max}**."
                     )
                 else:
@@ -813,7 +813,7 @@ class Cauldron(commands.Cog):
 
         if craftable < 1:
             await interaction.response.send_message(
-                f"❌ Your **{recipe['name']}** inventory is full. Your ingredients were returned.",
+                f"Your **{recipe['name']}** stack is full. Your ingredients were returned back to you.",
                 ephemeral=True,
             )
             return
@@ -824,13 +824,13 @@ class Cauldron(commands.Cog):
         ))
         description = (
             f"*{flavor}*\n\n"
-            f"You brewed **{recipe['emoji']} {recipe['name']} ×{craftable}**!"
+            f"You've brewed **{recipe['emoji']} {recipe['name']} ×{craftable}**!"
             + (
                 f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
                 if craftable < quantity else ""
             )
             + f"\n\n{recipe['description']}\n\n"
-            f"🧪 **Effect:** `{recipe['effect']['type']}`"
+            f"**Effect:** {recipe['effect']['type']} 🧪"
         )
 
         achievements_cog = self.bot.get_cog("Achievements")
@@ -839,7 +839,7 @@ class Cauldron(commands.Cog):
                 await achievements_cog.add_haunted_crafting_progress(interaction.user.id, "cauldron", channel=interaction.channel)
 
         embed = discord.Embed(
-            title="🧙 Brew Complete!",
+            title="Brew Completed! 🧙",
             description=description,
             color=discord.Color.dark_purple(),
         )
@@ -857,7 +857,7 @@ class Cauldron(commands.Cog):
     )
     @app_commands.choices(
         season=[
-            app_commands.Choice(name="🎃 Halloween", value="halloween"),
+            app_commands.Choice(name="Halloween - Lair of Frights 🎃", value="halloween"),
         ],
     )
     async def seasonal_crafting(
@@ -866,7 +866,7 @@ class Cauldron(commands.Cog):
         season: str,
     ):
         if season != "halloween":
-            await ctx.send("❌ That seasonal crafting event is not available.")
+            await ctx.send("❌ That seasonal crafting event is not available right now.")
             return
 
         if not is_halloween_channel(ctx.channel):
@@ -874,23 +874,23 @@ class Cauldron(commands.Cog):
             return
         if not halloween_is_active():
             await ctx.send(
-                "🎃 Lair of Frights Seasonal Crafting is dormant right now. "
-                "Come back during the Halloween season."
+                "Lair of Frights Seasonal Crafting is dormant right now. "
+                "Come back during the Halloween season!"
             )
             return
 
         await ctx.defer()
         embed = discord.Embed(
-            title="🎃 Seasonal Crafting",
+            title="Seasonal Crafting 🎉",
             description=(
                 "The Halloween crafting stations are all gathered in one place.\n\n"
-                "🧙 **Witch's Cauldron** — Brew tonics, elixirs, incense, and other strange mixtures.\n"
-                "🔧 **Haunted Workshop** — Assemble devices, tools, and salvaged machinery.\n"
-                "🕯️ **Ritual Table** — Create wards, charms, and occult objects."
+                "**Witch's Cauldron** 🧙 - Brew tonics, elixirs, incense, and other strange mixtures.\n"
+                "**Haunted Workshop** 🔧 - Assemble devices, tools, and salvaged machinery.\n"
+                "**Ritual Table** 🕯️ - Create wards, charms, and occult objects."
             ),
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text="Halloween Seasonal System")
+        embed.set_footer(text="Enceladus' Seasonal System")
         await ctx.send(
             embed=embed,
             view=SeasonalCraftingView(self, ctx.author.id),

@@ -34,14 +34,14 @@ class SetXPModal(discord.ui.Modal):
                 )
         except ValueError:
             return await interaction.response.send_message(
-                "Please enter a valid whole number for XP.",
+                "❌ Please enter a valid whole number for XP.",
                 ephemeral=True
             )
 
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "The leveling system is currently unavailable. Please report to staff.",
+                "❌ The leveling system is currently unavailable.",
                 ephemeral=True
             )
 
@@ -126,7 +126,7 @@ class SetLevelModal(discord.ui.Modal):
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "The leveling system is currently unavailable. Please report to staff.",
+                "❌ The leveling system is currently unavailable.",
                 ephemeral=True
             )
 
@@ -155,7 +155,7 @@ class SetLevelModal(discord.ui.Modal):
 
         await interaction.response.send_message(
             f"Set {self.member.mention} to **Level {level}** "
-            f"({new_xp} XP).",
+            f"({new_xp}XP).",
             ephemeral=True
         )
 
@@ -209,7 +209,7 @@ class AddXPModal(discord.ui.Modal):
         leveling_cog = self.admin_cog.bot.get_cog("Leveling")
         if leveling_cog is None:
             return await interaction.response.send_message(
-                "The leveling system is currently unavailable. Please report to staff.",
+                "❌ The leveling system is currently unavailable.",
                 ephemeral=True
             )
 
@@ -226,12 +226,12 @@ class AddXPModal(discord.ui.Modal):
             new_xp, new_level = result
             await interaction.response.send_message(
                 f"Added {amount} XP to {self.member.mention}! "
-                f"They now have **{new_xp} XP** (Level {new_level}).",
+                f"They now have **{new_xp}XP** (Level {new_level}).",
                 ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"Added {amount} XP to {self.member.mention}!",
+                f"Added {amount}XP to {self.member.mention}!",
                 ephemeral=True
             )
 
@@ -443,7 +443,7 @@ class ResetConfirmationView(discord.ui.View):
 
         if leveling_cog is None:
             await interaction.edit_original_response(
-                content="The leveling system is currently unavailable. Please report to staff.",
+                content="❌ The leveling system is currently unavailable.",
                 view=None
             )
             return
@@ -752,7 +752,7 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.followup.send(
-                    "The leveling system is currently unavailable. Please report to staff.",
+                    "❌ The leveling system is currently unavailable.",
                     ephemeral=True
                 )
 
@@ -821,7 +821,7 @@ class Admin(commands.Cog):
                     raise
 
             await interaction.followup.send(
-                f"✅ Sync complete! Calibrated {synced_count} members.",
+                f"Sync complete! Calibrated {synced_count} members. ✅",
                 ephemeral=True
             )
 
@@ -832,7 +832,7 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.followup.send(
-                    "The leveling system is currently unavailable. Please report to staff.",
+                    "❌ The leveling system is currently unavailable.",
                     ephemeral=True
                 )
 
@@ -967,7 +967,7 @@ class Admin(commands.Cog):
 
             if leveling_cog is None:
                 return await interaction.response.send_message(
-                    "The leveling system is currently unavailable. Please report to staff.",
+                    "❌ The leveling system is currently unavailable.",
                     ephemeral=True
                 )
 
@@ -998,7 +998,7 @@ class Admin(commands.Cog):
 
             if moderation_cog is None:
                 return await interaction.response.send_message(
-                    "The moderation system is currently unavailable. Please report to staff.",
+                    "❌ The moderation system is currently unavailable.",
                     ephemeral=True
                 )
 
@@ -1028,12 +1028,12 @@ class Admin(commands.Cog):
 
             if verification_cog is None:
                 return await interaction.response.send_message(
-                    "The verification system is currently unavailable. Please report to staff.",
+                    "❌ The verification system is currently unavailable. Please report to 'astrothadragon'",
                     ephemeral=True
                 )
 
             embed = discord.Embed(
-                title="🔞 Verification Center",
+                title="Verification Center 🔞",
                 description=(
                     "Select the type of verification you want below.\n\n"
                     "Verification is manually reviewed by staff.\n"
@@ -1050,7 +1050,7 @@ class Admin(commands.Cog):
                 )
 
             await interaction.response.send_message(
-                "NSFW verification panel deployed successfully.",
+                "NSFW verification view panel deployed successfully.",
                 ephemeral=True
             )
 

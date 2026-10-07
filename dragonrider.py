@@ -493,7 +493,7 @@ class DragonFlight(commands.Cog):
                         reset_timestamp = self.get_next_midnight_reset()
 
                         return await ctx.send(
-                            f"You've used all **{max_daily_attempts}** Dragonrider attempt{'s' if max_daily_attempts != 1 else ''} today.\n"
+                            f"**You've used all **{max_daily_attempts}** Dragonrider attempt{'s' if max_daily_attempts != 1 else ''} today!** 🐲\n"
                             f"You can attempt another test <t:{reset_timestamp}:R>"
                         )
 
@@ -571,9 +571,9 @@ class DragonFlight(commands.Cog):
         if not success:
             return await ctx.send(
                 f"{user.mention} attempts their Dragonrider test! 🐲\n\n"
-                f"**{random.choice(FAIL_MESSAGES)}**\n\n"
-                f"You've failed your test! Your instructor must endure another day... 💔\n\n"
-                f"-# ***Test Attempts:*** {attempts}"
+                f"*{random.choice(FAIL_MESSAGES)}*\n\n"
+                f"**You've failed your test!** Your instructor must endure another day... 💔\n\n"
+                f"-# **Test attempts: {attempts}**"
             )
 
         license_role = guild.get_role(LICENSE_ROLE_ID)
@@ -605,14 +605,15 @@ class DragonFlight(commands.Cog):
                 await db.commit()
 
             return await ctx.send(
-                "You passed the Dragonrider Test, but the Dragonrider License role "
+                "❌ You passed the Dragonrider Test, but the Dragonrider License role "
                 "is missing from this server. Your license has not been recorded. Please report to staff."
             )
 
         await ctx.send(
-            f"{random.choice(SUCCESS_MESSAGES)}\n\n"
-            f"Wooooo!{user.mention} has earned their Dragonrider License! The instructor can finally sleep at night 😌\n"
-            f"**Test Attempts:** {attempts}"
+            f"*{random.choice(SUCCESS_MESSAGES)}*\n\n"
+            f"**Woohooo!**\n"
+            f"{user.mention} has earned their Dragonrider License! The instructor can finally sleep at night 😌\n\n"
+            f"**Test attempts: {attempts}**"
         )
 
 

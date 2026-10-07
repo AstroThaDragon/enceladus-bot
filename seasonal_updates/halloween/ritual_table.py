@@ -186,10 +186,10 @@ class RitualSelect(discord.ui.Select):
 
     async def callback(self, interaction):
         if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("❌ This ritual table belongs to someone else.", ephemeral=True)
+            await interaction.response.send_message("This ritual table belongs to someone else.", ephemeral=True)
             return
         if not halloween_is_active():
-            await interaction.response.send_message("🎃 The Ritual Table is dormant outside Halloween.", ephemeral=True)
+            await interaction.response.send_message("The Ritual Table is dormant outside Halloween.", ephemeral=True)
             return
         recipe_id = self.values[0]
         recipe = RITUAL_RECIPES[recipe_id]
@@ -211,13 +211,13 @@ class RitualRecipeBookView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("❌ This recipe book belongs to someone else.", ephemeral=True)
+            await interaction.response.send_message("This recipe book belongs to someone else.", ephemeral=True)
             return False
         if not is_halloween_channel(interaction.channel):
             await interaction.response.send_message(halloween_channel_message(), ephemeral=True)
             return False
         if not halloween_is_active():
-            await interaction.response.send_message("🎃 The Ritual Table is dormant outside Halloween.", ephemeral=True)
+            await interaction.response.send_message("The Ritual Table is dormant outside Halloween.", ephemeral=True)
             return False
         return True
 
@@ -256,7 +256,7 @@ class RitualSelectView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This ritual table belongs to someone else.",
+                "This ritual table belongs to someone else.",
                 ephemeral=True,
             )
             return False
@@ -268,7 +268,7 @@ class RitualSelectView(discord.ui.View):
             return False
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 The Ritual Table is dormant outside Halloween.",
+                "The Ritual Table is dormant outside Halloween.",
                 ephemeral=True,
             )
             return False
@@ -296,7 +296,7 @@ class RitualView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "❌ This ritual table belongs to someone else.",
+                "This ritual table belongs to someone else.",
                 ephemeral=True,
             )
             return False
@@ -308,7 +308,7 @@ class RitualView(discord.ui.View):
             return False
         if not halloween_is_active():
             await interaction.response.send_message(
-                "🎃 The Ritual Table is dormant outside Halloween.",
+                "The Ritual Table is dormant outside Halloween.",
                 ephemeral=True,
             )
             return False
@@ -325,7 +325,7 @@ class RitualView(discord.ui.View):
         button: discord.ui.Button,
     ):
         embed = discord.Embed(
-            title="🕯️ Perform a Ritual",
+            title="Perform a Ritual 🕯️",
             description=(
                 "Choose a ritual to perform. You will choose the quantity after selecting a ritual."
             ),
@@ -381,16 +381,16 @@ class RitualTable(commands.Cog):
 
     async def show_menu(self, interaction):
         embed = discord.Embed(
-            title="🕯️ Ritual Table",
+            title="Ritual Table 🕯️",
             description=(
                 "The surface is covered in chalk marks, candle wax, and diagrams you do not remember drawing.\n"
                 "*The candles are already lit. You don't remember lighting them.*\n\n"
-                "Choose a ritual to perform. Select a ritual to choose how many to craft."
+                "Choose a ritual to perform! Select a ritual to choose how many to craft."
             ),
             color=discord.Color.dark_purple(),
         )
         embed.add_field(
-            name="📖 Known Rituals",
+            name="Known Rituals 📖",
             value="\n".join(f"{r['emoji']} **{r['name']}**" for r in RITUAL_RECIPES.values()),
             inline=False,
         )
@@ -407,11 +407,11 @@ class RitualTable(commands.Cog):
         pages = ["\n\n──────────────\n\n".join(recipes[i:i + 3]) for i in range(0, len(recipes), 3)]
 
         embed = discord.Embed(
-            title="📖 Ritual Recipe Book",
+            title="Ritual Book 📖",
             description=pages[0],
             color=discord.Color.dark_purple(),
         )
-        embed.set_footer(text=f"Page 1/{len(pages)} • Halloween Seasonal System")
+        embed.set_footer(text=f"Page 1/{len(pages)} • Enceladus' Seasonal System")
         await interaction.response.edit_message(
             embed=embed,
             view=RitualRecipeBookView(self, interaction.user.id, pages),
@@ -442,7 +442,7 @@ class RitualTable(commands.Cog):
             if craftable < 1:
                 await db.rollback()
                 if current_result >= result_max:
-                    message = f"❌ Your **{recipe['name']}** inventory is full. You currently have **{current_result}/{result_max}**."
+                    message = f"Your **{recipe['name']}** stack is full. You currently have **{current_result}/{result_max}.**"
                 else:
                     message = "❌ **Missing ritual components:**\n" + "\n".join(missing)
                 await interaction.response.send_message(message, ephemeral=True)
@@ -470,7 +470,7 @@ class RitualTable(commands.Cog):
 
         if craftable < 1:
             await interaction.response.send_message(
-                f"❌ Your **{recipe['name']}** inventory is full. Your components were returned.",
+                f"Your **{recipe['name']}** stack is full. Your materials were returned back to you.",
                 ephemeral=True,
             )
             return
@@ -484,7 +484,7 @@ class RitualTable(commands.Cog):
         )
         await interaction.response.send_message(
             f"*{flavor}*\n\n"
-            f"🕯️ **Ritual complete.** You created **{recipe['emoji']} {recipe['name']} ×{craftable}**."
+            f"**Ritual completed!** 🕯️\nYou've created **{recipe['emoji']} {recipe['name']} ×{craftable}.**"
             + (
                 f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
                 if craftable < quantity else ""

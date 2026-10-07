@@ -1114,7 +1114,7 @@ class Minigames(commands.Cog):
         result, new_balance = await self.change_balance(interaction.user.id, bet, spin, "slots")
         if result is None:
             return await interaction.followup.send(
-                "You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
+                "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
@@ -1278,7 +1278,7 @@ class Minigames(commands.Cog):
             if not row:
                 await db.rollback()
                 return await interaction.followup.send(
-                    "You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
+                    "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
                     ephemeral=True
                 )
 
@@ -1376,7 +1376,7 @@ class Minigames(commands.Cog):
         result, new_balance = await self.change_balance(interaction.user.id, bet, spin, "roulette")
         if result is None:
             return await interaction.followup.send(
-                "You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
+                "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if result.get("error") == "no_token":
@@ -1451,7 +1451,7 @@ class Minigames(commands.Cog):
         token_balance = await self.consume_arcade_token(interaction.user.id)
         if token_balance is None:
             return await interaction.followup.send(
-                "You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
+                "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!",
                 ephemeral=True,
             )
         if token_balance < 0:
@@ -1512,26 +1512,26 @@ class Minigames(commands.Cog):
 
         if arcade_coins is None:
             return await ctx.send(
-                "You don't have an active profile yet. Run `/scavenge` or `/mine` first!"
+                "❌ You don't have an active profile yet. Run `/scavenge` or `/mine` first!"
             )
 
         embed = discord.Embed(
-            title="Enceladus' Minigame Terminal",
+            title="*Enceladus' Minigame Terminal* 🎮",
             description=(
                 "Welcome to the station's recreational deck!\n\n"
-                f"**Arcade Token Balance:** {arcade_coins:,}\n"
-                "Each game costs **1 Arcade Token** to play.\n"
+                f"**Your Arcade Token balance:** {arcade_coins:,}\n"
+                "Each game costs **1 Arcade Token** to play. 🪙\n"
                 "Your actual wagers are paid in **Stardust** inside the games.\n"
-                "Use the exchange option to convert Stardust at **100 Stardust = 1 Arcade Token**.\n\n"
-                "Choose a game below. **The house has an edge.** "
-                "Don't bet what you can't afford to lose!\n\n"
-                "**Slots** 🎰 — spend 1 token, then wager Stardust\n"
-                "**Dice** 🎲 — spend 1 token, then wager Stardust\n"
-                "**Blackjack** 🃏 — spend 1 token, then wager Stardust\n"
-                "**Roulette** 🎡 — spend 1 token, then wager Stardust\n"
-                "**Space Trivia** 🚀 — spend 1 token to answer for Stardust\n"
-                "**Arcade Token Exchange** 🪙 — buy Arcade Tokens with Stardust\n"
-                "**Your stats** 📊 — view your minigame history"
+                "Use the exchange option to convert **100 Stardust** for **1 Arcade Token.** ✨\n\n"
+                "Choose a game below. "
+                "**Don't bet what you can't afford to lose!**\n\n"
+                "**Slots** 🎰 - spend 1 token, wager Stardust and spin those slots!\n"
+                "**Dice** 🎲 - spend 1 token, wager Stardust and roll the dice!\n"
+                "**Blackjack** 🃏 - spend 1 token, wager Stardust and play some Blackjack!\n"
+                "**Roulette** 🎡 - spend 1 token, wager Stardust and play Roulette!\n"
+                "**Space Trivia** 🚀 - spend 1 token to answer a question for 100 Stardust!\n"
+                "**Arcade Token exchange** 🪙 - buy Arcade Tokens with Stardust!\n"
+                "**Your stats** 📊 - view your minigame history"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )

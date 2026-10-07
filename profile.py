@@ -323,9 +323,9 @@ class BackgroundCollectionView(discord.ui.View):
 
         if self.section == "main":
             embed = discord.Embed(
-                title="Background collection",
+                title="Background collection 🖼️",
                 description=(
-                    "Browse the profile backgrounds you've unlocked.\n\n"
+                    "**Browse the profile backgrounds you've unlocked!**\n\n"
                     "Choose a category below to get started.\n"
                     "Locked backgrounds are not shown here."
                 ),
@@ -336,9 +336,9 @@ class BackgroundCollectionView(discord.ui.View):
 
         if self.section == "events":
             embed = discord.Embed(
-                title="Event backgrounds",
+                title="Event backgrounds 🎉",
                 description=(
-                    "Choose an event to browse the backgrounds you've unlocked from it.\n\n"
+                    "**Choose an event to browse the backgrounds you've unlocked from it!**\n\n"
                     "More events can be added here in the future!"
                 ),
                 color=discord.Color.orange()
@@ -640,7 +640,7 @@ class Profile(commands.Cog):
             "unlocked_backgrounds": unlocked_backgrounds
         }
 
-    @commands.hybrid_command(name="profile", description="View your profile.")
+    @commands.hybrid_command(name="profile", description="View your expedition profile.")
     @app_commands.describe(member="The user whose profile you want to view")
     async def profile(self, ctx: commands.Context, member: discord.Member | None = None):
         target = member or ctx.author
@@ -683,7 +683,7 @@ class Profile(commands.Cog):
         separator = "━━━━━━━━━━━━━━━━━━━━━━━━"
 
         embed = discord.Embed(
-            title=f"🛸 Personnel Record — {target.display_name}",
+            title=f"{target.display_name}'s personnel record",
             description=(
                 f"🏷️ Title: **{data['title']}**\n"
                 f"{separator}\n"
@@ -704,7 +704,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="Rank & XP",
+            name="*Rank & XP* 📊",
             value=f"Level **{data['level']}** • **{data['xp']:,} XP**",
             inline=True
         )
@@ -714,7 +714,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="Stardust",
+            name="*Stardust* ✨",
             value=f"**{data['stardust']:,}**",
             inline=True
         )
@@ -724,7 +724,7 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="Daily Exploration Streak",
+            name="*Daily exploration streak* 🔥",
             value=f"**{data['daily_streak']} days**",
             inline=True
         )
@@ -734,10 +734,10 @@ class Profile(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="Exploration Upgrades",
+            name="*Exploration upgrades* 🧰",
             value=(
-                f"Mining Laser — **Tier {data['mining_upgrade']}/5**\n"
-                f"Scavenging Drone — **Tier {data['scavenging_upgrade']}/5**"
+                f"Mining Laser - **Tier {data['mining_upgrade']}/5**\n 🔫"
+                f"Scavenging Drone - **Tier {data['scavenging_upgrade']}/5** 🛸"
             ),
             inline=False
         )
@@ -756,7 +756,7 @@ class Profile(commands.Cog):
         else:
             companion_text = "**None**"
 
-        embed.add_field(name="Current companion", value=companion_text, inline=True)
+        embed.add_field(name="*Current companion*", value=companion_text, inline=True)
         
         # Environment Window Image
         embed.set_image(url="attachment://viewport.png")
@@ -768,7 +768,7 @@ class Profile(commands.Cog):
         artist = BACKGROUND_ARTISTS.get(active_background_id)
 
         if artist:
-            embed.set_footer(text=f"Artwork credit — {artist}")
+            embed.set_footer(text=f"Artwork credit - {artist}")
 
         await ctx.send(file=file, embed=embed)
 
@@ -787,14 +787,14 @@ class Profile(commands.Cog):
         # Keep profile bios short enough to fit nicely on the profile card.
         if len(text) > 180:
             return await ctx.send(
-                f"**Woah there, bru!Your bio is too long!** "
-                f"Please keep it to **180 characters or fewer** "
-                f"({len(text)}/180)."
+                f"❌ **Woah there, bru! Your bio is too long!** "
+                f"Please keep it to **180 characters or fewer!**\n\n "
+                f"*({len(text)}/180)*"
             )
 
         if not text:
             return await ctx.send(
-                "**Your bio can't be empty!**"
+                "❌ **Your bio can't be empty!**"
             )
 
         from database import ECONOMY_DB_NAME
@@ -812,7 +812,7 @@ class Profile(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"**Bio updated!**"
+            f"**Bio updated!**\n"
             f"Use `/profile` to check it out!\n",
             ephemeral=True
         )
@@ -863,9 +863,9 @@ class Profile(commands.Cog):
             await db.commit()
 
         await ctx.send(
-            f"**User bio has been moderated**\n"
+            f"**User's bio has been moderated**\n"
             f"User: {member.mention}\n"
-            f"Reason: {reason}"
+            f"*Reason: {reason}*"
         )
 
     async def background_autocomplete(
@@ -956,7 +956,7 @@ class Profile(commands.Cog):
 
             choices.append(
                 app_commands.Choice(
-                    name=f"{emoji} {display_name}",
+                    name=f"{display_name} {emoji}",
                     value=item_id
                 )
             )
@@ -1257,7 +1257,7 @@ class Profile(commands.Cog):
 
                 await interaction.response.edit_message(
                     content=(
-                        f"{interaction.user.mention} **Voucher redeemed!**\n"
+                        f"{interaction.user.mention} **voucher redeemed!**\n"
                         f"{reward['emoji']} **{reward['name']}** is now unlocked!\n"
                         "You can select it anytime with `/background equip`"
                     ),

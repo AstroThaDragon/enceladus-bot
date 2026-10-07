@@ -121,7 +121,7 @@ async def equip_weapon(db, user_id, weapon_id):
 
     if not row:
         await db.rollback()
-        return False, "You don't have an active profile yet."
+        return False, "❌ You don't have an active profile yet. Run `/mining` or `/scavenging` first!"
 
     try:
         effects = json.loads(row[0] or "{}")

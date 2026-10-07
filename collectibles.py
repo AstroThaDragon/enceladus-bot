@@ -268,7 +268,7 @@ class Collectibles(commands.Cog):
             data = collectible_map.get(collectible)
             if not data:
                 return await ctx.send(
-                    "That collectible is no longer available in the current collection.",
+                    "❌ That collectible is no longer available in the current collection.",
                     ephemeral=True,
                 )
 
@@ -285,7 +285,7 @@ class Collectibles(commands.Cog):
                 color=discord.Color.dark_purple(),
             )
             embed.set_author(
-                name=f"{ctx.author.display_name}'s Collectible",
+                name=f"{ctx.author.display_name}'s Collectibles",
                 icon_url=ctx.author.display_avatar.url,
             )
 
@@ -382,7 +382,7 @@ class Collectibles(commands.Cog):
                         lines.append("❓ **???**")
 
                 embed = discord.Embed(
-                    title=f"{ctx.author.mention}'s Collectibles",
+                    title=f"{ctx.author.display_name}'s Collectibles",
                     description=(
                         f"**{category}** • Part **{page_number}/{total_pages}**\n"
                         f"Collected: **{found}/{total}** ({found / total * 100:.0f}%)\n\n"
@@ -394,7 +394,7 @@ class Collectibles(commands.Cog):
                 pages.append(embed)
 
         if not pages:
-            return await ctx.send("There are no seasonal collectibles available yet!")
+            return await ctx.send("❌ There are no collectibles available yet!")
 
         class CollectiblesView(discord.ui.View):
             def __init__(self, owner_id, embeds):

@@ -142,7 +142,7 @@ class Fun(commands.Cog):
         embed = discord.Embed(
             title=f"Songs found for {song_name}!",
             description="Beep boop bop! Found a matching song search for you! Click the button below to view the results on YouTube!",
-            color=discord.Color.red() # Changed to Red to match YouTube's branding
+            color=discord.Color.red()
         )
         # Using a YouTube icon for the thumbnail
         embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/e/ef/Youtube_logo.png")
@@ -169,7 +169,7 @@ class Fun(commands.Cog):
     @commands.hybrid_command(name="slap", description="Slap a member with a random object!")
     async def slap(self, ctx, member: discord.Member):
         if member == self.bot.user:
-            return await ctx.send(f"Nice try, {ctx.author.mention}, but I'm too fast for you! 😎")
+            return await ctx.send(f"Nice try, {ctx.author.mention}! But I'm too fast for you! 😎")
         
         slap_objects = [
             "a large, smelly fish! 🐟",
@@ -210,8 +210,8 @@ class Fun(commands.Cog):
     async def coinflip(self, ctx):
         """Flips a cosmic coin."""
         outcomes = [
-            "**SUPERNOVA**! The star explodes in brilliant light! (Heads)",
-            "**BLACK HOLE**! Light itself cannot escape the void. (Tails)"
+            "**SUPERNOVA!** The star explodes in brilliant light! (Heads)",
+            "**BLACK HOLE!** Light itself cannot escape the void! (Tails)"
         ]
         
         loading_msgs = [
@@ -228,7 +228,7 @@ class Fun(commands.Cog):
 
     @commands.hybrid_command(name="blackhole", description="Suck a message into the void!")
     async def blackhole(self, ctx, text: str):
-        distorted = " ".join(list(text)) # Spaced out
+        distorted = " ".join(list(text))
         await ctx.send(f"**EVENT HORIZON REACHED**\n`{distorted}`\n*...aaaand it's gone forever.*")
 
     @commands.hybrid_command(name="hug", description="Give someone a warm, soft hug!")
@@ -243,9 +243,9 @@ class Fun(commands.Cog):
         options = [option.strip() for option in choices.split(",")]
         
         if len(options) < 2:
-            return await ctx.send("Give me at least two options separated by a comma! (e.g., Pizza, Pasta)")
+            return await ctx.send("❌ Give me at least two options separated by a comma! (e.g., Pizza, Pasta)")
             
-        await ctx.send(f"I've thought about it, and I choose: **{random.choice(options)}!**")
+        await ctx.send(f"I've thought about it... and I choose: *{random.choice(options)}!*")
 
     @commands.hybrid_command(name="mock", description="mAkE yOuR tExT lOoK lHiS.")
     async def mock(self, ctx, *, text: str):
@@ -253,7 +253,7 @@ class Fun(commands.Cog):
         
         emoji = "<:SpongeMock:1502200574945529896>" 
         
-        await ctx.send(f"{emoji} {ctx.author.mention} {mocked_text}")
+        await ctx.send(f"{ctx.author.mention} *{mocked_text}* {emoji}")
 
     @commands.hybrid_command(name="roll", description="Roll a die (2-20 sides).")
     async def roll(self, ctx, sides: int = 6):
@@ -265,7 +265,7 @@ class Fun(commands.Cog):
             return await ctx.send("Easy there, high roller! Max die size is **20.**")
         
         result = random.randint(1, sides)
-        await ctx.send(f"**{ctx.author.mention}** rolled a **D{sides}** and got: **{result}** 🎲")
+        await ctx.send(f"**{ctx.author.mention}** rolled a **D{sides}** and got **{result}!** 🎲")
 
     @commands.hybrid_command(name="spacefact", description="Pull real-time data on a random celestial body!")
     async def spacefact(self, ctx):
@@ -292,7 +292,7 @@ class Fun(commands.Cog):
                             if b.get("gravity") or b.get("discoveredBy")
                         ]
                         if not bodies:
-                            return await ctx.send("The Solar System Database returned no usable celestial bodies right now.")
+                            return await ctx.send("❌ The Solar System Database returned no usable celestial bodies right now.")
                         body = random.choice(bodies)
                         
                         name = body.get('englishName', 'Unknown Entity')
@@ -340,11 +340,11 @@ class Fun(commands.Cog):
                         await ctx.send(embed=embed)
                     else:
                         print(f"API Error Status: {response.status}")
-                        await ctx.send("The API uplink rejected our key or is down. Please report to staff.")
+                        await ctx.send("❌ The API uplink rejected our key or is down. Please report to staff.")
         except Exception as e:
             await log_command_error(self.bot, ctx, e)
             print(f"Space Error: {e}")
-            await ctx.send("Something went wrong in the asteroid belt. Please report to staff.")
+            await ctx.send("❌ Something went wrong in the asteroid belt. Please report to staff.")
     
     @commands.hybrid_command(name="furryrate", description="Check the local fluff levels!")
     async def furryrate(self, ctx, member: discord.Member | None = None):
@@ -662,22 +662,22 @@ class Fun(commands.Cog):
                         
                         if horoscope_text:
                             embed = discord.Embed(
-                                title=f"{sign.name} — Your daily reading", 
+                                title=f"{sign.name} - Your daily reading", 
                                 description=horoscope_text,
                                 color=0x6a0dad
                             )
-                            embed.add_field(name="📅 Date", value=reading_date, inline=True)
+                            embed.add_field(name="Date 📅", value=reading_date, inline=True)
                             
-                            embed.set_footer(text="The stars have spoken in The Cosmic Lair.")
+                            embed.set_footer(text="The stars have spoken!")
                             await interaction.followup.send(embed=embed)
                         else:
                             print(f"DEBUG DATA: {raw_data}")
-                            await interaction.followup.send("The stars are shy... I couldn't find the reading in the response. Please report to staff.")
+                            await interaction.followup.send("❌ The stars are shy... I couldn't find the reading in the response. Please report to staff.")
                     else:
-                        await interaction.followup.send(f"The cosmic vibrations are distorted. (Status: {response.status})")
+                        await interaction.followup.send(f"❌ The cosmic vibrations are distorted. (Status: {response.status})")
         except Exception as e:
             await log_app_command_error(self.bot, interaction, e)
-            await interaction.followup.send("The connection failed. Please try again later and report to staff.")
+            await interaction.followup.send("❌ The connection failed. Please try again later and report to staff.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fun(bot, "fun.db"))

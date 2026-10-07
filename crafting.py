@@ -155,12 +155,12 @@ class Crafting(commands.Cog):
             return {item_id: quantity for item_id, quantity in await cursor.fetchall()}
 
     def recipe_embed(self, recipe, owned):
-        lines = [f"{recipe['emoji']} **{recipe['name']}**", "", "**Materials Required:**"]
+        lines = [f"{recipe['emoji']} ***{recipe['name']}***", "", "**Materials Required:**"]
         for item_id, amount in recipe["ingredients"].items():
             icon, name = MATERIAL_NAMES[item_id]
             have = owned.get(item_id, 0)
             mark = "✅" if have >= amount else "❌"
-            lines.append(f"{mark} {icon} {name} ×{amount}  *(you have {have})*")
+            lines.append(f"{mark} {icon} {name} ×{amount}  **(you have {have})**")
         destination = (
             "Use `/heal` to restore HP."
             if recipe["result"] in {"makeshift_medkit", "trick_or_treat_bag"}
@@ -168,7 +168,7 @@ class Crafting(commands.Cog):
         )
         lines += ["", f"**Produces:** {recipe['emoji']} {recipe['name']} ×1", "", destination]
         return discord.Embed(
-            title="Crafting",
+            title="Crafting Guide 🔨",
             description="\n".join(lines),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -187,11 +187,11 @@ class Crafting(commands.Cog):
                     material_emoji, name = MATERIAL_NAMES[item_id]
                     have = owned.get(item_id, 0)
                     mark = "✅" if have >= amount else "❌"
-                    lines.append(f"{mark} {material_emoji} {name} ×{amount} *(you have {have})*")
+                    lines.append(f"{mark} {material_emoji} {name} ×{amount} **(you have {have})**")
                 sections.append("\n".join(lines))
 
             embed = discord.Embed(
-                title="Crafting Recipe Book",
+                title="Crafting Recipe Book 📖",
                 description="\n\n".join(sections),
                 color=discord.Color.from_rgb(0, 229, 255),
             )
@@ -302,11 +302,11 @@ class Crafting(commands.Cog):
             await db.commit()
 
         embed = discord.Embed(
-            title="Crafting Complete!",
+            title="Crafting Complete! ✅",
             description=(
                 f"{mention}\n\nYou crafted **{data['emoji']} {data['name']} ×{craftable}**!"
                 + (
-                    f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**."
+                    f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**"
                     if craftable < quantity else ""
                 )
                 + "\n\n"
@@ -325,9 +325,10 @@ class Crafting(commands.Cog):
     async def show_crafting_menu(self, target, owner_id):
         view = CraftingView(self, owner_id)
         embed = discord.Embed(
-            title="Crafting",
+            title="Crafting Guide 🔨",
             description=(
-                "Craft components, upgrade kits, and supplies from collected materials.\n\n"
+                "*Craft components, upgrade kits, and supplies from collected materials!*\n\n"
+                "──────────────────────────────────\n\n"
                 "**Known Recipes**\n"
                 f"{len(RECIPES)} recipes available.\n\n"
                 "Choose an option below."
@@ -339,7 +340,7 @@ class Crafting(commands.Cog):
         else:
             await target.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="craft", description="Open the crafting book.")
+    @commands.hybrid_command(name="craft", description="Open the crafting guide.")
     async def craft(self, ctx):
         await ctx.defer()
         await self.show_crafting_menu(ctx, ctx.author.id)
@@ -372,7 +373,7 @@ class CraftingView(discord.ui.View):
     async def craft_button(self, interaction, button):
         view = CraftingSelectView(self.cog, self.owner_id)
         embed = discord.Embed(
-            title="Craft",
+            title="Crafting Guide 🔨",
             description="Choose a recipe to craft.",
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -393,7 +394,7 @@ class CraftingView(discord.ui.View):
 
         description = "\n".join(lines) if lines else "You don't have any crafting materials yet."
         embed = discord.Embed(
-            title="Crafting Materials",
+            title="Crafting Materials 📦",
             description=description,
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -446,7 +447,7 @@ class CraftingRecipeBookView(discord.ui.View):
     async def craft(self, interaction, button):
         await interaction.response.edit_message(
             embed=discord.Embed(
-                title="Craft",
+                title="Crafting Guide 🔨",
                 description="Choose a recipe to craft.",
                 color=discord.Color.from_rgb(0, 229, 255),
             ),
@@ -566,7 +567,7 @@ class CraftingRecipeActionView(discord.ui.View):
         view = CraftingSelectView(self.cog, self.owner_id)
         await interaction.response.edit_message(
             embed=discord.Embed(
-                title="Craft",
+                title="Crafting Guide 🔨",
                 description="Choose a recipe to craft.",
                 color=discord.Color.from_rgb(0, 229, 255),
             ),

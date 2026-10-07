@@ -114,10 +114,10 @@ class VerifyView(View):
         except discord.Forbidden:
             pending_codes.pop(member.id, None)
             return await interaction.followup.send(
-                "**DM Delivery Failed!**\n"
+                "**DM delivery failed! ❌**\n"
                 "I couldn't send you a verification code because your Direct Messages are disabled for this server.\n\n"
                 "**How to fix:**\n"
-                "1. Right-click or tap the server icon / header (**The Cosmic Lair**).\n"
+                "1. Right-click or tap the server icon/header **(The Cosmic Lair)**\n"
                 "2. Go to **Privacy Settings**.\n"
                 "3. Enable **Direct Messages**.\n"
                 "4. Click the **Verify** button again!",
@@ -315,14 +315,14 @@ class Moderation(commands.Cog):
         category = guild.get_channel(TICKET_CATEGORY_ID)
         if not isinstance(category, discord.CategoryChannel):
             return await interaction.response.send_message(
-                "The support ticket category could not be found. Please report this to staff.",
+                "❌ The support ticket category could not be found. Please report this to staff.",
                 ephemeral=True,
             )
 
         existing = await self._get_open_ticket(guild, member.id)
         if existing:
             return await interaction.response.send_message(
-                f"You already have an open support ticket: {existing.mention}",
+                f"❌ You already have an open support ticket: {existing.mention}",
                 ephemeral=True,
             )
 
@@ -346,14 +346,14 @@ class Moderation(commands.Cog):
         except (discord.Forbidden, discord.HTTPException) as exc:
             print(f"[TICKET CREATE ERROR] Could not create ticket for {member} ({member.id}): {exc}")
             return await interaction.followup.send(
-                "I couldn't create your support ticket. Please report this to staff.",
+                "❌ I couldn't create your support ticket. Please report this to staff.",
                 ephemeral=True,
             )
 
         embed = discord.Embed(
             title="Support Ticket",
             description=(
-                f"Welcome, {member.mention}! The Cosmic Lair staff will be with you as soon as possible.\n\n"
+                f"**Welcome, {member.mention}!** The Cosmic Lair staff will be with you as soon as possible. 🌌\n\n"
                 "Please describe what you need help with and include any relevant details, "
                 "screenshots, or other information.\n\n"
                 "When your issue has been resolved, use the button below to close this ticket."
@@ -409,13 +409,13 @@ class Moderation(commands.Cog):
 
         if not guild or not isinstance(channel, discord.TextChannel):
             return await interaction.response.send_message(
-                "This is not a support ticket channel.",
+                "❌ This is not a support ticket channel.",
                 ephemeral=True,
             )
 
         if not channel.topic or not channel.topic.startswith("support_ticket:"):
             return await interaction.response.send_message(
-                "This channel is not a support ticket.",
+                "❌ This channel is not a support ticket.",
                 ephemeral=True,
             )
 
@@ -431,7 +431,7 @@ class Moderation(commands.Cog):
 
         if interaction.user.id != ticket_owner_id and not is_staff:
             return await interaction.response.send_message(
-                "Only the ticket owner or staff can close this ticket.",
+                "❌ Only the ticket owner or staff can close this ticket.",
                 ephemeral=True,
             )
 
@@ -484,12 +484,12 @@ class Moderation(commands.Cog):
             print(f"[TICKET CLOSE ERROR] Could not close {channel} ({channel.id}): {exc}")
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "I couldn't finish closing this ticket. Please report this to staff.",
+                    "❌ I couldn't finish closing this ticket. Please report this to staff.",
                     ephemeral=True,
                 )
             else:
                 await interaction.followup.send(
-                    "I couldn't finish closing this ticket. Please report this to staff.",
+                    "❌ I couldn't finish closing this ticket. Please report this to staff.",
                     ephemeral=True,
                 )
         finally:
@@ -585,6 +585,7 @@ class Moderation(commands.Cog):
             try:
                 await member.send(
                     f"You were banned from **{member.guild.name}** because your username/display name matched a blocked account name pattern."
+                    f"If you feel this was an error, contact 'astrothadragon'."
                 )
             except discord.Forbidden:
                 pass
@@ -698,7 +699,7 @@ class Moderation(commands.Cog):
 
         if cleaned_code != correct_code:
             return await ctx.send(
-                f"{member.mention}, incorrect verification code. Check your DMs and try again.",
+                f"❌ {member.mention} incorrect verification code. Check your DMs and try again.",
                 delete_after=10
             )
 
@@ -717,7 +718,7 @@ class Moderation(commands.Cog):
             stored_code = row[0] if row and row[0] else correct_code
             if stored_code != correct_code:
                 return await ctx.send(
-                    f"{member.mention}, your verification code is no longer active. Click the **Verify** button to generate a new one!",
+                    f"❌ {member.mention} your verification code is no longer active. Click the **Verify** button to generate a new one!",
                     delete_after=10
                 )
 
@@ -759,7 +760,7 @@ class Moderation(commands.Cog):
             pass
 
         await ctx.send(
-            f"{member.mention}, you're verified! Welcome to The Cosmic Lair!",
+            f"{member.mention}, you're verified! Welcome to The Cosmic Lair! 🌌",
             delete_after=10
         )
 
@@ -767,12 +768,12 @@ class Moderation(commands.Cog):
 
         if log_channel:
             await log_channel.send(
-                f"{member.mention} passed server verification."
+                f"{member.mention} passed server verification. ✅"
             )
 
         try:
             await member.send(
-                "You have successfully verified in **The Cosmic Lair**!"
+                "You have successfully verified in **The Cosmic Lair**! We hope you enjoy your stay! 🌌"
             )
         except discord.Forbidden:
             pass
@@ -781,7 +782,7 @@ class Moderation(commands.Cog):
     async def verifycode_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(
-                f"{ctx.author.mention}, you forgot to include your code!\n"
+                f"❌ {ctx.author.mention} you forgot to include your code!\n"
                 f"Format: `-verifycode <YOUR-CODE>`",
                 delete_after=10
             )
@@ -812,7 +813,7 @@ class Moderation(commands.Cog):
 
                 try:
                     await message.channel.send(
-                        f"{message.author.mention}, your message was removed "
+                        f"{message.author.mention} your message was removed "
                         f"because images and videos in this channel must be marked "
                         f"as spoilers.\n"
                         f"Please repost the photo/video with Discord's spoiler "
@@ -852,7 +853,7 @@ class Moderation(commands.Cog):
         # 1. Typed just the code without command prefix
         if is_just_code:
             await message.channel.send(
-                f"{message.author.mention}, you typed the code without the command!\n"
+                f"❌ {message.author.mention} you typed the code without the command!\n"
                 f"Format: `-verifycode {content.upper()}`",
                 delete_after=10
             )
@@ -860,7 +861,7 @@ class Moderation(commands.Cog):
         # 2. Forgot the '-' prefix (e.g., "verifycode COSMIC-91823")
         elif content_lower.startswith("verifycode"):
             await message.channel.send(
-                f"{message.author.mention}, don't forget the `-` at the start!\n"
+                f"❌ {message.author.mention} don't forget the `-` at the start!\n"
                 f"Format: `-{content}`",
                 delete_after=10
             )
@@ -868,7 +869,7 @@ class Moderation(commands.Cog):
         # 3. Added spaces or hyphens into the command name (e.g., "-verify code")
         elif content_lower.startswith(("-verify code", "-verify-code", "verify-code", "verify code")):
             await message.channel.send(
-                f"{message.author.mention}, the command must be written as `-verifycode` (one word, no spaces).\n"
+                f"❌ {message.author.mention} the command must be written as `-verifycode` (one word, no spaces).\n"
                 f"Example: `-verifycode <YOUR-CODE>`",
                 delete_after=10
             )
@@ -1100,7 +1101,7 @@ class Moderation(commands.Cog):
 
                     if strikes >= 3:
                         action_text = (
-                            "You have reached the maximum number of verification strikes "
+                            "⛔ You have reached the maximum number of verification strikes "
                             "and have been banned from the server.\n\n"
                             "If you believe this was a mistake, you may appeal by contacting "
                             "'@Enceladus#0496', or the server owner at 'astrothadragon.'"
@@ -1113,7 +1114,7 @@ class Moderation(commands.Cog):
 
                     try:
                         await member.send(
-                            f"You were removed from **{guild.name}** because you did not verify yourself within 30 minutes.\n\n"
+                            f"❌ You were removed from **{guild.name}** because you did not verify yourself within 30 minutes!\n\n"
                             f"Verification strike: **{strikes}/3**\n\n"
                             f"{action_text}"
                         )

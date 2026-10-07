@@ -199,11 +199,11 @@ class Upgrades(commands.Cog):
     async def build_embed(self, user_id):
         stardust, mining_level, scavenging_level, salvage_level = await self.get_levels(user_id)
         embed = discord.Embed(
-            title="⚙️ Your Exploration Upgrades",
+            title="Your Exploration Upgrades ⚙️",
             description=(
                 "**These are the upgrades currently installed on your exploration equipment.**\n\n"
-                "Each system has **5 levels**, and you must complete them **in order**. "
-                "Every upgrade requires both **Stardust and materials**."
+                "Each system has **5 levels**, and you must complete them **in order.** "
+                "Every upgrade requires both **Stardust and materials!**"
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -218,14 +218,14 @@ class Upgrades(commands.Cog):
                 if system == "salvage":
                     value = (
                         f"**Level:** 5/5 ✨ MAX\n"
-                        f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**"
+                        f"Bonus material chance: **+{data['bonus_chance'] * 100:.0f}%** ♻️"
                     )
                 else:
                     value = (
-                        f"**Level:** 5/5 ✨ MAX\n"
-                        f"🔋 Max Charges: **{data['charges']}**\n"
-                        f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                        f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**"
+                        f"**Level:** 5/5 MAX ✨\n"
+                        f"Max charges: **{data['charges']}** 🔋\n"
+                        f"Stardust output: **+{data['stardust'] * 100:.0f}%** ✨\n"
+                        f"Rare loot bonus: **+{data['rare'] * 100:.1f}%** 🌟"
                     )
             else:
                 next_level = level + 1
@@ -236,30 +236,30 @@ class Upgrades(commands.Cog):
                 if system == "salvage":
                     value = (
                         f"**Level:** {level}/5\n"
-                        f"Next: **Level {next_level}**\n"
-                        f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**\n\n"
-                        f"💰 **{data['cost']:,} Stardust**\n"
+                        f"Next: **level {next_level}**\n"
+                        f"Bonus material chance: **+{data['bonus_chance'] * 100:.0f}%** ♻️\n\n"
+                        f"**{data['cost']:,} Stardust** ✨\n"
                         f"{comp_icon} **{comp_name} ×1**\n"
                         f"{self.material_text(mats)}"
-                        + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
+                        + ("\n**Nanite Retrofit Kit ×1** 🧬" if next_level == 5 else "")
                     )
                 else:
                     value = (
                         f"**Level:** {level}/5\n"
-                        f"Next: **Level {next_level}**\n"
-                        f"🔋 Max Charges: **{data['charges']}**\n"
-                        f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                        f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
-                        f"💰 **{data['cost']:,} Stardust**\n"
+                        f"Next: **level {next_level}**\n"
+                        f"Max charges: **{data['charges']}** 🔋\n"
+                        f"Stardust output: **+{data['stardust'] * 100:.0f}%** ✨\n"
+                        f"Rare loot bonus: **+{data['rare'] * 100:.1f}%** 🌟\n\n"
+                        f"**{data['cost']:,} Stardust** ✨\n"
                         f"{comp_icon} **{comp_name} ×1**\n"
                         f"{self.material_text(mats)}"
-                        + ("\n🧬 **Nanite Retrofit Kit ×1**" if next_level == 5 else "")
+                        + ("\n**Nanite Retrofit Kit ×1** 🧬" if next_level == 5 else "")
                     )
             embed.add_field(name=f"{info['emoji']} Your {info['name']}", value=value, inline=False)
         embed.set_footer(text=f"Available Stardust: {stardust:,} • Craft upgrade parts with /craft")
         return embed
 
-    @commands.hybrid_command(name="upgrades", description="View your permanent exploration upgrades.")
+    @commands.hybrid_command(name="upgrades", description="View your exploration device upgrades.")
     async def upgrades(self, ctx):
         await ctx.defer()
         await ctx.send(content=ctx.author.mention, embed=await self.build_embed(ctx.author.id))
@@ -267,9 +267,9 @@ class Upgrades(commands.Cog):
     @commands.hybrid_command(name="upgrade", description="Purchase the next level of a permanent exploration upgrade.")
     @app_commands.describe(upgrade="Choose which exploration system to upgrade.")
     @app_commands.choices(upgrade=[
-        app_commands.Choice(name="🔫 Mining Laser", value="mining"),
-        app_commands.Choice(name="🤖 Scavenging Drone", value="scavenging"),
-        app_commands.Choice(name="♻️ Salvage Rig", value="salvage"),
+        app_commands.Choice(name="Mining Laser 🔫", value="mining"),
+        app_commands.Choice(name="Scavenging Drone 🛸", value="scavenging"),
+        app_commands.Choice(name="Salvage Rig ♻️", value="salvage"),
     ])
     async def upgrade(self, ctx, upgrade: str):
         await ctx.defer()
@@ -300,7 +300,7 @@ class Upgrades(commands.Cog):
 
             if level >= MAX_LEVEL:
                 await db.rollback()
-                return await ctx.send(f"{ctx.author.mention} ✨ **{info['name']}** is already maxed at Level 5!")
+                return await ctx.send(f"✨ {ctx.author.mention} **{info['name']}** is already maxed at Level 5!")
 
             next_level = level + 1
             data = info["levels"][next_level]
@@ -312,7 +312,7 @@ class Upgrades(commands.Cog):
 
             if stardust < data["cost"]:
                 await db.rollback()
-                return await ctx.send(f"{ctx.author.mention} ❌ You need **{data['cost']:,} Stardust** for Level {next_level}. You have **{stardust:,}**.")
+                return await ctx.send(f"❌ {ctx.author.mention} you need **{data['cost']:,} Stardust** for Level {next_level}. You have **{stardust:,}.**")
 
             missing = []
             consumptions = []
@@ -349,9 +349,9 @@ class Upgrades(commands.Cog):
             if missing:
                 await db.rollback()
                 return await ctx.send(
-                    f"{ctx.author.mention} ❌ You're missing the materials for **{info['name']} Level {next_level}**:\n"
+                    f"❌ {ctx.author.mention} you're missing the materials for **{info['name']} Level {next_level}:**\n"
                     + "\n".join(missing)
-                    + "\n\nUse `/craft` to make the required upgrade component."
+                    + "\n\n*Use `/craft` to make the required upgrade component.*"
                 )
 
             for item_id, amount in consumptions:
@@ -371,19 +371,19 @@ class Upgrades(commands.Cog):
             await db.commit()
 
         embed = discord.Embed(
-            title="⬆️ Upgrade Complete!",
+            title="Upgrade Completed! ⬆️",
             description=(
                 f"{ctx.author.mention}\n\n"
                 f"{info['emoji']} **{info['name']}** is now **Level {next_level}/5**!\n\n"
                 + (
-                    f"♻️ Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%**\n\n"
+                    f"Bonus Material Chance: **+{data['bonus_chance'] * 100:.0f}%** ♻️\n\n"
                     if upgrade == "salvage"
                     else
-                    f"🔋 Max Charges: **{data['charges']}**\n"
-                    f"💫 Stardust Output: **+{data['stardust'] * 100:.0f}%**\n"
-                    f"🌟 Rare Loot Bonus: **+{data['rare'] * 100:.1f}%**\n\n"
+                    f"Max charges: **{data['charges']}** 🔋\n"
+                    f"Stardust output: **+{data['stardust'] * 100:.0f}%** ✨\n"
+                    f"Rare loot bonus: **+{data['rare'] * 100:.1f}%** 🌟\n\n"
                 )
-                + f"💰 Spent: **{data['cost']:,} Stardust**\n"
+                + f"Spent: **{data['cost']:,} Stardust** ✨\n"
                 + "🧰 **Materials Consumed:**\n"
                 + "\n".join(
                     f"{MATERIAL_NAMES[item_id][0]} {MATERIAL_NAMES[item_id][1]} ×{amount}"

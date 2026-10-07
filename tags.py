@@ -1,8 +1,3 @@
-# © 2026 The Cosmic Lair & AstroThaDragon. All Rights Reserved. 
-# Unauthorized use of this code is prohibited.
-
-# tags.py
-
 tag_list = {
     "angery": "*angy deer noises*\nimages/angery.jpg",
     "arrived": "images/arrived.gif",
@@ -45,19 +40,18 @@ tag_list = {
         "images/laughat.gif"
     ),
     "list": (
-        "## 🏷️ Our current tags in the server! Don't forget the '-'!\n\n"
-
-        "`-angery` `-arrived` `-astro` `-baldi` `-banned`\n"
-        "`-beepboop` `-bite` `-blu` `-boykisser` `-brick` `-catburglar`\n"
-        "`-dead` `-deadchat` `-deletethis` `-desgostang`\n"
-        "`-dragonhug` `-forgetthat` `-freaky` `-freakycat`\n"
-        "`-gm` `-gn` `-handshake` `-hoopla` `-huzzah`\n"
-        "`-imtotallyfine` `-laughat` `-malo` `-minigames`\n"
-        "`-minion` `-murdock` `-nightflaid` `-pathetic` `-personalspace`\n"
-        "`-poyo` `-punch` `-quazar` `-retro` `-sacrifice` `-screwit` `-sharklunge`\n"
-        "`-sniffsniff` `-spunchgun` `-spunchpop` `-stinks`\n"
-        "`-tired` `-toopliss` `-toothless` `-trade`\n"
-        "`-umbre` `-umbrecup` `-vox` `-wtf`"
+        "### *Our fun tags in the server! Don't forget the - before any tag!* 🏷️\n\n"
+        "**-angery -arrived -astro -baldi -banned**\n"
+        "**-beepboop -bite -blu -boykisser -brick -catburglar**\n"
+        "**-dead -deadchat -deletethis -desgostang**\n"
+        "**-dragonhug -forgetthat -freaky -freakycat**\n"
+        "**-gm -gn -handshake -hoopla -huzzah**\n"
+        "**-imtotallyfine -laughat -malo -minigames**\n"
+        "**-minion -murdock -nightflaid -pathetic -personalspace**\n"
+        "**-poyo -punch -quazar -retro -sacrifice -screwit -sharklunge**\n"
+        "**-sniffsniff -spunchgun -spunchpop -stinks**\n"
+        "**-tired -toopliss -toothless -trade**\n"
+        "**-umbre -umbrecup -vox -wtf**"
     )
     ,
     "malo": (
