@@ -215,15 +215,47 @@ class LeaderboardView(discord.ui.View):
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
 async def load_custom_image(url):
-    async with aiohttp.ClientSession() as session:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"}
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.read()
-                return io.BytesIO(data)
-            else:
-                print(f"Image load failed. Status: {response.status}")
-                return None
+    """Download and validate a rank-card background image.
+
+    The URL must point to the actual image bytes (Discord CDN attachment
+    links work). We validate the downloaded bytes with Pillow so HTML error
+    pages, dead links, and other non-image responses never reach Editor().
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("Background URL is empty.")
+
+    url = url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("Background URL must start with http:// or https://.")
+
+    timeout = aiohttp.ClientTimeout(total=10)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/110.0.0.0 Safari/537.36"
+        )
+    }
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(url, headers=headers, allow_redirects=True) as response:
+            if response.status != 200:
+                raise ValueError(f"Image server returned HTTP {response.status}.")
+
+            data = await response.read()
+
+    if not data:
+        raise ValueError("Image response was empty.")
+
+    image_bytes = io.BytesIO(data)
+    try:
+        with Image.open(image_bytes) as img:
+            img.verify()
+    except Exception as e:
+        raise ValueError("The URL did not return a valid image file.") from e
+
+    image_bytes.seek(0)
+    return image_bytes
 
 class FontPreviewSelect(discord.ui.Select):
     def __init__(self, cog):
@@ -314,13 +346,16 @@ class FontPreviewSelect(discord.ui.Select):
         try:
             if bg_url and bg_url != 'default':
                 bg_data = await load_custom_image(bg_url)
-                background = Editor(bg_data).resize((900, 270)) if bg_data else Editor(Canvas((900, 270), color="#23272a"))
+                background = Editor(bg_data).resize((900, 270))
             elif os.path.exists("images/rank_template.png"):
                 background = Editor("images/rank_template.png")
             else:
                 background = Editor(Canvas((900, 270), color="#23272a"))
         except Exception:
-            background = Editor(Canvas((900, 270), color="#23272a"))
+            if os.path.exists("images/rank_template.png"):
+                background = Editor("images/rank_template.png")
+            else:
+                background = Editor(Canvas((900, 270), color="#23272a"))
 
         try:
             avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
@@ -500,18 +535,6 @@ class Leveling(commands.Cog):
         ]
         self.NO_XP_CATEGORIES = [593406939111751721, 593413698085978132]
 
-        self.level_roles = {
-            100: 1296961266627121223, 95: 1501609710573453324, 90: 1501609557804187781, 
-            85: 1501609375318675657, 80: 1501609179566313522, 75: 1501608976507211920, 
-            70: 1501608777613312020, 65: 1501608443356643328, 60: 1501608145582031000, 
-            55: 1501607815893094552, 50: 1296959776667730143, 45: 1296959689367617660, 
-            40: 1296959665455890483, 35: 1296959633436708897, 30: 1296959584820264980, 
-            25: 1295861213695311935, 20: 1295861175388475463, 15: 1295861144996806726, 
-            10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615,
-            0: 1501969001792798841
-        }
-
-        self.cooldowns = {}
     def is_no_xp_channel(self, channel) -> bool:
         """Return True when a channel, thread, or forum post should not award XP."""
         channel_id = getattr(channel, "id", None)
@@ -529,6 +552,19 @@ class Leveling(commands.Cog):
             return True
 
         return False
+
+        self.level_roles = {
+            100: 1296961266627121223, 95: 1501609710573453324, 90: 1501609557804187781, 
+            85: 1501609375318675657, 80: 1501609179566313522, 75: 1501608976507211920, 
+            70: 1501608777613312020, 65: 1501608443356643328, 60: 1501608145582031000, 
+            55: 1501607815893094552, 50: 1296959776667730143, 45: 1296959689367617660, 
+            40: 1296959665455890483, 35: 1296959633436708897, 30: 1296959584820264980, 
+            25: 1295861213695311935, 20: 1295861175388475463, 15: 1295861144996806726, 
+            10: 1295861102483210260, 5: 1295861061995597844, 1: 1295860897532608615,
+            0: 1501969001792798841
+        }
+
+        self.cooldowns = {}
 
     async def cog_load(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -874,8 +910,28 @@ class Leveling(commands.Cog):
                 else:
                     background = Editor(Canvas((900, 270), color="#23272a"))
             except Exception as e:
-                print(f"Background Error: {e}")
-                background = Editor(Canvas((900, 270), color="#23272a"))
+                # A saved custom background can become invalid later (deleted
+                # image, expired host URL, HTML response, etc.). Fall back to
+                # the normal rank background and clear the broken URL so the
+                # same error does not happen on every /rank.
+                print(
+                    f"Background Error for {member} (ID: {member.id}) "
+                    f"| bg_url={bg_url!r} | {e}"
+                )
+                try:
+                    async with aiosqlite.connect(self.db_path) as db:
+                        await db.execute(
+                            "UPDATE users SET bg_url = 'default' WHERE user_id = ?",
+                            (member.id,)
+                        )
+                        await db.commit()
+                except Exception as clear_error:
+                    print(f"Failed to clear invalid background for {member.id}: {clear_error}")
+
+                if os.path.exists("images/rank_template.png"):
+                    background = Editor("images/rank_template.png")
+                else:
+                    background = Editor(Canvas((900, 270), color="#23272a"))
 
             avatar_image = await load_image_async(member.display_avatar.replace(format="png", size=256).url)
             avatar = Editor(avatar_image).resize((150, 150)).circle_image()
@@ -1127,8 +1183,32 @@ class Leveling(commands.Cog):
             if color_hex:
                 if not color_hex.startswith("#") or len(color_hex) != 7: return await ctx.send("Invalid hex color!", ephemeral=True)
                 await db.execute("UPDATE users SET bar_color = ? WHERE user_id = ?", (color_hex, ctx.author.id))
-            if background_url: 
-                await db.execute("UPDATE users SET bg_url = ? WHERE user_id = ?", (background_url, ctx.author.id))
+            if background_url:
+                background_url = background_url.strip()
+
+                # Allow "default" to restore the normal rank-card background.
+                if background_url.lower() == "default":
+                    await db.execute(
+                        "UPDATE users SET bg_url = 'default' WHERE user_id = ?",
+                        (ctx.author.id,)
+                    )
+                else:
+                    # Validate the URL before saving it. This prevents broken
+                    # URLs from being stored and failing every future /rank.
+                    try:
+                        test_image = await load_custom_image(background_url)
+                        if test_image is None:
+                            raise ValueError("The URL did not return an image.")
+                    except Exception as e:
+                        return await ctx.send(
+                            f"❌ I couldn't use that background URL. Make sure it is a direct image URL (ending in an image file or a Discord CDN image link).\n\n**Reason:** {e}",
+                            ephemeral=True
+                        )
+
+                    await db.execute(
+                        "UPDATE users SET bg_url = ? WHERE user_id = ?",
+                        (background_url, ctx.author.id)
+                    )
             if font_choice:
                 await db.execute("UPDATE users SET font_choice = ? WHERE user_id = ?", (font_choice.value, ctx.author.id))
             if glow_toggle:
