@@ -677,6 +677,18 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             )
         return choices[:25]
 
+
+    @commands.hybrid_group(
+        name="fusion",
+        description="Fuse pets or learn how Pet Fusion works.",
+    )
+    async def fusion(self, ctx: commands.Context):
+        """Pet Fusion command group."""
+        await ctx.send(
+            "🧬 Choose a Fusion option: **fuse** to fuse a pet or **info** to learn how Fusion works."
+        )
+
+
     @fusion.command(
         name="info",
         description="Learn how Pet Fusion works.",
