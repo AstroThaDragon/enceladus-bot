@@ -479,8 +479,44 @@ class Leveling(commands.Cog):
         self.BOOSTER_ROLE_ID = 927505358736470047          
         self.WATCHLIST_ROLE_ID = 928584760748564570       
         
-        self.NO_XP_CHANNELS = [1117403991266041906, 593398659530489858, 1306821711970435122, 1496628909570265199, 1473398974508437645, 1352415256584130590, 1117391981627318363, 1512300086057631925, 1510687468842782720, 1306602160527507456, 1296962529989361685, 598883099987673088] 
+        self.NO_XP_CHANNELS = [
+            1117403991266041906,
+            593398659530489858,
+            1306821711970435122,
+            1496628909570265199,  # Fact of the Day
+            1352415256584130590,
+            1117391981627318363,
+            1512300086057631925,
+            1510687468842782720,
+            1306602160527507456,
+            1296962529989361685,
+            598883099987673088,
+            1548034265508356166,  # Exploration
+            1551692566829867058,  # Halloween Exploration
+            1552628676691107931,  # Exploration thread
+            1552629116254162964,  # Exploration thread
+            1117406397672472639,  # Suggestions forum
+            1117413444883316787,  # Help and Questions forum
+        ]
         self.NO_XP_CATEGORIES = [593406939111751721, 593413698085978132]
+
+    def is_no_xp_channel(self, channel) -> bool:
+        """Return True when a channel, thread, or forum post should not award XP."""
+        channel_id = getattr(channel, "id", None)
+        if channel_id in self.NO_XP_CHANNELS:
+            return True
+
+        # Threads and forum posts have their own channel IDs. If their parent
+        # channel is disabled for XP, the thread/post inherits that setting.
+        parent_id = getattr(channel, "parent_id", None)
+        if parent_id in self.NO_XP_CHANNELS:
+            return True
+
+        category_id = getattr(channel, "category_id", None)
+        if category_id in self.NO_XP_CATEGORIES:
+            return True
+
+        return False
 
         self.level_roles = {
             100: 1296961266627121223, 95: 1501609710573453324, 90: 1501609557804187781, 
@@ -714,7 +750,7 @@ class Leveling(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild: return
-        if message.channel.id in self.NO_XP_CHANNELS or message.channel.category_id in self.NO_XP_CATEGORIES: return
+        if self.is_no_xp_channel(message.channel): return
         if message.author.get_role(self.WATCHLIST_ROLE_ID): return
 
         user_id = message.author.id
