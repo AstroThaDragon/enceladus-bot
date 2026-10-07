@@ -36,7 +36,87 @@ class PetFusionMixin:
             db: aiosqlite.Connection,
         ) -> None:
             ...
-    async def _execute_pet_fusion(self, ctx: commands.Context, target_pet_id: int):
+    async def _get_fusion_preview(self, user_id: int, target_pet_id: int):
+        """Return the exact unfavorited pets eligible for the next Fusion."""
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            async with db.execute(
+                """
+                SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id,
+                       fusion_level, is_favorite
+                FROM pets
+                WHERE user_id = ? AND pet_id = ?
+                LIMIT 1
+                """,
+                (user_id, target_pet_id),
+            ) as cursor:
+                target = await cursor.fetchone()
+            if not target:
+                return None, "❌ You don't own that pet."
+
+            pet_type = target[1] or target[2] or ""
+            if pet_type not in PETS and pet_type not in HALLOWEEN_PETS and pet_type not in GLITCHED_PET_TYPES:
+                return None, "❌ This pet cannot be fused. Haunted location pets are unique companions."
+
+            level = int(target[4] or 1)
+            fusion_level = int(target[6] or 0)
+            variant_id = target[5] or ""
+            if fusion_level < 5:
+                next_fusion = fusion_level + 1
+                required_level = FUSION_LEVEL_GATES[next_fusion]
+                if level < required_level:
+                    return None, f"🔒 **Fusion {next_fusion}** unlocks at **Level {required_level}**. This pet is currently **Level {level}**."
+                cost = FUSION_COSTS[next_fusion]
+                cost_label = f"Fusion {next_fusion}/5"
+            else:
+                next_fusion = 5
+                cost = VARIANT_HUNT_COST
+                cost_label = "Variant Hunt"
+
+            duplicate_requirement = 2 if (pet_type in HALLOWEEN_PETS or pet_type in GLITCHED_PET_TYPES) else 5
+            async with db.execute(
+                f"""
+                SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite
+                FROM pets
+                WHERE user_id = ?
+                  AND pet_id != ?
+                  AND LOWER(TRIM(COALESCE(NULLIF(pet_type, ''), pet_stage, ''))) = LOWER(TRIM(?))
+                  AND LOWER(TRIM(COALESCE(variant_id, ''))) = LOWER(TRIM(?))
+                  AND CAST(COALESCE(is_favorite, 0) AS INTEGER) = 0
+                ORDER BY pet_id
+                LIMIT {duplicate_requirement}
+                """,
+                (user_id, target_pet_id, pet_type, variant_id),
+            ) as cursor:
+                duplicate_rows = list(await cursor.fetchall())
+
+            if len(duplicate_rows) < duplicate_requirement:
+                variant_text = " with the same variant" if variant_id else ""
+                return None, f"❌ You need **{duplicate_requirement} non-favorited duplicates** of this pet{variant_text}. You currently have **{len(duplicate_rows)}/{duplicate_requirement}** available."
+
+            definition = get_pet_definition(pet_type, variant_id)
+            if not definition:
+                return None, "❌ The selected pet definition could not be loaded."
+
+            return {
+                "target_pet_id": target_pet_id,
+                "target_name": definition["name"],
+                "target_emoji": definition["emoji"],
+                "target_level": level,
+                "target_fusion": fusion_level,
+                "target_variant_id": variant_id,
+                "pet_type": pet_type,
+                "next_fusion": next_fusion,
+                "cost": cost,
+                "cost_label": cost_label,
+                "duplicate_requirement": duplicate_requirement,
+                "duplicates": [
+                    {"pet_id": row[0], "nickname": row[3] or "", "level": int(row[4] or 1), "variant_id": row[5] or ""}
+                    for row in duplicate_rows
+                ],
+            }, None
+
+    async def _execute_pet_fusion(self, ctx: commands.Context, target_pet_id: int, duplicate_ids=None):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_schema(db)
             await db.execute("BEGIN IMMEDIATE")
@@ -85,21 +165,55 @@ class PetFusionMixin:
 
             duplicate_requirement = 2 if (pet_type in HALLOWEEN_PETS or pet_type in GLITCHED_PET_TYPES) else 5
 
-            async with db.execute(
-                f"""
-                SELECT pet_id
-                FROM pets
-                WHERE user_id = ?
-                  AND pet_id != ?
-                  AND LOWER(TRIM(COALESCE(NULLIF(pet_type, ''), pet_stage, ''))) = LOWER(TRIM(?))
-                  AND LOWER(TRIM(COALESCE(variant_id, ''))) = LOWER(TRIM(?))
-                  AND COALESCE(is_favorite, 0) = 0
-                ORDER BY pet_id
-                LIMIT {duplicate_requirement}
-                """,
-                (ctx.author.id, target_pet_id, pet_type, variant_id),
-            ) as cursor:
-                duplicate_rows = list(await cursor.fetchall())
+            if duplicate_ids is not None:
+                normalized_ids = [int(pet_id) for pet_id in duplicate_ids]
+                if len(normalized_ids) != duplicate_requirement or len(set(normalized_ids)) != duplicate_requirement:
+                    await db.rollback()
+                    return await ctx.send("❌ The Fusion preview is no longer valid. Please run Fusion again.")
+
+                placeholders = ",".join("?" for _ in normalized_ids)
+                async with db.execute(
+                    f"""
+                    SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite
+                    FROM pets
+                    WHERE user_id = ? AND pet_id IN ({placeholders})
+                    """,
+                    [ctx.author.id, *normalized_ids],
+                ) as cursor:
+                    duplicate_rows = list(await cursor.fetchall())
+
+                by_id = {row[0]: row for row in duplicate_rows}
+                valid = (
+                    len(duplicate_rows) == duplicate_requirement
+                    and all(
+                        pet_id in by_id
+                        and pet_id != target_pet_id
+                        and str(by_id[pet_id][1] or by_id[pet_id][2] or "").strip().lower() == str(pet_type).strip().lower()
+                        and str(by_id[pet_id][5] or "").strip().lower() == str(variant_id).strip().lower()
+                        and int(by_id[pet_id][7] or 0) == 0
+                        for pet_id in normalized_ids
+                    )
+                )
+                if not valid:
+                    await db.rollback()
+                    return await ctx.send("🔒 **Fusion cancelled for safety.** One or more of the pets shown in the confirmation is no longer available or has been favorited. Nothing was consumed.")
+                duplicate_rows = [by_id[pet_id] for pet_id in normalized_ids]
+            else:
+                async with db.execute(
+                    f"""
+                    SELECT pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite
+                    FROM pets
+                    WHERE user_id = ?
+                      AND pet_id != ?
+                      AND LOWER(TRIM(COALESCE(NULLIF(pet_type, ''), pet_stage, ''))) = LOWER(TRIM(?))
+                      AND LOWER(TRIM(COALESCE(variant_id, ''))) = LOWER(TRIM(?))
+                      AND CAST(COALESCE(is_favorite, 0) AS INTEGER) = 0
+                    ORDER BY pet_id
+                    LIMIT {duplicate_requirement}
+                    """,
+                    (ctx.author.id, target_pet_id, pet_type, variant_id),
+                ) as cursor:
+                    duplicate_rows = list(await cursor.fetchall())
 
             if len(duplicate_rows) < duplicate_requirement:
                 await db.rollback()

@@ -452,12 +452,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         display_name = pet["nickname"] or pet["name"]
         active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
 
-        pet_name_line = f"{pet['emoji']} **{pet['name']}"
-        if bundle_count > 1:
-            pet_name_line += f" ×{bundle_count}"
-        pet_name_line += "**"
+        pet_name_line = f"{pet['emoji']} **{pet['name']}**"
         if pet["nickname"]:
             pet_name_line += f" • {display_name}"
+        if bundle_count > 1:
+            pet_name_line += f" • **{bundle_count} Duplicates**"
 
         embed = discord.Embed(
             title=f"🐾 {ctx.author.display_name}'s Pet",
@@ -629,10 +628,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 rows = await cursor.fetchall()
 
         choices = []
-
         for pet_id, pet_type, pet_stage, nickname, level, variant_id, fusion_level, is_favorite in rows:
             pet_type_id = pet_type or pet_stage
-
             if pet_type_id not in PETS and pet_type_id not in HALLOWEEN_PETS and pet_type_id not in GLITCHED_PETS:
                 continue
 
@@ -640,22 +637,12 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             if not definition:
                 continue
 
-            # Count matching, non-favorited duplicates available to consume.
-            # Fusion matching intentionally ignores level: any matching pet/variant
-            # can be consumed, as long as it is not the target and is unfavorited.
+            # Fusion ignores level and nickname. A favorite pet may be selected
+            # as the target, but a favorite pet is never an eligible duplicate.
             target_type_key = str(pet_type_id or "").strip().lower()
             target_variant_key = str(variant_id or "").strip().lower()
             matching_duplicates = 0
-            for (
-                other_id,
-                other_type,
-                other_stage,
-                _nickname,
-                _level,
-                other_variant_id,
-                _fusion,
-                other_favorite,
-            ) in rows:
+            for other_id, other_type, other_stage, _nickname, _level, other_variant_id, _fusion, other_favorite in rows:
                 other_type_key = str(other_type or other_stage or "").strip().lower()
                 other_variant_key = str(other_variant_id or "").strip().lower()
                 favorite_key = str(other_favorite or "").strip().lower()
@@ -670,49 +657,25 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             display_name = nickname or definition["name"]
             level = int(level or 1)
             fusion = int(fusion_level or 0)
-
-            search = (
-                f"{display_name} {definition['name']} {pet_type_id} "
-                f"{pet_id} {level} {fusion} {variant_id or ''}"
-            ).lower()
-
+            search = f"{display_name} {definition['name']} {pet_type_id} {pet_id} {level} {fusion} {variant_id or ''}".lower()
             if current and current not in search:
                 continue
 
             variant_label = f" • {variant_id}" if variant_id else ""
-
             duplicate_requirement = 2 if (pet_type_id in HALLOWEEN_PETS or pet_type_id in GLITCHED_PETS) else 5
-            if matching_duplicates >= duplicate_requirement:
-                duplicate_label = f"{duplicate_requirement}/{duplicate_requirement} duplicates"
-            else:
-                duplicate_label = f"{matching_duplicates}/{duplicate_requirement} duplicates"
-
+            duplicate_label = f"{min(matching_duplicates, duplicate_requirement)}/{duplicate_requirement} Duplicates"
             choices.append(
                 app_commands.Choice(
                     name=(
-                        f"{definition['emoji']} {display_name}"
-                        f"{variant_label}"
-                        f" • Lv. {level}"
+                        f"{definition['emoji']} {display_name}{variant_label}"
+                        f" • Lvl {level}"
                         f" • Fusion {fusion}/5"
                         f" • {duplicate_label}"
                     )[:100],
                     value=str(pet_id),
                 )
             )
-
         return choices[:25]
-
-
-    @commands.hybrid_group(
-        name="fusion",
-        description="Fuse pets or learn how Pet Fusion works.",
-    )
-    async def fusion(self, ctx: commands.Context):
-        """Pet Fusion command group."""
-        await ctx.send(
-            "🧬 Choose a Fusion option: **fuse** to fuse a pet or **info** to learn how Fusion works."
-        )
-
 
     @fusion.command(
         name="info",
@@ -809,33 +772,37 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         except (TypeError, ValueError):
             return await ctx.send("❌ That pet selection is invalid.")
 
-        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
-            await self.ensure_schema(db)
-            async with db.execute(
-                "SELECT fusion_level, pet_type, variant_id FROM pets WHERE user_id = ? AND pet_id = ? LIMIT 1",
-                (ctx.author.id, target_pet_id),
-            ) as cursor:
-                row = await cursor.fetchone()
+        preview, error = await self._get_fusion_preview(ctx.author.id, target_pet_id)
+        if error:
+            return await ctx.send(error)
 
-        if not row:
-            return await ctx.send("❌ You don't own that pet.")
-
-        fusion_level = int(row[0] or 0)
-        if fusion_level >= 5:
-            definition = get_pet_definition(row[1] or "", row[2] or None)
-            display = definition["name"] if definition else "this pet"
-            return await ctx.send(
-                f"🧬 **{display} has reached maximum Fusion 5.**\n\n"
-                "Further fusions will **not** increase its passive bonus. "
-                "They only give you another chance to discover a rare variant.\n\n"
-                f"This attempt will consume **{2 if (row[1] or '') in HALLOWEEN_PETS else 5} matching duplicates**, **15,000 Stardust**, and **3 Astral Essence**.\n\n"
-                "Continue?",
-                view=PostFusionConfirmView(self, ctx, target_pet_id),
+        variant_text = f" • {preview['target_variant_id']}" if preview["target_variant_id"] else ""
+        duplicate_lines = []
+        for duplicate in preview["duplicates"]:
+            definition = get_pet_definition(preview["pet_type"], duplicate["variant_id"])
+            name = definition["name"] if definition else preview["target_name"]
+            duplicate_lines.append(
+                f"• {name}{variant_text if duplicate['variant_id'] == preview['target_variant_id'] else ''} — Level {duplicate['level']}"
             )
 
-        return await self._execute_pet_fusion(ctx, target_pet_id)
-
-
+        fusion_label = (
+            f"Fusion {preview['target_fusion']}/5 → Fusion {preview['next_fusion']}/5"
+            if preview["target_fusion"] < 5
+            else "Variant Hunt"
+        )
+        content = (
+            f"🧬 **Confirm Pet Fusion**\n\n"
+            f"You are about to use **{preview['target_emoji']} {preview['target_name']}**{variant_text} "
+            f"(Level **{preview['target_level']}** • {fusion_label}).\n\n"
+            f"**Pets being fused:**\n"
+            + "\n".join(duplicate_lines)
+            + "\n\n────────────────────────\n\n"
+            f"**Cost:** **{preview['cost']['stardust']:,} Stardust** • **{preview['cost']['essence']} Astral Essence**\n\n"
+            "🔒 **Favorite a pet to protect it.** Favorited pets can never be released or consumed by Fusion. "
+            "The target pet may be favorited; only the pets listed above will be consumed.\n\n"
+            "⚠️ **These pets will be permanently consumed.**"
+        )
+        return await ctx.send(content, view=PostFusionConfirmView(self, ctx, preview))
 
 
     def _pet_collection_category(self, pet):
@@ -949,7 +916,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         for entry in visible:
             pet = entry["pet"]
             marker = "⭐ " if any(member["is_active"] for member in entry["members"]) else ""
-            count_text = f" ×{entry['count']}" if entry["count"] > 1 else ""
+            count_text = f" • {entry['count']} Duplicates" if entry["count"] > 1 else ""
             lines.append(
                 f"{marker}{pet['emoji']} **{pet['name']}** — Lv. **{pet['level']}**{count_text}"
             )

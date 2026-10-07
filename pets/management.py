@@ -264,7 +264,10 @@ class PetManagementMixin:
             if not row:
                 await db.rollback()
                 return None
-            if row[6]:
+            # Favorite status is a hard protection boundary. Re-check it
+            # inside the transaction so a pet cannot be released if it was
+            # favorited after the confirmation prompt was opened.
+            if int(row[6] or 0) == 1:
                 await db.rollback()
                 return {"protected": True}
             pet_type = row[0] or row[1]

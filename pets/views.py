@@ -416,7 +416,7 @@ class PetGroupSelect(discord.ui.Select):
         for entry in entries:
             pet = entry["pet"]
             marker = "⭐ " if any(member["is_active"] for member in entry["members"]) else ""
-            count_text = f" ×{entry['count']}" if entry["count"] > 1 else ""
+            count_text = f" • {entry['count']} Duplicates" if entry["count"] > 1 else ""
             label = f"{marker}{pet['name']} — Lv. {pet['level']}{count_text}"
             options.append(discord.SelectOption(
                 label=label[:100],
@@ -424,7 +424,7 @@ class PetGroupSelect(discord.ui.Select):
                 emoji=pet["emoji"],
                 description=(
                     "Active companion" if any(member["is_active"] for member in entry["members"])
-                    else f"{entry['count']} matching copies"
+                    else f"{entry['count']} same-level copies"
                 ),
             ))
         super().__init__(
@@ -922,31 +922,30 @@ class FusionVariantView(discord.ui.View):
 
 
 class PostFusionConfirmView(discord.ui.View):
-    def __init__(self, cog, ctx, target_pet_id):
+    """Confirm a Fusion using the exact pets shown in the preview."""
+
+    def __init__(self, cog, ctx, preview):
         super().__init__(timeout=60)
         self.cog = cog
         self.ctx = ctx
-        self.target_pet_id = target_pet_id
+        self.preview = preview
 
-    @discord.ui.button(label="Yes, Continue", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Confirm Fusion", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("❌ This fusion confirmation isn't for you.", ephemeral=True)
         self.stop()
         await interaction.response.defer()
-        await self.cog._execute_pet_fusion(self.ctx, self.target_pet_id)
+        duplicate_ids = [pet["pet_id"] for pet in self.preview["duplicates"]]
+        await self.cog._execute_pet_fusion(self.ctx, self.preview["target_pet_id"], duplicate_ids=duplicate_ids)
         try:
             await interaction.edit_original_response(view=None)
         except discord.HTTPException:
             pass
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("❌ This fusion confirmation isn't for you.", ephemeral=True)
         self.stop()
-        await interaction.response.edit_message(
-            content="🧬 Fusion cancelled. Your pet and materials were not changed.",
-            view=None,
-        )
-
+        await interaction.response.edit_message(content="🧬 Fusion cancelled. Your pet and materials were not changed.", view=None)
