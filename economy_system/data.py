@@ -101,7 +101,7 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
     "wiring",
 }
 
-SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
+SELLABLE_ITEM_IDS = {'analysis_module', 'astral_lens', 'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'mutation_catalyst', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'quantum_coil', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
                      }
 
 SHOP_CATEGORY_INFO = {
@@ -178,6 +178,9 @@ SELL_ITEM_CATEGORY_IDS = {
         # Temporary utility items are consumables, not upgrade kits.
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "ore_magnet",
         "prototype_drill_bit", "cosmic_insurance", "fate_anchor",
+    },
+    "upgrade_materials": {
+        "quantum_coil", "astral_lens", "mutation_catalyst", "analysis_module",
     },
     "upgrade_kits": set(),  # Populated dynamically from crafting recipes below.
     "defense_weapons": {
