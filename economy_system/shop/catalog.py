@@ -166,9 +166,12 @@ class EconomyShopCatalogMixin:
                     continue
                 if category == "materials" and (
                     item_type not in {"Mineral", "Crafting Material", "Incubator Material"}
+                    or item_type == "Incubator Material"
                     or halloween_collectible
                     or item_id in HALLOWEEN_SPACE_JUNK_IDS
                 ):
+                    continue
+                if category == "upgrade_materials" and item_type != "Incubator Material":
                     continue
                 if category in SELL_ITEM_CATEGORY_IDS:
                     allowed_ids = SELL_ITEM_CATEGORY_IDS[category]

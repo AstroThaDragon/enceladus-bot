@@ -70,6 +70,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
             app_commands.Choice(name="❤️ Healing", value="healing"),
             app_commands.Choice(name="🔋 Recharge", value="recharge"),
             app_commands.Choice(name="🛠️ Upgrades", value="upgrades"),
+            app_commands.Choice(name="🧬 Upgrade Materials", value="upgrade_materials"),
             app_commands.Choice(name="🐾 Pet Items", value="pet_items"),
             app_commands.Choice(name="✨ Special", value="special"),
             app_commands.Choice(name="🎟️ Lottery", value="lottery"),
@@ -768,6 +769,47 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                         f"**{item['name']}** for **{cost:,} Stardust**!"
                     )
     
+                if item_id in {
+                    "quantum_coil",
+                    "astral_lens",
+                    "mutation_catalyst",
+                    "analysis_module",
+                }:
+                    # Incubator upgrade materials are regular stackable inventory
+                    # items. Their shop catalog entries currently use the generic
+                    # ``special`` type, so identify them by their explicit IDs.
+                    added_amount, new_quantity, max_quantity = await add_inventory_item(
+                        db,
+                        user_id,
+                        item_id,
+                        "Incubator Material",
+                        quantity,
+                    )
+
+                    if added_amount != quantity:
+                        await db.rollback()
+                        return await ctx.send(
+                            f"📦 **Inventory Full!** You can only hold **{max_quantity}x** "
+                            f"**{item['name']}**.\n"
+                            f"You currently have **{new_quantity}x**."
+                        )
+
+                    await db.execute(
+                        "UPDATE users SET stardust = ? WHERE user_id = ?",
+                        (new_stardust, user_id),
+                    )
+
+                    await self.record_shop_purchase(
+                        db, user_id, item_id, quantity
+                    )
+
+                    await db.commit()
+
+                    return await ctx.send(
+                        f"{ctx.author.mention} 🧬 **Purchase Successful!** Added **{quantity}x "
+                        f"{item['name']}** to your inventory for **{cost:,} Stardust**!"
+                    )
+
                 if item_type == "heal":
                     # Item key format:
                     # medkit -> medkits
