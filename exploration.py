@@ -2515,11 +2515,11 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             # Seasonal eggs automatically stop dropping when Halloween ends.
             egg_rolls = []
             if halloween_active:
-                if random.random() < 0.03:
+                if random.random() < 0.025:
                     egg_rolls.append("normal_egg")
-                if random.random() < 0.10:
+                if random.random() < 0.12:
                     egg_rolls.append("halloween_egg")
-                if random.random() < 0.08:
+                if random.random() < 0.09:
                     egg_rolls.append("glitched_egg")
             elif random.random() < NORMAL_EGG_CHANCE:
                 egg_rolls.append("normal_egg")
