@@ -109,6 +109,7 @@ class Enceladus(commands.Bot):
         self.add_view(PronounView())
         self.add_view(DMStatusView())
         self.add_view(FandomView())
+        self.add_view(InterestsView())
         self.add_view(GradientColorView())
         
         # 4. Global Sync
