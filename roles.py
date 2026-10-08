@@ -334,8 +334,12 @@ class GradientColorView(discord.ui.View):
 
 # --- SHARED TOGGLE LOGIC ---
 async def toggle_role(interaction: discord.Interaction, role_id: int):
+    # Acknowledge the interaction immediately so Discord's ~3-second timeout
+    # cannot be triggered while waiting for the role API request.
+    await interaction.response.defer(ephemeral=True)
+
     if not interaction.guild or not isinstance(interaction.user, discord.Member):
-        return await interaction.response.send_message(
+        return await interaction.followup.send(
             "❌ This action can only be performed in a server.",
             ephemeral=True
         )
@@ -346,19 +350,19 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
     async with _get_role_lock(member.id):
         role = guild.get_role(role_id)
         if not role:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "❌ Role not found! Please report to staff.",
                 ephemeral=True
             )
 
         if guild.me is None or guild.me.top_role <= role:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 f"❌ I can't assign the **{role.name}** role! Move my 'Enceladus' role higher in Server Settings.",
                 ephemeral=True
             )
 
         if role in member.roles:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 f"⚠️ You already have the **{role.name}** role. Would you like to remove it?",
                 view=RoleRemovalConfirmView(member.id, role.id),
                 ephemeral=True
@@ -366,16 +370,15 @@ async def toggle_role(interaction: discord.Interaction, role_id: int):
 
         try:
             await member.add_roles(role)
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Added **{role.name}** role!",
                 ephemeral=True
             )
         except (discord.Forbidden, discord.HTTPException) as e:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "❌ I couldn't manage that role. Please try again and report to staff if the issue persists.",
-                    ephemeral=True
-                )
+            await interaction.followup.send(
+                "❌ I couldn't manage that role. Please try again and report to staff if the issue persists.",
+                ephemeral=True
+            )
             print(f"[ROLE ERROR] Failed to manage role {role_id} for {member}: {e}")
 
 
