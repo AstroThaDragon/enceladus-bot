@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands, tasks
 import os
 import random
-from roles import DMStatusView, FandomView, GradientColorView, PersistentColorView, PingView, PlatformView, PronounView, RegionView, SexualityView, SpeciesSelectView
+from roles import DMStatusView, FandomView, GradientColorView, InterestsView, PersistentColorView, PingView, PlatformView, PronounView, RegionView, SexualityView, SpeciesSelectView
 from tags import tag_list
 from dotenv import load_dotenv
 from discord import app_commands
