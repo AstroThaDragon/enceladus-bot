@@ -1403,6 +1403,19 @@ class Inventory(commands.Cog):
         """Show items that /use supports, with the user's owned quantity."""
         current = (current or "").lower().strip()
 
+        # Seasonal Cauldron recipes register their potion metadata when
+        # cauldron.py is imported. inventory.py intentionally does not import
+        # cauldron.py at module load time because cauldron.py imports this
+        # module. Ensure the seasonal registry is populated lazily once the
+        # bot is already running, so /use can see freshly brewed potions too.
+        try:
+            import importlib
+            importlib.import_module("seasonal_updates.halloween.cauldron")
+        except Exception:
+            # Keep normal /use autocomplete working even if a seasonal cog
+            # fails to load; the actual seasonal item will simply be omitted.
+            pass
+
         # Healing items stay exclusively in /heal. Revival items stay in /revive.
         usable_items = {
             "fuel_refill",
@@ -1476,6 +1489,15 @@ class Inventory(commands.Cog):
                 continue
 
             info = ITEM_REGISTRY.get(item_id)
+            # Workshop/Ritual items are defined in the local seasonal-use
+            # registry. Fall back to that metadata if their crafting module
+            # has not populated ITEM_REGISTRY in this process yet.
+            if not info and item_id in HAUNTED_CRAFTED_USE_ITEMS:
+                config = HAUNTED_CRAFTED_USE_ITEMS[item_id]
+                info = {
+                    "name": config["name"],
+                    "emoji": config.get("emoji", "📦"),
+                }
             if not info:
                 continue
 
@@ -1714,6 +1736,15 @@ class Inventory(commands.Cog):
     async def _use_item_impl(self, ctx: commands.Context, item_id: str):
         user_id = ctx.author.id
         item_id = item_id.lower().strip()
+
+        # Make sure Cauldron potion metadata is available before building
+        # the valid-item set. This is intentionally lazy to avoid the
+        # inventory <-> cauldron circular import during startup.
+        try:
+            import importlib
+            importlib.import_module("seasonal_updates.halloween.cauldron")
+        except Exception:
+            pass
 
         valid = {
             "fuel_refill",
