@@ -913,6 +913,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 stage,
                 total_stages,
                 run["current_scene"],
+                run["story_state"],
             ),
         )
 
@@ -951,12 +952,18 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     )
 
                 current_profile = await get_or_create_profile(db, user_id)
-                choice, outcome, new_state, next_scene = resolve_choice(
-                    location_id,
-                    scene_id,
-                    run["story_state"],
-                    choice_index,
-                )
+                try:
+                    choice, outcome, new_state, next_scene = resolve_choice(
+                        location_id,
+                        scene_id,
+                        run["story_state"],
+                        choice_index,
+                    )
+                except IndexError:
+                    return await interaction.followup.send(
+                        "Those story choices are out of date. Please use the current Haunted Exploration buttons.",
+                        ephemeral=True,
+                    )
                 sanity_delta = int(outcome.get("sanity", 0))
                 result_text = outcome.get("text", "Something happens.")
 
@@ -3266,7 +3273,7 @@ class HauntedInfoButton(discord.ui.Button):
 
 
 class HauntedStoryView(discord.ui.View):
-    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id):
+    def __init__(self, cog, owner_id, location_id, stage, total_stages, scene_id, story_state=None):
         super().__init__(timeout=600)
         self.cog = cog
         self.owner_id = owner_id
@@ -3275,11 +3282,11 @@ class HauntedStoryView(discord.ui.View):
         self.total_stages = total_stages
         self.scene_id = scene_id
 
-        # The scene is read from the authored story data so the button labels
-        # are always the same labels shown by the engine.
-        from seasonal_updates.halloween.haunted_system import get_scene
-        _, scene = get_scene(location_id, scene_id)
-        for index, choice in enumerate(scene["choices"]):
+        # Build buttons from the same run-specific variant/route as the story
+        # engine, so submitted choice indexes match resolve_choice().
+        scene_data = render_scene(location_id, scene_id, story_state or {}, 100)
+        choices = scene_data["choices"]
+        for index, choice in enumerate(choices):
             label = choice.get("label", "Choose")
             risk = choice.get("risk", "medium")
             self.add_item(
