@@ -577,6 +577,102 @@ del _item_id, _name, _emoji, _desc
 # Space Junk so they can be used normally without becoming collectibles.
 ITEM_REGISTRY.update(halloween_season.HALLOWEEN_ITEMS)
 
+# ---------------------------------------------------------------------------
+# Haunted Cauldron registry bridge
+# ---------------------------------------------------------------------------
+# Cauldron recipes normally register themselves into ITEM_REGISTRY when
+# seasonal_updates.halloween.cauldron is imported.  Because inventory.py is
+# also imported by cauldron.py, that registration can be unavailable during
+# certain cog-loading orders.  Keep a small metadata fallback here so /use
+# never depends on import order.  The fallback contains only the fields /use
+# needs; the canonical recipes and ingredients remain in cauldron.py.
+HAUNTED_CAULDRON_POTION_FALLBACKS = {
+    "calming_draught": {
+        "name": "Calming Draught", "emoji": "🧪", "type": "Haunted Potion",
+        "desc": "A soothing spectral brew that restores Sanity when consumed.",
+        "haunted_effect": {"type": "sanity_restore", "amount": 25},
+    },
+    "warding_incense": {
+        "name": "Warding Incense", "emoji": "🕯️", "type": "Haunted Potion",
+        "desc": "Burn it before a Haunted run to ward off some of the worst things lurking within.",
+        "haunted_effect": {"type": "run_protection", "encounter_protection": 1},
+    },
+    "third_eye_tonic": {
+        "name": "Third-Eye Tonic", "emoji": "👁️", "type": "Haunted Potion",
+        "desc": "A disturbing tonic that sharpens your perception of the supernatural and increases your Haunted collectible chance by 5 percentage points.",
+        "haunted_effect": {"type": "encounter_insight", "amount": 1, "collectible_bonus": 0.05},
+    },
+    "gravekeepers_elixir": {
+        "name": "Gravekeeper's Elixir", "emoji": "⚰️", "type": "Haunted Potion",
+        "desc": "A cold, earthy draught that sharpens your perception of rare supernatural encounters.",
+        "haunted_effect": {"type": "encounter_insight", "amount": 1},
+    },
+    "hexbreaker_tonic": {
+        "name": "Hexbreaker Tonic", "emoji": "🔮", "type": "Haunted Potion",
+        "desc": "A sharp, bitter tonic infused with protective ritual components.",
+        "haunted_effect": {"type": "curse_protection", "amount": 1},
+    },
+    "phantom_breath": {
+        "name": "Phantom's Breath", "emoji": "🌫️", "type": "Haunted Potion",
+        "desc": "A ghostly vapor that sharpens supernatural perception and increases your Haunted collectible chance by 10 percentage points.",
+        "haunted_effect": {"type": "encounter_insight", "amount": 2, "collectible_bonus": 0.10},
+    },
+    "witches_remedy": {
+        "name": "Witch's Remedy", "emoji": "🌿", "type": "Haunted Potion",
+        "desc": "A soothing herbal mixture that restores 20 Sanity.",
+        "haunted_effect": {"type": "sanity_restore", "amount": 20},
+    },
+    "bellward_brew": {
+        "name": "Bellward Brew", "emoji": "🔔", "type": "Haunted Potion",
+        "desc": "A resonant brew said to keep hostile spirits at a cautious distance.",
+        "haunted_effect": {"type": "run_protection", "encounter_protection": 2},
+    },
+    "nightmare_nectar": {
+        "name": "Nightmare Nectar", "emoji": "🌙", "type": "Haunted Potion",
+        "desc": "Sweet at first taste, deeply unsettling afterward. It improves the chance of a rare supernatural discovery.",
+        "haunted_effect": {"type": "rare_encounter_bias", "amount": 1},
+    },
+    "spectral_solvent": {
+        "name": "Spectral Solvent", "emoji": "🫧", "type": "Haunted Potion",
+        "desc": "A volatile mixture capable of dissolving traces of spiritual residue.",
+        "haunted_effect": {"type": "sanity_guard", "amount": 1},
+    },
+}
+
+
+def _ensure_haunted_cauldron_items():
+    """Ensure Cauldron potion metadata is available regardless of import order."""
+    recipes = {}
+    try:
+        import importlib
+        cauldron = importlib.import_module("seasonal_updates.halloween.cauldron")
+        recipes = getattr(cauldron, "CAULDRON_RECIPES", {}) or {}
+    except Exception:
+        recipes = {}
+
+    if recipes:
+        for recipe in recipes.values():
+            result_id = recipe.get("result")
+            if not result_id:
+                continue
+            ITEM_REGISTRY.setdefault(
+                result_id,
+                {
+                    "name": recipe.get("name", result_id),
+                    "emoji": recipe.get("emoji", "🧪"),
+                    "max_quantity": 10,
+                    "type": recipe.get("result_type", "Haunted Potion"),
+                    "desc": recipe.get("description", "A Haunted Cauldron potion."),
+                    "haunted_effect": dict(recipe.get("effect", {})),
+                },
+            )
+    else:
+        # Fallback for the rare case where the Cauldron module cannot be
+        # imported because of a seasonal cog-loading order.
+        for item_id, info in HAUNTED_CAULDRON_POTION_FALLBACKS.items():
+            ITEM_REGISTRY.setdefault(item_id, dict(info))
+
+
 async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
     """
     Add an item while respecting the item's max_quantity from ITEM_REGISTRY.
@@ -1403,18 +1499,10 @@ class Inventory(commands.Cog):
         """Show items that /use supports, with the user's owned quantity."""
         current = (current or "").lower().strip()
 
-        # Seasonal Cauldron recipes register their potion metadata when
-        # cauldron.py is imported. inventory.py intentionally does not import
-        # cauldron.py at module load time because cauldron.py imports this
-        # module. Ensure the seasonal registry is populated lazily once the
-        # bot is already running, so /use can see freshly brewed potions too.
-        try:
-            import importlib
-            importlib.import_module("seasonal_updates.halloween.cauldron")
-        except Exception:
-            # Keep normal /use autocomplete working even if a seasonal cog
-            # fails to load; the actual seasonal item will simply be omitted.
-            pass
+        # Ensure Cauldron potion metadata is available before building the
+        # usable-item list. The helper handles both normal registration and
+        # the circular-import fallback.
+        _ensure_haunted_cauldron_items()
 
         # Healing items stay exclusively in /heal. Revival items stay in /revive.
         usable_items = {
@@ -1740,11 +1828,7 @@ class Inventory(commands.Cog):
         # Make sure Cauldron potion metadata is available before building
         # the valid-item set. This is intentionally lazy to avoid the
         # inventory <-> cauldron circular import during startup.
-        try:
-            import importlib
-            importlib.import_module("seasonal_updates.halloween.cauldron")
-        except Exception:
-            pass
+        _ensure_haunted_cauldron_items()
 
         valid = {
             "fuel_refill",
