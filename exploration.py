@@ -302,7 +302,7 @@ EXPLORATION_TEXT = {
         "reward_pet_home_bonus": " *(+{amount} home-location bonus)*",
         "reward_pet_level": " • **Pet Level {level}!** 🎉",
         "reward_candy_overflow": "Candy overflow: **{amount}** → **+{stardust} Stardust** ✨",
-        "reward_ingredient_overflow": "Ingredient overflow: **{amount}** → **+{stardust} Stardust** ✨",
+        "reward_ingredient_overflow": "Ingredient overflow: **{amount}** → **+{stardust} Stardust ✨",
         "reward_collectible": "**Halloween collectible found! {emoji} {name}** \n" + EXPLORATION_SEPARATOR + "\n*{description}*",
         "reward_usable_collectible": "**Usable collectible found!**\nUse `/use item: [item name]` to activate this collectible.",
     },
