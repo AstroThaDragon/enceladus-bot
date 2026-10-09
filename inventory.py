@@ -1734,6 +1734,13 @@ class Inventory(commands.Cog):
             "quantum_battery",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
             *HAUNTED_CRAFTED_USE_ITEMS.keys(),
+            # Cauldron potions are registered dynamically in ITEM_REGISTRY.
+            # Include them here so /use can reach the potion handler below.
+            *[
+                item_id
+                for item_id, info in ITEM_REGISTRY.items()
+                if info.get("type") == "Haunted Potion"
+            ],
         }
 
         # Dilated Time Crystals are handled by the Fortune system and are
