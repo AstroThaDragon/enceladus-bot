@@ -41,6 +41,8 @@ async def grant_haunted_completion_rewards(
     Location materials intentionally remain random drops from the location's
     pool; the authored story never determines which material is awarded.
     """
+    from economy_system.data import OVERFLOW_SELL_RATE
+
     rarity = roll_haunted_rarity()
     ranges = HAUNTED_REWARD_RANGES[rarity]
     stardust = int(random.randint(*ranges["stardust"]) * (1 + max(0.0, float(reward_bonus))))
@@ -71,7 +73,10 @@ async def grant_haunted_completion_rewards(
             db, user_id, ingredient_id, ingredient_type, ingredient_amount
         )
         ingredient_overflow = ingredient_amount - added_ingredient
-        ingredient_overflow_stardust = ingredient_overflow * HAUNTED_INGREDIENT_OVERFLOW_VALUES.get(ingredient_id, 10)
+        ingredient_sell_value = HAUNTED_INGREDIENT_OVERFLOW_VALUES.get(ingredient_id, 10)
+        ingredient_overflow_stardust = ingredient_overflow * max(
+            1, int(ingredient_sell_value * OVERFLOW_SELL_RATE)
+        )
         if ingredient_overflow_stardust:
             await db.execute(
                 "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
@@ -99,7 +104,7 @@ async def grant_haunted_completion_rewards(
         else:
             await db.execute(
                 "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
-                (collectible_value, user_id),
+                (max(1, int(collectible_value * OVERFLOW_SELL_RATE)), user_id),
             )
 
     await db.commit()

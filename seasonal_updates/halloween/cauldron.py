@@ -95,11 +95,10 @@ CAULDRON_RECIPES = {
         },
         "result": "gravekeepers_elixir",
         "result_type": "Haunted Potion",
-        "description": "A cold, earthy draught that costs 15 Sanity, but increases your Haunted collectible chance by 5 percentage points.",
+        "description": "A cold, earthy draught that sharpens your perception of rare supernatural encounters.",
         "effect": {
-            "type": "sanity_reduce",
-            "amount": 15,
-            "collectible_bonus": 0.05,
+            "type": "encounter_insight",
+            "amount": 1,
         },
     },
     "hexbreaker_tonic": {
@@ -145,11 +144,10 @@ CAULDRON_RECIPES = {
         },
         "result": "witches_remedy",
         "result_type": "Haunted Potion",
-        "description": "A dangerously soothing herbal mixture that costs 30 Sanity, but increases your Haunted collectible chance by 5 percentage points.",
+        "description": "A soothing herbal mixture that restores 20 Sanity.",
         "effect": {
-            "type": "sanity_reduce",
-            "amount": 30,
-            "collectible_bonus": 0.05,
+            "type": "sanity_restore",
+            "amount": 20,
         },
     },
     "bellward_brew": {
@@ -178,12 +176,10 @@ CAULDRON_RECIPES = {
         },
         "result": "nightmare_nectar",
         "result_type": "Haunted Potion",
-        "description": "Sweet at first taste, deeply unsettling afterward. It costs 10 Sanity, improves rare supernatural discovery, and increases your Haunted collectible chance by 10 percentage points.",
+        "description": "Sweet at first taste, deeply unsettling afterward. It improves the chance of a rare supernatural discovery.",
         "effect": {
             "type": "rare_encounter_bias",
             "amount": 1,
-            "collectible_bonus": 0.10,
-            "sanity_loss": 10,
         },
     },
     "spectral_solvent": {

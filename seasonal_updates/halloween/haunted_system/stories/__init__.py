@@ -34,6 +34,15 @@ STORIES = {
     "silent_campground": CAMPGROUND_STORY,
 }
 
+from .variants import STORY_VARIANTS
+from .alternate_routes import apply_alternate_routes
+
+for _location_id, _variant_data in STORY_VARIANTS.items():
+    STORIES[_location_id]["scene_variants"] = _variant_data.get("scenes", {})
+    STORIES[_location_id]["scene_reactions"] = _variant_data.get("reactions", {})
+
+apply_alternate_routes(STORIES)
+
 
 def get_story(location_id):
     return STORIES.get(location_id)

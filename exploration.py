@@ -25,6 +25,7 @@ from seasonal_updates.halloween.halloween import (
     GLITCHED_PET_EGG_CHANCE,
     HALLOWEEN_PET_CANDY_CHANCE,
     HALLOWEEN_SPACE_JUNK,
+    get_sell_reward as get_halloween_sell_reward,
     halloween_channel_message,
     is_halloween_channel,
 )
@@ -40,21 +41,26 @@ from pets import (
 )
 from pets.variants import MINING_ESSENCE_CHANCE
 from defense import roll_hazard_defense
+from upgrades import advance_calibration, CALIBRATION_DAILY_CAP
 from seasonal_updates.halloween.haunted import (
     HAUNTED_DAILY_ATTEMPTS,
     HAUNTED_LOCATIONS,
     SANITY_MAX,
     clear_run,
     consume_attempt,
-    get_active_run,
     get_or_create_profile,
     is_insane,
     sanity_percent,
     start_run,
     update_sanity,
-    grant_haunted_completion_rewards,
 )
-from seasonal_updates.halloween.haunted_system import advance_story, render_scene, resolve_choice
+from seasonal_updates.halloween.haunted_system import (
+    advance_story,
+    grant_haunted_completion_rewards,
+    get_active_run,
+    render_scene,
+    resolve_choice,
+)
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
@@ -95,34 +101,27 @@ SCAVENGE_BONUS_MINERALS = [
     ("titanium_chunk", "Titanium Ore Chunk", 0.007),
 ]
 
-MATERIAL_OVERFLOW_VALUES = {
-    "iron_ore": 3,
-    "copper_ore": 5,
-    "aluminum_ore": 4,
-    "titanium_chunk": 15,
-    "scrap_metal": 3,
-    "nuts_bolts": 4,
-    "wiring": 5,
-    "glue": 6,
-    "circuit_board": 20,
-    "quantum_coil": 2500,
-    "astral_lens": 3125,
-    "mutation_catalyst": 3750,
-    "analysis_module": 1875,
+LOOT_OVERFLOW_VALUES = {
+    "arcade_token": 50,
+    "astral_core": 750,
+    "quantum_battery": 800,
 }
 
-LOOT_OVERFLOW_VALUES = {
-    "titanium_chunk": 75, "arcade_token": 50, "time_crystal": 350, "astral_core": 750,
-    "gauze": 5, "medical_alcohol": 5, "bandaids": 5, "antiseptic_ointment": 5,
-    "quantum_battery": 800, "revive_kit": 200, "laser_charge_cell": 50, "drone_battery": 50,
-    "space_pizza": 10, "floppy_disk": 10, "meteorite": 10, "rubber_duck": 10, "rusty_gear": 10,
-    "tape_deck": 10, "alien_artifact": 10, "space_boot": 10, "cosmic_coin": 10, "holo_poster": 10,
-    "broken_laser": 10, "lost_logbook": 10, "left_sock": 10, "warp_mug": 10, "space_pudding": 10,
-    "tangled_cables": 10, "screaming_crystal": 10, "moon_cheese": 10, "golden_spatula": 60,
-    "parking_ticket": 10, "floating_plant": 10, "tinted_visor": 10, "purring_lint": 10, "pet_rock": 10,
-    "haunted_circuit": 10, "space_taco": 10, "rusty_wrench": 10, "alien_fossil": 10, "big_red_button": 10,
-    "antique_compass": 10, "broken_clock": 10, "perplexing_painting": 10, "cosmic_banana": 10,
-}
+
+def get_overflow_stardust(item_id, default=10):
+    """Return half the item's normal sale value, or a special-loot fallback."""
+    from economy_system.data import JUNK_PRICES, OVERFLOW_SELL_RATE
+
+    sell_price = JUNK_PRICES.get(item_id)
+    if sell_price is None:
+        seasonal_reward = get_halloween_sell_reward(item_id)
+        if seasonal_reward:
+            sell_price = seasonal_reward[0]
+    if sell_price is None:
+        sell_price = ITEM_REGISTRY.get(item_id, {}).get("sell_price", 0)
+    if sell_price:
+        return max(1, int(sell_price * OVERFLOW_SELL_RATE))
+    return LOOT_OVERFLOW_VALUES.get(item_id, default)
 
 
 SCAVENGE_STARDUST_CACHE_CHANCE = 0.04
@@ -170,7 +169,8 @@ EXPLORATION_TEXT = {
             "Enceladus opened a series of portals while searching for new places to explore for Halloween. "
             "Something came back through one of them. Whatever happened next left the portals - and Enceladus himself - changed.\n\n────────────────────────────\n\n"
             "The destinations beyond these portals are waiting. Choose one below and step through. "
-            "Each location is a coherent multi-scene story with meaningful choices, secrets, and dangers."
+            "Each expedition offers four locations. The available portals rotate after each run ends, "
+            "so the next expedition sends you somewhere different."
         ),
         "active_run_note": (
             "\n\nYou currently have an active run in **{location_name}** "
@@ -180,7 +180,8 @@ EXPLORATION_TEXT = {
         "field_explorer": "*Explorer*",
         "field_sanity": "*Sanity*",
         "field_daily_attempts": "*Daily Attempts*",
-        "sanity_field": "**{sanity}/100**\n{state}\nRegenerates continuously over time.",
+        "field_available_locations": "*Open Portals*",
+        "sanity_field": "**{sanity}/100**\n{state}\nAfter its last change: at least 50 after 6 hours, 100 by 12 hours.",
         "info_title": "Haunted Exploration — Field Guide",
         "info_description": (
             "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
@@ -200,20 +201,20 @@ EXPLORATION_TEXT = {
             "And sometimes... *something else comes out.*"
         ),
         "info_sanity": (
-            "Sanity starts at **100** and regenerates continuously. Most choices reduce it. "
-            "At **0 Sanity**, you enter **Insane** state."
+            "Sanity starts at **100** and recharges in steps after its last change: at least **50 after 6 hours**, and **100 by 12 hours**. "
+            "Most choices cost a little Sanity; a few bring brief relief. "
+            "An active expedition can continue at **0 Sanity**, but you must recover above zero before starting another."
         ),
         "info_grip": (
-            "Low Sanity makes reality less reliable. The same story can be perceived differently, and at **0 Sanity** "
-            "the opening perception can become profoundly wrong. Insanity does not randomly replace the story with unrelated encounters."
-            "However, low Sanity or Insanity can cause better reward drops."
+            "Low Sanity makes the haunt feel harder to endure, and scenes may be perceived differently. "
+            "Sanity does not increase your rewards; it is a resource that limits how many expeditions you can attempt before resting."
         ),
         "info_attempts": (
             "You get **{attempts} attempts per day**. Starting an adventure consumes one attempt, even if you run away. "
             "The daily reset is 12:00AM EST."
         ),
         "info_stages": (
-            "Runs are authored multi-scene adventures. Your choices can show different discoveries, pet opportunities, and various story reactions."
+            "Runs are multi-scene adventures. Some encounters and choices change between expeditions, and your choices can trigger later story reactions."
         ),
         "info_running_away": (
             "You can run away instead of taking an encounter choice. Most escapes work, but there is a small "
@@ -224,7 +225,7 @@ EXPLORATION_TEXT = {
         "scene_explorer": "*Explorer*",
         "scene_scene": "*Scene*",
         "scene_sanity": "*Sanity*",
-        "scene_sanity_insane": "***INSANITY***",
+        "scene_sanity_insane": "***Terrified***",
         "scene_sanity_unreliable": "***Reality is becoming unreliable...***",
         "scene_sanity_stable": "***Stable***",
         "malo_warning": "MalO is staring at **{choice}**.\n*You are not entirely sure why.*",
@@ -250,6 +251,14 @@ EXPLORATION_TEXT = {
             "**You're out of Haunted Exploration attempts for today!**\n"
             "Come back after the daily reset at 12:00 AM EST!"
         ),
+        "out_of_sanity": (
+            "**You can't make yourself enter another haunt yet.**\n"
+            "Your Sanity has reached **0**. Let it recover above zero before starting another expedition."
+        ),
+        "stale_location": (
+            "**Those portals have shifted.**\n"
+            "Open `/explore haunted` again to see the locations available for your next expedition."
+        ),
         "pet_already_found": (
             "**Something familiar appears**\n"
             "You recognize this companion. You've already befriended it, "
@@ -257,16 +266,16 @@ EXPLORATION_TEXT = {
         ),
         "completion_description": (
             "**{mention} explored {location_name}.**\n\n"
-            "**What happened**\n{result_text}\n\n"
+            "**What happened** 👻\n{result_text}\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
             "**Exploration complete**\n"
             "You've made it through! 🎉"
         ),
-        "completion_explorer": "*Explorer*",
-        "completion_story": "*Story*",
-        "completion_sanity": "*Final Sanity*",
+        "completion_explorer": "*Explorer* 👻",
+        "completion_story": "*Story* 🟥",
+        "completion_sanity": "*Final Sanity* 😵‍💫",
         "completion_rewards": "*Adventure rewards*\n────────────────────────────\n",
-        "completion_pet": "**Location-based pet found!**",
+        "completion_pet": "**Location-based pet found!** 🐾",
         "completion_footer": "Exploration complete • The portals remain open for now...",
         "escape_rare": [
             "You bolt for the exit. The door slams shut behind you by itself. Something follows you for three steps before disappearing.",
@@ -280,9 +289,9 @@ EXPLORATION_TEXT = {
         ],
         "escape_suffix": "\n\n**Something happened while you escaped...**",
         "escape_description": "**{mention} left the {location_name}.**\n\n{escape_text}{suffix}",
-        "escape_explorer": "*Explorer*",
-        "escape_run_ended": "*Run Ended*",
-        "escape_sanity": "*Sanity*",
+        "escape_explorer": "*Explorer* 👻",
+        "escape_run_ended": "*Run Ended* 🟥",
+        "escape_sanity": "*Sanity* 😵‍💫",
         "escape_rewards": "*Rewards*",
         "escape_no_reward": "No reward was earned from this run.",
         "escape_footer": "You've escaped. The portals remain open for now...",
@@ -292,33 +301,33 @@ EXPLORATION_TEXT = {
         "reward_pet_xp": "**+{amount} Pet XP** 🐾",
         "reward_pet_home_bonus": " *(+{amount} home-location bonus)*",
         "reward_pet_level": " • **Pet Level {level}!** 🎉",
-        "reward_candy_overflow": "Candy overflow: **{amount}** → **+{stardust} Stardust**",
-        "reward_ingredient_overflow": "Ingredient overflow: **{amount}** → **+{stardust} Stardust**",
+        "reward_candy_overflow": "Candy overflow: **{amount}** → **+{stardust} Stardust** ✨",
+        "reward_ingredient_overflow": "Ingredient overflow: **{amount}** → **+{stardust} Stardust** ✨",
         "reward_collectible": "**Halloween collectible found! {emoji} {name}** \n" + EXPLORATION_SEPARATOR + "\n*{description}*",
         "reward_usable_collectible": "**Usable collectible found!**\nUse `/use item: [item name]` to activate this collectible.",
     },
     "mining": {
         "title": "*Starship Mining Log - {display_name}* 🚀",
         "description": (
-            "*Your laser beam fired into the debris field...*\n\n"
+            "*Your laser beam fires into the debris field...* 🚀\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
             "Stardust collected: **{stardust:,}**{stardust_notes}"
-            "{result_sections}"
+            "{result_sections} ✨"
         ),
         "footer": "Fuel charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}",
         "pet_progress": "Companion progress",
-        "pet_xp": "Pet XP: **+{xp}XP**",
+        "pet_xp": "Pet XP: **+{xp}XP** 📊",
         "pet_level": " • **Level {level}!** 🎉",
-        "daily_name": "Daily reminder!",
+        "daily_name": "Daily reminder! 🎁",
         "daily_value": "You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
-        "cooldown_name": "Cooldown alerts",
+        "cooldown_name": "Cooldown alerts 🔔",
     },
     "scavenging": {
         "title": "*Derelict Salvage Log - {display_name}* 🔩",
         "description": (
-            "*Your scavenge drone has been deployed into abandoned sector wreckage...*\n\n"
+            "*Your scavenge drone has been deployed into abandoned sector wreckage...* 🛸\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
-            "Stardust found: **{stardust:,}**{quantum_note}{cache_note}"
+            "Stardust found: {stardust:,}{quantum_note}{cache_note} ✨"
             "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
             "Salvaged items: {loot}\n"
             "{materials_and_supplies}"
@@ -327,20 +336,20 @@ EXPLORATION_TEXT = {
             "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
             "{status}"
         ),
-        "footer": "*Drone charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}*",
+        "footer": "Drone charges remaining: {charges}/{max_charges} • Cooldown: {cooldown}",
         "pet_progress": "Companion Progress 🐾",
-        "pet_xp": "Pet XP: **+{xp}XP**",
+        "pet_xp": "Pet XP: **+{xp}XP** 📊",
         "pet_level": " • **Level {level}!** 🎉",
-        "daily_name": "Daily reminder!",
+        "daily_name": "Daily reminder! 🎁",
         "daily_value": "You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
-        "cooldown_name": "Cooldown alerts",
+        "cooldown_name": "Cooldown alerts 🔔",
         "health_status": "Health: **{hp}/{max_hp}HP**",
         "knocked_out_status": "*Knocked out!* Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{until}**.",
         "materials": "Salvaged materials: {findings}",
     },
     "revival": {
-        "title": "{mention} - Revival required!",
-        "description": "You are currently unconscious.\n\nChoose a revival method:",
+        "title": "{mention} - Revival required! 💀",
+        "description": "**You are currently unconscious!**\n\nChoose a revival method:",
         "no_items": (
             "You don't have any revival items.\n"
             "You can buy an **Emergency Full Revival** from `/shop buy`, other revival kits, or recover automatically at 12:00AM EST."
@@ -348,12 +357,12 @@ EXPLORATION_TEXT = {
         "already_conscious": "*{mention} You are already conscious and do not need a revival.*",
         "profile_missing": "{mention} Profile not found!",
         "expired_footer": "This revival menu will expire in 60 seconds.",
-        "revive_kit_name": "Revival Kit",
-        "revive_kit_value": "Restores **35%HP**\nOwned: **{count}**",
+        "revive_kit_name": "Basic Revival Kit",
+        "revive_kit_value": "Restores **35% of max HP**\nOwned: **{count}**",
         "emergency_kit_name": "Emergency Revival Kit",
-        "emergency_kit_value": "Restores **50%HP**\nOwned: **{count}**",
+        "emergency_kit_value": "Restores **50% of max HP**\nOwned: **{count}**",
         "full_revive_name": "Emergency Full Revival",
-        "full_revive_value": "Restores **100%HP**\nOwned: **{count}**",
+        "full_revive_value": "Restores **100% of max HP**\nOwned: **{count}**",
     },
 }
 
@@ -677,12 +686,19 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 embed = self._haunted_location_embed(interaction.user, profile)
                 await interaction.response.send_message(
                     embed=embed,
-                    view=HauntedLocationView(self, interaction.user.id),
+                    view=HauntedLocationView(
+                        self, interaction.user.id, profile["available_locations"]
+                    ),
                 )
 
     def _haunted_location_embed(self, member, profile):
         sanity = sanity_percent(profile["sanity"])
-        state = "***INSANE***" if is_insane(profile["sanity"]) else "***Stable***"
+        if is_insane(profile["sanity"]):
+            state = "***Too frightened to enter***"
+        elif profile["sanity"] <= 25:
+            state = "***Shaken***"
+        else:
+            state = "***Steady***"
         active = profile["active_location"]
 
         description = EXPLORATION_TEXT["haunted"]["location_description"]
@@ -712,6 +728,16 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             name=EXPLORATION_TEXT["haunted"]["field_daily_attempts"],
             value=f"**{profile['attempts']}/{HAUNTED_DAILY_ATTEMPTS}**",
             inline=True,
+        )
+        location_names = [
+            f"{HAUNTED_LOCATIONS[location_id]['emoji']} {HAUNTED_LOCATIONS[location_id]['name']}"
+            for location_id in profile.get("available_locations", [])
+            if location_id in HAUNTED_LOCATIONS
+        ]
+        embed.add_field(
+            name=EXPLORATION_TEXT["haunted"]["field_available_locations"],
+            value="\n".join(location_names) or "No portals are currently available.",
+            inline=False,
         )
         embed.set_footer(text=EXPLORATION_TEXT["haunted"]["location_footer"])
         return embed
@@ -776,6 +802,17 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         async with lock:
             async with aiosqlite.connect(self.get_db_path()) as db:
                 await self.ensure_schema(db)
+                profile = await get_or_create_profile(db, user_id)
+                if location_id not in profile["available_locations"]:
+                    return await interaction.followup.send(
+                        EXPLORATION_TEXT["haunted"]["stale_location"],
+                        ephemeral=True,
+                    )
+                if profile["sanity"] <= 0:
+                    return await interaction.followup.send(
+                        EXPLORATION_TEXT["haunted"]["out_of_sanity"],
+                        ephemeral=True,
+                    )
                 consumed, profile = await consume_attempt(db, user_id)
                 if not consumed:
                     return await interaction.followup.send(
@@ -1130,7 +1167,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 pet_discovery_message = run["story_state"].get("pet_discovery_message")
                 rare_escape = random.random() < 0.08
                 if rare_escape:
-                    sanity_loss = random.randint(4, 10)
+                    sanity_loss = random.randint(2, 4)
                     new_sanity = await update_sanity(db, user_id, -sanity_loss)
                     escape_text = random.choice(EXPLORATION_TEXT["haunted"]["escape_rare"])
                 else:
@@ -1407,6 +1444,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         user_id = ctx.author.id
         current_time = time.time()
         db_path = self.get_db_path()
+        calibration_update = None
 
         async with aiosqlite.connect(db_path) as db:
             await self.ensure_schema(db)
@@ -1508,7 +1546,9 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
             )
 
-            if effects.pop("prototype_drill_bit", False):
+            boosted_module_active = effects.pop("boosted_laser_module", False)
+            legacy_module_active = effects.pop("prototype_drill_bit", False)
+            if boosted_module_active or legacy_module_active:
                 found_stardust = int(found_stardust * 1.5)
 
             if pet_effects["stardust_bonus"]:
@@ -1566,7 +1606,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"{material_name} ×{added_material}"
                         )
                     if overflow_amount > 0:
-                        overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
+                        overflow_stardust = overflow_amount * get_overflow_stardust(material_id, 0)
                         new_stardust += overflow_stardust
                         mining_overflow_findings.append(
                             f"{material_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
@@ -1612,7 +1652,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             + f" **{glitch_item_name} ×{added_glitch}**"
                         )
                     if overflow_glitch > 0:
-                        overflow_value = overflow_glitch * MATERIAL_OVERFLOW_VALUES.get(glitch_item_id, 0)
+                        overflow_value = overflow_glitch * get_overflow_stardust(glitch_item_id, 0)
                         new_stardust += overflow_value
                         mining_special_findings.append(
                             f"Glitched overflow 📦 → **+{overflow_value:,} Stardust**"
@@ -1629,9 +1669,10 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Astral Essence **({essence_quantity}/{essence_max})**"
                     )
                 else:
-                    new_stardust += 2500
+                    overflow_stardust = get_overflow_stardust("astral_essence")
+                    new_stardust += overflow_stardust
                     mining_special_findings.append(
-                        "Astral Essence overflow: **+2,500 Stardust**"
+                        f"Astral Essence overflow: **+{overflow_stardust:,} Stardust**"
                     )
 
             # Halloween bonus resources are independent rolls during the active event.
@@ -1792,7 +1833,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Titanium Ore Chunk **({new_quantity}/{max_quantity})**"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("titanium_chunk", 75)
+                    overflow_stardust = get_overflow_stardust("titanium_chunk", 75)
                     new_stardust += overflow_stardust
 
                     mining_special_findings.append(
@@ -1822,7 +1863,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Arcade Token **({new_token_balance}/{token_max})**"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
+                    overflow_stardust = get_overflow_stardust("arcade_token", 50)
                     new_stardust += overflow_stardust
 
                     mining_special_findings.append(
@@ -1859,7 +1900,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Dilated Time Crystal **({current_crystals + 1}/{max_quantity})**"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("time_crystal", 350)
+                    overflow_stardust = get_overflow_stardust("time_crystal", 350)
                     new_stardust += overflow_stardust
 
                     mining_special_findings.append(
@@ -1883,7 +1924,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Astral Core **({new_quantity}/{max_quantity})**"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("astral_core", 750)
+                    overflow_stardust = get_overflow_stardust("astral_core", 750)
                     new_stardust += overflow_stardust
 
                     mining_special_findings.append(
@@ -1893,6 +1934,10 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 rarity_badge = "legendary"
 
             pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
+
+            calibration_update = await advance_calibration(
+                db, user_id, "mining", current_date.isoformat()
+            )
 
             await db.execute("""
                 UPDATE users 
@@ -1962,6 +2007,22 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=EXPLORATION_TEXT["mining"]["footer"].format(charges=new_charges, max_charges=max_mining_charges, cooldown=cooldown_text))
+        if calibration_update and calibration_update["active"]:
+            if calibration_update["ready"]:
+                calibration_note = "Calibration complete; this device is ready for its next kit."
+            elif calibration_update.get("gained"):
+                calibration_note = "Calibration run credited."
+            else:
+                calibration_note = "Daily calibration limit reached; progress resumes tomorrow."
+            embed.add_field(
+                name="Mining Laser Calibration",
+                value=(
+                    f"**{calibration_update['progress']}/{calibration_update['required']} runs** • "
+                    f"Today: **{calibration_update['today']}/{CALIBRATION_DAILY_CAP}**\n"
+                    f"{calibration_note} See `/upgrades` for details."
+                ),
+                inline=False,
+            )
         if pet_xp_result:
             pet_xp_text = EXPLORATION_TEXT["mining"]["pet_xp"].format(xp=pet_xp_result["xp_added"])
             if pet_xp_result["leveled_up"]:
@@ -2005,6 +2066,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         user_id = ctx.author.id
         current_time = time.time()
         db_path = self.get_db_path()
+        calibration_update = None
 
         async with aiosqlite.connect(db_path) as db:
             await self.ensure_schema(db)
@@ -2183,7 +2245,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"Arcade Token 🪙 **({token_quantity}/{token_max})**"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get("arcade_token", 50)
+                    overflow_stardust = get_overflow_stardust("arcade_token", 50)
                     token_overflow_stardust = overflow_stardust
                     bonus_discovery_findings.append(
                         f"Arcade Token overflow: **+{overflow_stardust:,} Stardust**"
@@ -2219,7 +2281,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             cache_note = ""
             if random.random() < SCAVENGE_STARDUST_CACHE_CHANCE:
                 cache_payout = random.randint(SCAVENGE_STARDUST_CACHE_MIN, SCAVENGE_STARDUST_CACHE_MAX)
-                cache_note = f"\n\nStardust cache found: **+{cache_payout:,} Stardust**"
+                cache_note = f"\n\nStardust cache found! **+{cache_payout:,} Stardust** 🎁"
 
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
 
@@ -2236,7 +2298,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"{get_pet_passive_message(pet_effects, 'xenomorph_bonus_loot')} **{bonus_item_name} ×{bonus_added}**"
                     )
                 if bonus_amount > bonus_added:
-                    overflow_value = (bonus_amount - bonus_added) * LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                    overflow_value = (bonus_amount - bonus_added) * get_overflow_stardust(bonus_item_id)
                     new_stardust += overflow_value
                     pet_findings.append(
                         f"**Xenomorph loot overflow:** **+{overflow_value:,} Stardust**"
@@ -2279,7 +2341,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         if bonus_added:
                             benefit_text = f"**{bonus_item_name} ×{bonus_added}**"
                         else:
-                            overflow_value = LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                            overflow_value = get_overflow_stardust(bonus_item_id)
                             new_stardust += overflow_value
                             benefit_text = f"**+{overflow_value} Stardust** from overflow"
                     else:
@@ -2417,7 +2479,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"{pet_bonus_loot_message} {bonus_item_name} ×{bonus_added}"
                     )
                 else:
-                    overflow_stardust = LOOT_OVERFLOW_VALUES.get(bonus_item_id, 10)
+                    overflow_stardust = get_overflow_stardust(bonus_item_id)
                     new_stardust += overflow_stardust
                     pet_findings.append(
                         f"{bonus_item_name} → Inventory Full (+{overflow_stardust:,} Stardust)"
@@ -2452,7 +2514,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         )
                     overflow_glitch = glitch_amount - added_glitch
                     if overflow_glitch > 0:
-                        overflow_value = overflow_glitch * LOOT_OVERFLOW_VALUES.get(glitch_item_id, 10)
+                        overflow_value = overflow_glitch * get_overflow_stardust(glitch_item_id)
                         new_stardust += overflow_value
                         pet_findings.append(
                             f"Glitched overflow → **+{overflow_value:,} Stardust**"
@@ -2598,8 +2660,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             # different incubator materials per run.
             #
             # Salvage Rig bonus is a relative chance multiplier:
-            # +10% turns a 20% base chance into 22%, while +65% turns it
-            # into 33%. This keeps higher tiers meaningful without making
+            # +10% turns a 20% base chance into 22%, while +25% turns it
+            # into 25%. This keeps higher tiers meaningful without making
             # common materials nearly guaranteed.
             incubator_material_ids = {
                 "quantum_coil",
@@ -2644,7 +2706,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             get_pet_passive_message(pet_effects, "material_bonus")
                         )
                     if overflow_amount > 0:
-                        overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(material_id, 0)
+                        overflow_stardust = overflow_amount * get_overflow_stardust(material_id, 0)
                         new_stardust += overflow_stardust
                         bonus_overflow_findings.append(
                             f"{material_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
@@ -2662,7 +2724,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"{supply_name} ×{added_supply}"
                         )
                     else:
-                        overflow_stardust = LOOT_OVERFLOW_VALUES.get(supply_id, 5)
+                        overflow_stardust = get_overflow_stardust(supply_id, 5)
                         new_stardust += overflow_stardust
                         bonus_overflow_findings.append(
                             f"{supply_name} → +{overflow_stardust} Stardust"
@@ -2698,7 +2760,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                                 get_pet_passive_message(pet_effects, "material_bonus")
                             )
                         if overflow_amount > 0:
-                            overflow_stardust = overflow_amount * MATERIAL_OVERFLOW_VALUES.get(mineral_id, 0)
+                            overflow_stardust = overflow_amount * get_overflow_stardust(mineral_id, 0)
                             new_stardust += overflow_stardust
                             bonus_overflow_findings.append(
                                 f"{mineral_name} ×{overflow_amount} → +{overflow_stardust} Stardust"
@@ -2714,7 +2776,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 # Use the item's individual overflow value.
                 # The fallback protects against a newly added loot item
                 # accidentally having no configured overflow value.
-                overflow_stardust = LOOT_OVERFLOW_VALUES.get(item_id, 10)
+                overflow_stardust = get_overflow_stardust(item_id)
 
                 new_stardust += overflow_stardust
 
@@ -2778,6 +2840,10 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
 
+            calibration_update = await advance_calibration(
+                db, user_id, "scavenging", current_date.isoformat()
+            )
+
             await db.execute("""
                 UPDATE users 
                 SET scavenge_charges = ?, last_scavenged = ?, stardust = ?, hp = ?, knocked_out_until = ?, active_effects = ?
@@ -2811,6 +2877,22 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         cooldown_minutes, cooldown_seconds = divmod(cooldown_total_seconds, 60)
         cooldown_text = f"{cooldown_minutes}m" if cooldown_seconds == 0 else f"{cooldown_minutes}m {cooldown_seconds}s"
         embed.set_footer(text=EXPLORATION_TEXT["scavenging"]["footer"].format(charges=new_charges, max_charges=max_scavenge_charges, cooldown=cooldown_text))
+        if calibration_update and calibration_update["active"]:
+            if calibration_update["ready"]:
+                calibration_note = "Calibration complete; this device is ready for its next kit."
+            elif calibration_update.get("gained"):
+                calibration_note = "Calibration run credited."
+            else:
+                calibration_note = "Daily calibration limit reached; progress resumes tomorrow."
+            embed.add_field(
+                name="Scavenging Drone Calibration",
+                value=(
+                    f"**{calibration_update['progress']}/{calibration_update['required']} runs** • "
+                    f"Today: **{calibration_update['today']}/{CALIBRATION_DAILY_CAP}**\n"
+                    f"{calibration_note} See `/upgrades` for details."
+                ),
+                inline=False,
+            )
         if pet_xp_result:
             pet_xp_text = EXPLORATION_TEXT["scavenging"]["pet_xp"].format(xp=pet_xp_result["xp_added"])
             if pet_xp_result["leveled_up"]:
@@ -2904,7 +2986,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 super().__init__(timeout=60)
 
                 revive_button = discord.ui.Button(
-                    label="Revival Kit",
+                    label="Basic Revival Kit · 35%",
                     emoji=EMOJIS.get("revive", "⚕️"),
                     style=discord.ButtonStyle.secondary,
                     disabled=available.get("revive", 0) <= 0
@@ -2913,7 +2995,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 self.add_item(revive_button)
 
                 kit_button = discord.ui.Button(
-                    label="Emergency Revival Kit",
+                    label="Emergency Revival Kit · 50%",
                     emoji=EMOJIS.get("revive_kit", "💉"),
                     style=discord.ButtonStyle.primary,
                     disabled=available.get("revive_kit", 0) <= 0
@@ -2922,7 +3004,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 self.add_item(kit_button)
 
                 full_button = discord.ui.Button(
-                    label="Emergency Full Revival",
+                    label="Emergency Full Revival · 100%",
                     emoji=EMOJIS.get("full_revive", "🚑"),
                     style=discord.ButtonStyle.success,
                     disabled=available.get("full_revive", 0) <= 0
@@ -2994,7 +3076,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
                     if not item_row or (item_row[0] or 0) <= 0:
                         item_name = {
-                            "revive": "Revival Kit",
+                            "revive": "Basic Revival Kit",
                             "revive_kit": "Emergency Revival Kit",
                             "full_revive": "Emergency Full Revival",
                         }.get(item_id, item_id)
@@ -3028,10 +3110,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     if heal_percent >= 1.0:
                         recovered_hp = max_hp
                     else:
-                        recovered_hp = max(
-                            1,
-                            (max_hp + 1) // 2
-                        )
+                        recovered_hp = max(1, int(max_hp * heal_percent))
 
                     await db.execute(
                         """
@@ -3046,7 +3125,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     await db.commit()
 
                 item_name = {
-                    "revive": "Revival Kit",
+                    "revive": "Basic Revival Kit",
                     "revive_kit": "Emergency Revival Kit",
                     "full_revive": "Emergency Full Revival",
                 }.get(item_id, item_id)
@@ -3114,12 +3193,13 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         )
 
 class HauntedLocationView(discord.ui.View):
-    def __init__(self, cog, owner_id):
+    def __init__(self, cog, owner_id, location_ids):
         super().__init__(timeout=90)
         self.cog = cog
         self.owner_id = owner_id
 
-        for index, (location_id, location) in enumerate(HAUNTED_LOCATIONS.items()):
+        for index, location_id in enumerate(location_ids):
+            location = HAUNTED_LOCATIONS[location_id]
             self.add_item(HauntedLocationButton(self.cog, self.owner_id, location_id, location, index))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:

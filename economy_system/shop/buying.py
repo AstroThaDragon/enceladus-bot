@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, time as dt_time
 from typing import Any, Optional, cast, Callable
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 import pytz
 
@@ -55,37 +54,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     async def shop(self, ctx: commands.Context):
             """Shop command group."""
             await ctx.send(
-                "🛒 Choose a shop option: **list**, **buy**, **sell**, or **rotating**."
+                "🛒 Choose a shop option: **buy**, **sell**, or **rotating**."
             )
-
-    @shop.command(
-        name="list",
-        description="View the station shop catalog.",
-    )
-    @app_commands.describe(
-        category="Optional shop category to open directly.",
-    )
-    @app_commands.choices(
-        category=[
-            app_commands.Choice(name="❤️ Healing", value="healing"),
-            app_commands.Choice(name="🔋 Recharge", value="recharge"),
-            app_commands.Choice(name="🛠️ Upgrades", value="upgrades"),
-            app_commands.Choice(name="🧬 Upgrade Materials", value="upgrade_materials"),
-            app_commands.Choice(name="🐾 Pet Items", value="pet_items"),
-            app_commands.Choice(name="✨ Special", value="special"),
-            app_commands.Choice(name="🎟️ Lottery", value="lottery"),
-            app_commands.Choice(name="🖼️ Backgrounds", value="backgrounds"),
-        ]
-    )
-    async def shop_list(
-            self,
-            ctx: commands.Context,
-            category: str = "healing",
-        ):
-            """Display the shop catalog."""
-            view = ShopView(self, ctx.author.id)
-            embed = view.build_embed(category)
-            await ctx.send(embed=embed, view=view)
 
     @shop.command(
         name="buy",
@@ -95,7 +65,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
             """Open the interactive Category → Item → Quantity → Confirm buy flow."""
             view = ShopTransactionView(self, ctx.author.id, "buy")
             embed = view._build_category_embed()
-            await ctx.send(embed=embed, view=view)
+            view.message = await ctx.send(embed=embed, view=view)
 
     @shop.command(
         name="sell",
@@ -105,7 +75,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
             """Open the interactive Category → Item → Quantity → Confirm sell flow."""
             view = ShopTransactionView(self, ctx.author.id, "sell")
             embed = view._build_category_embed()
-            await ctx.send(embed=embed, view=view)
+            view.message = await ctx.send(embed=embed, view=view)
 
     @shop.command(
         name="rotating",
@@ -113,8 +83,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     )
     async def shop_rotating(self, ctx: commands.Context):
             """Display today's rotating shop with direct purchase buttons."""
-            view = ShopView(self, ctx.author.id, category="daily")
-            embed = view.build_embed("daily")
+            view = ShopView(self, ctx.author.id)
+            embed = view.build_embed()
             embed.set_footer(text="Choose an offer below to buy it • Offers rotate at midnight Eastern time.")
             await ctx.send(embed=embed, view=view)
 
@@ -131,7 +101,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     
             if not is_permanent_item and rotating_item is None:
                 return await ctx.send(
-                    "❌ Invalid item ID! Check available items using `/shop`."
+                    "❌ Invalid item ID! Browse items with `/shop buy`."
                 )
     
             # Rotation-only items must be featured today. Permanent items may also
@@ -142,7 +112,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                 if item_id not in self.daily_rotation():
                     return await ctx.send(
                         "⏳ That item is not in today's rotating market. "
-                        "Check `/shop` and select 🔄️ Daily Offers for the current offers."
+                        "Check `/shop rotating` for the current offers."
                     )
     
             item: dict[str, Any] | None = self.SHOP_ITEMS.get(item_id)
@@ -518,12 +488,14 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                         return await ctx.send(
                             f"🏷️ **Title Unlocked!** You purchased **{item['name']}** "
                             + price_note
+                            + f"\n📦 Total owned: **{new_quantity}x**."
                         )
     
                     return await ctx.send(
                         f"{ctx.author.mention} 🔄 **Purchase Successful!** Added **{quantity}x "
                         f"{item['name']}** to your inventory "
                         + price_note
+                        + f"\n📦 Total owned: **{new_quantity}x**."
                     )
     
                 if item_type == "revive":
@@ -557,7 +529,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                     return await ctx.send(
                         f"{ctx.author.mention} ⚕️ **Purchase Successful!** Added **{quantity}x "
                         f"{item['name']}** to your inventory for "
-                        f"**{cost:,} Stardust**!"
+                        f"**{cost:,} Stardust**!\n📦 Total owned: **{new_quantity}x**."
                     )
     
                 if item_type == "consumable" and item_id in {
@@ -593,7 +565,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                     return await ctx.send(
                         f"{ctx.author.mention} 🔋 **Purchase Successful!** Added **{quantity}x "
                         f"{item['name']}** to your inventory for "
-                        f"**{cost:,} Stardust**!"
+                        f"**{cost:,} Stardust**!\n📦 Total owned: **{current_quantity + quantity}x**."
                     )
     
                 if item_type == "consumable" and item_id == "pet_snack":
@@ -626,7 +598,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     
                     return await ctx.send(
                         f"{ctx.author.mention} 🧬 **Purchase Successful!** Added **{quantity}x {item['name']}** "
-                        f"to your inventory for **{cost:,} Stardust**!"
+                        f"to your inventory for **{cost:,} Stardust**!\n📦 Total owned: **{new_quantity}x**."
                     )
                 if item_id == "astral_essence":
                     added_amount, new_quantity, max_quantity = await add_inventory_item(
@@ -658,7 +630,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     
                     return await ctx.send(
                         f"{ctx.author.mention} ✨ **Purchase Successful!** Added **{quantity}x "
-                        f"{item['name']}** to your inventory for **{cost:,} Stardust**!"
+                        f"{item['name']}** to your inventory for **{cost:,} Stardust**!\n"
+                        f"📦 Total owned: **{new_quantity}x**."
                     )
     
                 if item_id == "time_crystal":
@@ -700,6 +673,7 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
                         f"{ctx.author.mention} 💎 **Purchase Successful!** Added **{quantity}x "
                         f"{item['name']}** to your inventory for "
                         f"**{cost:,} Stardust**!\n"
+                        f"📦 Total owned: **{current_quantity + quantity}x**.\n"
                         f"If you miss a fortune streak, use `/usecrystal` to repair it."
                     )
     
@@ -766,7 +740,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     
                     return await ctx.send(
                         f"{ctx.author.mention} 🌟 **Purchase Successful!** Unlocked "
-                        f"**{item['name']}** for **{cost:,} Stardust**!"
+                        f"**{item['name']}** for **{cost:,} Stardust**!\n"
+                        "📦 Total owned: **1x**."
                     )
     
                 if item_id in {
@@ -807,7 +782,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
 
                     return await ctx.send(
                         f"{ctx.author.mention} 🧬 **Purchase Successful!** Added **{quantity}x "
-                        f"{item['name']}** to your inventory for **{cost:,} Stardust**!"
+                        f"{item['name']}** to your inventory for **{cost:,} Stardust**!\n"
+                        f"📦 Total owned: **{new_quantity}x**."
                     )
 
                 if item_type == "heal":
@@ -864,7 +840,8 @@ class EconomyShopBuyingMixin(commands.Cog, EconomyShopBuyingHost):
     
                     return await ctx.send(
                         f"{ctx.author.mention} 🛒 **Purchase Successful!** Added **{quantity}x {item['name']}** "
-                        f"to your inventory for **{cost:,} Stardust**!"
+                        f"to your inventory for **{cost:,} Stardust**!\n"
+                        f"📦 Total owned: **{current_quantity + quantity}x**."
                     )
     
                 await db.rollback()

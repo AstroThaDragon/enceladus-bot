@@ -97,7 +97,8 @@ class EconomySalvageMixin(commands.Cog):
                 db, user_id, material_id, "crafting_material", amount
             )
             overflow = amount - added
-            overflow_stardust = overflow * SALVAGE_OVERFLOW_VALUES.get(material_id, 0)
+            unit_value = int(ITEM_REGISTRY.get(material_id, {}).get("sell_price", 0) or 0)
+            overflow_stardust = overflow * int(unit_value * OVERFLOW_SELL_RATE)
             return added, overflow, overflow_stardust
 
     async def inventory_row_exists(self, db, user_id, item_id):
@@ -370,4 +371,3 @@ class EconomySalvageMixin(commands.Cog):
                 text=f"Salvage Rig Level {salvage_upgrade.get('level', 0)}/5 • Base salvage is guaranteed"
             )
             await ctx.send(embed=embed)
-

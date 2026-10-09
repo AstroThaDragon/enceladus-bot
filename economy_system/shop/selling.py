@@ -109,7 +109,7 @@ class EconomyShopSellingMixin:
     
             return rows, total_stardust, total_candy, item_count, lines
 
-    async def _confirm_bulk_sale(self, interaction, sale_kind, view):
+    async def _confirm_bulk_sale(self, interaction, sale_kind, view, *, return_view=None):
             """Execute a previously confirmed bulk sale using a fresh DB snapshot."""
             user_id = interaction.user.id
             db_path = self.get_db_path()
@@ -121,6 +121,15 @@ class EconomyShopSellingMixin:
                 rows = await self._get_bulk_sale_rows(db, user_id, sale_kind)
                 if not rows:
                     await db.rollback()
+                    if return_view:
+                        await interaction.followup.send(
+                            "❌ **Nothing to sell.** Your inventory changed before the confirmation was completed.",
+                            ephemeral=True,
+                        )
+                        shop_view = return_view.make_return_view()
+                        shop_view.message = return_view.message
+                        await shop_view.show_item_picker(interaction, edit_original=True)
+                        return
                     return await interaction.edit_original_response(
                         content="❌ **Nothing to sell.** Your inventory changed before the confirmation was completed.",
                         embed=None,
@@ -179,15 +188,22 @@ class EconomyShopSellingMixin:
                 f"\n📦 **Candy Overflow:** {candy_overflow} converted to ✨ **{candy_overflow * 5:,} Stardust**"
                 if candy_overflow else ""
             )
-            await interaction.edit_original_response(
-                content=(
-                    f"{interaction.user.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
-                    f"for ✨ **{total_stardust:,} Stardust**!{candy_text}{overflow_text}\n\n"
-                    f"**Items Sold:**\n{preview}"
-                ),
-                embed=None,
-                view=view,
+            sale_summary = (
+                f"{interaction.user.mention} 🛍️ **Salvage Vendor:** Sold **{item_count} items** "
+                f"for ✨ **{total_stardust:,} Stardust**!{candy_text}{overflow_text}\n\n"
+                f"**Items Sold:**\n{preview}"
             )
+            if return_view:
+                await interaction.followup.send(sale_summary)
+                shop_view = return_view.make_return_view()
+                shop_view.message = return_view.message
+                await shop_view.show_item_picker(interaction, edit_original=True)
+            else:
+                await interaction.edit_original_response(
+                    content=sale_summary,
+                    embed=None,
+                    view=view,
+                )
 
     async def sell(
             self,
@@ -240,7 +256,7 @@ class EconomyShopSellingMixin:
                     color=discord.Color.orange(),
                 )
                 view = SellAllConfirmView(self, user_id, target_item)
-                return await ctx.send(embed=embed, view=view)
+                view.message = await ctx.send(embed=embed, view=view)
     
             from inventory import ITEM_REGISTRY, add_inventory_item
     

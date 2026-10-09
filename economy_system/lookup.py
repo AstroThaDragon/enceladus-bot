@@ -83,7 +83,7 @@ class EconomyLookupMixin:
                     "hazard_shield",
                     "lucky_scanner",
                     "ore_magnet",
-                    "prototype_drill_bit",
+                    "boosted_laser_module",
                     "cosmic_insurance",
                     "fate_anchor",
                 },
@@ -223,4 +223,3 @@ class EconomyLookupMixin:
             )
             embed.set_footer(text="Enceladus Station Catalog")
             await ctx.send(embed=embed)
-

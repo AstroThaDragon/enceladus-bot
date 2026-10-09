@@ -63,7 +63,7 @@ class EconomyShopAutocompleteMixin:
                 "pet_snack": "🍪", "time_crystal": "💎", "astral_essence": "✨", "quantum_coil": "🌀", "astral_lens": "🔭", "mutation_catalyst": "🧬", "analysis_module": "🔬",
                 "neon_grid": "🌆", "deep_void": "🌌", "solaris_ring": "💫",
                 "fuel_stabilizer": "🛢️", "hazard_shield": "🛡️", "lucky_scanner": "📡",
-                "prototype_drill_bit": "⚙️",
+                "boosted_laser_module": "🔫",
             }
     
             choices = []
@@ -283,4 +283,3 @@ class EconomyShopAutocompleteMixin:
             if action == "sell":
                 return await self.shop_sell_autocomplete(interaction, current)
             return await self.shop_buy_autocomplete(interaction, current)
-

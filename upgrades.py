@@ -1,5 +1,7 @@
 import aiosqlite
 import discord
+import pytz
+from datetime import datetime
 from discord import app_commands
 from discord.ext import commands
 
@@ -7,6 +9,63 @@ from emojis import EMOJIS
 from database import ECONOMY_DB_NAME
 
 MAX_LEVEL = 5
+
+# Calibration is earned by successfully using the device after installing the
+# previous level. The daily cap is per device and follows the station's game day.
+CALIBRATION_REQUIREMENTS = {3: 15, 4: 20, 5: 25}
+CALIBRATION_DAILY_CAP = 10
+CALIBRATION_COLUMNS = {
+    "mining": ("mining_upgrade", "mining_calibration", "mining_calibration_day", "mining_calibration_today"),
+    "scavenging": ("scavenging_upgrade", "scavenging_calibration", "scavenging_calibration_day", "scavenging_calibration_today"),
+}
+
+
+async def get_calibration_state(db, user_id, system, today):
+    """Return the current device's next-tier calibration and daily progress."""
+    level_col, progress_col, day_col, today_col = CALIBRATION_COLUMNS[system]
+    async with db.execute(
+        f"SELECT COALESCE({level_col}, 0), COALESCE({progress_col}, 0), "
+        f"COALESCE({day_col}, ''), COALESCE({today_col}, 0) "
+        "FROM users WHERE user_id = ?",
+        (user_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+
+    level, progress, saved_day, today_count = row or (0, 0, "", 0)
+    if saved_day != today:
+        today_count = 0
+    target_tier = level + 1
+    required = CALIBRATION_REQUIREMENTS.get(target_tier, 0)
+    if not required:
+        progress = 0
+    return {
+        "level": level,
+        "target_tier": target_tier,
+        "progress": progress,
+        "required": required,
+        "today": today_count,
+        "daily_cap": CALIBRATION_DAILY_CAP,
+        "active": bool(required),
+        "ready": bool(required and progress >= required),
+    }
+
+
+async def advance_calibration(db, user_id, system, today):
+    """Credit one successful device run toward its next upgrade, if eligible."""
+    level_col, progress_col, day_col, today_col = CALIBRATION_COLUMNS[system]
+    state = await get_calibration_state(db, user_id, system, today)
+    if not state["active"] or state["ready"] or state["today"] >= CALIBRATION_DAILY_CAP:
+        state["gained"] = False
+        return state
+
+    next_progress = min(state["required"], state["progress"] + 1)
+    next_today = state["today"] + 1
+    await db.execute(
+        f"UPDATE users SET {progress_col} = ?, {day_col} = ?, {today_col} = ? WHERE user_id = ?",
+        (next_progress, today, next_today, user_id),
+    )
+    state.update(progress=next_progress, today=next_today, ready=next_progress >= state["required"], gained=True)
+    return state
 
 # Components crafted before tiered component IDs were introduced. These remain
 # valid as wildcard fallbacks so existing players do not lose already-crafted parts.
@@ -58,11 +117,11 @@ UPGRADE_DATA = {
         "emoji": "♻️",
         "column": "salvage_upgrade",
         "levels": {
-            1: {"cost": 2500, "component": "salvage_rig_kit_1", "bonus_chance": 0.10},
-            2: {"cost": 7500, "component": "salvage_rig_kit_2", "bonus_chance": 0.20},
-            3: {"cost": 25000, "component": "salvage_rig_kit_3", "bonus_chance": 0.35},
-            4: {"cost": 45000, "component": "salvage_rig_kit_4", "bonus_chance": 0.50},
-            5: {"cost": 75000, "component": "salvage_rig_kit_5", "bonus_chance": 0.65},
+            1: {"cost": 2500, "component": "salvage_rig_kit_1", "bonus_chance": 0.05},
+            2: {"cost": 7500, "component": "salvage_rig_kit_2", "bonus_chance": 0.10},
+            3: {"cost": 25000, "component": "salvage_rig_kit_3", "bonus_chance": 0.15},
+            4: {"cost": 45000, "component": "salvage_rig_kit_4", "bonus_chance": 0.20},
+            5: {"cost": 75000, "component": "salvage_rig_kit_5", "bonus_chance": 0.25},
         },
     },
 }
@@ -136,12 +195,20 @@ class Upgrades(commands.Cog):
     async def ensure_schema(self, db):
         async with db.execute("PRAGMA table_info(users)") as cursor:
             columns = {row[1] async for row in cursor}
-        if "mining_upgrade" not in columns:
-            await db.execute("ALTER TABLE users ADD COLUMN mining_upgrade INTEGER DEFAULT 0")
-        if "scavenging_upgrade" not in columns:
-            await db.execute("ALTER TABLE users ADD COLUMN scavenging_upgrade INTEGER DEFAULT 0")
-        if "salvage_upgrade" not in columns:
-            await db.execute("ALTER TABLE users ADD COLUMN salvage_upgrade INTEGER DEFAULT 0")
+        schema = {
+            "mining_upgrade": "INTEGER DEFAULT 0",
+            "scavenging_upgrade": "INTEGER DEFAULT 0",
+            "salvage_upgrade": "INTEGER DEFAULT 0",
+            "mining_calibration": "INTEGER DEFAULT 0",
+            "mining_calibration_day": "TEXT DEFAULT ''",
+            "mining_calibration_today": "INTEGER DEFAULT 0",
+            "scavenging_calibration": "INTEGER DEFAULT 0",
+            "scavenging_calibration_day": "TEXT DEFAULT ''",
+            "scavenging_calibration_today": "INTEGER DEFAULT 0",
+        }
+        for column, definition in schema.items():
+            if column not in columns:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
         await db.commit()
 
     async def get_levels(self, user_id):
@@ -198,12 +265,21 @@ class Upgrades(commands.Cog):
 
     async def build_embed(self, user_id):
         stardust, mining_level, scavenging_level, salvage_level = await self.get_levels(user_id)
+        today = datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            calibration = {
+                system: await get_calibration_state(db, user_id, system, today)
+                for system in ("mining", "scavenging")
+            }
         embed = discord.Embed(
             title="Your Exploration Upgrades ⚙️",
             description=(
                 "**These are the upgrades currently installed on your exploration equipment.**\n\n"
                 "Each system has **5 levels**, and you must complete them **in order.** "
-                "Every upgrade requires both **Stardust and materials!**"
+                "Every upgrade requires **Stardust and materials**. Levels III–V also require "
+                "device calibration earned by successful runs. Each device can earn up to "
+                f"**{CALIBRATION_DAILY_CAP} calibration runs per day**."
             ),
             color=discord.Color.from_rgb(0, 229, 255),
         )
@@ -221,6 +297,19 @@ class Upgrades(commands.Cog):
                         f"Bonus material chance: **+{data['bonus_chance'] * 100:.0f}%** ♻️"
                     )
                 else:
+                    state = calibration[system]
+                    if state["active"]:
+                        calibration_text = (
+                            f"\n\n**Calibration for Level {next_level}:** "
+                            f"{min(state['progress'], state['required'])}/{state['required']} runs"
+                            f" • Today: {state['today']}/{CALIBRATION_DAILY_CAP}"
+                        )
+                        if state["ready"]:
+                            calibration_text += " ✅ Ready to craft"
+                        else:
+                            calibration_text += f"\nUse `/{'mine' if system == 'mining' else 'scavenge'}` to make progress."
+                    else:
+                        calibration_text = ""
                     value = (
                         f"**Level:** 5/5 MAX ✨\n"
                         f"Max charges: **{data['charges']}** 🔋\n"
@@ -241,6 +330,7 @@ class Upgrades(commands.Cog):
                         f"**{data['cost']:,} Stardust** ✨\n"
                         f"{comp_icon} **{comp_name} ×1**\n"
                         f"{self.material_text(mats)}"
+                        f"{calibration_text}"
                         + ("\n**Nanite Retrofit Kit ×1** 🧬" if next_level == 5 else "")
                     )
                 else:
@@ -304,6 +394,18 @@ class Upgrades(commands.Cog):
 
             next_level = level + 1
             data = info["levels"][next_level]
+            if upgrade in CALIBRATION_COLUMNS and next_level in CALIBRATION_REQUIREMENTS:
+                today = datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
+                state = await get_calibration_state(db, user_id, upgrade, today)
+                if not state["ready"]:
+                    await db.rollback()
+                    return await ctx.send(
+                        f"🔧 {ctx.author.mention} **{info['name']} Level {next_level} needs calibration.**\n\n"
+                        f"Progress: **{state['progress']}/{state['required']} runs** • "
+                        f"Today: **{state['today']}/{CALIBRATION_DAILY_CAP}**\n"
+                        f"Use `/{'mine' if upgrade == 'mining' else 'scavenge'}` after installing "
+                        "the previous level. Check `/upgrades` to track progress."
+                    )
             required = dict(UPGRADE_MATERIALS[upgrade][next_level])
             component = data["component"]
             required[component] = required.get(component, 0) + 1
@@ -364,8 +466,13 @@ class Upgrades(commands.Cog):
                     "DELETE FROM inventory WHERE user_id = ? AND item_id = ? AND quantity <= 0",
                     (user_id, item_id),
                 )
+            calibration_reset = (
+                f", {CALIBRATION_COLUMNS[upgrade][1]} = 0"
+                if upgrade in CALIBRATION_COLUMNS
+                else ""
+            )
             await db.execute(
-                f"UPDATE users SET stardust = stardust - ?, {column} = ? WHERE user_id = ?",
+                f"UPDATE users SET stardust = stardust - ?, {column} = ?{calibration_reset} WHERE user_id = ?",
                 (data["cost"], next_level, user_id),
             )
             await db.commit()

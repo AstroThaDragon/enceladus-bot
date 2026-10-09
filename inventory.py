@@ -199,6 +199,7 @@ HALLOWEEN_SPECIAL_USE_ITEMS = {
         "name": "Unknown Alien Artifact",
         "emoji": "👽",
         "achievement_id": "halloween_marker",
+        "achievement_name": "Make Us Whole",
         "title_id": "title_unitologist",
         "use_message": (
             "**You hold the artifact and hear faint whispers.**\n"
@@ -260,6 +261,7 @@ USE_AUTOCOMPLETE_EMOJI_FALLBACKS = {
     "laser_power_cell": "⚡",
     "lucky_scanner": "📡",
     "ore_magnet": "🧲",
+    "boosted_laser_module": "🔫",
     "prototype_drill_bit": "⚙️",
     "quantum_battery": "⚛️",
     "station_rations": "🥫",
@@ -297,15 +299,17 @@ ITEM_REGISTRY = {
     "nanite_patch": {"name": "Nanite Stim-Patch", "emoji": EMOJIS.get("nanite_patch", "🩹"), "max_quantity": 50, "sell_price": 200, "type": "Healing", "desc": "Quickly knits minor planetary surface wounds. Restores +35 HP."},
     "medkit": {"name": "Field Trauma Medkit", "emoji": EMOJIS.get("medkit", "🧰"), "max_quantity": 25, "sell_price": 375, "type": "Healing", "desc": "Standard planetary survival trauma kit. Restores +100 HP."},
     "makeshift_medkit": {"name": "Makeshift Medkit", "emoji": EMOJIS.get("makeshift_medkit", "🩹"), "max_quantity": 25, "sell_price": 250, "type": "Healing", "desc": "A hastily assembled field kit made from scavenged medical supplies. Restores +60 HP."},
-    "full_revive": {"name": "Emergency Full Revival", "emoji": EMOJIS.get("full_revive", "⚕️"), "max_quantity": 10, "sell_price": 400, "type": "Healing", "desc": "Immediately revives an unconscious explorer at full HP."},
-    "revive_kit": {"name": "Emergency Revival Kit", "emoji": EMOJIS.get("revive_kit", "💉"), "max_quantity": 25, "sell_price": 750, "type": "Healing", "desc": "Rare salvage that revives an unconscious explorer with 50% HP."},
-    "revive": {"name": "Revival Kit", "emoji": EMOJIS.get("revive", "⚕️"), "max_quantity": 25, "sell_price": 175, "type": "Consumable", "desc": "A basic revival item"},
+    "full_revive": {"name": "Emergency Full Revival", "emoji": EMOJIS.get("full_revive", "⚕️"), "max_quantity": 10, "sell_price": 450, "type": "Healing", "desc": "Revives an unconscious explorer at 100% of their maximum HP."},
+    "revive_kit": {"name": "Emergency Revival Kit", "emoji": EMOJIS.get("revive_kit", "💉"), "max_quantity": 25, "sell_price": 300, "type": "Healing", "desc": "Revives an unconscious explorer at 50% of their maximum HP."},
+    "revive": {"name": "Basic Revival Kit", "emoji": EMOJIS.get("revive", "⚕️"), "max_quantity": 25, "sell_price": 175, "type": "Consumable", "desc": "Revives an unconscious explorer at 35% of their maximum HP."},
     "fuel_stabilizer": {"name": "Fuel Stabilizer", "emoji": EMOJIS.get("fuel_stabilizer", "🛢️"), "max_quantity": 5, "sell_price": 400, "type": "Consumable", "desc": "Makes the next mining run cost no fuel charge."},
     "station_rations": {"name": "Station Rations", "emoji": EMOJIS.get("station_rations", "🥫"), "max_quantity": 99, "sell_price": 75, "type": "Consumable", "desc": "Restores 15 HP."},
     "hazard_shield": {"name": "Hazard Shield", "emoji": EMOJIS.get("hazard_shield", "🛡️"), "max_quantity": 5, "sell_price": 500, "type": "Consumable", "desc": "Blocks the next scavenging hazard."},
     "lucky_scanner": {"name": "Deep-Space Scanner", "emoji": EMOJIS.get("lucky_scanner", "📡"), "max_quantity": 5, "sell_price": 350, "type": "Consumable", "desc": "Improves rare-find odds on the next scavenging run."},
     "ore_magnet": {"name": "Ore Magnet", "emoji": EMOJIS.get("ore_magnet", "🧲"), "max_quantity": 5, "sell_price": 250, "type": "Consumable", "desc": "Guarantees a titanium ore find on the next mining run."},
-    "prototype_drill_bit": {"name": "Prototype Drill Bit", "emoji": EMOJIS.get("prototype_drill_bit", "⚙️"), "max_quantity": 5, "sell_price": 500, "type": "Consumable", "desc": "Boosts Stardust from the next mining run."},
+    "boosted_laser_module": {"name": "Boosted Laser Module", "emoji": "🔫", "max_quantity": 5, "sell_price": 500, "type": "Consumable", "desc": "Boosts Stardust from the next mining run."},
+    # Preserve use/sale support for copies earned before the ID was renamed.
+    "prototype_drill_bit": {"name": "Prototype Drill Bit (Legacy)", "emoji": "⚙️", "max_quantity": 5, "sell_price": 500, "type": "Consumable", "desc": "Legacy name for the Boosted Laser Module. Boosts Stardust from the next mining run."},
     "cosmic_insurance": {"name": "Cosmic Insurance", "emoji": EMOJIS.get("cosmic_insurance", "📋"), "max_quantity": 5, "sell_price": 400, "type": "Consumable", "desc": "Prevents a knockout from the next scavenging hazard."},
     "fate_anchor": {"name": "Fate Anchor", "emoji": EMOJIS.get("fate_anchor", "⚓"), "max_quantity": 5, "sell_price": 1125, "type": "Consumable", "desc": "Protects one missed fortune streak day."},
 
@@ -320,14 +324,14 @@ ITEM_REGISTRY = {
 
     # Materials & Minerals
     "titanium_chunk": {"name": "Titanium Ore Chunk", "emoji": EMOJIS["titanium_chunk"], "max_quantity": 99, "sell_price": 100, "type": "Mineral", "desc": "High-purity raw titanium extracted from deep sector asteroids."},
-    "iron_ore": {"name": "Iron Ore", "emoji": EMOJIS["iron_ore"], "max_quantity": 99, "sell_price": 150, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
-    "copper_ore": {"name": "Copper Ore", "emoji": EMOJIS["copper_ore"], "max_quantity": 99, "sell_price": 125, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
-    "aluminum_ore": {"name": "Aluminum Ore", "emoji": EMOJIS["aluminum_ore"], "max_quantity": 99, "sell_price": 125, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
-    "circuit_board": {"name": "Circuit Board", "emoji": EMOJIS["circuit_board"], "max_quantity": 99, "sell_price": 150, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
-    "glue": {"name": "Industrial Glue", "emoji": EMOJIS["glue"], "max_quantity": 99, "sell_price": 80, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
-    "scrap_metal": {"name": "Scrap Metal", "emoji": EMOJIS["scrap_metal"], "max_quantity": 99, "sell_price": 65, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
-    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": EMOJIS["nuts_bolts"], "max_quantity": 99, "sell_price": 75, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
-    "wiring": {"name": "Wiring", "emoji": EMOJIS["wiring"], "max_quantity": 99, "sell_price": 95, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
+    "iron_ore": {"name": "Iron Ore", "emoji": EMOJIS["iron_ore"], "max_quantity": 99, "sell_price": 75, "type": "Mineral", "desc": "Raw iron extracted from asteroid rock."},
+    "copper_ore": {"name": "Copper Ore", "emoji": EMOJIS["copper_ore"], "max_quantity": 99, "sell_price": 65, "type": "Mineral", "desc": "Conductive copper-bearing ore from asteroid deposits."},
+    "aluminum_ore": {"name": "Aluminum Ore", "emoji": EMOJIS["aluminum_ore"], "max_quantity": 99, "sell_price": 65, "type": "Mineral", "desc": "Lightweight aluminum ore recovered from asteroid deposits."},
+    "circuit_board": {"name": "Circuit Board", "emoji": EMOJIS["circuit_board"], "max_quantity": 99, "sell_price": 75, "type": "Crafting Material", "desc": "Recovered electronics useful for building exploration equipment."},
+    "glue": {"name": "Industrial Glue", "emoji": EMOJIS["glue"], "max_quantity": 99, "sell_price": 40, "type": "Crafting Material", "desc": "Heavy-duty adhesive salvaged from abandoned station supplies."},
+    "scrap_metal": {"name": "Scrap Metal", "emoji": EMOJIS["scrap_metal"], "max_quantity": 99, "sell_price": 35, "type": "Crafting Material", "desc": "Useful metal recovered from wreckage."},
+    "nuts_bolts": {"name": "Nuts & Bolts", "emoji": EMOJIS["nuts_bolts"], "max_quantity": 99, "sell_price": 40, "type": "Crafting Material", "desc": "Assorted fasteners salvaged from abandoned equipment."},
+    "wiring": {"name": "Wiring", "emoji": EMOJIS["wiring"], "max_quantity": 99, "sell_price": 50, "type": "Crafting Material", "desc": "Usable electrical wiring salvaged from damaged equipment."},
 
     # Defensive Weapons
     "stop_sign": {"name": "Stop Sign", "emoji": "🛑", "max_quantity": 1, "sell_price": 125, "type": "Defense Weapon", "desc": "A surprisingly sturdy traffic sign. Provides a small chance to prevent a scavenging hazard."},
@@ -450,8 +454,8 @@ ITEM_REGISTRY = {
     "title_haunted_explorer": {"name": "Haunted Explorer", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title for those who discovered something they probably should not have."},
     "title_something_is_very_wrong": {"name": "Something Is Very Wrong", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title earned by discovering something impossible."},
     "title_worth_it": {"name": "Worth It", "emoji": "🩸", "max_quantity": 1, "type": "Title", "desc": "A title for surviving a discovery that really hurt."},
-    "title_unwell": {"name": "Unwell", "emoji": "🫥", "max_quantity": 1, "type": "Title", "desc": "A title earned after a discovery pushes you to 0 Sanity."},
-    "title_the_other_side": {"name": "The Other Side", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title for discovering something while completely insane."},
+    "title_unwell": {"name": "Unwell", "emoji": "🫥", "max_quantity": 1, "type": "Title", "desc": "A title earned after a discovery leaves you too frightened to enter another haunt."},
+    "title_the_other_side": {"name": "The Other Side", "emoji": "👁️", "max_quantity": 1, "type": "Title", "desc": "A title for making a discovery while completely depleted."},
     "title_i_shouldnt_have_looked": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "max_quantity": 1, "type": "Title", "desc": "A title for discovering every rare Haunted discovery."},
     "title_practiced_alchemist": {"name": "Practiced Alchemist", "emoji": "🧪", "max_quantity": 1, "type": "Title", "desc": "A title for brewing Haunted items."},
     "title_alchemist": {"name": "Alchemist", "emoji": "🧪", "max_quantity": 1, "type": "Title", "desc": "A title for crafting five Haunted Cauldron items."},
@@ -461,6 +465,7 @@ ITEM_REGISTRY = {
     "title_occultist": {"name": "Occultist", "emoji": "🕯️", "max_quantity": 1, "type": "Title", "desc": "A title for performing five Haunted rituals."},
     "title_haunted_item_collector": {"name": "Haunted Item Collector", "emoji": "🔧", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by crafting every location-based Haunted collectible."},
     "title_horror_enthusiast": {"name": "Horror Enthusiast", "emoji": "👻", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by collecting every Halloween Space Junk collectible."},
+    "title_unitologist": {"name": "Unitologist", "emoji": "👽", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by using the Unknown Alien Artifact and hearing its message."},
     "title_candy_nommer": {"name": "Candy Nommer", "emoji": "🍫", "max_quantity": 1, "type": "Title", "desc": "A permanent title for consuming over 250 pieces of candy/trick or treat bags. Diabeetus."},
     "title_seal_breaker": {"name": "Seal Breaker", "emoji": "🍷", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by breaking the seal on the Cursed Wine Cabinet."},
     "title_corrupted_data": {"name": "CORRUPTED DATA", "emoji": "👾", "max_quantity": 1, "type": "Title", "desc": "A permanent title earned by hatching MissingNo. from a Glitched Egg."},
@@ -525,6 +530,30 @@ ITEM_REGISTRY = {
     "blackened_tree_bark": {"name": "Blackened Tree Bark", "emoji": "🌲", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A piece of bark from a tree with no visible source. It is cold despite being dry."},
     "unidentified_black_tendril": {"name": "Unidentified Black Tendril", "emoji": "🖤", "max_quantity": 99, "sell_price": 10, "type": "Haunted Ingredient", "desc": "A thin, rubbery black strand that seems to twitch when nobody is looking directly at it."},
 }
+
+# Upgrade components sell for half the recovery value of their recipe materials.
+# This lets players clear unwanted kits without making crafting a Stardust profit.
+UPGRADE_COMPONENT_SELL_PRICES = {
+    "reinforced_laser_parts_1": 412,
+    "reinforced_laser_parts_2": 1055,
+    "reinforced_laser_parts_3": 1692,
+    "reinforced_laser_parts_4": 2615,
+    "reinforced_laser_parts_5": 3712,
+    "drone_upgrade_kit_1": 302,
+    "drone_upgrade_kit_2": 775,
+    "drone_upgrade_kit_3": 1365,
+    "drone_upgrade_kit_4": 2125,
+    "drone_upgrade_kit_5": 3207,
+    "salvage_rig_kit_1": 197,
+    "salvage_rig_kit_2": 507,
+    "salvage_rig_kit_3": 840,
+    "salvage_rig_kit_4": 1495,
+    "salvage_rig_kit_5": 2260,
+    "nanite_retrofit_kit": 967,
+}
+for _item_id, _sell_price in UPGRADE_COMPONENT_SELL_PRICES.items():
+    ITEM_REGISTRY[_item_id]["sell_price"] = _sell_price
+del _item_id, _sell_price
 
 # Seasonal Space Junk is registered here so it automatically appears in /inventory
 # while its event module remains the place where the seasonal definitions live.
@@ -1387,6 +1416,7 @@ class Inventory(commands.Cog):
             "hazard_shield",
             "lucky_scanner",
             "ore_magnet",
+            "boosted_laser_module",
             "prototype_drill_bit",
             "cosmic_insurance",
             "fate_anchor",
@@ -1674,6 +1704,7 @@ class Inventory(commands.Cog):
                 config.get("use_message", "You used the item.") + effect_note
             ),
             "achievement_id": config.get("achievement_id"),
+            "achievement_name": config.get("achievement_name"),
             "title_id": config.get("title_id"),
             "background_id": config.get("background_id"),
             "knocked_out_until": knocked_out_until,
@@ -1696,6 +1727,7 @@ class Inventory(commands.Cog):
             "hazard_shield",
             "lucky_scanner",
             "ore_magnet",
+            "boosted_laser_module",
             "prototype_drill_bit",
             "cosmic_insurance",
             "fate_anchor",
@@ -1815,11 +1847,9 @@ class Inventory(commands.Cog):
                 effect_type = str(potion_effect.get("type") or "")
                 amount = int(potion_effect.get("amount", 1) or 1)
 
-                if effect_type in {"sanity_restore", "sanity_reduce"}:
-                    # Immediate Sanity potions refresh continuous regeneration
-                    # first, then apply their configured change and clamp to
-                    # 0-100.  This keeps restorative and risky brews consistent
-                    # with the normal Haunted Sanity system.
+                if effect_type == "sanity_restore":
+                    # Sanity restoratives refresh continuous regeneration first,
+                    # then apply their configured change and clamp to 0-100.
                     await db.execute(
                         """
                         CREATE TABLE IF NOT EXISTS haunted_profiles (
@@ -1850,14 +1880,9 @@ class Inventory(commands.Cog):
                     else:
                         current_sanity = 100.0
 
-                    if effect_type == "sanity_restore":
-                        change = float(amount)
-                        change_label = "Restored"
-                        change_prefix = "+"
-                    else:
-                        change = -float(amount)
-                        change_label = "Lost"
-                        change_prefix = "-"
+                    change = float(amount)
+                    change_label = "Restored"
+                    change_prefix = "+"
 
                     new_sanity = max(0.0, min(100.0, current_sanity + change))
                     applied_amount = abs(new_sanity - current_sanity)
@@ -1875,17 +1900,6 @@ class Inventory(commands.Cog):
                             VALUES (?, ?, ?, 20, '')
                             """,
                             (user_id, new_sanity, now),
-                        )
-
-                    if row[0] > 1:
-                        await db.execute(
-                            "UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ?",
-                            (user_id, item_id),
-                        )
-                    else:
-                        await db.execute(
-                            "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
-                            (user_id, item_id),
                         )
 
                     # Secondary Haunted effects (such as collectible bonuses)
@@ -1918,10 +1932,7 @@ class Inventory(commands.Cog):
                         )
 
                     await db.commit()
-                    if effect_type == "sanity_restore":
-                        sanity_text = f"{change_label} **{change_prefix}{applied_amount:.0f} Sanity** 🧠"
-                    else:
-                        sanity_text = f"{change_label} **{change_prefix}{applied_amount:.0f} Sanity** 🧠"
+                    sanity_text = f"{change_label} **{change_prefix}{applied_amount:.0f} Sanity** 🧠"
                     bonus_text = (
                         f"\nCollectible chance: **+{collectible_bonus * 100:.0f} percentage points** on your next Haunted run. 🎃"
                         if collectible_bonus > 0 else ""
@@ -1930,57 +1941,6 @@ class Inventory(commands.Cog):
                         f"{ctx.author.mention} {potion_info['emoji']} **{potion_info['name']} consumed!**\n"
                         f"{sanity_text} — now at **{new_sanity:.0f}/100**.{bonus_text}"
                     )
-
-                # Some run-scoped potions also carry an immediate Sanity cost
-                # (for example Nightmare Nectar). Apply that cost now while
-                # keeping the potion's primary effect prepared for the next run.
-                secondary_sanity_loss = float(potion_effect.get("sanity_loss", 0.0) or 0.0)
-                if secondary_sanity_loss > 0:
-                    await db.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS haunted_profiles (
-                            user_id INTEGER PRIMARY KEY,
-                            sanity REAL NOT NULL DEFAULT 100,
-                            sanity_updated_at REAL NOT NULL DEFAULT 0,
-                            haunted_attempts INTEGER NOT NULL DEFAULT 20,
-                            attempts_date TEXT NOT NULL DEFAULT '',
-                            active_location TEXT DEFAULT '',
-                            active_stage INTEGER NOT NULL DEFAULT 0,
-                            active_total_stages INTEGER NOT NULL DEFAULT 0,
-                            active_started_at REAL NOT NULL DEFAULT 0
-                        )
-                        """
-                    )
-                    now = time.time()
-                    async with db.execute(
-                        "SELECT sanity, sanity_updated_at FROM haunted_profiles WHERE user_id = ?",
-                        (user_id,),
-                    ) as cursor:
-                        sanity_row = await cursor.fetchone()
-
-                    if sanity_row:
-                        current_sanity = max(0.0, min(100.0, float(sanity_row[0])))
-                        updated_at = float(sanity_row[1] or now)
-                        elapsed = max(0.0, now - updated_at)
-                        current_sanity = min(100.0, current_sanity + elapsed * 100.0 / (6 * 60 * 60))
-                    else:
-                        current_sanity = 100.0
-
-                    new_sanity = max(0.0, current_sanity - secondary_sanity_loss)
-                    if sanity_row:
-                        await db.execute(
-                            "UPDATE haunted_profiles SET sanity = ?, sanity_updated_at = ? WHERE user_id = ?",
-                            (new_sanity, now, user_id),
-                        )
-                    else:
-                        await db.execute(
-                            """
-                            INSERT INTO haunted_profiles
-                                (user_id, sanity, sanity_updated_at, haunted_attempts, attempts_date)
-                            VALUES (?, ?, ?, 20, '')
-                            """,
-                            (user_id, new_sanity, now),
-                        )
 
                 effect_keys = {
                     "run_protection": "haunted_potion_run_protection",
@@ -2101,9 +2061,9 @@ class Inventory(commands.Cog):
 
                     unlock_note = ""
                     if achievement_unlocked:
-                        achievement_name = special_result.get("achievement_id", "Unknown").replace(
-                            "halloween_", ""
-                        ).replace("_", " ").title()
+                        achievement_name = special_result.get("achievement_name") or special_result.get(
+                            "achievement_id", "Unknown"
+                        ).replace("halloween_", "").replace("_", " ").title()
                         unlock_note += (
                             f"\n\n**Achievement unlocked!** 🏆\n{achievement_name}!"
                         )
@@ -2300,7 +2260,8 @@ class Inventory(commands.Cog):
                         "hazard_shield": "Hazard Shield",
                         "lucky_scanner": "Deep-Space Scanner",
                         "ore_magnet": "Ore Magnet",
-                        "prototype_drill_bit": "Prototype Drill Bit",
+                        "boosted_laser_module": "Boosted Laser Module",
+                        "prototype_drill_bit": "Boosted Laser Module (Legacy)",
                         "cosmic_insurance": "Cosmic Insurance",
                         "fate_anchor": "Fate Anchor",
                     }
@@ -2322,6 +2283,7 @@ class Inventory(commands.Cog):
                     "hazard_shield": "next scavenging hazard is blocked",
                     "lucky_scanner": "next scavenging run has improved rare-find odds",
                     "ore_magnet": "next mining run guarantees titanium ore",
+                    "boosted_laser_module": "next mining run earns bonus Stardust",
                     "prototype_drill_bit": "next mining run earns bonus Stardust",
                     "cosmic_insurance": "next knockout is prevented",
                     "fate_anchor": "next missed fortune streak is protected",

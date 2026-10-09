@@ -5,6 +5,7 @@ imports so the story engine and reward system can depend on it safely.
 """
 
 HAUNTED_DAILY_ATTEMPTS = 35
+HAUNTED_LOCATION_ROTATION_SIZE = 4
 SANITY_MAX = 100
 SANITY_REGEN_SECONDS = 6 * 60 * 60
 

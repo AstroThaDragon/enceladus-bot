@@ -27,7 +27,6 @@ EMOJIS = {
     "hazard_shield": "<:hazard_shield:1550033476445667438>",
     "lucky_scanner": "<:lucky_scanner:1550033475459878982>",
     "ore_magnet": "<:ore_magnet:1550033474700836934>",
-    "prototype_drill_bit": "<:prototype_drill_bit:1550033473941536789>",
     "cosmic_insurance": "<:cosmic_insurance:1550033471785795655>",
     "fate_anchor": "<:fate_anchor:1550033472498835507>",
     "stardust_cache": "<:stardust_cache:1550033473249480714>",

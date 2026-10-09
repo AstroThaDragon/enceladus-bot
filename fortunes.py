@@ -145,7 +145,7 @@ RARITY_PREFIXES = {
     "uncommon": "✨",
     "rare": "🌙",
     "legendary": "**A legendary fortune appears!** 🌌\n",
-    "void": "**The fortune cookie cracks open strangely...**💀\n"
+    "void": "**The fortune cookie cracks open strangely...** 💀\n"
 }
 
 STAT_MOODS = {
@@ -256,7 +256,11 @@ class Fortunes(commands.Cog):
                     "ERROR",
                     "???",
                     "∞",
-                    "NULL"
+                    "NULL",
+                    "///[ERROR]",
+                    "MISSING_VALUE",
+                    "0x0000001",
+                    "NULL_POINTER"
                 ]
                 value = random.choice(void_values)
 
@@ -890,13 +894,13 @@ class Fortunes(commands.Cog):
             f"{event_note}"
             f"{prefix} **{ctx.author.mention} pulls apart the cookie...**\n"
             f"> *\"{selected_fortune}\"*\n"
-            f"**Your lucky mumbers:** *{lucky_nums}*\n 🔮"
-            f"\n**Your stats for today:**\n*{stats_text}*\n\n"
+            f"**Your lucky numbers!**\n*{lucky_nums}*\n 🔮"
+            f"\n**Your stats for today!**\n*{stats_text}*\n\n"
             f"**XP gained:** +{total_xp}\n"
-            f"**Your fortune streak:** {current_streak} day{'s' if current_streak != 1 else ''} 🔥"
+            f"**Your fortune streak:** {current_streak} day{'s' if current_streak != 1 else ''}{' 🔥' if current_streak >= 3 else ''}"
         )
 
-    @commands.hybrid_command(name="usecrystal", description="Use a Dilated Time Crystal to restore a fortune streak missed yesterday (max 2 per month).")
+    @commands.hybrid_command(name="usecrystal", description="Use a Dilated Time Crystal to restore a fortune streak missed yesterday (max 2 per month)")
     async def use_crystal(self, ctx: commands.Context):
         user_id = ctx.author.id
         async with self._get_user_lock(user_id):

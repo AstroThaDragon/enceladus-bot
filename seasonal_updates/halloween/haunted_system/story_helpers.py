@@ -3,9 +3,13 @@
 
 def _outcome(text, sanity=0, *, effects=None, next_scene=None, discovery_id=None,
              pet_discovery=False, end=False, ending_title=None):
+    authored_sanity = int(sanity)
+    # Sanity is an expedition reserve, not an insanity countdown. Keep the
+    # existing authored risk ranking, but make ordinary choice costs gentler.
+    sanity_cost = int(round(authored_sanity * 0.4)) if authored_sanity < 0 else authored_sanity
     return {
         "weight": 100,
-        "sanity": int(sanity),
+        "sanity": sanity_cost,
         "text": text,
         "effects": dict(effects or {}),
         "next_scene": next_scene,
@@ -59,7 +63,7 @@ def discovery_choice(label, key, risk, discovery_id, text, sanity, next_scene, *
 
 
 def pet_choice(label, key, risk, text, sanity, next_scene, *, effects=None):
-    return choice(
+    result = choice(
         label,
         key,
         risk,
@@ -69,6 +73,13 @@ def pet_choice(label, key, risk, text, sanity, next_scene, *, effects=None):
         effects=effects,
         pet_discovery=True,
     )
+    result["fallback_outcome"] = _outcome(
+        "You follow the sound, but it stops just beyond the light. A small set "
+        "of prints ends at a wall; something on the other side softly taps back.",
+        0,
+        next_scene=next_scene,
+    )
+    return result
 
 
 def scene(scene_id, text, choices, *, low_sanity=None, insane=None, reactions=None):

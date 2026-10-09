@@ -30,18 +30,47 @@ def get_scene(location_id, scene_id):
     return story, scene
 
 
+def _active_scene(story, scene_id, state):
+    """Apply the run's saved scene variation without changing story routing."""
+    scene = copy.deepcopy(story["scenes"][scene_id])
+    selections = (state or {}).get("scene_variants") or {}
+    selected = selections.get(scene_id, 0)
+    variants = (story.get("scene_variants") or {}).get(scene_id, [])
+    if isinstance(selected, int) and selected > 0 and selected <= len(variants):
+        scene.update(copy.deepcopy(variants[selected - 1]))
+
+    if (state or {}).get("story_route") == "alternate":
+        episode_scene = (story.get("alternate_episode") or {}).get("scenes", {}).get(scene_id)
+        if episode_scene:
+            scene.update(copy.deepcopy(episode_scene))
+
+    extra_reactions = (story.get("scene_reactions") or {}).get(scene_id, [])
+    if extra_reactions:
+        scene["reactions"] = list(scene.get("reactions") or []) + copy.deepcopy(extra_reactions)
+    for choice in scene.get("choices", []):
+        fallback = choice.pop("fallback_outcome", None)
+        if fallback and not (state or {}).get("pet_opportunity_available", False):
+            choice["outcomes"] = [copy.deepcopy(fallback)]
+    return scene
+
+
 def render_scene(location_id, scene_id, state, sanity, *, active_effects=None):
-    story, scene = get_scene(location_id, scene_id)
+    story, _base_scene = get_scene(location_id, scene_id)
     state = state or {}
     active_effects = active_effects or {}
+    scene = _active_scene(story, scene_id, state)
 
     if scene_id == story["opening_scene"]:
-        if float(sanity) <= 0:
-            text = story["opening"].get("insane") or story["opening"].get("low") or story["opening"].get("normal", "")
-        elif float(sanity) <= 25:
-            text = story["opening"].get("low") or story["opening"].get("normal", "")
+        if state.get("story_route") == "alternate":
+            episode = story.get("alternate_episode") or {}
+            text = f"**{episode.get('title', story['title'])}**\n\n{episode.get('opening', '')}"
         else:
-            text = story["opening"].get("normal", "")
+            if float(sanity) <= 0:
+                text = story["opening"].get("insane") or story["opening"].get("low") or story["opening"].get("normal", "")
+            elif float(sanity) <= 25:
+                text = story["opening"].get("low") or story["opening"].get("normal", "")
+            else:
+                text = story["opening"].get("normal", "")
 
         # Opening variants are an additive narrative layer. The authored
         # sanity-specific opening above remains intact; a selected variant
@@ -50,7 +79,7 @@ def render_scene(location_id, scene_id, state, sanity, *, active_effects=None):
         # behave exactly as before.
         opening_variants = story.get("opening_variants") or []
         variant_index = state.get("opening_variant")
-        if opening_variants and isinstance(variant_index, int):
+        if state.get("story_route") != "alternate" and opening_variants and isinstance(variant_index, int):
             if 0 <= variant_index < len(opening_variants):
                 variant_text = str(opening_variants[variant_index] or "").strip()
                 if variant_text:
@@ -92,7 +121,8 @@ def render_scene(location_id, scene_id, state, sanity, *, active_effects=None):
 
 
 def resolve_choice(location_id, scene_id, state, choice_index):
-    story, scene = get_scene(location_id, scene_id)
+    story, _base_scene = get_scene(location_id, scene_id)
+    scene = _active_scene(story, scene_id, state)
     choices = scene.get("choices", [])
     if not isinstance(choice_index, int) or not 0 <= choice_index < len(choices):
         raise IndexError("Invalid Haunted story choice index.")

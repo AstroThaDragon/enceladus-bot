@@ -8,10 +8,12 @@ from pets import get_active_pet_effects
 from .constants import (
     HAUNTED_DAILY_ATTEMPTS,
     HAUNTED_LOCATION_PET_OPPORTUNITY_CHANCE,
+    HAUNTED_LOCATION_ROTATION_SIZE,
     HAUNTED_STORY_VERSION,
+    HAUNTED_LOCATIONS,
     SANITY_MAX,
 )
-from .sanity import calculate_sanity, game_date, now
+from .sanity import calculate_sanity_state, game_date, now
 from .stories import get_story
 
 
@@ -40,10 +42,22 @@ async def ensure_haunted_schema(db):
             active_location TEXT DEFAULT '',
             active_stage INTEGER NOT NULL DEFAULT 0,
             active_total_stages INTEGER NOT NULL DEFAULT 0,
-            active_started_at REAL NOT NULL DEFAULT 0
+            active_started_at REAL NOT NULL DEFAULT 0,
+            location_order TEXT NOT NULL DEFAULT '[]',
+            location_group INTEGER NOT NULL DEFAULT 0
         )
         """
     )
+
+    async with db.execute("PRAGMA table_info(haunted_profiles)") as cursor:
+        profile_columns = {row[1] for row in await cursor.fetchall()}
+    for column, definition in {
+        "location_order": "TEXT NOT NULL DEFAULT '[]'",
+        "location_group": "INTEGER NOT NULL DEFAULT 0",
+    }.items():
+        if column not in profile_columns:
+            await db.execute(f"ALTER TABLE haunted_profiles ADD COLUMN {column} {definition}")
+
     await db.execute(
         """
         CREATE TABLE IF NOT EXISTS haunted_runs (
@@ -71,6 +85,43 @@ async def ensure_haunted_schema(db):
             await db.execute(f"ALTER TABLE haunted_runs ADD COLUMN {column} {definition}")
 
 
+def _location_group(order, group_index):
+    start = group_index * HAUNTED_LOCATION_ROTATION_SIZE
+    available = list(order[start:start + HAUNTED_LOCATION_ROTATION_SIZE])
+    if len(available) < HAUNTED_LOCATION_ROTATION_SIZE:
+        previous_start = max(0, start - HAUNTED_LOCATION_ROTATION_SIZE)
+        previous = set(order[previous_start:start])
+        fillers = [location_id for location_id in order if location_id not in previous and location_id not in available]
+        available.extend(fillers[:HAUNTED_LOCATION_ROTATION_SIZE - len(available)])
+    return available
+
+
+async def _ensure_location_rotation(db, user_id, raw_order, group_index):
+    location_ids = list(HAUNTED_LOCATIONS)
+    order = _decode_json(raw_order, [])
+    if (
+        not isinstance(order, list)
+        or len(order) != len(location_ids)
+        or not all(isinstance(location_id, str) for location_id in order)
+        or set(order) != set(location_ids)
+    ):
+        order = location_ids[:]
+        random.shuffle(order)
+        group_index = 0
+
+    group_count = (len(order) + HAUNTED_LOCATION_ROTATION_SIZE - 1) // HAUNTED_LOCATION_ROTATION_SIZE
+    try:
+        group_index = int(group_index)
+    except (TypeError, ValueError):
+        group_index = 0
+    group_index = max(0, min(group_count - 1, group_index))
+    await db.execute(
+        "UPDATE haunted_profiles SET location_order = ?, location_group = ? WHERE user_id = ?",
+        (json.dumps(order), group_index, user_id),
+    )
+    return order, group_index, _location_group(order, group_index)
+
+
 async def get_or_create_profile(db, user_id):
     today = game_date()
     current_time = now()
@@ -79,7 +130,8 @@ async def get_or_create_profile(db, user_id):
     async with db.execute(
         """
         SELECT sanity, sanity_updated_at, haunted_attempts, attempts_date,
-               active_location, active_stage, active_total_stages
+               active_location, active_stage, active_total_stages,
+               location_order, location_group
         FROM haunted_profiles
         WHERE user_id = ?
         """,
@@ -97,6 +149,10 @@ async def get_or_create_profile(db, user_id):
             (user_id, current_time, HAUNTED_DAILY_ATTEMPTS, today),
         )
         await db.commit()
+        order, group_index, available_locations = await _ensure_location_rotation(
+            db, user_id, "[]", 0
+        )
+        await db.commit()
         return {
             "sanity": 100.0,
             "sanity_updated_at": current_time,
@@ -105,32 +161,44 @@ async def get_or_create_profile(db, user_id):
             "active_location": "",
             "active_stage": 0,
             "active_total_stages": 0,
+            "available_locations": available_locations,
+            "location_order": order,
+            "location_group": group_index,
         }
 
-    sanity, updated_at, attempts, attempts_date, active_location, active_stage, active_total = row
-    current_sanity = calculate_sanity(sanity, updated_at, current_time)
+    (sanity, updated_at, attempts, attempts_date, active_location, active_stage,
+     active_total, raw_location_order, location_group) = row
+    current_sanity, sanity_anchor = calculate_sanity_state(
+        sanity, updated_at, current_time
+    )
     if attempts_date != today:
         attempts = HAUNTED_DAILY_ATTEMPTS
         attempts_date = today
 
+    order, group_index, available_locations = await _ensure_location_rotation(
+        db, user_id, raw_location_order, location_group
+    )
     await db.execute(
         """
         UPDATE haunted_profiles
         SET sanity = ?, sanity_updated_at = ?, haunted_attempts = ?, attempts_date = ?
         WHERE user_id = ?
         """,
-        (current_sanity, current_time, attempts, attempts_date, user_id),
+        (current_sanity, sanity_anchor, attempts, attempts_date, user_id),
     )
     await db.commit()
 
     return {
         "sanity": current_sanity,
-        "sanity_updated_at": current_time,
+        "sanity_updated_at": sanity_anchor,
         "attempts": attempts,
         "attempts_date": attempts_date,
         "active_location": active_location or "",
         "active_stage": active_stage or 0,
         "active_total_stages": active_total or 0,
+        "available_locations": available_locations,
+        "location_order": order,
+        "location_group": group_index,
     }
 
 
@@ -163,12 +231,15 @@ async def update_sanity(db, user_id, delta, regen_multiplier=1.0):
         updated_at = current_time
     else:
         sanity, updated_at = row
-        sanity = calculate_sanity(sanity, updated_at, current_time, regen_multiplier)
+        sanity, updated_at = calculate_sanity_state(
+            sanity, updated_at, current_time, regen_multiplier
+        )
 
     new_sanity = max(0.0, min(SANITY_MAX, sanity + float(delta)))
+    sanity_anchor = updated_at if float(delta) == 0 else current_time
     await db.execute(
         "UPDATE haunted_profiles SET sanity = ?, sanity_updated_at = ? WHERE user_id = ?",
-        (new_sanity, current_time, user_id),
+        (new_sanity, sanity_anchor, user_id),
     )
     return new_sanity
 
@@ -304,43 +375,34 @@ async def start_run(db, user_id, location_id, sanity):
         effects["haunted_run_half_next_negative"] = True
 
     # Location pets are intentionally an opportunity rather than a guaranteed
-    # encounter. The roll happens once when the run starts. If it fails, the
-    # authored pet scene is skipped cleanly so its pet-specific clues never
-    # appear to the player. If it succeeds, the pet scene is shown normally
-    # and choosing its explicitly marked option guarantees the pet.
+    # encounter. The roll happens once when the run starts; the pet scene stays
+    # in the route either way, while the engine swaps in a spooky non-pet
+    # outcome when this run has no pet opportunity.
     pet_opportunity_available = random.random() < HAUNTED_LOCATION_PET_OPPORTUNITY_CHANCE
-
-    pet_scene_id = None
-    for candidate_scene_id in story.get("scene_order", []):
-        candidate_scene = story.get("scenes", {}).get(candidate_scene_id, {})
-        if any(
-            outcome.get("pet_discovery")
-            for candidate_choice in candidate_scene.get("choices", [])
-            for outcome in candidate_choice.get("outcomes", [])
-            if isinstance(outcome, dict)
-        ):
-            pet_scene_id = candidate_scene_id
-            break
 
     skip_scenes = []
     shortcut_scene = story.get("shortcut_scene") if effects.get("haunted_run_stage_reduced") else None
     if shortcut_scene:
         skip_scenes.append(shortcut_scene)
-    if not pet_opportunity_available and pet_scene_id:
-        skip_scenes.append(pet_scene_id)
-
-    # Deduplicate while preserving story order. Each skipped authored scene
-    # reduces the displayed run length by one.
+    # Deduplicate while preserving story order. Shortcut items can shorten a
+    # run, but pet availability never changes its displayed stage count.
     skip_scenes = list(dict.fromkeys(skip_scenes))
     total_stages = max(2, total_stages - len(skip_scenes))
 
     opening_variants = story.get("opening_variants") or []
     opening_variant = random.randrange(len(opening_variants)) if opening_variants else None
+    scene_variants = {
+        scene_id: random.randrange(len(variants) + 1)
+        for scene_id, variants in (story.get("scene_variants") or {}).items()
+        if variants
+    }
 
     story_state = {
         "flags": {},
         "discoveries_found": [],
+        "story_route": "alternate" if random.random() < 0.5 else "original",
         "opening_variant": opening_variant,
+        "scene_variants": scene_variants,
         "pet_opportunity_available": pet_opportunity_available,
         "pet_opportunity_taken": False,
         "pet_discovery_message": None,
@@ -417,6 +479,7 @@ async def get_active_run(db, user_id):
     state = _decode_json(raw_state, {})
     if not isinstance(state, dict):
         state = {}
+    state.setdefault("scene_variants", {})
 
     # Additive compatibility migration for an in-progress pre-story run. We do
     # not delete it or consume another attempt; we map its current stage to the
@@ -483,6 +546,31 @@ async def save_story_state(db, user_id, *, stage=None, current_scene=None, state
 
 
 async def clear_run(db, user_id):
+    async with db.execute(
+        "SELECT location_id FROM haunted_runs WHERE user_id = ?", (user_id,)
+    ) as cursor:
+        active_run = await cursor.fetchone()
+
+    if active_run:
+        profile = await get_or_create_profile(db, user_id)
+        next_group = profile["location_group"] + 1
+        group_count = (
+            len(profile["location_order"]) + HAUNTED_LOCATION_ROTATION_SIZE - 1
+        ) // HAUNTED_LOCATION_ROTATION_SIZE
+        order = profile["location_order"]
+        if next_group >= group_count:
+            previous_locations = set(profile["available_locations"])
+            fresh_locations = [item for item in HAUNTED_LOCATIONS if item not in previous_locations]
+            repeated_locations = [item for item in HAUNTED_LOCATIONS if item in previous_locations]
+            random.shuffle(fresh_locations)
+            random.shuffle(repeated_locations)
+            order = fresh_locations + repeated_locations
+            next_group = 0
+        await db.execute(
+            "UPDATE haunted_profiles SET location_order = ?, location_group = ? WHERE user_id = ?",
+            (json.dumps(order), next_group, user_id),
+        )
+
     await db.execute("DELETE FROM haunted_runs WHERE user_id = ?", (user_id,))
     await db.execute(
         """

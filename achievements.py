@@ -102,7 +102,7 @@ ACHIEVEMENTS = {
     "haunted_impossible": {"name": "That Wasn't There Before", "emoji": "👁️", "description": "Discover an impossible environmental anomaly.", "reward": "Profile title: Something Is Very Wrong"},
     "haunted_worth_it": {"name": "Worth It", "emoji": "🩸", "description": "Survive a rare discovery that causes a major Sanity loss.", "reward": "Profile title: Worth It"},
     "haunted_unwell": {"name": "Unwell", "emoji": "🫥", "description": "Reach 0 Sanity after triggering a rare discovery.", "reward": "Profile title: Unwell"},
-    "haunted_other_side": {"name": "The Other Side", "emoji": "👁️", "description": "Discover a rare event while at 0 Sanity.", "reward": "Profile title: The Other Side"},
+    "haunted_other_side": {"name": "The Other Side", "emoji": "👁️", "description": "Discover a rare event while your Sanity is fully depleted.", "reward": "Profile title: The Other Side"},
     "haunted_all_discoveries": {"name": "I Shouldn't Have Looked", "emoji": "🕳️", "description": "Discover every rare discovery across all Haunted locations.", "reward": "Profile title: I Shouldn't Have Looked"},
 
     # Haunted crafting achievements
@@ -154,7 +154,7 @@ ACHIEVEMENTS = {
         "reward": "Profile title: Spirit Communicator",
     },
     "halloween_marker": {
-        "name": "Unitologist",
+        "name": "Make Us Whole",
         "emoji": "👽",
         "description": "Use the Unknown Alien Artifact.",
         "reward": "Profile title: Unitologist",
@@ -1034,7 +1034,7 @@ class Achievements(commands.Cog):
         try:
             await ensure_achievement_tables(db)
             unlocked = []
-            if sanity_delta <= -10 and new_sanity > 0 and await self._grant_haunted_achievement(db, user_id, "haunted_worth_it", "title_worth_it"):
+            if sanity_delta <= -5 and new_sanity > 0 and await self._grant_haunted_achievement(db, user_id, "haunted_worth_it", "title_worth_it"):
                 unlocked.append("haunted_worth_it")
             if sanity_delta < 0 and new_sanity <= 0 and await self._grant_haunted_achievement(db, user_id, "haunted_unwell", "title_unwell"):
                 unlocked.append("haunted_unwell")

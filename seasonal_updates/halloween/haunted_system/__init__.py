@@ -9,7 +9,7 @@ from .constants import *  # noqa: F401,F403
 from .discoveries import RARE_DISCOVERIES, HAUNTED_IMPOSSIBLE_DISCOVERIES
 from .engine import get_scene, render_scene, resolve_choice
 from .rewards import grant_haunted_completion_rewards, roll_haunted_rarity
-from .sanity import calculate_sanity, game_date, is_insane, sanity_percent
+from .sanity import calculate_sanity, calculate_sanity_state, game_date, is_insane, sanity_percent
 from .state import (
     advance_story,
     clear_run,
@@ -24,6 +24,7 @@ from .stories import STORIES, get_story
 
 __all__ = [
     "HAUNTED_DAILY_ATTEMPTS",
+    "HAUNTED_LOCATION_ROTATION_SIZE",
     "HAUNTED_LOCATIONS",
     "SANITY_MAX",
     "SANITY_REGEN_SECONDS",
@@ -35,6 +36,7 @@ __all__ = [
     "grant_haunted_completion_rewards",
     "roll_haunted_rarity",
     "calculate_sanity",
+    "calculate_sanity_state",
     "game_date",
     "is_insane",
     "sanity_percent",

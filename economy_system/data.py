@@ -3,6 +3,7 @@ from seasonal_updates.halloween.halloween import get_collectibles as get_hallowe
 from seasonal_updates.halloween.halloween import HALLOWEEN_SPACE_JUNK
 
 DEFAULT_VAULT_CAPACITY = 250_000
+OVERFLOW_SELL_RATE = 0.5
 
 BULK_SELL_OPTIONS = {
     "all_junk": "🗑️ Sell All Space Junk",
@@ -84,11 +85,6 @@ SALVAGE_MATERIAL_NAMES = {
     "wiring": (EMOJIS.get("wiring", "🧵"), "Wiring"),
 }
 
-SALVAGE_OVERFLOW_VALUES = {
-    "iron_ore": 3, "copper_ore": 5, "titanium_chunk": 15, "aluminum_ore": 4,
-    "circuit_board": 20, "glue": 6, "scrap_metal": 3, "nuts_bolts": 4, "wiring": 5,
-}
-
 NORMAL_SELL_ALL_MATERIAL_IDS = {
     "titanium_chunk",
     "iron_ore",
@@ -101,7 +97,7 @@ NORMAL_SELL_ALL_MATERIAL_IDS = {
     "wiring",
 }
 
-SELLABLE_ITEM_IDS = {'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
+SELLABLE_ITEM_IDS = {'boosted_laser_module', 'cosmic_insurance', 'drone_battery', 'drone_power_cell', 'drone_quantum_battery', 'fate_anchor', 'fuel_refill', 'fuel_stabilizer', 'full_revive', 'hazard_shield', 'heavy_wrench', 'laser_charge_cell', 'laser_power_cell', 'lucky_scanner', 'makeshift_medkit', 'medkit', 'nanite_patch', 'ore_magnet', 'plasma_cutter', 'prototype_drill_bit', 'revive', 'revive_kit', 'station_rations', 'stick', 'stop_sign', 'wooden_shield', 'wooden_spoon', 'wooden_sword',
                      }
 
 SHOP_CATEGORY_INFO = {
@@ -133,7 +129,7 @@ SHOP_BUY_CATEGORY_ITEMS = {
     ],
     "consumables": [
         "station_rations", "ore_magnet", "fate_anchor", "cosmic_insurance",
-        "fuel_stabilizer", "hazard_shield", "lucky_scanner", "prototype_drill_bit",
+        "fuel_stabilizer", "hazard_shield", "lucky_scanner", "boosted_laser_module",
     ],
     "upgrades": [
         "incubator_2", "incubator_3", "vault_expansion", "vault_expansion_2",
@@ -182,7 +178,7 @@ SELL_ITEM_CATEGORY_IDS = {
         "drone_battery", "drone_power_cell", "drone_quantum_battery",
         # Temporary utility items are consumables, not upgrade kits.
         "fuel_stabilizer", "hazard_shield", "lucky_scanner", "ore_magnet",
-        "prototype_drill_bit", "cosmic_insurance", "fate_anchor",
+        "boosted_laser_module", "prototype_drill_bit", "cosmic_insurance", "fate_anchor",
     },
     "upgrade_kits": set(),  # Populated dynamically from crafting recipes below.
     "defense_weapons": {
@@ -228,16 +224,16 @@ SHOP_ITEMS = {
                 "desc": "Standard planetary survival trauma kit. Restores +100 HP."
             },
             "revive": {
-                "name": f"{EMOJIS.get('revive', '⚕️')} Revival Kit",
+                "name": f"{EMOJIS.get('revive', '⚕️')} Basic Revival Kit",
                 "cost": 350,
                 "type": "revive",
-                "desc": "Immediately revives an unconscious explorer at 35% HP."
+                "desc": "Revives an unconscious explorer at 35% of their maximum HP."
             },
             "full_revive": {
                 "name": f"{EMOJIS.get('full_revive', '⚕️')} Emergency Full Revival",
-                "cost": 800,
+                "cost": 900,
                 "type": "revive",
-                "desc": "Immediately revives an unconscious explorer at full HP."
+                "desc": "Revives an unconscious explorer at 100% of their maximum HP."
             },
             "laser_charge_cell": {
                 "name": f"{EMOJIS.get('laser_charge_cell', '🔋')} Laser Charge Cell",
@@ -347,8 +343,8 @@ SHOP_ITEMS = {
                 "name": f"{EMOJIS.get('lucky_scanner', '📡')} Deep-Space Scanner", "cost": 700, "type": "consumable",
                 "desc": "Improves rare-find odds on your next scavenging run."
             },
-            "prototype_drill_bit": {
-                "name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "type": "consumable",
+            "boosted_laser_module": {
+                "name": "Boosted Laser Module", "cost": 1000, "type": "consumable",
                 "desc": "Boosts Stardust from your next mining run."
             },
             "incubator_2": {
@@ -378,39 +374,41 @@ SHOP_ITEMS = {
         }
 
 JUNK_PRICES = {
-            "space_pizza": 30,
-            "floppy_disk": 50,
-            "meteorite": 85,
-            "rubber_duck": 50,
-            "rusty_gear": 15,
-            "tape_deck": 45,
-            "alien_artifact": 80,
-            "space_boot": 25,
+            # Floors keep selling at least as valuable as liquidating a typical
+            # salvage result, including the Salvage Rig's level-5 bonus chance.
+            "space_pizza": 50,
+            "floppy_disk": 80,
+            "meteorite": 105,
+            "rubber_duck": 70,
+            "rusty_gear": 60,
+            "tape_deck": 80,
+            "alien_artifact": 100,
+            "space_boot": 60,
             "cosmic_coin": 120,
-            "holo_poster": 35,
-            "broken_laser": 20,
-            "lost_logbook": 20,
-            "left_sock": 10,
-            "warp_mug": 30,
-            "space_pudding": 10,
-            "tangled_cables": 25,
+            "holo_poster": 55,
+            "broken_laser": 80,
+            "lost_logbook": 50,
+            "left_sock": 50,
+            "warp_mug": 60,
+            "space_pudding": 50,
+            "tangled_cables": 80,
             "screaming_crystal": 100,
-            "moon_cheese": 60,
-            "golden_spatula": 120,
-            "parking_ticket": 10,
-            "floating_plant": 70,
-            "tinted_visor": 25,
-            "purring_lint": 30,
-            "pet_rock": 40,
+            "moon_cheese": 80,
+            "golden_spatula": 140,
+            "parking_ticket": 50,
+            "floating_plant": 90,
+            "tinted_visor": 60,
+            "purring_lint": 50,
+            "pet_rock": 90,
             "haunted_circuit": 120,
-            "space_taco": 35,
-            "rusty_wrench": 25,
-            "alien_fossil": 75,
-            "big_red_button": 10,
-            "antique_compass": 30,
-            "broken_clock": 30,
-            "perplexing_painting": 80,
-            "cosmic_banana": 20
+            "space_taco": 55,
+            "rusty_wrench": 60,
+            "alien_fossil": 95,
+            "big_red_button": 80,
+            "antique_compass": 80,
+            "broken_clock": 80,
+            "perplexing_painting": 100,
+            "cosmic_banana": 50
         }
 
 ROTATING_ITEMS = {
@@ -419,10 +417,10 @@ ROTATING_ITEMS = {
             "hazard_shield": {"name": f"{EMOJIS.get('hazard_shield', '🛡️')} Hazard Shield", "cost": 1000, "desc": "Blocks the next scavenging hazard."},
             "lucky_scanner": {"name": f"{EMOJIS.get('lucky_scanner', '📡')} Deep-Space Scanner", "cost": 700, "desc": "Improves rare-find odds on your next scavenging run."},
             "ore_magnet": {"name": f"{EMOJIS.get('ore_magnet', '🧲')} Ore Magnet", "cost": 500, "desc": "Guarantees a titanium ore find on your next mining run."},
-            "prototype_drill_bit": {"name": f"{EMOJIS.get('prototype_drill_bit', '⚙️')} Prototype Drill Bit", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
+            "boosted_laser_module": {"name": "🔫 Boosted Laser Module", "cost": 1000, "desc": "Boosts Stardust from your next mining run."},
             "cosmic_insurance": {"name": f"{EMOJIS.get('cosmic_insurance', '📋')} Cosmic Insurance", "cost": 800, "desc": "Prevents a knockout from your next scavenging hazard."},
             "fate_anchor": {"name": f"{EMOJIS.get('fate_anchor', '⚓')} Fate Anchor", "cost": 2250, "desc": "Protects one missed fortune streak day."},
-            "revive_kit": {"name": f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit", "cost": 1500, "desc": "Revives an unconscious explorer at 50% HP."},
+            "revive_kit": {"name": f"{EMOJIS.get('revive_kit', '💉')} Emergency Revival Kit", "cost": 600, "desc": "Revives an unconscious explorer at 50% of their maximum HP."},
             "stop_sign": {"name": "🛑 Stop Sign", "cost": 250, "type": "defense_weapon", "desc": "Lethal Company-inspired station debris. 8% chance to prevent a scavenging hazard."},
             "stick": {"name": "🪵 Stick", "cost": 450, "type": "defense_weapon", "desc": "Undertale-inspired weapon. 4% chance to prevent a scavenging hazard."},
             "wooden_sword": {"name": "🗡️ Wooden Sword", "cost": 800, "type": "defense_weapon", "desc": "Minecraft-inspired starter weapon. 10% chance to prevent a scavenging hazard."},
@@ -456,7 +454,7 @@ SHOP_LIMITS = {
             "hazard_shield": (5, "daily"),
             "lucky_scanner": (5, "daily"),
             "ore_magnet": (5, "daily"),
-            "prototype_drill_bit": (5, "daily"),
+            "boosted_laser_module": (5, "daily"),
             "cosmic_insurance": (5, "daily"),
             "fate_anchor": (3, "daily"),
             "revive_kit": (3, "daily"),

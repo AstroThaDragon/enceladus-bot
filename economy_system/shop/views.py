@@ -261,6 +261,7 @@ class ShopTransactionView(discord.ui.View):
         self.quantity_input = "1"
         self.item_entries = []
         self.finished = False
+        self.processing = False
         self.message = None
         self._build_category_view()
 
@@ -271,7 +272,48 @@ class ShopTransactionView(discord.ui.View):
                 ephemeral=True,
             )
             return False
+        if self.finished:
+            await interaction.response.send_message(
+                "⚠️ This shop has been closed.", ephemeral=True
+            )
+            return False
+        if self.processing:
+            await interaction.response.send_message(
+                "⏳ Your transaction is still processing.", ephemeral=True
+            )
+            return False
         return True
+
+    def _add_cancel_button(self, *, row=2):
+        cancel = discord.ui.Button(
+            label="Cancel",
+            emoji="✖️",
+            style=discord.ButtonStyle.danger,
+            row=row,
+        )
+
+        async def cancel_callback(interaction: discord.Interaction):
+            if not await self.check_owner(interaction):
+                return
+            self.finished = True
+            self.stop()
+            await interaction.response.edit_message(
+                content="🛒 **Shop closed.**",
+                embed=None,
+                view=None,
+            )
+
+        cancel.callback = cast(Any, cancel_callback)
+        self.add_item(cancel)
+
+    def make_return_view(self):
+        """Create a fresh view after a separate bulk-sale confirmation view."""
+        view = ShopTransactionView(self.cog, self.user_id, self.mode)
+        view.category = self.category
+        view.page = self.page
+        view.search_query = self.search_query
+        view.message = self.message
+        return view
 
     def _build_category_view(self):
         self.clear_items()
@@ -291,6 +333,7 @@ class ShopTransactionView(discord.ui.View):
 
         search.callback = cast(Any, search_callback)
         self.add_item(search)
+        self._add_cancel_button(row=2)
 
     def _category_title(self):
         emoji, label, _ = SHOP_CATEGORY_INFO.get(
@@ -381,6 +424,50 @@ class ShopTransactionView(discord.ui.View):
         entry = self._entry_for_item(self.selected_item)
         return entry.get("owned") if entry else None
 
+    async def _get_buy_owned_quantity(self):
+        """Read the current stack count for the selected shop item."""
+        if not self.selected_item:
+            return None
+        selected_info = self._get_selected_info() or {}
+        if selected_info.get("type") == "station_upgrade":
+            return None
+
+        legacy_columns = {
+            "time_crystal": "time_crystals",
+            "nanite_patch": "nanite_patchs",
+            "medkit": "medkits",
+        }
+        async with aiosqlite.connect(self.cog.get_db_path()) as db:
+            await self.cog.ensure_schema(db)
+            if self.selected_item in legacy_columns:
+                column = legacy_columns[self.selected_item]
+                async with db.execute("PRAGMA table_info(users)") as cursor:
+                    columns = {row[1] for row in await cursor.fetchall()}
+                if column not in columns:
+                    return 0
+                async with db.execute(
+                    f"SELECT COALESCE({column}, 0) FROM users WHERE user_id = ?",
+                    (self.user_id,),
+                ) as cursor:
+                    row = await cursor.fetchone()
+                return int(row[0] or 0) if row else 0
+
+            await db.execute(
+                """CREATE TABLE IF NOT EXISTS inventory (
+                    user_id INTEGER NOT NULL,
+                    item_id TEXT NOT NULL,
+                    item_type TEXT NOT NULL DEFAULT 'crafting_material',
+                    quantity INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, item_id)
+                )"""
+            )
+            async with db.execute(
+                "SELECT quantity FROM inventory WHERE user_id = ? AND item_id = ?",
+                (self.user_id, self.selected_item),
+            ) as cursor:
+                row = await cursor.fetchone()
+            return int(row[0] or 0) if row else 0
+
     @staticmethod
     def _strip_emoji_name(name):
         # Discord custom emoji markup is not reliably rendered in button labels.
@@ -439,7 +526,7 @@ class ShopTransactionView(discord.ui.View):
             view=self,
         )
 
-    async def show_item_picker(self, interaction):
+    async def show_item_picker(self, interaction, *, edit_original=False):
         self.clear_items()
         entries = await self._get_entries()
         self.item_entries = entries
@@ -483,6 +570,9 @@ class ShopTransactionView(discord.ui.View):
                         detail = f"💰 **{price:,} Stardust**"
                     if info.get("desc"):
                         detail += f"\n📖 {info['desc']}"
+                    limit_text = self.cog.shop_limit_text(entry["id"])
+                    limit = limit_text.removeprefix(" • Limit: ") if limit_text else "None"
+                    detail += f"\n📦 **Purchase limit:** {limit}"
                 else:
                     owned = int(entry.get("owned", 0) or 0)
                     stored_type = entry.get("stored_type") or info.get("type")
@@ -568,12 +658,18 @@ class ShopTransactionView(discord.ui.View):
         self.add_item(search)
         if self.category != "__rotating__":
             self.add_item(categories)
+        self._add_cancel_button(row=2)
 
         embed.set_footer(
             text="Items are shown above • Use the item buttons to select one, or Search to filter."
         )
 
-        await interaction.response.edit_message(embed=embed, view=self)
+        if edit_original:
+            self.message = await interaction.edit_original_response(
+                content=None, embed=embed, view=self
+            )
+        else:
+            await interaction.response.edit_message(content=None, embed=embed, view=self)
 
     def _get_selected_info(self):
         if self.selected_item is None:
@@ -608,11 +704,14 @@ class ShopTransactionView(discord.ui.View):
         if self.mode == "buy":
             unit_price = self._buy_unit_price()
             total = unit_price * self.quantity
+            owned = await self._get_buy_owned_quantity()
             lines = [
+                f"📦 You currently have: **{owned:,}x**" if owned is not None else "",
                 f"💰 Price: **{unit_price:,} Stardust each**",
                 f"🧮 Quantity: **{self.quantity:,}**",
                 f"💸 Total: **{total:,} Stardust**",
             ]
+            lines = [line for line in lines if line]
             if self.selected_item in self.cog.SHOP_ITEMS and self.selected_item in self.cog.daily_rotation():
                 lines.insert(1, "🏷️ **15% Daily Discount**")
 
@@ -685,6 +784,7 @@ class ShopTransactionView(discord.ui.View):
         confirm.callback = cast(Any, confirm_callback)
         self.add_item(back)
         self.add_item(confirm)
+        self._add_cancel_button(row=2)
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def show_bulk_sale(self, interaction):
@@ -692,10 +792,9 @@ class ShopTransactionView(discord.ui.View):
             self.user_id, self.selected_item
         )
         if not rows:
-            return await interaction.response.edit_message(
-                content="❌ **Nothing to sell!** You don't currently have any items covered by this Sell All option.",
-                embed=None,
-                view=self,
+            return await interaction.response.send_message(
+                "❌ You don't currently have any items covered by this Sell All option.",
+                ephemeral=True,
             )
 
         preview = "\n".join(lines[:12])
@@ -714,7 +813,11 @@ class ShopTransactionView(discord.ui.View):
             ),
             color=discord.Color.orange(),
         )
-        view = SellAllConfirmView(self.cog, self.user_id, self.selected_item)
+        self.stop()
+        view = SellAllConfirmView(
+            self.cog, self.user_id, self.selected_item, return_view=self
+        )
+        view.message = self.message
         await interaction.response.edit_message(embed=embed, content=None, view=view)
 
     async def confirm_transaction(self, interaction):
@@ -725,49 +828,35 @@ class ShopTransactionView(discord.ui.View):
         if not self.selected_item:
             return await interaction.response.send_message("❌ No item selected.", ephemeral=True)
 
-        self.finished = True
-        for child in self.children:
-            if isinstance(child, (discord.ui.Button, discord.ui.Select)):
-                child.disabled = True
-        await interaction.response.edit_message(view=self)
+        self.processing = True
+        await interaction.response.defer()
 
         # The existing transaction methods contain the full purchase/sale
         # accounting logic. The adapter lets them respond to this interaction
         # without duplicating that logic in the UI.
         ctx = ShopInteractionContext(interaction)
-        if self.mode == "buy":
-            await self.cog.buy(ctx, self.selected_item, self.quantity)
-        else:
-            await self.cog.sell(ctx, self.selected_item, self.quantity_input)
+        try:
+            if self.mode == "buy":
+                await self.cog.buy(ctx, self.selected_item, self.quantity)
+            else:
+                await self.cog.sell(ctx, self.selected_item, self.quantity_input)
+        finally:
+            self.processing = False
+            self.selected_item = None
+            self.quantity = 1
+            self.quantity_input = "1"
+            await self.show_item_picker(interaction, edit_original=True)
 
     async def on_timeout(self):
+        self.finished = True
         for child in self.children:
             if isinstance(child, (discord.ui.Button, discord.ui.Select)):
                 child.disabled = True
-
-class ShopListCategorySelect(discord.ui.Select):
-    def __init__(self, shop_view):
-        self.shop_view = shop_view
-        options = [
-            discord.SelectOption(label="Healing", emoji="❤️", value="healing"),
-            discord.SelectOption(label="Recharge", emoji="🔋", value="recharge"),
-            discord.SelectOption(label="Upgrades", emoji="🛠️", value="upgrades"),
-            discord.SelectOption(label="Pet Items", emoji="🐾", value="pet_items"),
-            discord.SelectOption(label="Special", emoji="✨", value="special"),
-            discord.SelectOption(label="Lottery", emoji="🎟️", value="lottery"),
-            discord.SelectOption(label="Backgrounds", emoji="🖼️", value="backgrounds"),
-        ]
-        super().__init__(placeholder="📂 Select a shop category...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.shop_view.user_id:
-            return await interaction.response.send_message(
-                "⚠️ This shop menu belongs to the person who opened it.", ephemeral=True
-            )
-        category = self.values[0]
-        await interaction.response.edit_message(
-            embed=self.shop_view.build_embed(category), view=self.shop_view
-        )
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except (discord.NotFound, discord.HTTPException):
+                pass
 
 class RotatingShopBuyButton(discord.ui.Button):
     """Buy button for one of today's rotating offers."""
@@ -815,21 +904,18 @@ class RotatingShopBuyButton(discord.ui.Button):
             "info": self.item,
             "owned": None,
         }]
+        view.message = interaction.message
         await view.show_quantity(interaction)
 
 class ShopView(discord.ui.View):
-    """Legacy /shop catalog view plus the interactive daily rotating shop."""
+    """Interactive daily rotating offers view."""
 
-    def __init__(self, cog, user_id, category=None):
+    def __init__(self, cog, user_id):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
-        self.category = category
 
-        if category == "daily":
-            self._add_daily_buttons()
-        else:
-            self.add_item(ShopListCategorySelect(self))
+        self._add_daily_buttons()
 
     def _add_daily_buttons(self):
         for item_id in self.cog.daily_rotation():
@@ -846,76 +932,31 @@ class ShopView(discord.ui.View):
                 )
             )
 
-    def build_embed(self, category):
-        # Preserve the existing /shop list catalog behavior while the new
-        # transaction UI handles /shop buy and /shop sell.
+    def build_embed(self):
         cog = self.cog
         embed = discord.Embed(
             title="🛒 Enceladus Station Trading Post",
             color=discord.Color.from_rgb(0, 229, 255)
         )
-        if category == "daily":
-            embed.description = (
-                "🔄 **Daily Rotating Offers**\n"
-                f"Today's station market — **{cog.rotation_date()}**\n\n"
-                "These offers rotate at midnight Eastern time."
-            )
-            for item_id in cog.daily_rotation():
-                item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
-                if not item:
-                    continue
-                is_permanent = item_id in cog.SHOP_ITEMS
-                daily_cost = int(item["cost"] * 0.85) if is_permanent else item["cost"]
-                price_text = (
-                    f"💰 ~~{item['cost']:,}~~ → **{daily_cost:,} Stardust** 🔥\n🏷️ **15% Daily Discount**"
-                    if is_permanent else f"💰 Price: **{daily_cost:,} Stardust**"
-                )
-                limit_text = cog.shop_limit_text(item_id)
-                embed.add_field(
-                    name=item["name"],
-                    value=f"{price_text}\n📖 {item['desc']}\n📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}",
-                    inline=False,
-                )
-            return embed
-
-        if category == "lottery":
-            embed.description = (
-                "🎟️ **Monthly Lottery**\n"
-                "Choose your own five numbers from 1–99 and enter the monthly drawing."
-            )
-            embed.add_field(
-                name="🎟️ Lottery Ticket",
-                value=(
-                    "💰 Price: **100 Stardust** per ticket\n"
-                    "🔢 Choose **5 different numbers from 1–99**\n"
-                    "📦 Maximum: **25 active tickets** per user per cycle\n"
-                    "🏆 Top prize: **10,000 Stardust** for matching all 5\n\n"
-                    "Use `/lottery buy` to choose your numbers and purchase a ticket.\n\n"
-                    "NOTE: Lotteries are only available when a staff member opens one. Wait until it's announced!"
-                ),
-                inline=False,
-            )
-            embed.set_footer(text="Use /lottery to view the current drawing and your tickets.")
-            return embed
-
-        item_ids = list(SHOP_BUY_CATEGORY_ITEMS.get(category, []))
-        descriptions = {
-            "healing": "❤️ **Medical Supplies**\nKeep yourself alive out there, explorer.",
-            "recharge": "🔋 **Power & Recharge Supplies**\nRestore charges to your mining laser or scavenging drone.",
-            "upgrades": "🛠️ **Station Upgrades**\nPermanent equipment and station expansions.",
-            "pet_items": "🐾 **Pet Supplies**\nBecause even station companions need snacks.",
-            "special": "✨ **Special Items**\nUnusual technology with unusual consequences.",
-            "backgrounds": "🖼️ **Profile Backgrounds**\nCustomize the look of your station profile.",
-        }
-        embed.description = descriptions.get(category, "Choose a shop category.")
-        for item_id in item_ids:
+        embed.description = (
+            "🔄 **Daily Rotating Offers**\n"
+            f"Today's station market — **{cog.rotation_date()}**\n\n"
+            "These offers rotate at midnight Eastern time."
+        )
+        for item_id in cog.daily_rotation():
             item = cog.SHOP_ITEMS.get(item_id) or cog.ROTATING_ITEMS.get(item_id)
             if not item:
                 continue
+            is_permanent = item_id in cog.SHOP_ITEMS
+            daily_cost = int(item["cost"] * 0.85) if is_permanent else item["cost"]
+            price_text = (
+                f"💰 ~~{item['cost']:,}~~ → **{daily_cost:,} Stardust** 🔥\n🏷️ **15% Daily Discount**"
+                if is_permanent else f"💰 Price: **{daily_cost:,} Stardust**"
+            )
             limit_text = cog.shop_limit_text(item_id)
             embed.add_field(
                 name=item["name"],
-                value=f"💰 Price: **{item['cost']:,} Stardust**\n📖 {item['desc']}\n📦 **Purchase Limit:** {limit_text.lstrip(' • Limit: ') if limit_text else 'None'}",
+                value=f"{price_text}\n📖 {item['desc']}\n📦 **Purchase Limit:** {limit_text.removeprefix(' • Limit: ') if limit_text else 'None'}",
                 inline=False,
             )
         return embed
@@ -923,12 +964,14 @@ class ShopView(discord.ui.View):
 class SellAllConfirmView(discord.ui.View):
     """Confirmation controls for bulk inventory sales."""
 
-    def __init__(self, cog, owner_id, sale_kind):
+    def __init__(self, cog, owner_id, sale_kind, *, return_view=None):
         super().__init__(timeout=60)
         self.cog = cog
         self.owner_id = owner_id
         self.sale_kind = sale_kind
+        self.return_view = return_view
         self.finished = False
+        self.message = None
 
     async def interaction_check(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
@@ -945,22 +988,35 @@ class SellAllConfirmView(discord.ui.View):
         for child in self.children:
             if isinstance(child, (discord.ui.Button, discord.ui.Select)):
                 child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except (discord.NotFound, discord.HTTPException):
+                pass
 
     @discord.ui.button(label="Yes, Sell All", emoji="✅", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.finished:
             return
         self.finished = True
+        self.stop()
         for child in self.children:
             if isinstance(child, (discord.ui.Button, discord.ui.Select)):
                 child.disabled = True
-        await self.cog._confirm_bulk_sale(interaction, self.sale_kind, self)
+        await self.cog._confirm_bulk_sale(
+            interaction, self.sale_kind, self, return_view=self.return_view
+        )
 
     @discord.ui.button(label="Cancel", emoji="❌", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.finished:
             return
         self.finished = True
+        self.stop()
+        if self.return_view:
+            view = self.return_view.make_return_view()
+            await view.show_item_picker(interaction)
+            return
         for child in self.children:
             if isinstance(child, (discord.ui.Button, discord.ui.Select)):
                 child.disabled = True

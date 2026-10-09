@@ -52,7 +52,7 @@ class EconomyDatabaseMixin:
                 "fuel_stabilizer",
                 "hazard_shield",
                 "lucky_scanner",
-                "prototype_drill_bit",
+                "boosted_laser_module",
             }
             excluded_upgrade_ids = (
                 set(SHOP_BUY_CATEGORY_ITEMS.get("upgrades", ()))

@@ -1,10 +1,18 @@
 import aiosqlite
 import discord
+import pytz
+from datetime import datetime
 from discord.ext import commands
 
 from emojis import EMOJIS
 from database import ECONOMY_DB_NAME
-from upgrades import UPGRADE_DATA
+from inventory import ITEM_REGISTRY
+from upgrades import (
+    CALIBRATION_DAILY_CAP,
+    CALIBRATION_REQUIREMENTS,
+    UPGRADE_DATA,
+    get_calibration_state,
+)
 
 MATERIAL_NAMES = {
     "iron_ore": (EMOJIS.get("iron_ore", "⛏️"), "Iron Ore"),
@@ -166,7 +174,14 @@ class Crafting(commands.Cog):
             if recipe["result"] in {"makeshift_medkit", "trick_or_treat_bag"}
             else "These crafted parts are used by `/upgrade`."
         )
-        lines += ["", f"**Produces:** {recipe['emoji']} {recipe['name']} ×1", "", destination]
+        result_owned = owned.get(recipe["result"], 0)
+        lines += [
+            "",
+            f"**Currently owned:** {result_owned}x {recipe['name']}",
+            f"**Produces:** {recipe['emoji']} {recipe['name']} ×1",
+            "",
+            destination,
+        ]
         return discord.Embed(
             title="Crafting Guide 🔨",
             description="\n".join(lines),
@@ -188,12 +203,21 @@ class Crafting(commands.Cog):
                     have = owned.get(item_id, 0)
                     mark = "✅" if have >= amount else "❌"
                     lines.append(f"{mark} {material_emoji} {name} ×{amount} **(you have {have})**")
+                lines.append(
+                    f"📦 Currently owned: **{owned.get(recipe['result'], 0)}x {recipe['name']}**"
+                )
                 sections.append("\n".join(lines))
 
             embed = discord.Embed(
                 title="Crafting Recipe Book 📖",
                 description="\n\n".join(sections),
                 color=discord.Color.from_rgb(0, 229, 255),
+            )
+            embed.set_footer(
+                text=(
+                    "Level III–V upgrade kits require device calibration. "
+                    "See /upgrades • Up to 10 credited runs per device each day."
+                )
             )
             pages.append(embed)
 
@@ -234,6 +258,9 @@ class Crafting(commands.Cog):
 
         if progression_system and isinstance(progression_tier, int) and progression_tier > 1:
             async with aiosqlite.connect(ECONOMY_DB_NAME) as progress_db:
+                upgrade_cog = self.bot.get_cog("Upgrades")
+                if upgrade_cog:
+                    await upgrade_cog.ensure_schema(progress_db)
                 column = UPGRADE_DATA[progression_system]["column"]
                 async with progress_db.execute(
                     f"SELECT COALESCE({column}, 0) FROM users WHERE user_id = ?",
@@ -266,6 +293,26 @@ class Crafting(commands.Cog):
                     f"Required level: **{required_level}/5**"
                 )
 
+            if progression_system in {"mining", "scavenging"} and progression_tier in CALIBRATION_REQUIREMENTS:
+                today = datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
+                async with aiosqlite.connect(ECONOMY_DB_NAME) as progress_db:
+                    upgrade_cog = self.bot.get_cog("Upgrades")
+                    if upgrade_cog:
+                        await upgrade_cog.ensure_schema(progress_db)
+                    state = await get_calibration_state(
+                        progress_db, user_id, progression_system, today
+                    )
+                if not state["ready"]:
+                    device_command = "mine" if progression_system == "mining" else "scavenge"
+                    return await self._send(
+                        ctx,
+                        f"{mention} **{data['name']} needs device calibration before it can be crafted.**\n\n"
+                        f"Progress: **{state['progress']}/{state['required']} runs** • "
+                        f"Today: **{state['today']}/{CALIBRATION_DAILY_CAP}**\n"
+                        f"Use `/{device_command}` after installing the previous upgrade. "
+                        "Check `/upgrades` to track progress."
+                    )
+
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await self.ensure_inventory(db)
             await db.execute("BEGIN IMMEDIATE")
@@ -288,6 +335,20 @@ class Crafting(commands.Cog):
                     f"{mention} You're missing:\n" + "\n".join(missing)
                 )
 
+            result_owned = owned.get(data["result"], 0)
+            result_max = ITEM_REGISTRY.get(data["result"], {}).get("max_quantity", 10)
+            result_space = max(0, result_max - result_owned)
+            if result_space < 1:
+                await db.rollback()
+                result_info = ITEM_REGISTRY.get(data["result"], {})
+                return await self._send(
+                    ctx,
+                    f"{mention} **Inventory full!** You already have **{result_owned}x "
+                    f"{result_info.get('name', data['name'])}**, the maximum of **{result_max}x**.",
+                )
+
+            craftable = min(craftable, result_space)
+
             for item_id, amount in data["ingredients"].items():
                 await db.execute(
                     "UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_id = ?",
@@ -305,8 +366,9 @@ class Crafting(commands.Cog):
             title="Crafting Complete! ✅",
             description=(
                 f"{mention}\n\nYou crafted **{data['emoji']} {data['name']} ×{craftable}**!"
+                f"\n📦 Total owned: **{owned.get(data['result'], 0) + craftable}x {data['name']}**."
                 + (
-                    f"\n\nYou requested **×{quantity}**, but only had enough materials for **×{craftable}**"
+                    f"\n\nYou requested **×{quantity}**, but only **×{craftable}** fit your available materials and inventory space."
                     if craftable < quantity else ""
                 )
                 + "\n\n"
@@ -494,6 +556,23 @@ class CraftingSelect(discord.ui.Select):
             owned = await self.cog.owned(db, self.owner_id)
 
         embed = self.cog.recipe_embed(recipe, owned)
+        progression_system, progression_tier = get_tiered_recipe_progression(recipe)
+        if progression_system in {"mining", "scavenging"} and progression_tier in CALIBRATION_REQUIREMENTS:
+            today = datetime.now(pytz.timezone("US/Eastern")).date().isoformat()
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+                upgrade_cog = self.cog.bot.get_cog("Upgrades")
+                if upgrade_cog:
+                    await upgrade_cog.ensure_schema(db)
+                state = await get_calibration_state(db, self.owner_id, progression_system, today)
+            progress_line = (
+                f"\n\n**Calibration:** {min(state['progress'], state['required'])}/"
+                f"{state['required']} runs • Today: {state['today']}/{CALIBRATION_DAILY_CAP}"
+            )
+            if state["ready"]:
+                progress_line += " ✅ Ready"
+            else:
+                progress_line += f"\nUse `/{'mine' if progression_system == 'mining' else 'scavenge'}`; see `/upgrades`."
+            embed.description += progress_line
         is_upgrade_component = (
             get_tiered_recipe_progression(recipe)[0] is not None
             or recipe["result"] in {"nanite_retrofit_kit", "astral_power_core"}
