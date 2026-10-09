@@ -168,11 +168,11 @@ HAUNTED_INGREDIENT_OVERFLOW_VALUES = {'yellow_wallpaper_scrap': 100,
  'blackened_tree_bark': 40,
  'unidentified_black_tendril': 200}
 
-HAUNTED_REWARD_RANGES = {'common': {'stardust': (150, 275), 'candy': (3, 6), 'ingredients': (1, 2)},
- 'uncommon': {'stardust': (250, 425), 'candy': (5, 10), 'ingredients': (2, 3)},
- 'rare': {'stardust': (400, 700), 'candy': (8, 14), 'ingredients': (2, 4)},
- 'legendary': {'stardust': (700, 1200), 'candy': (14, 22), 'ingredients': (3, 5)},
- 'void': {'stardust': (1200, 2000), 'candy': (25, 40), 'ingredients': (4, 7)}}
+HAUNTED_REWARD_RANGES = {'common': {'stardust': (100, 200), 'candy': (3, 6), 'ingredients': (1, 2)},
+ 'uncommon': {'stardust': (220, 350), 'candy': (5, 10), 'ingredients': (2, 3)},
+ 'rare': {'stardust': (350, 500), 'candy': (8, 14), 'ingredients': (2, 4)},
+ 'legendary': {'stardust': (700, 900), 'candy': (14, 22), 'ingredients': (3, 5)},
+ 'void': {'stardust': (950, 1300), 'candy': (25, 40), 'ingredients': (4, 7)}}
 
 HAUNTED_COLLECTIBLE_CHANCES = {'common': 0.15, 'uncommon': 0.20, 'rare': 0.25, 'legendary': 0.35, 'void': 0.55}
 
