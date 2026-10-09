@@ -67,7 +67,7 @@ COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 # Halloween Space Junk collectibles can very rarely be found while scavenging.
 # This is intentionally much rarer than the normal Haunted Exploration
 # collectible discovery chance.
-SCAVENGE_HALLOWEEN_COLLECTIBLE_CHANCE = 0.040
+SCAVENGE_HALLOWEEN_COLLECTIBLE_CHANCE = 0.080
 
 MINING_MATERIALS = [
     ("iron_ore", "Iron Ore", 0.22),
