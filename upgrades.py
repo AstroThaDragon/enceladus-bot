@@ -289,6 +289,7 @@ class Upgrades(commands.Cog):
             if index:
                 embed.add_field(name="━━━━━━━━━━━━━━━━━━━━", value="\u200b", inline=False)
             info = UPGRADE_DATA[system]
+            calibration_text = ""
             if level >= MAX_LEVEL:
                 data = info["levels"][MAX_LEVEL]
                 if system == "salvage":
@@ -297,19 +298,6 @@ class Upgrades(commands.Cog):
                         f"Bonus material chance: **+{data['bonus_chance'] * 100:.0f}%** ♻️"
                     )
                 else:
-                    state = calibration[system]
-                    if state["active"]:
-                        calibration_text = (
-                            f"\n\n**Calibration for Level {next_level}:** "
-                            f"{min(state['progress'], state['required'])}/{state['required']} runs"
-                            f" • Today: {state['today']}/{CALIBRATION_DAILY_CAP}"
-                        )
-                        if state["ready"]:
-                            calibration_text += " ✅ Ready to craft"
-                        else:
-                            calibration_text += f"\nUse `/{'mine' if system == 'mining' else 'scavenge'}` to make progress."
-                    else:
-                        calibration_text = ""
                     value = (
                         f"**Level:** 5/5 MAX ✨\n"
                         f"Max charges: **{data['charges']}** 🔋\n"
@@ -322,6 +310,17 @@ class Upgrades(commands.Cog):
                 mats = UPGRADE_MATERIALS[system][next_level]
                 component = data["component"]
                 comp_icon, comp_name = MATERIAL_NAMES[component]
+                if system in CALIBRATION_COLUMNS and next_level in CALIBRATION_REQUIREMENTS:
+                    state = calibration[system]
+                    calibration_text = (
+                        f"\n\n**Calibration for Level {next_level}:** "
+                        f"{min(state['progress'], state['required'])}/{state['required']} runs"
+                        f" • Today: {state['today']}/{CALIBRATION_DAILY_CAP}"
+                    )
+                    if state["ready"]:
+                        calibration_text += " ✅ Ready to craft"
+                    else:
+                        calibration_text += f"\nUse `/{'mine' if system == 'mining' else 'scavenge'}` to make progress."
                 if system == "salvage":
                     value = (
                         f"**Level:** {level}/5\n"
@@ -330,7 +329,6 @@ class Upgrades(commands.Cog):
                         f"**{data['cost']:,} Stardust** ✨\n"
                         f"{comp_icon} **{comp_name} ×1**\n"
                         f"{self.material_text(mats)}"
-                        f"{calibration_text}"
                         + ("\n**Nanite Retrofit Kit ×1** 🧬" if next_level == 5 else "")
                     )
                 else:
@@ -343,6 +341,7 @@ class Upgrades(commands.Cog):
                         f"**{data['cost']:,} Stardust** ✨\n"
                         f"{comp_icon} **{comp_name} ×1**\n"
                         f"{self.material_text(mats)}"
+                        f"{calibration_text}"
                         + ("\n**Nanite Retrofit Kit ×1** 🧬" if next_level == 5 else "")
                     )
             embed.add_field(name=f"{info['emoji']} Your {info['name']}", value=value, inline=False)

@@ -327,7 +327,7 @@ EXPLORATION_TEXT = {
         "description": (
             "*Your scavenge drone has been deployed into abandoned sector wreckage...* 🛸\n\n"
             + EXPLORATION_SEPARATOR + "\n\n"
-            "Stardust found: {stardust:,}{quantum_note}{cache_note} ✨"
+            "**Stardust found:** {stardust:,}{quantum_note}{cache_note} ✨"
             "\n\n" + EXPLORATION_SEPARATOR + "\n\n"
             "Salvaged items: {loot}\n"
             "{materials_and_supplies}"
@@ -343,7 +343,7 @@ EXPLORATION_TEXT = {
         "daily_name": "Daily reminder! 🎁",
         "daily_value": "You didn't claim your daily yet! Use `/daily` to claim your Stardust reward!",
         "cooldown_name": "Cooldown alerts 🔔",
-        "health_status": "Health: **{hp}/{max_hp}HP**",
+        "health_status": "Health: {hp}/{max_hp}HP",
         "knocked_out_status": "*Knocked out!* Use `/revive`, buy `/shop buy`, or recover at 50%HP at **{until}**.",
         "materials": "Salvaged materials: {findings}",
     },
