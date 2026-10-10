@@ -190,7 +190,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         empty_tubes = [tube_id for tube_id in range(1, slots + 1) if tube_id not in occupied]
         now = time.time()
         ready_eggs = [row for row in rows if float(row[3]) <= now]
-        return eggs, empty_tubes, ready_eggs
+        return eggs, empty_tubes, ready_eggs, rows
 
 
     async def _egg_autocomplete(self, interaction, current):

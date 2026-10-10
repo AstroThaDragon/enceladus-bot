@@ -1,6 +1,7 @@
 """Discord UI views used by the pet system."""
 
 from typing import cast
+import time
 
 import discord
 
@@ -28,7 +29,7 @@ class IncubatorMainView(discord.ui.View):
     async def start_incubation(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._owner(interaction):
             return
-        eggs, empty_tubes, _ready_eggs = await self.cog._incubator_action_data(self.user_id)
+        eggs, empty_tubes, _ready_eggs, _rows = await self.cog._incubator_action_data(self.user_id)
         view = IncubatorStartView(self.cog, self.user_id, eggs, empty_tubes)
         await interaction.response.edit_message(
             embed=view.build_embed(),
@@ -39,8 +40,8 @@ class IncubatorMainView(discord.ui.View):
     async def hatch(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._owner(interaction):
             return
-        _eggs, _empty_tubes, ready_eggs = await self.cog._incubator_action_data(self.user_id)
-        view = IncubatorHatchView(self.cog, self.user_id, ready_eggs)
+        _eggs, _empty_tubes, ready_eggs, rows = await self.cog._incubator_action_data(self.user_id)
+        view = IncubatorHatchView(self.cog, self.user_id, ready_eggs, rows)
         await interaction.response.edit_message(
             embed=view.build_embed(),
             view=view,
@@ -94,7 +95,7 @@ class IncubatorStartView(discord.ui.View):
         self.egg_select = discord.ui.Select(
             placeholder="Choose an egg...",
             options=egg_options,
-            disabled=not eggs,
+            disabled=not eggs or not empty_tubes,
             row=0,
         )
         self.egg_select.callback = self._select_egg
@@ -127,10 +128,14 @@ class IncubatorStartView(discord.ui.View):
 
     def build_embed(self):
         description = "Choose an egg you own and an empty unlocked tube to begin incubation."
-        if not self.eggs:
-            description += "\n\nYou don't currently have any eggs in storage."
         if not self.empty_tubes:
-            description += "\n\nAll unlocked tubes are occupied. Hatch an egg or unlock another tube first."
+            description += (
+                "\n\n**You can't start an incubation yet! All unlocked tubes are occupied!**\n "
+                "The incubation option is disabled until a tube is free. Hatch an incubated egg, wait for one to finish, "
+                "or unlock another tube if available."
+            )
+        if not self.eggs:
+            description += "\n\n**You don't have any eggs to incubate!**\nFind an egg first through `/scavenge`, then return here."
         return discord.Embed(title="🥚 Start Incubation", description=description, color=discord.Color.from_rgb(120, 140, 160))
 
     async def interaction_check(self, interaction):
@@ -166,11 +171,12 @@ class IncubatorStartView(discord.ui.View):
 
 
 class IncubatorHatchView(discord.ui.View):
-    def __init__(self, cog, user_id, ready_eggs):
+    def __init__(self, cog, user_id, ready_eggs, incubating_eggs):
         super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
         self.ready_eggs = ready_eggs
+        self.incubating_eggs = incubating_eggs
         self.selected_tube = None
 
         options = []
@@ -206,7 +212,28 @@ class IncubatorHatchView(discord.ui.View):
     def build_embed(self):
         description = "Choose an egg that is ready to hatch. Its tube is shown in the menu."
         if not self.ready_eggs:
-            description += "\n\nNo eggs are ready yet. Incubating eggs and their timers remain visible on the main screen."
+            if not self.incubating_eggs:
+                description += (
+                    "\n\n**There are no eggs in your incubator tubes!**\nChoose **Start Incubation** "
+                    "to place an egg into an empty tube first."
+                )
+            else:
+                waiting_lines = []
+                for row in self.incubating_eggs:
+                    tube_id, egg_id = int(row[5]), row[1]
+                    info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
+                    remaining = max(0, int(float(row[3]) - time.time()))
+                    hours, remainder = divmod(remaining, 3600)
+                    minutes = remainder // 60
+                    waiting_lines.append(
+                        f"• Tube {tube_id}: {info['emoji']} **{info['name']}** — "
+                        f"**{hours}h {minutes}m remaining**"
+                    )
+                description += (
+                    "\n\n**No eggs are ready to hatch yet!** Your tubes are still incubating:\n"
+                    + "\n".join(waiting_lines)
+                    + "\n\nThe timers are also visible on the main incubator screen."
+                )
         return discord.Embed(title="🐣 Hatch", description=description, color=discord.Color.from_rgb(120, 140, 160))
 
     async def interaction_check(self, interaction):
@@ -390,7 +417,7 @@ class FeedTreatSelect(discord.ui.Select):
         options = []
         for item_id, label, emoji in (
             ("pet_snack", "Pet Treat", "🍖"),
-            ("halloween_pet_candy", "Halloween Pet Candy", "🎃"),
+            ("halloween_pet_candy", "Halloween Pet Candy", "🍬"),
         ):
             quantity = owned.get(item_id, 0)
             if quantity <= 0:
@@ -486,7 +513,7 @@ class ReleaseConfirmationView(discord.ui.View):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message("❌ This confirmation isn't for you.", ephemeral=True)
         self.stop()
-        await interaction.response.edit_message(content="Release cancelled. 👍", view=None)
+        await interaction.response.edit_message(content="Release cancelled. ✅", view=None)
 
 
 class RenamePetModal(discord.ui.Modal):
@@ -661,7 +688,8 @@ class PetGroupSelect(discord.ui.Select):
                 ephemeral=True,
             )
 
-        self.view.stop()
+        if self.view is not None:
+            self.view.stop()
         view = PetManagementView(self.cog, self.user_id, self.ctx, pets, index)
         await interaction.response.edit_message(
             embed=self.cog._pet_embed(self.ctx, pets[index], index, len(pets)),
