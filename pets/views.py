@@ -146,11 +146,26 @@ class IncubatorStartView(discord.ui.View):
 
     async def _select_egg(self, interaction):
         self.selected_egg = self.egg_select.values[0]
+
+        # Discord resets a select's highlighted option after the interaction.
+        # Update the placeholder so the current selection remains visible.
+        info = ITEM_REGISTRY.get(
+            self.selected_egg,
+            {"name": self.selected_egg, "emoji": "🥚"},
+        )
+        self.egg_select.placeholder = f"{info['emoji']} {info['name']}"
+
         self.start_button.disabled = not (self.selected_egg and self.selected_tube)
         await interaction.response.edit_message(view=self)
 
     async def _select_tube(self, interaction):
         self.selected_tube = int(self.tube_select.values[0])
+
+        # Discord resets a select's highlighted option after the interaction.
+        # Update the placeholder so the current selection remains visible.
+        tube_emoji = ("🧪", "🔬", "🧬")[self.selected_tube - 1]
+        self.tube_select.placeholder = f"{tube_emoji} Tube {self.selected_tube}"
+
         self.start_button.disabled = not (self.selected_egg and self.selected_tube)
         await interaction.response.edit_message(view=self)
 
