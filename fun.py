@@ -204,7 +204,7 @@ class Fun(commands.Cog):
         
         random_object = random.choice(slap_objects)
         
-        await ctx.send(f"**{ctx.author.mention}** slaps **{member.mention}** across the face with {random_object}!")
+        await ctx.send(f"**{ctx.author.mention}** slaps **{member.mention}** across the face with {random_object}")
 
     @commands.hybrid_command(name="coinflip", description="Consult the stars for a 50/50 outcome.")
     async def coinflip(self, ctx):
