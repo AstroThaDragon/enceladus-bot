@@ -29,6 +29,7 @@ from .views import (
     FeedTreatSelect, FeedTreatView, ReleaseConfirmationView, RenamePetModal,
     PetStatsView, PetManagementView, FusionVariantView, PostFusionConfirmView,
     PetCollectionView, PetCategoryView, IncubatorMainView, IncubatorTubeSelectView,
+    IncubatorStartView, IncubatorHatchView,
 )
 from .management import PetManagementMixin
 from .fusion import PetFusionMixin
@@ -175,6 +176,21 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         ) as cursor:
             row = await cursor.fetchone()
         return max(1, min(3, int(row[0] if row else 1)))
+
+
+    async def _incubator_action_data(self, user_id):
+        """Return the currently owned eggs, open tubes, and ready eggs for UI menus."""
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            await self.ensure_schema(db)
+            slots = await self._get_incubator_slots(db, user_id)
+            eggs = await self._owned_eggs(db, user_id)
+            rows = await self._incubator_rows(db, user_id)
+
+        occupied = {int(row[5]) for row in rows}
+        empty_tubes = [tube_id for tube_id in range(1, slots + 1) if tube_id not in occupied]
+        now = time.time()
+        ready_eggs = [row for row in rows if float(row[3]) <= now]
+        return eggs, empty_tubes, ready_eggs
 
 
     async def _egg_autocomplete(self, interaction, current):
@@ -957,7 +973,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 description=(
                     "You don't have any pets yet!\n\n"
                     "🥚 Eggs can be discovered during scavenging.\n"
-                    "⏳ Use `/incubator` with **Start incubation** to hatch one."
+                    "⏳ Use `/incubator` and tap **Start Incubation** to hatch one."
                 ),
                 color=discord.Color.from_rgb(120, 140, 160),
             )
@@ -1052,7 +1068,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                     f"✨ Detection **Lv. {upgrades['detection']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['detection']}**\n"
                     f"🍀 Luck **Lv. {upgrades['luck']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['luck']}** • "
                     f"🔬 Analysis **Lv. {upgrades['analysis']}/{INCUBATOR_UPGRADE_CAPS[slot_id]['analysis']}**\n"
-                    "Use `/incubator` with **Start incubation** to begin."
+                    "Use the **Start Incubation** button below to begin."
                 )
                 embed.add_field(name=tube_titles[slot_id - 1], value=tube_art, inline=True)
                 continue
@@ -1067,7 +1083,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
             if remaining <= 0:
                 status = "✨ **READY TO HATCH!**"
-                instruction = f"Use `/incubator` with **Hatch ready egg** and choose **{egg_id}**"
+                instruction = "Tap **Hatch** below to reveal your new companion."
             else:
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
@@ -1252,56 +1268,9 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         name="incubator",
         description="View and manage your pet egg incubators.",
     )
-    @app_commands.describe(
-        action="Choose Start to begin incubation or Hatch to claim a ready egg.",
-        egg="Choose the egg to start or hatch.",
-        tube="Choose which incubator tube to use for starting or hatching an egg.",
-    )
-    @app_commands.choices(
-        action=[
-            app_commands.Choice(name="Start incubation", value="start"),
-            app_commands.Choice(name="Hatch ready egg", value="hatch"),
-        ],
-        tube=[
-            app_commands.Choice(name="🧪 Tube I", value=1),
-            app_commands.Choice(name="🔬 Tube II", value=2),
-            app_commands.Choice(name="🧬 Tube III", value=3),
-        ],
-    )
-    @app_commands.autocomplete(egg=_incubator_egg_autocomplete)
-    async def incubator(
-        self,
-        ctx: commands.Context,
-        action: str | None = None,
-        egg: str | None = None,
-        tube: int | None = None,
-    ):
-        """View the incubator bay, start an egg, or hatch a ready egg."""
+    async def incubator(self, ctx: commands.Context):
+        """View the incubator bay and manage eggs with buttons."""
         await ctx.defer()
-
-        action = action.lower().strip() if action else None
-        egg = egg.lower().strip() if egg else None
-
-        if action == "start":
-            if not egg:
-                return await ctx.send("❌ Choose an egg to start incubating.")
-            if tube is None:
-                return await ctx.send("❌ Choose which incubator tube to use.")
-            return await self._incubator_start(ctx, egg, tube)
-
-        if action == "hatch":
-            if tube is None:
-                return await ctx.send("❌ Choose which incubator tube to hatch from.")
-            if not egg:
-                return await ctx.send("❌ Choose the egg to hatch.")
-            return await self._incubator_hatch(ctx, egg, tube)
-
-        if action is not None:
-            return await ctx.send("❌ Choose **Start** or **Hatch** as the incubator action.")
-
-        if egg:
-            return await ctx.send("❌ Choose **Start** or **Hatch** when providing an egg.")
-
         embed = await self._incubator_main_embed(ctx.author.id, ctx.author.display_name)
         await ctx.send(embed=embed, view=IncubatorMainView(self, ctx.author.id))
 
@@ -1351,7 +1320,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                             f"<@{user_id}> 🔔 {info['emoji']} "
                             f"**Your pet egg is ready to hatch!**\n"
                             f"Your **{info['name']}** in **Tube {slot_id}** has finished incubating.\n\n"
-                            f"Use `/incubator` with **Hatch ready egg**, choose **Tube {slot_id}**, and select **{egg_id}** to reveal your new companion! 🐣"
+                            "Use the **Hatch** button on `/incubator` to reveal your new companion! 🐣"
                         )
                     except Exception as e:
                         await log_task_error(self.bot, "incubator_checker / send notification", e, context=f"user_id={user_id}, egg_id={egg_id}, slot_id={slot_id}")

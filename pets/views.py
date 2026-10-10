@@ -7,6 +7,7 @@ import discord
 from .config import PET_PASSIVE_MAX_LEVEL
 from .core import get_pet_definition, get_passive_value, passive_level_for_pet, xp_needed_for_next_level
 from .incubator import (INCUBATOR_UPGRADE_CAPS, UPGRADE_COSTS, UPGRADE_DESCRIPTIONS, UPGRADE_LABELS, SPEED_REDUCTIONS, DETECTION_BONUSES, LUCK_OCCURRENCE_BONUSES)
+from inventory import ITEM_REGISTRY
 
 
 
@@ -23,6 +24,28 @@ class IncubatorMainView(discord.ui.View):
             return False
         return True
 
+    @discord.ui.button(label="Start Incubation", emoji="🥚", style=discord.ButtonStyle.success, row=0)
+    async def start_incubation(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._owner(interaction):
+            return
+        eggs, empty_tubes, _ready_eggs = await self.cog._incubator_action_data(self.user_id)
+        view = IncubatorStartView(self.cog, self.user_id, eggs, empty_tubes)
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view,
+        )
+
+    @discord.ui.button(label="Hatch", emoji="🐣", style=discord.ButtonStyle.success, row=0)
+    async def hatch(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._owner(interaction):
+            return
+        _eggs, _empty_tubes, ready_eggs = await self.cog._incubator_action_data(self.user_id)
+        view = IncubatorHatchView(self.cog, self.user_id, ready_eggs)
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view,
+        )
+
     @discord.ui.button(label="Upgrade Tubes", emoji="🔧", style=discord.ButtonStyle.primary, row=0)
     async def upgrade(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._owner(interaction):
@@ -31,6 +54,189 @@ class IncubatorMainView(discord.ui.View):
         await interaction.response.edit_message(
             embed=await self.cog._incubator_upgrade_tubes_embed(self.user_id),
             view=view,
+        )
+
+
+class _IncubatorInteractionContext:
+    """Small Context-compatible adapter for reusing incubator action logic from buttons."""
+
+    def __init__(self, cog, interaction):
+        self.cog = cog
+        self.interaction = interaction
+        self.author = interaction.user
+        self.channel = interaction.channel
+
+    async def send(self, content=None, **kwargs):
+        await self.interaction.followup.send(content=content, **kwargs)
+
+
+class IncubatorStartView(discord.ui.View):
+    def __init__(self, cog, user_id, eggs, empty_tubes):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.eggs = eggs
+        self.empty_tubes = empty_tubes
+        self.selected_egg = None
+        self.selected_tube = None
+
+        egg_options = [
+            discord.SelectOption(
+                label=ITEM_REGISTRY.get(egg_id, {"name": egg_id})["name"],
+                value=egg_id,
+                description=f"Owned: {quantity}",
+                emoji=ITEM_REGISTRY.get(egg_id, {"emoji": "🥚"})["emoji"],
+            )
+            for egg_id, quantity in eggs.items()
+        ]
+        if not egg_options:
+            egg_options = [discord.SelectOption(label="No eggs available", value="none", emoji="🥚")]
+        self.egg_select = discord.ui.Select(
+            placeholder="Choose an egg...",
+            options=egg_options,
+            disabled=not eggs,
+            row=0,
+        )
+        self.egg_select.callback = self._select_egg
+        self.add_item(self.egg_select)
+
+        tube_options = [
+            discord.SelectOption(label=f"Tube {tube_id}", value=str(tube_id), emoji=("🧪", "🔬", "🧬")[tube_id - 1])
+            for tube_id in empty_tubes
+        ]
+        if not tube_options:
+            tube_options = [discord.SelectOption(label="No empty unlocked tubes", value="none", emoji="🔒")]
+        self.tube_select = discord.ui.Select(
+            placeholder="Choose an empty tube...",
+            options=tube_options,
+            disabled=not empty_tubes,
+            row=1,
+        )
+        self.tube_select.callback = self._select_tube
+        self.add_item(self.tube_select)
+
+        self.start_button = discord.ui.Button(
+            label="Start Incubation", emoji="🥚", style=discord.ButtonStyle.success,
+            disabled=True, row=2,
+        )
+        self.start_button.callback = self._start
+        self.add_item(self.start_button)
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary, row=2)
+        back.callback = self._back
+        self.add_item(back)
+
+    def build_embed(self):
+        description = "Choose an egg you own and an empty unlocked tube to begin incubation."
+        if not self.eggs:
+            description += "\n\nYou don't currently have any eggs in storage."
+        if not self.empty_tubes:
+            description += "\n\nAll unlocked tubes are occupied. Hatch an egg or unlock another tube first."
+        return discord.Embed(title="🥚 Start Incubation", description=description, color=discord.Color.from_rgb(120, 140, 160))
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    async def _select_egg(self, interaction):
+        self.selected_egg = self.egg_select.values[0]
+        self.start_button.disabled = not (self.selected_egg and self.selected_tube)
+        await interaction.response.edit_message(view=self)
+
+    async def _select_tube(self, interaction):
+        self.selected_tube = int(self.tube_select.values[0])
+        self.start_button.disabled = not (self.selected_egg and self.selected_tube)
+        await interaction.response.edit_message(view=self)
+
+    async def _start(self, interaction):
+        await interaction.response.defer()
+        ctx = _IncubatorInteractionContext(self.cog, interaction)
+        await self.cog._incubator_start(ctx, self.selected_egg, self.selected_tube)
+        await interaction.edit_original_response(
+            embed=await self.cog._incubator_main_embed(self.user_id, interaction.user.display_name),
+            view=IncubatorMainView(self.cog, self.user_id),
+        )
+
+    async def _back(self, interaction):
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_main_embed(self.user_id, interaction.user.display_name),
+            view=IncubatorMainView(self.cog, self.user_id),
+        )
+
+
+class IncubatorHatchView(discord.ui.View):
+    def __init__(self, cog, user_id, ready_eggs):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.ready_eggs = ready_eggs
+        self.selected_tube = None
+
+        options = []
+        for row in ready_eggs:
+            tube_id, egg_id = int(row[5]), row[1]
+            info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})
+            options.append(discord.SelectOption(
+                label=f"Tube {tube_id} — {info['name']}",
+                value=str(tube_id),
+                emoji=info["emoji"],
+            ))
+        if not options:
+            options = [discord.SelectOption(label="No eggs ready to hatch", value="none", emoji="⏳")]
+        self.egg_select = discord.ui.Select(
+            placeholder="Choose a ready egg...",
+            options=options,
+            disabled=not ready_eggs,
+            row=0,
+        )
+        self.egg_select.callback = self._select_egg
+        self.add_item(self.egg_select)
+
+        self.hatch_button = discord.ui.Button(
+            label="Hatch", emoji="🐣", style=discord.ButtonStyle.success,
+            disabled=True, row=1,
+        )
+        self.hatch_button.callback = self._hatch
+        self.add_item(self.hatch_button)
+        back = discord.ui.Button(label="Back", emoji="↩️", style=discord.ButtonStyle.secondary, row=1)
+        back.callback = self._back
+        self.add_item(back)
+
+    def build_embed(self):
+        description = "Choose an egg that is ready to hatch. Its tube is shown in the menu."
+        if not self.ready_eggs:
+            description += "\n\nNo eggs are ready yet. Incubating eggs and their timers remain visible on the main screen."
+        return discord.Embed(title="🐣 Hatch", description=description, color=discord.Color.from_rgb(120, 140, 160))
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This incubator interface isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    async def _select_egg(self, interaction):
+        self.selected_tube = int(self.egg_select.values[0])
+        self.hatch_button.disabled = False
+        await interaction.response.edit_message(view=self)
+
+    async def _hatch(self, interaction):
+        row = next((row for row in self.ready_eggs if int(row[5]) == self.selected_tube), None)
+        if row is None:
+            await interaction.response.send_message("That egg is no longer available to hatch. Refresh `/incubator` and try again.", ephemeral=True)
+            return
+        await interaction.response.defer()
+        ctx = _IncubatorInteractionContext(self.cog, interaction)
+        await self.cog._incubator_hatch(ctx, row[1], self.selected_tube)
+        await interaction.edit_original_response(
+            embed=await self.cog._incubator_main_embed(self.user_id, interaction.user.display_name),
+            view=IncubatorMainView(self.cog, self.user_id),
+        )
+
+    async def _back(self, interaction):
+        await interaction.response.edit_message(
+            embed=await self.cog._incubator_main_embed(self.user_id, interaction.user.display_name),
+            view=IncubatorMainView(self.cog, self.user_id),
         )
 
 

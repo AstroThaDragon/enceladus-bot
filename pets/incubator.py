@@ -453,7 +453,7 @@ class PetIncubatorMixin:
             f"{ctx.author.mention} {info['emoji']} **{info['name']} is now incubating in Tube {available_slot}!**\n"
             f"⏳ Incubation time: **{duration // 3600}h {(duration % 3600) // 60}m**\n"
             "🔔 I'll alert you when it's ready to hatch!\n"
-            f"Use `/incubator` with **Hatch ready egg**, choose **Tube {available_slot}**, and select **{egg}** when the timer finishes."
+            "Use the **Hatch** button on `/incubator` when the timer finishes."
         )
 
 
