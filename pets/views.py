@@ -130,12 +130,12 @@ class IncubatorStartView(discord.ui.View):
         description = "Choose an egg you own and an empty unlocked tube to begin incubation."
         if not self.empty_tubes:
             description += (
-                "\n\n**You can't start an incubation yet! All unlocked tubes are occupied!**\n "
+                "\n\n⚠️ **You can't start an incubation yet! All unlocked tubes are occupied!**\n "
                 "The incubation option is disabled until a tube is free. Hatch an incubated egg, wait for one to finish, "
                 "or unlock another tube if available."
             )
         if not self.eggs:
-            description += "\n\n**You don't have any eggs to incubate!**\nFind an egg first through `/scavenge`, then return here."
+            description += "\n\n⚠️ **You don't have any eggs to incubate!**\nFind an egg first through `/scavenge`, then return here."
         return discord.Embed(title="🥚 Start Incubation", description=description, color=discord.Color.from_rgb(120, 140, 160))
 
     async def interaction_check(self, interaction):
@@ -214,7 +214,7 @@ class IncubatorHatchView(discord.ui.View):
         if not self.ready_eggs:
             if not self.incubating_eggs:
                 description += (
-                    "\n\n**There are no eggs in your incubator tubes!**\nChoose **Start Incubation** "
+                    "\n\n⚠️ **There are no eggs in your incubator tubes!**\nChoose **Start Incubation** "
                     "to place an egg into an empty tube first."
                 )
             else:
@@ -230,7 +230,7 @@ class IncubatorHatchView(discord.ui.View):
                         f"**{hours}h {minutes}m remaining**"
                     )
                 description += (
-                    "\n\n**No eggs are ready to hatch yet!** Your tubes are still incubating:\n"
+                    "\n\n⚠️ **No eggs are ready to hatch yet!** Your tubes are still incubating:\n"
                     + "\n".join(waiting_lines)
                     + "\n\nThe timers are also visible on the main incubator screen."
                 )
