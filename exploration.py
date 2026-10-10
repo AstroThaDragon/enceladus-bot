@@ -42,24 +42,22 @@ from pets import (
 from pets.variants import MINING_ESSENCE_CHANCE
 from defense import roll_hazard_defense
 from upgrades import advance_calibration, CALIBRATION_DAILY_CAP
-from seasonal_updates.halloween.haunted import (
+from seasonal_updates.halloween.haunted_system import (
     HAUNTED_DAILY_ATTEMPTS,
     HAUNTED_LOCATIONS,
     SANITY_MAX,
+    advance_story,
     clear_run,
     consume_attempt,
+    grant_haunted_completion_rewards,
+    get_active_run,
     get_or_create_profile,
     is_insane,
+    render_scene,
+    resolve_choice,
     sanity_percent,
     start_run,
     update_sanity,
-)
-from seasonal_updates.halloween.haunted_system import (
-    advance_story,
-    grant_haunted_completion_rewards,
-    get_active_run,
-    render_scene,
-    resolve_choice,
 )
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166

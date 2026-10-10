@@ -801,8 +801,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             return await ctx.send("❌ That pet selection is invalid.")
 
         preview, error = await self._get_fusion_preview(ctx.author.id, target_pet_id)
-        if error:
-            return await ctx.send(error)
+        if error or preview is None:
+            return await ctx.send(error or "❌ The fusion preview could not be created.")
 
         variant_text = f" • {preview['target_variant_id']}" if preview["target_variant_id"] else ""
         duplicate_lines = []

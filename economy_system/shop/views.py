@@ -971,7 +971,7 @@ class SellAllConfirmView(discord.ui.View):
         self.sale_kind = sale_kind
         self.return_view = return_view
         self.finished = False
-        self.message = None
+        self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:

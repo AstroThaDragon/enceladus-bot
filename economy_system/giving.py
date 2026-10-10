@@ -189,7 +189,7 @@ class EconomyGivingMixin:
     )
     @app_commands.autocomplete(pet=give_pet_autocomplete, item=give_item_autocomplete)
     async def give(
-            self,
+            self: Any,
             ctx: commands.Context,
             member: discord.Member,
             pet: Optional[str] = None,

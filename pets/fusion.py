@@ -28,7 +28,7 @@ from .config import *
 from .core import *
 
 class PetFusionMixin:
-    bot: discord.Client
+    bot: commands.Bot
 
     if TYPE_CHECKING:
         async def ensure_schema(
@@ -287,9 +287,15 @@ class PetFusionMixin:
                     f"pet_variant:{pet_type}:{discovered_variant}",
                     category="Pet Variants",
                 )
-                achievements_cog = self.bot.get_cog("Achievements")
-                if achievements_cog:
-                    await achievements_cog.add_variant_discovery_progress(
+            achievements_cog = self.bot.get_cog("Achievements")
+            if achievements_cog:
+                add_variant_progress = getattr(
+                    achievements_cog,
+                    "add_variant_discovery_progress",
+                    None,
+                )
+                if add_variant_progress is not None:
+                    await add_variant_progress(
                         ctx.author.id,
                         pet_type,
                         discovered_variant,
