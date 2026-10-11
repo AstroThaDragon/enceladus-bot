@@ -683,10 +683,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
                 embed = self._haunted_location_embed(interaction.user, profile)
                 await interaction.response.send_message(
+                    content=interaction.user.mention,
                     embed=embed,
                     view=HauntedLocationView(
                         self, interaction.user.id, profile["available_locations"]
                     ),
+                    allowed_mentions=discord.AllowedMentions(users=True),
                 )
 
     def _haunted_location_embed(self, member, profile):
@@ -902,7 +904,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
         embed.set_footer(text=EXPLORATION_TEXT["haunted"]["scene_footer"])
         await interaction.edit_original_response(
-            content=None,
+            content=interaction.user.mention,
             embed=embed,
             view=HauntedStoryView(
                 self,
@@ -1033,7 +1035,6 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             )
                             new_state["pet_discovery_message"] = pet_discovery_message
                     new_state["pet_opportunity_taken"] = True
-
                 await db.execute(
                     "UPDATE users SET active_effects = ? WHERE user_id = ?",
                     (json.dumps(effects), user_id),
@@ -1071,6 +1072,9 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"Haunted story state disappeared while advancing {location_id}:{scene_id}"
                         )
                     new_stage, _, _ = advanced
+                    refreshed_run = await get_active_run(db, user_id)
+                    if refreshed_run:
+                        total_stages = refreshed_run["total_stages"]
 
             if is_complete:
                 # Completion rewards are guaranteed when a Haunted run completes.
@@ -1131,7 +1135,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 if pet_discovery_message:
                     reward_embed.add_field(name=EXPLORATION_TEXT["haunted"]["completion_pet"], value=pet_discovery_message, inline=False)
                 reward_embed.set_footer(text=EXPLORATION_TEXT["haunted"]["completion_footer"])
-                await interaction.edit_original_response(content=None, embed=reward_embed, view=None)
+                await interaction.edit_original_response(
+                    content=interaction.user.mention,
+                    embed=reward_embed,
+                    view=None,
+                    allowed_mentions=discord.AllowedMentions(users=True),
+                )
                 return
 
             await self._show_haunted_stage(
