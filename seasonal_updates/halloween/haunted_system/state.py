@@ -25,6 +25,20 @@ def _decode_json(raw, fallback):
     return value
 
 
+def _scene_has_pet_discovery(story, scene_id):
+    """Return True when an authored scene contains its location-pet choice."""
+    scene = (story.get("scenes") or {}).get(scene_id) or {}
+    for choice in scene.get("choices", []):
+        if not isinstance(choice, dict):
+            continue
+        if choice.get("pet_discovery"):
+            return True
+        for outcome in choice.get("outcomes", []):
+            if isinstance(outcome, dict) and outcome.get("pet_discovery"):
+                return True
+    return False
+
+
 async def ensure_haunted_schema(db):
     """Create Haunted tables and add only new nullable/defaulted columns.
 
@@ -375,9 +389,9 @@ async def start_run(db, user_id, location_id, sanity):
         effects["haunted_run_half_next_negative"] = True
 
     # Location pets are intentionally an opportunity rather than a guaranteed
-    # encounter. The roll happens once when the run starts; the pet scene stays
-    # in the route either way, while the engine swaps in a spooky non-pet
-    # outcome when this run has no pet opportunity.
+    # encounter. The roll happens once when the run starts. The authored pet
+    # scene remains in the route either way, but only a successful opportunity
+    # reveals its Pet Discovery choice when that scene is reached.
     pet_opportunity_available = random.random() < HAUNTED_LOCATION_PET_OPPORTUNITY_CHANCE
 
     skip_scenes = []
@@ -385,7 +399,8 @@ async def start_run(db, user_id, location_id, sanity):
     if shortcut_scene:
         skip_scenes.append(shortcut_scene)
     # Deduplicate while preserving story order. Shortcut items can shorten a
-    # run, but pet availability never changes its displayed stage count.
+    # run. A pet opportunity deliberately does not change the displayed stage
+    # count until the pet scene is actually reached.
     skip_scenes = list(dict.fromkeys(skip_scenes))
     total_stages = max(2, total_stages - len(skip_scenes))
 
@@ -405,6 +420,7 @@ async def start_run(db, user_id, location_id, sanity):
         "scene_variants": scene_variants,
         "pet_opportunity_available": pet_opportunity_available,
         "pet_opportunity_taken": False,
+        "pet_stage_revealed": False,
         "pet_discovery_message": None,
         "insane_opening": float(sanity) <= 0,
         "story_version": HAUNTED_STORY_VERSION,
@@ -492,6 +508,7 @@ async def get_active_run(db, user_id):
         state.setdefault("discoveries_found", [])
         state.setdefault("pet_opportunity_available", False)
         state.setdefault("pet_opportunity_taken", False)
+        state.setdefault("pet_stage_revealed", False)
         state.setdefault("pet_discovery_message", None)
         state.setdefault("skip_scenes", [])
         state["story_version"] = HAUNTED_STORY_VERSION
@@ -502,6 +519,26 @@ async def get_active_run(db, user_id):
             WHERE user_id = ?
             """,
             (HAUNTED_STORY_VERSION, current_scene, total_stages, json.dumps(state), user_id),
+        )
+        await db.execute(
+            "UPDATE haunted_profiles SET active_total_stages = ? WHERE user_id = ?",
+            (total_stages, user_id),
+        )
+        await db.commit()
+
+    # If an in-progress run is already sitting on its hidden pet scene, make
+    # sure the newly revealed seventh stage is reflected in both stored totals.
+    if (
+        state.get("pet_opportunity_available")
+        and not state.get("pet_stage_revealed")
+        and _scene_has_pet_discovery(story, current_scene)
+        and int(total_stages) == int(story.get("scene_count", total_stages))
+    ):
+        state["pet_stage_revealed"] = True
+        total_stages = int(total_stages) + 1
+        await db.execute(
+            "UPDATE haunted_runs SET total_stages = ?, story_state = ? WHERE user_id = ?",
+            (total_stages, json.dumps(state), user_id),
         )
         await db.execute(
             "UPDATE haunted_profiles SET active_total_stages = ? WHERE user_id = ?",
@@ -632,21 +669,34 @@ async def advance_story(db, user_id, next_scene, state):
     if target not in story["scenes"]:
         raise KeyError(f"Haunted story points to missing scene {target!r}")
 
+    # The location-pet scene is hidden inside the normal six-scene route until
+    # a run actually rolls a pet opportunity. Reaching that scene reveals the
+    # extra stage, changing the visible route from X/6 to X/7.
+    total_stages = int(run["total_stages"])
+    if (
+        state.get("pet_opportunity_available")
+        and not state.get("pet_stage_revealed")
+        and _scene_has_pet_discovery(story, target)
+        and total_stages < int(story.get("scene_count", total_stages)) + 1
+    ):
+        state["pet_stage_revealed"] = True
+        total_stages += 1
+
     new_stage = run["stage"] + 1
-    if new_stage > run["total_stages"]:
+    if new_stage > total_stages:
         return None
 
     await db.execute(
         """
         UPDATE haunted_runs
-        SET stage = ?, current_scene = ?, story_state = ?, encounter_index = encounter_index + 1
+        SET stage = ?, total_stages = ?, current_scene = ?, story_state = ?, encounter_index = encounter_index + 1
         WHERE user_id = ?
         """,
-        (new_stage, target, json.dumps(state or {}), user_id),
+        (new_stage, total_stages, target, json.dumps(state or {}), user_id),
     )
     await db.execute(
-        "UPDATE haunted_profiles SET active_stage = ? WHERE user_id = ?",
-        (new_stage, user_id),
+        "UPDATE haunted_profiles SET active_stage = ?, active_total_stages = ? WHERE user_id = ?",
+        (new_stage, total_stages, user_id),
     )
     await db.commit()
     return new_stage, target, state

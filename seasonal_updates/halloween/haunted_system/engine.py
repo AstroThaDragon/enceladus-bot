@@ -20,6 +20,17 @@ def _matches_reaction(reaction, state):
     return all(state.get(flag) for flag in required)
 
 
+def _is_pet_choice(choice):
+    if not isinstance(choice, dict):
+        return False
+    if choice.get("pet_discovery"):
+        return True
+    return any(
+        isinstance(outcome, dict) and outcome.get("pet_discovery")
+        for outcome in choice.get("outcomes", [])
+    )
+
+
 def get_scene(location_id, scene_id):
     story = get_story(location_id)
     if not story:
@@ -47,10 +58,15 @@ def _active_scene(story, scene_id, state):
     extra_reactions = (story.get("scene_reactions") or {}).get(scene_id, [])
     if extra_reactions:
         scene["reactions"] = list(scene.get("reactions") or []) + copy.deepcopy(extra_reactions)
-    for choice in scene.get("choices", []):
-        fallback = choice.pop("fallback_outcome", None)
-        if fallback and not (state or {}).get("pet_opportunity_available", False):
-            choice["outcomes"] = [copy.deepcopy(fallback)]
+    if not (state or {}).get("pet_opportunity_available", False):
+        # Pet Discovery is a hidden opportunity, not a failed choice. When the
+        # run does not roll it, remove the authored pet choice entirely so the
+        # player never sees a button or hint that a pet could have appeared.
+        scene["choices"] = [
+            choice
+            for choice in scene.get("choices", [])
+            if not _is_pet_choice(choice)
+        ]
     return scene
 
 
