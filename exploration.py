@@ -129,6 +129,16 @@ def _clean_exploration_line(text):
     return str(text).replace("*", "").strip()
 
 
+def _display_exploration_emoji(value, fallback=""):
+    """Return a safe display emoji, falling back when a custom emoji cannot render."""
+    if not value:
+        return fallback
+    value = str(value).strip()
+    if value.startswith("<:") or value.startswith("<a:"):
+        return fallback
+    return value
+
+
 def _format_exploration_lines(lines):
     """Render result lines with consistent bold labels before colons."""
     rendered = []
@@ -1752,7 +1762,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
                 overflow_candy = candy_found - added_candy
                 if added_candy:
-                    candy_note = f"**{EMOJIS.get('halloween_candy', '🍬')} Halloween Candy ×{added_candy}**"
+                    candy_emoji = _display_exploration_emoji(EMOJIS.get("halloween_candy"), "🍬")
+                    candy_note = f"**{candy_emoji} Halloween Candy ×{added_candy}**"
                     if candy_doubled:
                         candy_note += " (Samhain bonus!)"
                     seasonal_findings.append(candy_note)
@@ -2678,7 +2689,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 )
                 overflow_candy = candy_found - added_candy
                 if added_candy:
-                    candy_note = f"**{EMOJIS.get('halloween_candy', '🍬')} Halloween Candy ×{added_candy}**"
+                    candy_emoji = _display_exploration_emoji(EMOJIS.get("halloween_candy"), "🍬")
+                    candy_note = f"**{candy_emoji} Halloween Candy ×{added_candy}**"
                     if candy_doubled:
                         candy_note += " (Samhain bonus!)"
                     seasonal_findings.append(candy_note)
