@@ -174,6 +174,17 @@ HAUNTED_REWARD_RANGES = {'common': {'stardust': (100, 200), 'candy': (3, 6), 'in
  'legendary': {'stardust': (700, 900), 'candy': (14, 22), 'ingredients': (3, 5)},
  'void': {'stardust': (950, 1300), 'candy': (25, 40), 'ingredients': (4, 7)}}
 
+# Number of different material types that can appear in a completion reward.
+# The roll is capped by the selected location's material pool size.
+# Higher rarities are increasingly likely to produce multiple material types.
+HAUNTED_INGREDIENT_TYPE_RANGES = {
+    'common': (1, 2),
+    'uncommon': (1, 2),
+    'rare': (2, 3),
+    'legendary': (2, 4),
+    'void': (3, 5),
+}
+
 HAUNTED_COLLECTIBLE_CHANCES = {'common': 0.15, 'uncommon': 0.20, 'rare': 0.25, 'legendary': 0.35, 'void': 0.55}
 
 HAUNTED_RARITY_WEIGHTS = {'common': 50, 'uncommon': 30, 'rare': 14, 'legendary': 5.6, 'void': 0.4}

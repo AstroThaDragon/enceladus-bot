@@ -10,6 +10,7 @@ from .constants import (
     HAUNTED_COLLECTIBLE_CHANCES,
     HAUNTED_INGREDIENT_OVERFLOW_VALUES,
     HAUNTED_INGREDIENT_POOLS,
+    HAUNTED_INGREDIENT_TYPE_RANGES,
     HAUNTED_RARITY_EMOJIS,
     HAUNTED_RARITY_LABELS,
     HAUNTED_RARITY_WEIGHTS,
@@ -49,7 +50,36 @@ async def grant_haunted_completion_rewards(
     candy = random.randint(*ranges["candy"])
     ingredient_amount = random.randint(*ranges["ingredients"])
     ingredient_amount = max(1, int(ingredient_amount * (1 + max(0.0, float(ingredient_bonus)))))
-    ingredient_id = _weighted_choice(HAUNTED_INGREDIENT_POOLS.get(location_id, []))
+
+    # Roll multiple material TYPES from the selected location only. Higher
+    # rarities can produce more types, while the total material quantity still
+    # comes from the existing rarity range above.
+    ingredient_pool = list(dict.fromkeys(HAUNTED_INGREDIENT_POOLS.get(location_id, [])))
+    ingredient_rewards = []
+
+    if ingredient_pool:
+        min_types, max_types = HAUNTED_INGREDIENT_TYPE_RANGES.get(rarity, (1, 1))
+        type_count = min(len(ingredient_pool), random.randint(min_types, max_types))
+
+        # Sample without replacement so a multi-material reward actually gives
+        # different materials when the location has enough unique options.
+        selected_ingredients = random.sample(ingredient_pool, type_count)
+
+        # Distribute the total rolled quantity across the selected materials,
+        # guaranteeing at least one of each.
+        remaining_amount = ingredient_amount
+        for index, ingredient_id in enumerate(selected_ingredients):
+            remaining_types = type_count - index - 1
+            if remaining_types:
+                amount = random.randint(1, remaining_amount - remaining_types)
+            else:
+                amount = remaining_amount
+
+            remaining_amount -= amount
+            ingredient_rewards.append({
+                "ingredient_id": ingredient_id,
+                "requested": amount,
+            })
 
     await db.execute(
         "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
@@ -67,23 +97,49 @@ async def grant_haunted_completion_rewards(
 
     added_ingredient = 0
     ingredient_overflow = 0
-    if ingredient_id:
+    ingredient_overflow_stardust = 0
+
+    for reward in ingredient_rewards:
+        ingredient_id = reward["ingredient_id"]
+        requested = reward["requested"]
         ingredient_type = ITEM_REGISTRY.get(ingredient_id, {}).get("type", "Haunted Ingredient")
-        added_ingredient, _, _ = await add_inventory_item(
-            db, user_id, ingredient_id, ingredient_type, ingredient_amount
+
+        added, _, _ = await add_inventory_item(
+            db, user_id, ingredient_id, ingredient_type, requested
         )
-        ingredient_overflow = ingredient_amount - added_ingredient
-        ingredient_sell_value = HAUNTED_INGREDIENT_OVERFLOW_VALUES.get(ingredient_id, 10)
-        ingredient_overflow_stardust = ingredient_overflow * max(
-            1, int(ingredient_sell_value * OVERFLOW_SELL_RATE)
+        overflow = requested - added
+        overflow_value = HAUNTED_INGREDIENT_OVERFLOW_VALUES.get(ingredient_id, 10)
+        overflow_stardust = overflow * max(
+            1, int(overflow_value * OVERFLOW_SELL_RATE)
         )
-        if ingredient_overflow_stardust:
-            await db.execute(
-                "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
-                (ingredient_overflow_stardust, user_id),
-            )
-    else:
-        ingredient_overflow_stardust = 0
+
+        added_ingredient += added
+        ingredient_overflow += overflow
+        ingredient_overflow_stardust += overflow_stardust
+
+        reward.update({
+            "name": ITEM_REGISTRY.get(ingredient_id, {}).get("name", ingredient_id),
+            "emoji": ITEM_REGISTRY.get(ingredient_id, {}).get("emoji", "🧪"),
+            "added": added,
+            "overflow": overflow,
+            "overflow_stardust": overflow_stardust,
+        })
+
+    if ingredient_overflow_stardust:
+        await db.execute(
+            "UPDATE users SET stardust = COALESCE(stardust, 0) + ? WHERE user_id = ?",
+            (ingredient_overflow_stardust, user_id),
+        )
+
+    # Keep the legacy single-material fields populated with the first material
+    # so existing callers remain compatible until their display is upgraded.
+    primary_ingredient = ingredient_rewards[0] if ingredient_rewards else None
+    ingredient_id = primary_ingredient["ingredient_id"] if primary_ingredient else None
+    ingredient_amount = primary_ingredient["requested"] if primary_ingredient else 0
+    ingredient_overflow = primary_ingredient["overflow"] if primary_ingredient else 0
+    ingredient_overflow_stardust = sum(
+        reward["overflow_stardust"] for reward in ingredient_rewards
+    )
 
     collectible = None
     collectible_added = False
@@ -124,6 +180,8 @@ async def grant_haunted_completion_rewards(
         "ingredient_requested": ingredient_amount,
         "ingredient_overflow": ingredient_overflow,
         "ingredient_overflow_stardust": ingredient_overflow_stardust,
+        "ingredients": ingredient_rewards,
+        "ingredient_count": len(ingredient_rewards),
         "collectible": collectible if collectible_added else None,
         "collectible_found": collectible_added,
         "collectible_first_discovery": collectible_first_discovery,

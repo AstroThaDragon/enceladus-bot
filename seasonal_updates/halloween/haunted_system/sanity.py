@@ -24,10 +24,10 @@ def calculate_sanity(sanity, updated_at, current_time=None, regen_multiplier=1.0
 
 
 def calculate_sanity_state(sanity, updated_at, current_time=None, regen_multiplier=1.0):
-    """Return Sanity and its recovery anchor after applying six-hour steps.
+    """Return continuously regenerated Sanity and its recovery anchor.
 
-    Sanity rises to at least half after one recovery interval and to full after
-    two. The returned timestamp preserves time elapsed toward the next step.
+    Sanity regenerates linearly over time: 50 Sanity takes three hours and
+    100 Sanity takes six hours from zero.
     """
     if current_time is None:
         current_time = now()
@@ -38,20 +38,14 @@ def calculate_sanity_state(sanity, updated_at, current_time=None, regen_multipli
     if multiplier == 0 or sanity >= SANITY_MAX:
         return sanity, current_time if sanity >= SANITY_MAX else updated_at
 
-    interval = SANITY_REGEN_SECONDS / multiplier
-    steps = int(elapsed // interval)
-    if steps <= 0:
-        return sanity, updated_at
+    # SANITY_REGEN_SECONDS is the time required to regenerate the full bar.
+    regen_rate = (SANITY_MAX / SANITY_REGEN_SECONDS) * multiplier
+    recovered = min(float(SANITY_MAX), sanity + (elapsed * regen_rate))
 
-    halfway = SANITY_MAX / 2
-    if sanity >= halfway and steps >= 1:
+    if recovered >= SANITY_MAX:
         return float(SANITY_MAX), current_time
 
-    if sanity < halfway and steps >= 2:
-        return float(SANITY_MAX), current_time
-
-    recovered = max(sanity, halfway)
-    return recovered, updated_at + interval
+    return recovered, current_time
 
 
 def sanity_percent(sanity):
