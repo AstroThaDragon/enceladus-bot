@@ -210,7 +210,7 @@ EXPLORATION_TEXT = {
         "field_sanity": "*Sanity*",
         "field_daily_attempts": "*Daily Attempts*",
         "field_available_locations": "*Open Portals*",
-        "sanity_field": "**{sanity}/100**\n{state}\nAfter its last change: at least 50 after 6 hours, 100 by 12 hours.",
+        "sanity_field": "**{sanity}/100**\n{state}\nRegenerates gradually over time: 50 Sanity after 3 hours, and 100 by 6 hours.",
         "info_title": "Haunted Exploration — Field Guide",
         "info_description": (
             "Haunted Exploration is a multi-stage Halloween adventure built around a series of portals opened by "
@@ -230,7 +230,7 @@ EXPLORATION_TEXT = {
             "And sometimes... *something else comes out.*"
         ),
         "info_sanity": (
-            "Sanity starts at **100** and recharges in steps after its last change: at least **50 after 6 hours**, and **100 by 12 hours**. "
+            "Sanity starts at **100** and regenerates gradually over time: **50 after 3 hours**, and **100 by 6 hours** from its last change. "
             "Most choices cost a little Sanity; a few bring brief relief. "
             "An active expedition can continue at **0 Sanity**, but you must recover above zero before starting another."
         ),
@@ -873,11 +873,6 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     ephemeral=True,
                 )
 
-            # The hidden pet stage can increase the route total from 6 to 7
-            # while a run is in progress. Always render the database's current
-            # total instead of trusting the value captured by an older view.
-            total_stages = run["total_stages"]
-
             async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 effect_row = await cursor.fetchone()
             try:
@@ -980,16 +975,13 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     or run["location_id"] != location_id
                     or run["stage"] != stage
                     or run["current_scene"] != scene_id
+                    or run["total_stages"] != total_stages
                 ):
                     return await interaction.followup.send(
                         EXPLORATION_TEXT["haunted"]["scene_unavailable"],
                         ephemeral=True,
                     )
 
-                # total_stages is display metadata and can change when the
-                # hidden pet scene is revealed. It must not invalidate a valid
-                # button from the currently displayed scene.
-                total_stages = run["total_stages"]
                 current_profile = await get_or_create_profile(db, user_id)
                 try:
                     choice, outcome, new_state, next_scene = resolve_choice(
@@ -1119,9 +1111,6 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"Haunted story state disappeared while advancing {location_id}:{scene_id}"
                         )
                     new_stage, _, _ = advanced
-                    refreshed_run = await get_active_run(db, user_id)
-                    if refreshed_run:
-                        total_stages = refreshed_run["total_stages"]
 
             if is_complete:
                 # Completion rewards are guaranteed when a Haunted run completes.
@@ -1131,8 +1120,22 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     f"{reward['rarity_emoji']} **{reward['rarity_label']} Haul**",
                     f"**+{reward['stardust']:,} Stardust** ✨",
                     f"**+{reward['candy']} Halloween Candy** 🍬",
-                    f"{reward['ingredient_emoji']} **+{reward['ingredient_added']} {reward['ingredient_name']}**",
                 ]
+
+                # Haunted runs can now award multiple material types from the
+                # selected location's own material pool.
+                ingredient_rewards = reward.get("ingredients") or []
+                if ingredient_rewards:
+                    reward_lines.append("🌿 **Materials Found:**")
+                    for ingredient in ingredient_rewards:
+                        reward_lines.append(
+                            f"{ingredient['emoji']} **+{ingredient['added']} {ingredient['name']}**"
+                        )
+                else:
+                    # Backward-compatible fallback for older reward payloads.
+                    reward_lines.append(
+                        f"{reward['ingredient_emoji']} **+{reward['ingredient_added']} {reward['ingredient_name']}**"
+                    )
                 if pet_xp_result:
                     xp_line = f"🐾 **+{pet_xp_result['xp_added']} Pet XP**"
                     if haunted_home_bonus:
@@ -1219,13 +1222,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             async with aiosqlite.connect(self.get_db_path()) as db:
                 await self.ensure_schema(db)
                 run = await get_active_run(db, user_id)
-                if not run or run["location_id"] != location_id or run["stage"] != stage:
+                if not run or run["location_id"] != location_id or run["stage"] != stage or run["total_stages"] != total_stages:
                     return await interaction.followup.send(
                         EXPLORATION_TEXT["haunted"]["run_unavailable"],
                         ephemeral=True,
                     )
 
-                total_stages = run["total_stages"]
                 pet_discovery_message = run["story_state"].get("pet_discovery_message")
                 rare_escape = random.random() < 0.08
                 if rare_escape:
