@@ -142,6 +142,15 @@ async def init_bump_db():
         os.makedirs(db_folder, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("CREATE TABLE IF NOT EXISTS bump_timer (id INTEGER PRIMARY KEY, remind_at TEXT, channel_id INTEGER)")
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bump_streak (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                last_bumper_id INTEGER,
+                streak INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
         await db.execute("CREATE TABLE IF NOT EXISTS vaulted_messages (message_id INTEGER PRIMARY KEY)") 
         await db.commit()
 
@@ -515,9 +524,44 @@ async def on_message(message):
 
         user_mention = user_obj.mention if user_obj else "there"
 
+        # Track consecutive bumpers persistently so repeated bumps by the
+        # same person award progressively less XP. Any different bumper
+        # resets the streak for the next person back to the full reward.
+        bump_xp = 400
+        bump_streak = 1
+
+        if user_obj:
+            async with aiosqlite.connect(DB_PATH) as db:
+                async with db.execute(
+                    "SELECT last_bumper_id, streak FROM bump_streak WHERE id = 1"
+                ) as cursor:
+                    streak_row = await cursor.fetchone()
+
+                if streak_row and streak_row[0] == user_obj.id:
+                    bump_streak = int(streak_row[1] or 0) + 1
+                else:
+                    bump_streak = 1
+
+                bump_xp_by_streak = {
+                    1: 400,
+                    2: 200,
+                    3: 100,
+                    4: 50,
+                }
+                bump_xp = bump_xp_by_streak.get(bump_streak, 25)
+
+                await db.execute(
+                    """
+                    INSERT OR REPLACE INTO bump_streak (id, last_bumper_id, streak)
+                    VALUES (1, ?, ?)
+                    """,
+                    (user_obj.id, bump_streak)
+                )
+                await db.commit()
+
         thanks_text = (
             f"Thank you so much for bumping our server, {user_mention}! It helps us a ton! <:CoolEevee:1109771250634592306> 💜\n"
-            f"You've earned **400 XP** for the server bump! You can come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
+            f"You've earned **{bump_xp} XP** for the server bump! You can come back in two hours to do it again! <a:DancingEevee:1109781719315398766>"
         )
 
         await message.channel.send(thanks_text)
@@ -527,7 +571,7 @@ async def on_message(message):
             add_xp_func = getattr(leveling_cog, "add_xp", None)
             
             if add_xp_func:
-                await add_xp_func(user_obj, 400)
+                await add_xp_func(user_obj, bump_xp)
             else:
                 print("❌ Leveling cog not found. Couldn't award bump XP.")
 
@@ -973,8 +1017,9 @@ def get_next_fortune_reset():
 async def resetbump(ctx):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM bump_timer WHERE id = 1")
+        await db.execute("DELETE FROM bump_streak WHERE id = 1")
         await db.commit()
-    await ctx.send("Bump timer cleared!")
+    await ctx.send("Bump timer and bump XP streak cleared!")
 
 class HelpView(discord.ui.View):
     def __init__(self, bot_instance, author, pages):

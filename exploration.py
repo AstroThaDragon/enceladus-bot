@@ -873,6 +873,11 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     ephemeral=True,
                 )
 
+            # The hidden pet stage can increase the route total from 6 to 7
+            # while a run is in progress. Always render the database's current
+            # total instead of trusting the value captured by an older view.
+            total_stages = run["total_stages"]
+
             async with db.execute("SELECT active_effects FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 effect_row = await cursor.fetchone()
             try:
@@ -975,13 +980,16 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     or run["location_id"] != location_id
                     or run["stage"] != stage
                     or run["current_scene"] != scene_id
-                    or run["total_stages"] != total_stages
                 ):
                     return await interaction.followup.send(
                         EXPLORATION_TEXT["haunted"]["scene_unavailable"],
                         ephemeral=True,
                     )
 
+                # total_stages is display metadata and can change when the
+                # hidden pet scene is revealed. It must not invalidate a valid
+                # button from the currently displayed scene.
+                total_stages = run["total_stages"]
                 current_profile = await get_or_create_profile(db, user_id)
                 try:
                     choice, outcome, new_state, next_scene = resolve_choice(
@@ -1111,6 +1119,9 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                             f"Haunted story state disappeared while advancing {location_id}:{scene_id}"
                         )
                     new_stage, _, _ = advanced
+                    refreshed_run = await get_active_run(db, user_id)
+                    if refreshed_run:
+                        total_stages = refreshed_run["total_stages"]
 
             if is_complete:
                 # Completion rewards are guaranteed when a Haunted run completes.
@@ -1208,12 +1219,13 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             async with aiosqlite.connect(self.get_db_path()) as db:
                 await self.ensure_schema(db)
                 run = await get_active_run(db, user_id)
-                if not run or run["location_id"] != location_id or run["stage"] != stage or run["total_stages"] != total_stages:
+                if not run or run["location_id"] != location_id or run["stage"] != stage:
                     return await interaction.followup.send(
                         EXPLORATION_TEXT["haunted"]["run_unavailable"],
                         ephemeral=True,
                     )
 
+                total_stages = run["total_stages"]
                 pet_discovery_message = run["story_state"].get("pet_discovery_message")
                 rare_escape = random.random() < 0.08
                 if rare_escape:
