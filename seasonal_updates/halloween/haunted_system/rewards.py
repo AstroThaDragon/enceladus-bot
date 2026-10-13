@@ -59,7 +59,14 @@ async def grant_haunted_completion_rewards(
 
     if ingredient_pool:
         min_types, max_types = HAUNTED_INGREDIENT_TYPE_RANGES.get(rarity, (1, 1))
-        type_count = min(len(ingredient_pool), random.randint(min_types, max_types))
+        # Each selected type must receive at least one unit. Cap the type count
+        # by both the location pool and the total quantity rolled for this haul.
+        type_count = min(
+            len(ingredient_pool),
+            ingredient_amount,
+            random.randint(min_types, max_types),
+        )
+        type_count = max(1, type_count)
 
         # Sample without replacement so a multi-material reward actually gives
         # different materials when the location has enough unique options.
