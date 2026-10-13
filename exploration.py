@@ -1496,7 +1496,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
     @commands.hybrid_command(name="mine", description="Deploy your mining laser to scout for Stardust and rare loot!")
     async def mine(self, ctx: commands.Context):
         try:
-            await ctx.defer(thinking=True)
+            await ctx.defer()
         except discord.NotFound as exc:
             # Discord error 10062 means the interaction token has already
             # expired or is no longer valid. There is no valid response to send
@@ -2137,7 +2137,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare findings!")
     async def scavenge(self, ctx: commands.Context):
         try:
-            await ctx.defer(thinking=True)
+            await ctx.defer()
         except discord.NotFound as exc:
             # Discord error 10062 means the interaction token has already
             # expired or is no longer valid. There is no valid response to send
