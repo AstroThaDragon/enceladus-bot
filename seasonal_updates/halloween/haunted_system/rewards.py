@@ -78,7 +78,10 @@ async def grant_haunted_completion_rewards(
         for index, ingredient_id in enumerate(selected_ingredients):
             remaining_types = type_count - index - 1
             if remaining_types:
-                amount = random.randint(1, remaining_amount - remaining_types)
+                # Keep the upper bound valid even if a future reward-range
+                # change accidentally violates the distribution invariant.
+                max_amount = max(1, remaining_amount - remaining_types)
+                amount = random.randint(1, max_amount)
             else:
                 amount = remaining_amount
 
