@@ -1495,7 +1495,16 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
     @commands.hybrid_command(name="mine", description="Deploy your mining laser to scout for Stardust and rare loot!")
     async def mine(self, ctx: commands.Context):
-        await ctx.defer()
+        try:
+            await ctx.defer(thinking=True)
+        except discord.NotFound as exc:
+            # Discord error 10062 means the interaction token has already
+            # expired or is no longer valid. There is no valid response to send
+            # for that interaction, so stop here instead of triggering a second
+            # unhandled response error.
+            if getattr(exc, "code", None) == 10062:
+                return
+            raise
 
         user_id = ctx.author.id
         lock = self._user_locks.setdefault(user_id, asyncio.Lock())
@@ -2127,7 +2136,16 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
     @commands.hybrid_command(name="scavenge", description="Search derelict wreckage for salvage, Stardust, and occasional rare findings!")
     async def scavenge(self, ctx: commands.Context):
-        await ctx.defer()
+        try:
+            await ctx.defer(thinking=True)
+        except discord.NotFound as exc:
+            # Discord error 10062 means the interaction token has already
+            # expired or is no longer valid. There is no valid response to send
+            # for that interaction, so stop here instead of triggering a second
+            # unhandled response error.
+            if getattr(exc, "code", None) == 10062:
+                return
+            raise
 
         user_id = ctx.author.id
         lock = self._user_locks.setdefault(user_id, asyncio.Lock())
