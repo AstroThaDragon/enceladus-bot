@@ -739,7 +739,9 @@ def _ensure_haunted_cauldron_items():
             ITEM_REGISTRY.setdefault(item_id, dict(info))
 
 
-async def add_inventory_item(db, user_id, item_id, item_type, amount=1):
+async def add_inventory_item(
+    db, user_id: int, item_id: str, item_type: str, amount: int = 1
+) -> tuple[int, int, int]:
     """
     Add an item while respecting the item's max_quantity from ITEM_REGISTRY.
 

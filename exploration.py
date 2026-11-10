@@ -46,19 +46,23 @@ from seasonal_updates.halloween.haunted_system import (
     HAUNTED_DAILY_ATTEMPTS,
     HAUNTED_LOCATIONS,
     SANITY_MAX,
-    advance_story,
-    clear_run,
     consume_attempt,
-    grant_haunted_completion_rewards,
-    get_or_create_profile,
     is_insane,
     render_scene,
     resolve_choice,
     sanity_percent,
-    start_run,
     update_sanity,
 )
-from seasonal_updates.halloween.haunted_system.state import get_active_run
+from seasonal_updates.halloween.haunted_system.state import (
+    advance_story,
+    clear_run,
+    get_active_run,
+    get_or_create_profile,
+    start_run,
+)
+from seasonal_updates.halloween.haunted_system.rewards import (
+    grant_haunted_completion_rewards,
+)
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
@@ -1128,6 +1132,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     pet_xp_result = await add_pet_xp(db, user_id, haunted_pet_xp_amount)
                     await clear_run(db, user_id)
                 else:
+                    # ``is_complete`` is derived from this value above, but a
+                    # separate boolean does not narrow an Optional for Pylance.
+                    if next_scene is None:
+                        raise RuntimeError(
+                            f"Haunted story cannot continue without a next scene: {location_id}:{scene_id}"
+                        )
                     advanced = await advance_story(db, user_id, next_scene, new_state)
                     if advanced is None:
                         raise RuntimeError(

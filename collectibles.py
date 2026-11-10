@@ -228,7 +228,14 @@ async def ensure_collectible_tables(db):
     """)
 
 
-async def record_collectible(db, bot, user_id, collectible_id, category="Halloween", channel=None):
+async def record_collectible(
+    db,
+    bot,
+    user_id: int,
+    collectible_id: str,
+    category: str = "Halloween",
+    channel=None,
+) -> bool:
     """Permanently record a seasonal collectible inside an existing transaction."""
     await ensure_collectible_tables(db)
     cursor = await db.execute(

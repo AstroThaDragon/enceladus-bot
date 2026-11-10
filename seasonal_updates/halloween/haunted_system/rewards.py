@@ -1,6 +1,7 @@
 """Existing Haunted completion reward rolls, kept separate from story content."""
 
 import random
+from typing import Any
 
 from inventory import add_inventory_item, ITEM_REGISTRY
 from collectibles import record_collectible
@@ -36,7 +37,7 @@ async def grant_haunted_completion_rewards(
     collectible_bonus=0.0,
     ingredient_bonus=0.0,
     reward_bonus=0.0,
-):
+) -> dict[str, Any]:
     """Grant the existing random completion rewards.
 
     Location materials intentionally remain random drops from the location's

@@ -137,7 +137,7 @@ async def _ensure_location_rotation(db, user_id, raw_order, group_index):
     return order, group_index, _location_group(order, group_index)
 
 
-async def get_or_create_profile(db, user_id):
+async def get_or_create_profile(db, user_id: int) -> dict[str, Any]:
     today = game_date()
     current_time = now()
     await ensure_haunted_schema(db)
@@ -583,7 +583,7 @@ async def save_story_state(db, user_id, *, stage=None, current_scene=None, state
     return new_stage
 
 
-async def clear_run(db, user_id):
+async def clear_run(db, user_id: int) -> None:
     async with db.execute(
         "SELECT location_id FROM haunted_runs WHERE user_id = ?", (user_id,)
     ) as cursor:
@@ -628,7 +628,9 @@ async def clear_run(db, user_id):
     )
     await db.commit()
 
-async def advance_story(db, user_id, next_scene, state):
+async def advance_story(
+    db, user_id: int, next_scene: str, state: dict[str, Any]
+) -> tuple[int, str, dict[str, Any]] | None:
     """Persist the next authored scene, honoring a one-scene shortcut."""
     run = await get_active_run(db, user_id)
     if not run:

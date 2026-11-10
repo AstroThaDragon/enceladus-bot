@@ -615,7 +615,7 @@ async def get_haunted_exploration_pet_xp(
     db,
     user_id: int,
     location_id: str,
-):
+) -> tuple[int, int]:
     """Roll Haunted Exploration Pet XP and apply the matching-pet bonus."""
     amount = roll_haunted_exploration_pet_xp()
     home_bonus = 0
