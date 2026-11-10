@@ -178,13 +178,88 @@ class HarvestKitchen(commands.Cog):
         if collection not in {"autumn", "thanksgiving"}:
             await ctx.send("That seasonal kitchen is not available.")
             return
-        title = "🍂 Autumn Harvest Kitchen" if collection == "autumn" else "🦃 Thanksgiving Kitchen"
-        embed = self._kitchen_embed()
-        embed.title = title
-        await ctx.send(embed=embed, view=KitchenView(self, ctx.author.id, collection=collection))
+        await ctx.send(
+            embed=self._kitchen_embed(collection),
+            view=KitchenView(self, ctx.author.id, collection),
+        )
 
-    def _kitchen_embed(self):
-        return discord.Embed(title="🍁 Harvest Kitchen",description="Choose a recipe to prepare. Ingredients are consumed only when you confirm cooking. Butter, salt, sugar, and eggs are pantry staples and never need to be collected.\n\nSuccessful cooking has a **10% seasonal egg chance**. Treat crafting does not roll for eggs.",color=discord.Color.orange())
+    def _recipes(self, collection):
+        if collection == "autumn":
+            return {**AUTUMN_RECIPES, **AUTUMN_PET_TREATS}
+        return {**THANKSGIVING_RECIPES, **AUTUMN_PET_TREATS, **THANKSGIVING_PET_TREATS}
+
+    def _kitchen_embed(self, collection):
+        recipes = self._recipes(collection)
+        title = "Seasonal Crafting Guide 🍂" if collection == "autumn" else "Seasonal Crafting Guide 🦃"
+        return discord.Embed(
+            title=title,
+            description=(
+                "*Prepare seasonal foods, drinks, and treats from gathered ingredients!*\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"**Known Recipes**\n{len(recipes)} recipes available.\n\n"
+                "Food and drink crafting has a **10% seasonal egg chance**. Pet treat crafting does not roll for eggs.\n\n"
+                "Choose an option below."
+            ),
+            color=discord.Color.orange(),
+        )
+
+    async def _owned(self, user_id):
+        async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
+            async with db.execute(
+                "SELECT item_id, quantity FROM inventory WHERE user_id=?", (user_id,)
+            ) as cur:
+                return {item_id: quantity for item_id, quantity in await cur.fetchall()}
+
+    async def recipe_book_embeds(self, user_id, collection):
+        owned = await self._owned(user_id)
+        recipes = list(self._recipes(collection).items())
+        pages = []
+        for start in range(0, len(recipes), 3):
+            sections = []
+            for recipe_id, recipe in recipes[start:start + 3]:
+                ingredients = recipe.get("ingredients", {})
+                if recipe_id in AUTUMN_PET_TREAT_RECIPES:
+                    ingredients = AUTUMN_PET_TREAT_RECIPES[recipe_id]
+                lines = [f"{recipe.get('emoji', '🍽️')} **{recipe['name']}**"]
+                for item_id, detail in ingredients.items():
+                    quantity = detail["quantity"]
+                    item_info = ITEM_REGISTRY.get(item_id, {})
+                    name = item_info.get("name", item_id.replace("_", " ").title())
+                    emoji = item_info.get("emoji", "🥣")
+                    if detail.get("collection") == "pantry":
+                        lines.append(f"✅ {emoji} {name} ×{quantity} *(pantry staple)*")
+                        continue
+                    have = owned.get(item_id, 0)
+                    mark = "✅" if have >= quantity else "❌"
+                    lines.append(f"{mark} {emoji} {name} ×{quantity} **(you have {have})**")
+                lines.append(
+                    f"📦 Currently owned: **{owned.get(recipe_id, 0)}x {recipe['name']}**"
+                )
+                sections.append("\n".join(lines))
+
+            embed = discord.Embed(
+                title="Seasonal Crafting Recipe Book 📖",
+                description="\n\n──────────────\n\n".join(sections),
+                color=discord.Color.orange(),
+            )
+            embed.set_footer(text=f"{start // 3 + 1}/{(len(recipes) + 2) // 3} • Pantry staples are always available")
+            pages.append(embed)
+        return pages
+
+    async def materials_embed(self, user_id, collection):
+        owned = await self._owned(user_id)
+        ingredients = self._pool(collection)
+        lines = []
+        for item_id, info in ingredients.items():
+            quantity = owned.get(item_id, 0)
+            if quantity:
+                lines.append(f"{info.get('emoji', '🥣')} **{info.get('name', item_id)}** ×{quantity}")
+        title = "🍂 Autumn Materials" if collection == "autumn" else "🦃 Thanksgiving Materials"
+        return discord.Embed(
+            title=title,
+            description="\n".join(lines) if lines else "You haven't gathered any seasonal ingredients yet.",
+            color=discord.Color.orange(),
+        )
 
     async def recipe_embed(self, user_id, recipe_id):
         recipe=AUTUMN_RECIPES.get(recipe_id) or THANKSGIVING_RECIPES.get(recipe_id) or AUTUMN_PET_TREATS.get(recipe_id) or THANKSGIVING_PET_TREATS.get(recipe_id)
@@ -307,45 +382,196 @@ class HarvestKitchen(commands.Cog):
         await interaction.edit_original_response(content=msg, embed=None, view=None)
 
 class KitchenView(discord.ui.View):
-    def __init__(self, cog, owner_id, collection="thanksgiving"):
+    def __init__(self, cog, owner_id, collection="autumn"):
         super().__init__(timeout=180)
         self.cog = cog
         self.owner_id = owner_id
         self.collection = collection
-        if collection == "autumn":
-            recipes = {**AUTUMN_RECIPES, **AUTUMN_PET_TREATS}
-        else:
-            recipes = {**THANKSGIVING_RECIPES, **AUTUMN_PET_TREATS, **THANKSGIVING_PET_TREATS}
-        options = [
-            discord.SelectOption(label=v["name"][:100], value=k, emoji=v.get("emoji"))
-            for k, v in recipes.items()
-        ][:25]
-        self.add_item(RecipeSelect(cog, owner_id, options))
 
     async def interaction_check(self, interaction):
-        if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("This kitchen menu belongs to another player.", ephemeral=True)
-            return False
-        if not self.cog._active():
-            await interaction.response.send_message("🍂 The Autumn event has ended; the Harvest Kitchen is closed.", ephemeral=True)
-            return False
-        return True
+        return await _check_kitchen_interaction(interaction, self.owner_id, self.cog)
+
+    @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
+    async def recipes_button(self, interaction, button):
+        pages = await self.cog.recipe_book_embeds(self.owner_id, self.collection)
+        view = KitchenRecipeBookView(self.cog, self.owner_id, self.collection, pages)
+        await interaction.response.edit_message(embed=pages[0], view=view)
+
+    @discord.ui.button(label="Craft", style=discord.ButtonStyle.success)
+    async def cook_button(self, interaction, button):
+        view = KitchenSelectView(self.cog, self.owner_id, self.collection, self)
+        embed = discord.Embed(
+            title="Choose a seasonal recipe",
+            description="Pick something delicious to prepare. You can review the ingredients before cooking.",
+            color=discord.Color.orange(),
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Materials", style=discord.ButtonStyle.secondary)
+    async def materials_button(self, interaction, button):
+        embed = await self.cog.materials_embed(self.owner_id, self.collection)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=KitchenMaterialsView(self.cog, self.owner_id, self.collection),
+        )
+
+
+async def _check_kitchen_interaction(interaction, owner_id, cog):
+    if interaction.user.id != owner_id:
+        await interaction.response.send_message(
+            "This seasonal kitchen belongs to another player.", ephemeral=True
+        )
+        return False
+    if not cog._active():
+        await interaction.response.send_message(
+            "🍂 The Autumn event has ended; seasonal crafting is closed.", ephemeral=True
+        )
+        return False
+    return True
+
+
+class KitchenMaterialsView(discord.ui.View):
+    def __init__(self, cog, owner_id, collection):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.collection = collection
+
+    async def interaction_check(self, interaction):
+        return await _check_kitchen_interaction(interaction, self.owner_id, self.cog)
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=self.cog._kitchen_embed(self.collection),
+            view=KitchenView(self.cog, self.owner_id, self.collection),
+        )
+
+
+class KitchenRecipeBookView(discord.ui.View):
+    def __init__(self, cog, owner_id, collection, pages, page=0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.collection = collection
+        self.pages = pages
+        self.page = page
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.previous_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction):
+        return await _check_kitchen_interaction(interaction, self.owner_id, self.cog)
+
+    async def _show(self, interaction):
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.page], view=self)
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def previous_button(self, interaction, button):
+        self.page -= 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="Craft", style=discord.ButtonStyle.success)
+    async def cook_button(self, interaction, button):
+        view = KitchenSelectView(self.cog, self.owner_id, self.collection, self)
+        embed = discord.Embed(
+            title="Choose a seasonal recipe",
+            description="Pick something delicious to prepare. You can review the ingredients before cooking.",
+            color=discord.Color.orange(),
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction, button):
+        self.page += 1
+        await self._show(interaction)
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=self.cog._kitchen_embed(self.collection),
+            view=KitchenView(self.cog, self.owner_id, self.collection),
+        )
+
+
+class KitchenSelectView(discord.ui.View):
+    def __init__(self, cog, owner_id, collection, back_view):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.collection = collection
+        self.back_view = back_view
+        options = [
+            discord.SelectOption(label=recipe["name"][:100], value=recipe_id, emoji=recipe.get("emoji"))
+            for recipe_id, recipe in cog._recipes(collection).items()
+        ][:25]
+        self.add_item(RecipeSelect(cog, owner_id, options, collection, back_view))
+
+    async def interaction_check(self, interaction):
+        return await _check_kitchen_interaction(interaction, self.owner_id, self.cog)
+
+    @discord.ui.button(label="◀ Back", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction, button):
+        back_embed = (
+            self.back_view.pages[self.back_view.page]
+            if isinstance(self.back_view, KitchenRecipeBookView)
+            else self.cog._kitchen_embed(self.collection)
+        )
+        await interaction.response.edit_message(
+            embed=back_embed, view=self.back_view
+        )
+
 
 class RecipeSelect(discord.ui.Select):
-    def __init__(self,cog,owner_id,options):
-        super().__init__(placeholder="Choose a recipe…",min_values=1,max_values=1,options=options); self.cog=cog; self.owner_id=owner_id
-    async def callback(self,interaction):
-        recipe_id=self.values[0]; embed=await self.cog.recipe_embed(self.owner_id,recipe_id)
-        await interaction.response.edit_message(embed=embed,view=CookConfirmView(self.cog,self.owner_id,recipe_id))
+    def __init__(self, cog, owner_id, options, collection, back_view):
+        super().__init__(placeholder="Choose a recipe…", min_values=1, max_values=1, options=options)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.collection = collection
+        self.back_view = back_view
+
+    async def callback(self, interaction):
+        recipe_id = self.values[0]
+        embed = await self.cog.recipe_embed(self.owner_id, recipe_id)
+        select_view = KitchenSelectView(
+            self.cog, self.owner_id, self.collection, self.back_view
+        )
+        await interaction.response.edit_message(
+            embed=embed,
+            view=CookConfirmView(
+                self.cog, self.owner_id, recipe_id, self.collection, select_view
+            ),
+        )
+
 
 class CookConfirmView(discord.ui.View):
-    def __init__(self,cog,owner_id,recipe_id):
-        super().__init__(timeout=120); self.cog=cog; self.owner_id=owner_id; self.recipe_id=recipe_id
+    def __init__(self, cog, owner_id, recipe_id, collection, return_view):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.recipe_id = recipe_id
+        self.collection = collection
+        self.return_view = return_view
+
+    async def interaction_check(self, interaction):
+        return await _check_kitchen_interaction(interaction, self.owner_id, self.cog)
+
     @discord.ui.button(label="Cook",style=discord.ButtonStyle.success,emoji="🍳")
     async def cook_button(self,interaction,button):
-        if interaction.user.id!=self.owner_id: return await interaction.response.send_message("This recipe isn't yours.",ephemeral=True)
         await self.cog.cook(interaction,self.recipe_id)
-    @discord.ui.button(label="Cancel",style=discord.ButtonStyle.secondary)
-    async def cancel_button(self,interaction,button): await interaction.response.edit_message(content="Cooking cancelled. No ingredients were used.",embed=None,view=None)
+
+    @discord.ui.button(label="Back",style=discord.ButtonStyle.secondary)
+    async def cancel_button(self,interaction,button):
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Choose a seasonal recipe",
+                description="Pick something delicious to prepare. You can review the ingredients before cooking.",
+                color=discord.Color.orange(),
+            ),
+            view=self.return_view,
+        )
 
 async def setup(bot): await bot.add_cog(HarvestKitchen(bot))

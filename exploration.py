@@ -65,6 +65,13 @@ from seasonal_updates.halloween.haunted_system.rewards import (
 )
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
+SEASONAL_ALERT_ACTIVITIES = {
+    "autumn_harvest": ("🍂 Autumn Harvest", "autumn harvest"),
+    "thanksgiving_gathering": ("🦃 Thanksgiving Gathering", "Thanksgiving gathering"),
+}
+SEASONAL_ACTIVITY_COOLDOWN_SECONDS = 15 * 60
+SEASONAL_ACTIVITY_CYCLE_SECONDS = 12 * 60 * 60
+SEASONAL_ACTIVITY_ATTEMPT_LIMIT = 20
 
 # Halloween Space Junk collectibles can very rarely be found while scavenging.
 # This is intentionally much rarer than the normal Haunted Exploration
@@ -523,7 +530,7 @@ class Exploration(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def cooldown_alert_checker(self):
-        """Check for completed mining/scavenging cooldowns and notify opted-in users."""
+        """Check completed mining, scavenging, and seasonal cooldowns."""
         try:
             channel = self.bot.get_channel(COOLDOWN_ALERT_CHANNEL_ID)
             if channel is None:
@@ -540,6 +547,25 @@ class Exploration(commands.Cog):
 
             async with aiosqlite.connect(db_path) as db:
                 await self.ensure_schema(db)
+                await db.execute(
+                    """CREATE TABLE IF NOT EXISTS seasonal_activity_usage (
+                        user_id INTEGER NOT NULL,
+                        activity_id TEXT NOT NULL,
+                        window_start REAL NOT NULL,
+                        uses INTEGER NOT NULL DEFAULT 0,
+                        last_used REAL NOT NULL DEFAULT 0,
+                        PRIMARY KEY (user_id, activity_id)
+                    )"""
+                )
+                await db.execute(
+                    """CREATE TABLE IF NOT EXISTS seasonal_cooldown_alerts (
+                        user_id INTEGER NOT NULL,
+                        activity_id TEXT NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 0,
+                        alert_sent_for REAL NOT NULL DEFAULT 0,
+                        PRIMARY KEY (user_id, activity_id)
+                    )"""
+                )
 
                 async with db.execute(
                     """
@@ -624,6 +650,58 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
                         except (discord.Forbidden, discord.HTTPException):
                             pass
+
+                async with db.execute(
+                    """SELECT alerts.user_id, alerts.activity_id, alerts.alert_sent_for,
+                              usage.window_start, usage.uses, usage.last_used
+                       FROM seasonal_cooldown_alerts AS alerts
+                       JOIN seasonal_activity_usage AS usage
+                         ON usage.user_id = alerts.user_id
+                        AND usage.activity_id = alerts.activity_id
+                       WHERE alerts.enabled = 1"""
+                ) as cursor:
+                    seasonal_alerts = await cursor.fetchall()
+
+                for user_id, activity_id, sent_for, window_start, uses, last_used in seasonal_alerts:
+                    activity_info = SEASONAL_ALERT_ACTIVITIES.get(activity_id)
+                    if activity_info is None:
+                        continue
+
+                    if uses >= SEASONAL_ACTIVITY_ATTEMPT_LIMIT:
+                        event_key = window_start
+                        available_at = window_start + SEASONAL_ACTIVITY_CYCLE_SECONDS
+                        is_cycle_reset = True
+                    else:
+                        if not last_used:
+                            continue
+                        event_key = last_used
+                        available_at = last_used + SEASONAL_ACTIVITY_COOLDOWN_SECONDS
+                        is_cycle_reset = False
+
+                    if current_time < available_at or sent_for == event_key:
+                        continue
+
+                    display_name, command_name = activity_info
+                    if is_cycle_reset:
+                        message = (
+                            f"<@{user_id}> {display_name} attempts have refreshed! "
+                            f"You can head out again with `/explore` → **{command_name}**."
+                        )
+                    else:
+                        message = (
+                            f"<@{user_id}> Your {display_name} cooldown is over! "
+                            f"You can head out again with `/explore` → **{command_name}**."
+                        )
+                    try:
+                        await channel.send(message)
+                        await db.execute(
+                            """UPDATE seasonal_cooldown_alerts
+                               SET alert_sent_for = ?
+                               WHERE user_id = ? AND activity_id = ?""",
+                            (event_key, user_id, activity_id),
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
 
                 await db.commit()
 
@@ -1503,6 +1581,109 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             await ctx.send(
                 "**Cooldown alerts off**\n"
                 "You won't receive mining or scavenging cooldown notifications."
+            )
+
+    @commands.hybrid_command(
+        name="seasonal_alerts",
+        description="Opt in or out of Autumn and Thanksgiving exploration cooldown alerts.",
+    )
+    @app_commands.describe(
+        activity="Choose which seasonal exploration alerts to change for Autumn & Thanksgiving event.",
+        enabled="Turn alerts on or off.",
+    )
+    @app_commands.choices(
+        activity=[
+            app_commands.Choice(name="Both seasonal explorations", value="all"),
+            app_commands.Choice(name="Autumn Harvest", value="autumn_harvest"),
+            app_commands.Choice(name="Thanksgiving Gathering", value="thanksgiving_gathering"),
+        ],
+    )
+    async def seasonal_alerts(
+        self,
+        ctx: commands.Context,
+        activity: str,
+        enabled: bool,
+    ):
+        """Set seasonal exploration cooldown alerts for one or both activities."""
+        await ctx.defer()
+        user_id = ctx.author.id
+        activity_ids = (
+            list(SEASONAL_ALERT_ACTIVITIES)
+            if activity == "all"
+            else [activity]
+        )
+        if any(activity_id not in SEASONAL_ALERT_ACTIVITIES for activity_id in activity_ids):
+            return await ctx.send("Choose Autumn Harvest, Thanksgiving Gathering, or both.")
+        now = time.time()
+
+        async with aiosqlite.connect(self.get_db_path()) as db:
+            await db.execute(
+                """CREATE TABLE IF NOT EXISTS seasonal_activity_usage (
+                    user_id INTEGER NOT NULL,
+                    activity_id TEXT NOT NULL,
+                    window_start REAL NOT NULL,
+                    uses INTEGER NOT NULL DEFAULT 0,
+                    last_used REAL NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, activity_id)
+                )"""
+            )
+            await db.execute(
+                """CREATE TABLE IF NOT EXISTS seasonal_cooldown_alerts (
+                    user_id INTEGER NOT NULL,
+                    activity_id TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    alert_sent_for REAL NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, activity_id)
+                )"""
+            )
+
+            for activity_id in activity_ids:
+                alert_sent_for = 0.0
+                if enabled:
+                    async with db.execute(
+                        """SELECT window_start, uses, last_used
+                           FROM seasonal_activity_usage
+                           WHERE user_id = ? AND activity_id = ?""",
+                        (user_id, activity_id),
+                    ) as cursor:
+                        usage = await cursor.fetchone()
+                    if usage:
+                        window_start, uses, last_used = usage
+                        if uses >= SEASONAL_ACTIVITY_ATTEMPT_LIMIT:
+                            event_key = window_start
+                            available_at = window_start + SEASONAL_ACTIVITY_CYCLE_SECONDS
+                        elif last_used:
+                            event_key = last_used
+                            available_at = last_used + SEASONAL_ACTIVITY_COOLDOWN_SECONDS
+                        else:
+                            event_key = 0.0
+                            available_at = 0.0
+                        # Suppress notifications for cooldowns that had already
+                        # finished before the player opted in.
+                        if event_key and now >= available_at:
+                            alert_sent_for = event_key
+
+                await db.execute(
+                    """INSERT INTO seasonal_cooldown_alerts
+                       (user_id, activity_id, enabled, alert_sent_for)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(user_id, activity_id) DO UPDATE SET
+                           enabled = excluded.enabled,
+                           alert_sent_for = excluded.alert_sent_for""",
+                    (user_id, activity_id, int(enabled), alert_sent_for),
+                )
+            await db.commit()
+
+        activity_names = [SEASONAL_ALERT_ACTIVITIES[item][0] for item in activity_ids]
+        selection = " and ".join(activity_names)
+        if enabled:
+            await ctx.send(
+                f"**Seasonal alerts on!** You’ll be mentioned in the Exploration channel "
+                f"when the {selection} cooldown finishes or its attempts refresh."
+            )
+        else:
+            await ctx.send(
+                f"**Seasonal alerts off.** You won’t receive cooldown alerts for {selection}."
             )
 
     async def maybe_suggest_cooldown_alerts(self, ctx):
