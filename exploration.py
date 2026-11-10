@@ -545,7 +545,7 @@ class Exploration(commands.Cog):
                         last_scavenged,
                         mining_alert_sent,
                         scavenge_alert_sent,
-                        active_effects_raw
+                        active_effects AS active_effects_raw
                     FROM users
                     WHERE cooldown_alerts = 1
                       AND (
