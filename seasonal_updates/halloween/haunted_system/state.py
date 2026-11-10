@@ -2,6 +2,7 @@
 
 import json
 import random
+from typing import Any
 
 from pets import get_active_pet_effects
 
@@ -472,7 +473,7 @@ async def start_run(db, user_id, location_id, sanity):
     return total_stages
 
 
-async def get_active_run(db, user_id):
+async def get_active_run(db, user_id: int) -> dict[str, Any] | None:
     await ensure_haunted_schema(db)
     async with db.execute(
         """

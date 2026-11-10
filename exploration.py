@@ -50,7 +50,6 @@ from seasonal_updates.halloween.haunted_system import (
     clear_run,
     consume_attempt,
     grant_haunted_completion_rewards,
-    get_active_run,
     get_or_create_profile,
     is_insane,
     render_scene,
@@ -59,6 +58,7 @@ from seasonal_updates.halloween.haunted_system import (
     start_run,
     update_sanity,
 )
+from seasonal_updates.halloween.haunted_system.state import get_active_run
 
 COOLDOWN_ALERT_CHANNEL_ID = 1548034265508356166
 
