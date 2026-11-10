@@ -832,7 +832,11 @@ class Fortunes(commands.Cog):
                     current_streak = 1
 
             from pets.core import get_active_pet_effects
-            pet_effects = await get_active_pet_effects(db, user_id)
+            # Fortune streaks live in the primary database, while pet records
+            # live in the separate economy database. Don't pass the fortune DB
+            # connection to pet helpers or SQLite will report a missing pets table.
+            async with aiosqlite.connect(ECONOMY_DB_NAME) as pet_db:
+                pet_effects = await get_active_pet_effects(pet_db, user_id)
             rarity, selected_fortune = self.choose_fortune(
                 pet_effects.get("fortune_rarity_weight_bonus", 0.0)
             )
