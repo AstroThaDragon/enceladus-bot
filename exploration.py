@@ -2428,6 +2428,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             new_stardust = stardust + found_stardust + token_overflow_stardust + cache_payout
 
             pet_findings = []
+            egg_findings = []
             pet_flavor_findings = []
 
             if xenomorph_bonus_loot_pending:
@@ -2785,12 +2786,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     db, user_id, egg_id, "pet_egg", 1
                 )
                 if added_egg:
-                    pet_findings.append(
-                        f"{egg_info['emoji']} **You've found a {egg_info['name']}!** — use `/incubator Start incubation:{egg_id} tube:` to hatch it!"
+                    egg_findings.append(
+                        f"{egg_info['emoji']} **{egg_info['name']} ×1**"
                     )
                 else:
-                    pet_findings.append(
-                        f"{egg_info['emoji']} {egg_info['name']} → inventory full"
+                    egg_findings.append(
+                        f"{egg_info['emoji']} **{egg_info['name']}** found, but your Pet Egg storage is full."
                     )
 
             # Halloween resources are independent bonus rolls and never replace normal loot.
@@ -3016,6 +3017,14 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             if special_findings:
                 result_blocks.append(
                     "**Special items:** " + _format_exploration_lines(special_findings)
+                )
+            if egg_findings:
+                result_blocks.append(
+                    "🥚 **EGG DISCOVERED!**\n"
+                    + EXPLORATION_SEPARATOR
+                    + "\n"
+                    + "\n".join(egg_findings)
+                    + "\n\nOpen `/incubator`, choose **Start Incubation**, select the egg and an empty tube, then start incubation!"
                 )
             if seasonal_findings:
                 result_blocks.append(

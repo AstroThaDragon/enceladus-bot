@@ -23,7 +23,14 @@ class HarvestKitchen(commands.Cog):
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("""CREATE TABLE IF NOT EXISTS seasonal_activity_usage (
                 user_id INTEGER NOT NULL, activity_id TEXT NOT NULL, window_start REAL NOT NULL,
-                uses INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, activity_id))""")
+                uses INTEGER NOT NULL DEFAULT 0, last_used REAL NOT NULL DEFAULT 0,
+                PRIMARY KEY(user_id, activity_id))""")
+            async with db.execute("PRAGMA table_info(seasonal_activity_usage)") as cur:
+                columns = {row[1] for row in await cur.fetchall()}
+            if "last_used" not in columns:
+                await db.execute(
+                    "ALTER TABLE seasonal_activity_usage ADD COLUMN last_used REAL NOT NULL DEFAULT 0"
+                )
             await db.execute("""CREATE TABLE IF NOT EXISTS seasonal_pet_unlocks (
                 user_id INTEGER NOT NULL, pet_type TEXT NOT NULL, unlocked_at REAL NOT NULL,
                 PRIMARY KEY(user_id, pet_type))""")
@@ -32,15 +39,37 @@ class HarvestKitchen(commands.Cog):
     def _active(self): return is_autumn_active(datetime.now(ET))
 
     async def _use_slot(self, db, user_id, activity_id):
-        now=time.time(); interval=12*3600; cap=20
-        async with db.execute("SELECT window_start, uses FROM seasonal_activity_usage WHERE user_id=? AND activity_id=?",(user_id,activity_id)) as cur: row=await cur.fetchone()
+        now = time.time()
+        interval = 12 * 3600
+        cooldown = 15 * 60
+        cap = 20
+        async with db.execute(
+            "SELECT window_start, uses, last_used FROM seasonal_activity_usage WHERE user_id=? AND activity_id=?",
+            (user_id, activity_id),
+        ) as cur:
+            row = await cur.fetchone()
         if not row or now-row[0] >= interval:
-            start=now; uses=0
-            await db.execute("INSERT INTO seasonal_activity_usage(user_id,activity_id,window_start,uses) VALUES(?,?,?,0) ON CONFLICT(user_id,activity_id) DO UPDATE SET window_start=excluded.window_start, uses=0",(user_id,activity_id,start))
-        else: start,uses=row
-        if uses>=cap: return False, max(0,int(interval-(now-start)))
-        await db.execute("UPDATE seasonal_activity_usage SET uses=uses+1 WHERE user_id=? AND activity_id=?",(user_id,activity_id))
-        return True, cap-uses-1
+            start = now
+            uses = 0
+            last_used = row[2] if row else 0
+            await db.execute(
+                "INSERT INTO seasonal_activity_usage(user_id,activity_id,window_start,uses,last_used) VALUES(?,?,?,0,?) "
+                "ON CONFLICT(user_id,activity_id) DO UPDATE SET window_start=excluded.window_start, uses=0",
+                (user_id, activity_id, start, last_used),
+            )
+        else:
+            start, uses, last_used = row
+        attempts_left = max(0, cap - uses)
+        if uses >= cap:
+            return False, max(0, int(interval - (now - start))), 0, "limit"
+        cooldown_remaining = max(0, int(cooldown - (now - (last_used or 0)))) if last_used else 0
+        if cooldown_remaining:
+            return False, cooldown_remaining, attempts_left, "cooldown"
+        await db.execute(
+            "UPDATE seasonal_activity_usage SET uses=uses+1, last_used=? WHERE user_id=? AND activity_id=?",
+            (now, user_id, activity_id),
+        )
+        return True, 0, attempts_left - 1, None
 
     def _pool(self, collection):
         if collection=="autumn": return AUTUMN_INGREDIENTS
@@ -56,11 +85,20 @@ class HarvestKitchen(commands.Cog):
         name,emoji,collection=ACTIVITIES[activity_id]
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("BEGIN IMMEDIATE")
-            ok,remaining=await self._use_slot(db,interaction.user.id,activity_id)
+            ok, remaining, attempts_left, reason = await self._use_slot(
+                db, interaction.user.id, activity_id
+            )
             if not ok:
                 await db.commit()
-                embed = discord.Embed(title=f"{emoji} {name}", description=f"You're out of attempts for this 12-hour cycle. Your next cycle begins in **{remaining//3600}h {(remaining%3600)//60}m**.", color=discord.Color.orange())
-                embed.set_footer(text="Attempts left: 0/20 • Each activity resets on its own 12-hour cycle.")
+                if reason == "cooldown":
+                    minutes, seconds = divmod(remaining, 60)
+                    description = f"Your gathering grounds are still recovering. Try again in **{minutes}m {seconds}s**."
+                    footer = f"Attempts left: {attempts_left}/20 • 15-minute cooldown per activity."
+                else:
+                    description = f"You're out of attempts for this 12-hour cycle. Your next cycle begins in **{remaining//3600}h {(remaining%3600)//60}m**."
+                    footer = "Attempts left: 0/20 • Each activity resets on its own 12-hour cycle."
+                embed = discord.Embed(title=f"{emoji} {name}", description=description, color=discord.Color.orange())
+                embed.set_footer(text=footer)
                 return await interaction.response.send_message(content=interaction.user.mention, embed=embed)
             effects=await get_active_pet_effects(db,interaction.user.id)
             pool=self._pool(collection)
@@ -129,7 +167,7 @@ class HarvestKitchen(commands.Cog):
             else "You explored the harvest grounds and came back with a bounty for the feast."
         )
         embed=discord.Embed(title=f"{emoji} {name}",description=outing+"\n\n**You gathered:**\n"+"\n".join(rewards),color=discord.Color.orange())
-        embed.set_footer(text=f"Attempts left: {remaining}/20 • Egg chance: 5% • Pet treat chance: 2%")
+        embed.set_footer(text=f"Attempts left: {attempts_left}/20 • 15-minute cooldown • Egg chance: 5% • Pet treat chance: 2%")
         await interaction.response.send_message(content=interaction.user.mention, embed=embed)
 
     async def open_kitchen(self, ctx, collection="autumn"):

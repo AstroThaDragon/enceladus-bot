@@ -136,7 +136,11 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
 
     async def _owned_eggs(self, db, user_id):
-        egg_ids = ["normal_egg", "halloween_egg", "glitched_egg"]
+        egg_ids = [
+            egg_id
+            for egg_id in EGG_POOLS
+            if ITEM_REGISTRY.get(egg_id, {}).get("type") == "Pet Egg"
+        ]
         placeholders = ",".join("?" for _ in egg_ids)
         async with db.execute(
             f"""
