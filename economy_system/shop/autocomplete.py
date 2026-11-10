@@ -197,6 +197,7 @@ class EconomyShopAutocompleteMixin:
                     }
                     or item_id in SELLABLE_ITEM_IDS
                     or item_id == "astral_essence"
+                    or info.get("event") == "autumn"
                 )
     
             def display_choice(item_id, quantity, info):
@@ -228,7 +229,7 @@ class EconomyShopAutocompleteMixin:
                 if not current or current in crystal_display.lower() or "time_crystal" in current:
                     choices.append(app_commands.Choice(name=crystal_display[:100], value="time_crystal"))
     
-            if category in {"space_junk", "collectibles", "halloween", "materials", *SELL_ITEM_CATEGORY_IDS.keys()}:
+            if category in {"space_junk", "collectibles", "halloween", "seasonal", "materials", *SELL_ITEM_CATEGORY_IDS.keys()}:
                 for item_id, owned_quantity, stored_type in rows:
                     info = ITEM_REGISTRY.get(item_id)
                     if not info:
@@ -249,6 +250,8 @@ class EconomyShopAutocompleteMixin:
                     if category == "collectibles" and not normal_collectible:
                         continue
                     if category == "halloween" and not halloween:
+                        continue
+                    if category == "seasonal" and info.get("event") != "autumn":
                         continue
                     if category == "materials" and (
                         item_type not in {"Mineral", "Crafting Material", "Incubator Material"}

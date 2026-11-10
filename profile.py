@@ -32,6 +32,8 @@ BACKGROUND_ARTISTS = {
     "background_corrupted_reality": "Egor Komarov on Unsplash",
     "background_quantum_genesis": "Brecht Corbell on Unsplash",
     "background_astral_foundry": "Michael Pointner on Unsplash",
+    "background_autumn_kitchen": "@emilywelchstyle on Instagram",
+    "background_thanksgiving_feast": "Emma Eriksson on Unsplash",
 }
 
 BACKGROUND_COLLECTIONS = {
@@ -67,6 +69,11 @@ BACKGROUND_COLLECTIONS = {
             "background_quantum_genesis",
             "background_astral_foundry",
         ],
+    },
+    "autumn": {
+        "label": "Autumn & Thanksgiving 🍂",
+        "emoji": "🍂",
+        "items": ["background_autumn_kitchen", "background_thanksgiving_feast"],
     },
 }
 
@@ -154,6 +161,14 @@ BACKGROUND_COLLECTION_INFO = {
     "background_astral_foundry": {
         "name": "The Astral Foundry", "emoji": "🌌",
         "obtained": "Master all upgrades on **all three incubator tubes**.",
+    },
+    "background_autumn_kitchen": {
+        "name": "Autumn Kitchen", "emoji": "🥧",
+        "obtained": "Cook **10 Autumn recipes**.",
+    },
+    "background_thanksgiving_feast": {
+        "name": "Thanksgiving Feast", "emoji": "🦃",
+        "obtained": "Cook **10 Thanksgiving recipes**.",
     },
 }
 
@@ -287,13 +302,19 @@ class BackgroundCollectionView(discord.ui.View):
                 label="Halloween", emoji="🎃",
                 style=discord.ButtonStyle.primary
             )
+            autumn = discord.ui.Button(
+                label="Autumn & Thanksgiving", emoji="🍂",
+                style=discord.ButtonStyle.primary
+            )
             back = discord.ui.Button(
                 label="Back", emoji="↩️",
                 style=discord.ButtonStyle.secondary
             )
             halloween.callback = self._halloween_callback
+            autumn.callback = self._autumn_callback
             back.callback = self._back_main_callback
             self.add_item(halloween)
+            self.add_item(autumn)
             self.add_item(back)
             return
 
@@ -412,6 +433,12 @@ class BackgroundCollectionView(discord.ui.View):
 
     async def _halloween_callback(self, interaction):
         self.section = "halloween"
+        self.page = 0
+        self._refresh_items()
+        await self._update(interaction)
+
+    async def _autumn_callback(self, interaction):
+        self.section = "autumn"
         self.page = 0
         self._refresh_items()
         await self._update(interaction)
@@ -897,6 +924,8 @@ class Profile(commands.Cog):
             "background_watched_from_the_trees": "Watched From the Trees",
             "background_haunted_item_collector": "Haunted Item Collector",
             "background_corrupted_reality": "CORRUPTED REALITY",
+            "background_autumn_kitchen": "Autumn Kitchen",
+            "background_thanksgiving_feast": "Thanksgiving Feast",
         }
 
 
@@ -952,6 +981,8 @@ class Profile(commands.Cog):
                 "background_watched_from_the_trees": "🌲",
                 "background_haunted_item_collector": "🔧",
                 "background_corrupted_reality": "💾",
+                "background_autumn_kitchen": "🥧",
+                "background_thanksgiving_feast": "🦃",
             }.get(item_id, "🖼️")
 
             choices.append(
@@ -1037,7 +1068,9 @@ class Profile(commands.Cog):
             "background_dead_end": "Dead-End",
             "background_watched_from_the_trees": "Watched From the Trees",
             "background_haunted_item_collector": "Haunted Item Collector",
-            "background_corrupted_reality": "CORRUPTED REALITY"
+            "background_corrupted_reality": "CORRUPTED REALITY",
+            "background_autumn_kitchen": "Autumn Kitchen",
+            "background_thanksgiving_feast": "Thanksgiving Feast",
         }
 
         if background not in valid_backgrounds:

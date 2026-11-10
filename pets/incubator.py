@@ -7,9 +7,6 @@ import aiosqlite
 import discord
 from discord.ext import commands
 
-from typing import cast
-from achievements import Achievements
-
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
 from .variants import (
@@ -21,7 +18,6 @@ from .variants import (
     get_hatched_variant_chance, get_effective_hatch_variant_weights, get_variant_roll_pool,
 )
 from typing import TYPE_CHECKING
-from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from achievements import Achievements
@@ -374,7 +370,7 @@ class PetIncubatorMixin:
             await db.execute("UPDATE users SET stardust = stardust - ? WHERE user_id = ?", (cost, user_id))
             await db.commit()
 
-            achievements_cog = cast(Achievements | None, self.bot.get_cog("Achievements"))
+            achievements_cog = self.bot.get_cog("Achievements")
             if achievements_cog:
                 await achievements_cog.record_incubator_upgrade(user_id, tube_id, levels, db=db, channel=channel)
                 await db.commit()
@@ -536,10 +532,7 @@ class PetIncubatorMixin:
                     f"pet_variant:{pet_type}:{variant_id}",
                     category="Pet Variants",
                 )
-                if achievements_cog := cast(
-                    Achievements | None,
-                    self.bot.get_cog("Achievements"),
-                ):
+                if achievements_cog := self.bot.get_cog("Achievements"):
                     add_variant_progress = getattr(
                         achievements_cog,
                         "add_variant_discovery_progress",
@@ -566,10 +559,7 @@ class PetIncubatorMixin:
                 (row[0],),
             )
 
-            achievements_cog = cast(
-                Achievements | None,
-                self.bot.get_cog("Achievements"),
-            )
+            achievements_cog = self.bot.get_cog("Achievements")
             if achievements_cog:
                 # The Halloween hatch achievement is specifically for Halloween Eggs.
                 # Glitched Eggs have their own achievement chain.

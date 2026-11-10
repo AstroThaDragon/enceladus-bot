@@ -117,6 +117,7 @@ SHOP_CATEGORY_INFO = {
     "materials": ("🔧", "Ores & Materials", "Sell ores and normal crafting materials."),
     "collectibles": ("🎃", "Collectibles", "Sell discovered collectible items."),
     "halloween": ("👻", "Halloween", "Sell eligible seasonal items."),
+    "seasonal": ("🍂", "Autumn & Thanksgiving", "Sell Autumn Harvest and Thanksgiving ingredients, treats, and prepared foods."),
     "upgrade_kits": ("🛠️", "Upgrade Kits", "Actual crafted kits used for permanent upgrades."),
     "defense_weapons": ("🛡️", "Defense Weapons", "Items that can help protect you from scavenging hazards."),
 }
@@ -165,6 +166,7 @@ SHOP_SELL_CATEGORY_CHOICES = [
     ("🛡️ Defense Weapons", "defense_weapons"),
     ("🎃 Collectibles", "collectibles"),
     ("👻 Halloween", "halloween"),
+    ("🍂 Autumn & Thanksgiving", "seasonal"),
     ("✨ Special Items", "special"),
 ]
 

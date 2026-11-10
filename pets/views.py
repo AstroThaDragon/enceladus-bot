@@ -655,6 +655,14 @@ class PetCollectionView(discord.ui.View):
     async def haunted(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._open_category(interaction, "haunted")
 
+    @discord.ui.button(label="🍂 Autumn Pets", style=discord.ButtonStyle.primary, row=2)
+    async def autumn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "autumn")
+
+    @discord.ui.button(label="🦃 Thanksgiving Pets", style=discord.ButtonStyle.primary, row=2)
+    async def thanksgiving(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_category(interaction, "thanksgiving")
+
 
 class PetGroupSelect(discord.ui.Select):
     """Select one grouped pet entry and open an individual copy for management."""

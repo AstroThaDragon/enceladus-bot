@@ -347,7 +347,7 @@ class Fortunes(commands.Cog):
 
         return fortunes
 
-    def choose_fortune(self):
+    def choose_fortune(self, rarity_weight_bonus: float = 0.0):
         fortunes = self.load_fortunes()
         active_event = self.get_active_event()
 
@@ -368,9 +368,14 @@ class Fortunes(commands.Cog):
 
         weights = event_weights.get(active_event or "", RARITY_WEIGHTS)
 
+        rarity_order = {"common": 0, "uncommon": 1, "rare": 2, "legendary": 3, "void": 4}
+        adjusted_weights = [
+            weight * (1 + max(0.0, rarity_weight_bonus) * rarity_order.get(rarity, 0))
+            for rarity, weight in weights.items()
+        ]
         rarity = random.choices(
             population=list(weights.keys()),
-            weights=list(weights.values()),
+            weights=adjusted_weights,
             k=1
         )[0]
 
@@ -826,7 +831,11 @@ class Fortunes(commands.Cog):
                 else:
                     current_streak = 1
 
-            rarity, selected_fortune = self.choose_fortune()
+            from pets.core import get_active_pet_effects
+            pet_effects = await get_active_pet_effects(db, user_id)
+            rarity, selected_fortune = self.choose_fortune(
+                pet_effects.get("fortune_rarity_weight_bonus", 0.0)
+            )
 
             stat_mood = STAT_MOODS.get(rarity, "neutral")
             stats = self.generate_fortune_stats(stat_mood)

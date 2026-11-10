@@ -544,7 +544,8 @@ class Exploration(commands.Cog):
                         last_mined,
                         last_scavenged,
                         mining_alert_sent,
-                        scavenge_alert_sent
+                        scavenge_alert_sent,
+                        active_effects_raw
                     FROM users
                     WHERE cooldown_alerts = 1
                       AND (
@@ -560,20 +561,24 @@ class Exploration(commands.Cog):
                     last_mined,
                     last_scavenged,
                     mining_alert_sent,
-                    scavenge_alert_sent
+                    scavenge_alert_sent,
+                    active_effects_raw
                 ) in users:
                     # The actual exploration cooldown can be shortened by the
                     # user's active pet, so alerts must use the same effective
                     # cooldown as /mine and /scavenge.
                     pet_effects = await get_active_pet_effects(db, user_id)
-                    effective_cooldown = self.COOLDOWN_SECONDS * (
-                        1 - pet_effects.get("cooldown_reduction", 0.0)
-                    )
+                    active_effects = json.loads(active_effects_raw or "{}")
+                    pet_cooldown_reduction = pet_effects.get("cooldown_reduction", 0.0)
+                    mining_reduction = min(0.8, pet_cooldown_reduction + float(active_effects.get("seasonal_coffee_mining_cooldown", 0.0) or 0.0))
+                    scavenge_reduction = min(0.8, pet_cooldown_reduction + float(active_effects.get("seasonal_coffee_scavenge_cooldown", 0.0) or 0.0))
+                    mining_cooldown = self.COOLDOWN_SECONDS * (1 - mining_reduction)
+                    scavenge_cooldown = self.COOLDOWN_SECONDS * (1 - scavenge_reduction)
 
                     # Mining cooldown
                     if (
                         last_mined
-                        and current_time - last_mined >= effective_cooldown
+                        and current_time - last_mined >= mining_cooldown
                         and mining_alert_sent != last_mined
                     ):
                         try:
@@ -596,7 +601,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     # Scavenging cooldown
                     if (
                         last_scavenged
-                        and current_time - last_scavenged >= effective_cooldown
+                        and current_time - last_scavenged >= scavenge_cooldown
                         and scavenge_alert_sent != last_scavenged
                     ):
                         try:
@@ -664,6 +669,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
     @app_commands.choices(
         event=[
             app_commands.Choice(name="Haunted", value="haunted"),
+            app_commands.Choice(name="Autumn Harvest", value="autumn_harvest"),
+            app_commands.Choice(name="Thanksgiving Gathering", value="thanksgiving_gathering"),
         ],
         action=[
             app_commands.Choice(name="Info", value="info"),
@@ -675,6 +682,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
         event: str,
         action: str | None = None,
     ):
+        if event in {"autumn_harvest", "thanksgiving_gathering"}:
+            seasonal_cog = self.bot.get_cog("HarvestKitchen")
+            if seasonal_cog is None:
+                return await interaction.response.send_message("The seasonal gathering system is temporarily unavailable.", ephemeral=True)
+            return await seasonal_cog.gather(interaction, event)
+
         if event == "haunted" and action == "info":
             if not is_halloween_channel(interaction.channel):
                 return await interaction.response.send_message(
@@ -1571,7 +1584,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             mining_upgrade = await upgrade_cog.get_effects(user_id, "mining") if upgrade_cog else {"level": 0, "max_charges": 10, "stardust_mult": 1.0, "rare_bonus": 0.0}
             # Space Dragon grants +3 maximum Mining charges at passive level 5.
             max_mining_charges = mining_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
-            mining_rare_bonus = mining_upgrade.get("rare_bonus", 0.0) + kolossos_next_loot_bonus
+            mining_rare_bonus = (mining_upgrade.get("rare_bonus", 0.0) + kolossos_next_loot_bonus
+                                 + pet_effects.get("mining_rare_discovery_bonus", 0.0))
 
             if hp <= 0:
                 return await ctx.send(self.knockout_message(knocked_out_until or "tomorrow", ctx.author.mention))
@@ -1597,9 +1611,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             elapsed = current_time - last_mined
 
-            effective_cooldown = self.COOLDOWN_SECONDS * (
-                1 - pet_effects["cooldown_reduction"]
+            mining_cooldown_reduction = min(
+                0.8,
+                pet_effects["cooldown_reduction"]
+                + float(effects.get("seasonal_coffee_mining_cooldown", 0.0) or 0.0),
             )
+            effective_cooldown = self.COOLDOWN_SECONDS * (1 - mining_cooldown_reduction)
 
             if elapsed < effective_cooldown:
                 remaining = int(effective_cooldown - elapsed)
@@ -1612,6 +1629,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     f"{ctx.author.mention} **Your laser is depleted!** You are out of fuel charges. "
                     "Visit the shop for a refill item, or wait until daily reset at 12:00AM EST!"
                 )
+
+            effects.pop("seasonal_coffee_mining_cooldown", None)
 
             # --- TIERED LOOT ROLL ---
             roll = 0.70 if effects.pop("ore_magnet", False) else random.random()
@@ -1684,6 +1703,10 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             for material_id, material_name, chance in MINING_MATERIALS:
                 if random.random() < chance:
                     amount_found = random.randint(1, 5)
+                    material_quantity_bonus = pet_effects.get("material_quantity_bonus", 0.0)
+                    if material_quantity_bonus and random.random() < material_quantity_bonus:
+                        amount_found += 1
+                        mining_pet_flavor_findings.append(get_pet_passive_message(pet_effects, "material_quantity_bonus"))
                     if pet_effects["material_bonus"] and random.random() < pet_effects["material_bonus"]:
                         amount_found += 1
                         mining_pet_flavor_findings.append(
@@ -2028,7 +2051,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
                 rarity_badge = "legendary"
 
-            pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
+            mining_pet_xp = int(roll_normal_exploration_pet_xp() * (1 + pet_effects.get("xp_bonus", 0.0)))
+            pet_xp_result = await add_pet_xp(db, user_id, mining_pet_xp)
 
             calibration_update = await advance_calibration(
                 db, user_id, "mining", current_date.isoformat()
@@ -2209,7 +2233,7 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
             # Space Dragon grants +3 maximum Scavenging charges at passive level 5.
             max_scavenge_charges = scavenging_upgrade["max_charges"] + pet_effects.get("extra_charge_count", 0)
             scavenging_rare_bonus = scavenging_upgrade.get("rare_bonus", 0.0)
-            scavenging_rare_bonus += kolossos_next_loot_bonus
+            scavenging_rare_bonus += kolossos_next_loot_bonus + pet_effects.get("scavenging_rare_discovery_bonus", 0.0)
             salvage_bonus_chance = max(0.0, salvage_upgrade.get("bonus_chance", 0.0))
 
             # Daily charge reset: charges refresh to 10 once per calendar day.
@@ -2233,9 +2257,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             elapsed = current_time - last_scavenged
 
-            effective_cooldown = self.COOLDOWN_SECONDS * (
-                1 - pet_effects["cooldown_reduction"]
+            scavenge_cooldown_reduction = min(
+                0.8,
+                pet_effects["cooldown_reduction"]
+                + float(effects.get("seasonal_coffee_scavenge_cooldown", 0.0) or 0.0),
             )
+            effective_cooldown = self.COOLDOWN_SECONDS * (1 - scavenge_cooldown_reduction)
 
             # Health Knockout Check
             if hp <= 0:
@@ -2249,6 +2276,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
 
             if charges <= 0:
                 return await ctx.send(f"{ctx.author.mention} **Your drone battery is depleted!** You are out of scavenge charges. Visit the shop for a recharge item, or wait until daily reset at 12:00AM EST.")
+
+            effects.pop("seasonal_coffee_scavenge_cooldown", None)
 
             junk_items = {
                 "space_pizza": "Dehydrated Space Pizza (slightly freezer-burned) 🍕",
@@ -2598,6 +2627,34 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                         f"{bonus_item_name} → Inventory Full (+{overflow_stardust:,} Stardust)"
                     )
 
+            # Autumn pets can discover seasonal ingredients during scavenging.
+            # Their drops are separate from the normal Space Junk reward.
+            ingredient_chance = pet_effects.get("autumn_ingredient_discovery_bonus", 0.0)
+            if ingredient_chance or pet_effects.get("acorn_discovery_bonus", 0.0):
+                from seasonal_updates.autumn.autumn import AUTUMN_INGREDIENTS, is_autumn_active
+                from zoneinfo import ZoneInfo
+                if is_autumn_active(datetime.now(ZoneInfo("America/New_York"))):
+                    if random.random() < min(1.0, ingredient_chance):
+                        ingredient_id = random.choice(list(AUTUMN_INGREDIENTS))
+                        ingredient_info = AUTUMN_INGREDIENTS[ingredient_id]
+                        added_ingredient, _, _ = await add_inventory_item(
+                            db, user_id, ingredient_id, "Event Items", 1
+                        )
+                        if added_ingredient:
+                            seasonal_findings.append(f"{ingredient_info.get('emoji', '🍂')} {ingredient_info.get('name', ingredient_id)} ×{added_ingredient}")
+                    if "acorns" in AUTUMN_INGREDIENTS and random.random() < min(1.0, pet_effects.get("acorn_discovery_bonus", 0.0)):
+                        added_acorns, _, _ = await add_inventory_item(db, user_id, "acorns", "Event Items", 1)
+                        if added_acorns:
+                            seasonal_findings.append(f"🌰 Acorns ×{added_acorns}")
+
+            extra_reward_chance = min(1.0, pet_effects.get("extra_scavenge_reward_chance", 0.0)
+                                      + pet_effects.get("scavenging_reward_bonus", 0.0))
+            if extra_reward_chance and random.random() < extra_reward_chance:
+                bonus_item_id, bonus_item_name = random.choice(list(junk_items.items()))
+                bonus_added, _, _ = await add_inventory_item(db, user_id, bonus_item_id, "space_junk", 1)
+                if bonus_added:
+                    pet_findings.append(f"{bonus_item_name} ×{bonus_added}")
+
             # MissingNo. rarely corrupts the current scavenging reward data.
             if pet_effects.get("missingno_error", 0.0) and random.random() < pet_effects.get("missingno_error", 0.0):
                 glitch_roll = random.random()
@@ -2809,6 +2866,12 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                     )
                     if material_bonus_triggered:
                         amount_found += random.randint(1, 3)
+                    material_quantity_bonus = pet_effects.get("material_quantity_bonus", 0.0)
+                    if material_quantity_bonus and random.random() < material_quantity_bonus:
+                        amount_found += 1
+                    rare_quantity_bonus = pet_effects.get("rare_material_extra_quantity", 0)
+                    if rare_quantity_bonus and random.random() < pet_effects.get("scavenging_rare_discovery_bonus", 0.0):
+                        amount_found += int(rare_quantity_bonus)
                     added_material, material_quantity, material_max = await add_inventory_item(
                         db, user_id, material_id, "crafting_material", amount_found
                     )
@@ -2969,7 +3032,8 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 else ""
             )
 
-            pet_xp_result = await add_pet_xp(db, user_id, roll_normal_exploration_pet_xp())
+            scavenging_pet_xp = int(roll_normal_exploration_pet_xp() * (1 + pet_effects.get("xp_bonus", 0.0)))
+            pet_xp_result = await add_pet_xp(db, user_id, scavenging_pet_xp)
 
             calibration_update = await advance_calibration(
                 db, user_id, "scavenging", current_date.isoformat()

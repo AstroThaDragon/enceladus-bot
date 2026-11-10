@@ -5,6 +5,8 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from seasonal_updates.halloween.halloween import get_collectibles as get_halloween_collectibles
+from seasonal_updates.autumn.autumn import AUTUMN_RECIPES
+from seasonal_updates.autumn.thanksgiving import THANKSGIVING_RECIPES
 from inventory import HALLOWEEN_SPECIAL_USE_ITEMS, ITEM_REGISTRY
 
 # ---------------------------------------------------------------------------
@@ -183,7 +185,35 @@ for _item_id, _data in LOCATION_BASED_COLLECTIBLES.items():
 
 
 def get_all_halloween_collectibles():
-    return get_halloween_collectibles() + LOCATION_BASED_COLLECTIBLE_ENTRIES
+    return (
+        get_halloween_collectibles()
+        + LOCATION_BASED_COLLECTIBLE_ENTRIES
+        + AUTUMN_KITCHEN_COLLECTIBLE_ENTRIES
+        + THANKSGIVING_KITCHEN_COLLECTIBLE_ENTRIES
+    )
+
+
+def _recipe_collectible_entries(recipes, collection_name):
+    return [
+        (
+            item_id,
+            recipe["name"],
+            recipe.get("emoji", ITEM_REGISTRY.get(item_id, {}).get("emoji", "🍽️")),
+            recipe.get(
+                "description",
+                f"A freshly prepared {collection_name} recipe from the seasonal kitchen.",
+            ),
+        )
+        for item_id, recipe in recipes.items()
+    ]
+
+
+AUTUMN_KITCHEN_COLLECTIBLE_ENTRIES = _recipe_collectible_entries(
+    AUTUMN_RECIPES, "Autumn"
+)
+THANKSGIVING_KITCHEN_COLLECTIBLE_ENTRIES = _recipe_collectible_entries(
+    THANKSGIVING_RECIPES, "Thanksgiving"
+)
 
 
 async def ensure_collectible_tables(db):
@@ -357,6 +387,8 @@ class Collectibles(commands.Cog):
         categories = {
             "Halloween - Lair of Frights Collectibles": get_halloween_collectibles(),
             "Halloween - Haunted Location Collectibles": LOCATION_BASED_COLLECTIBLE_ENTRIES,
+            "Autumn Kitchen Foods & Drinks": AUTUMN_KITCHEN_COLLECTIBLE_ENTRIES,
+            "Thanksgiving Kitchen Foods & Drinks": THANKSGIVING_KITCHEN_COLLECTIBLE_ENTRIES,
         }
 
         pages = []

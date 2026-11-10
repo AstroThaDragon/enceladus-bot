@@ -70,6 +70,7 @@ class EconomyShopSellingMixin:
                     sellable = bool(int(info.get("sell_price", 0) or 0)) and (
                         item_type in {"Mineral", "Crafting Material", "Haunted Ingredient", "Location-Based Collectible", "Collectible"}
                         or item_id in SELLABLE_ITEM_IDS
+                        or info.get("event") == "autumn"
                     )
                 if not sellable:
                     continue
@@ -498,6 +499,7 @@ class EconomyShopSellingMixin:
                         }
                         and not is_upgrade_kit
                         and target_item not in SELLABLE_ITEM_IDS
+                        and info.get("event") != "autumn"
                         and target_item != "astral_essence"
                     ):
                         await db.rollback()

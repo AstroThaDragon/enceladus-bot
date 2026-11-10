@@ -9,6 +9,8 @@ from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
 from inventory import add_inventory_item, ITEM_REGISTRY
+from seasonal_updates.autumn.autumn import AUTUMN_PET_TREATS
+from seasonal_updates.autumn.thanksgiving import THANKSGIVING_PET_TREATS
 from .variants import (
     ASTRAL_ESSENCE_ID, ASTRAL_ESSENCE_NAME, ASTRAL_ESSENCE_EMOJI,
     FUSION_COSTS, VARIANT_HUNT_COST, FUSION_LEVEL_GATES,
@@ -34,6 +36,10 @@ class PetManagementMixin:
             "pet_snack": PET_TREAT_XP,
             "halloween_pet_candy": HALLOWEEN_PET_CANDY_XP,
         }
+        xp_amounts.update({
+            treat_id: HALLOWEEN_PET_CANDY_XP
+            for treat_id in (*AUTUMN_PET_TREATS, *THANKSGIVING_PET_TREATS)
+        })
         if treat not in xp_amounts:
             return None, "❌ That isn't a valid pet treat."
         if not isinstance(quantity, int) or quantity < 1 or quantity > 99:

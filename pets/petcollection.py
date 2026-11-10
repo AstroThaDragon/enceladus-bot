@@ -8,6 +8,8 @@ from .config import (
     HALLOWEEN_PETS,
     HAUNTED_PETS,
     GLITCHED_PETS,
+    _AUTUMN_PETS,
+    _THANKSGIVING_PETS,
 )
 from .variants import (
     NORMAL_PET_TYPES,
@@ -87,6 +89,16 @@ def build_collection_categories():
     categories["👻 Haunted Pets"] = [
         _pet_entry(pet_type, HAUNTED_PETS[pet_type])
         for pet_type in sorted(HAUNTED_PETS)
+    ]
+
+    categories["🍂 Autumn Pets"] = [
+        _pet_entry(pet_type, _AUTUMN_PETS[pet_type])
+        for pet_type in sorted(_AUTUMN_PETS)
+    ]
+
+    categories["🦃 Thanksgiving Pets"] = [
+        _pet_entry(pet_type, _THANKSGIVING_PETS[pet_type])
+        for pet_type in sorted(_THANKSGIVING_PETS)
     ]
 
     categories["💾 Glitched Pets"] = [

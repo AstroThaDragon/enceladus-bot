@@ -173,6 +173,34 @@ ACHIEVEMENTS = {
     },
 
     # -----------------------------------------------------------------------
+    # Autumn and Thanksgiving event achievements
+    # -----------------------------------------------------------------------
+    "autumn_first_gather": {
+        "name": "First Leaves",
+        "emoji": "🍂",
+        "description": "Complete an Autumn Harvest gathering run.",
+        "reward": "2,500 Stardust",
+    },
+    "thanksgiving_first_gather": {
+        "name": "Gather 'Round",
+        "emoji": "🦃",
+        "description": "Complete a Thanksgiving Gathering run.",
+        "reward": "2,500 Stardust",
+    },
+    "autumn_home_cook": {
+        "name": "A Cozy Kitchen",
+        "emoji": "🥧",
+        "description": "Cook 10 Autumn recipes.",
+        "reward": "7,500 Stardust + Autumn Kitchen profile background",
+    },
+    "thanksgiving_feast": {
+        "name": "A Feast to Remember",
+        "emoji": "🍽️",
+        "description": "Cook 10 Thanksgiving recipes.",
+        "reward": "7,500 Stardust + Thanksgiving Feast profile background",
+    },
+
+    # -----------------------------------------------------------------------
     # Incubator upgrade achievements
     # -----------------------------------------------------------------------
     "incubator_first_upgrade": {
@@ -442,6 +470,56 @@ class Achievements(commands.Cog):
                 await channel.send(content=f"<@{int(user_id)}>", embed=embed)
             except (discord.Forbidden, discord.HTTPException):
                 continue
+
+    async def record_autumn_action(self, user_id, action, db=None, channel=None):
+        """Track Autumn and Thanksgiving gathering or cooking milestones."""
+        milestones = {
+            "autumn_gathering": ("autumn_gathering", 1, "autumn_first_gather", 2_500, None),
+            "thanksgiving_gathering": ("thanksgiving_gathering", 1, "thanksgiving_first_gather", 2_500, None),
+            "autumn_cooking": ("autumn_cooking", 10, "autumn_home_cook", 7_500, "background_autumn_kitchen"),
+            "thanksgiving_cooking": ("thanksgiving_cooking", 10, "thanksgiving_feast", 7_500, "background_thanksgiving_feast"),
+        }
+        milestone = milestones.get(action)
+        if milestone is None:
+            return []
+
+        progress_id, threshold, achievement_id, reward, background_id = milestone
+        owns_db = db is None
+        if owns_db:
+            db = await aiosqlite.connect(ECONOMY_DB_NAME)
+
+        try:
+            await ensure_achievement_tables(db)
+            await db.execute(
+                """
+                INSERT INTO achievement_progress (user_id, achievement_id, progress)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, achievement_id)
+                DO UPDATE SET progress = progress + 1
+                """,
+                (user_id, progress_id),
+            )
+            async with db.execute(
+                "SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?",
+                (user_id, progress_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+            progress = int(row[0] if row else 0)
+            unlocked = []
+            if progress >= threshold and await self._grant_haunted_achievement(
+                db, user_id, achievement_id,
+                background_id=background_id,
+                stardust_reward=reward,
+            ):
+                unlocked.append(achievement_id)
+
+            if owns_db:
+                await db.commit()
+            await self._notify_achievement_unlocks(user_id, unlocked, channel)
+            return unlocked
+        finally:
+            if owns_db:
+                await db.close()
 
     async def add_glitched_pet_progress(self, user_id, pet_type, db=None, channel=None):
         """Record a Glitched Egg hatch and unlock the related permanent achievements."""
@@ -1177,7 +1255,7 @@ class Achievements(commands.Cog):
             half_needed = math.ceil(total * 0.5) if total else 0
 
             # All current achievements belong to the Halloween event.
-            category_name = "Lair of Frights - Halloween Event 👻"
+            category_name = "Seasonal Events 🎃🍂"
             category_fields = []
 
             haunted_crafting_ids = {
@@ -1227,6 +1305,23 @@ class Achievements(commands.Cog):
                         bag_row = await cursor.fetchone()
                     bag_progress = min(bag_row[0] if bag_row else 0, 25)
                     progress = f"Progress: **{bag_progress}/25**"
+                elif achievement_id in {"autumn_first_gather", "thanksgiving_first_gather"}:
+                    progress_id = "autumn_gathering" if achievement_id == "autumn_first_gather" else "thanksgiving_gathering"
+                    async with db.execute(
+                        "SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?",
+                        (user_id, progress_id),
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    progress = f"Progress: **{min(row[0] if row else 0, 1)}/1**"
+                elif achievement_id in {"autumn_home_cook", "thanksgiving_feast"}:
+                    progress_id = "autumn_cooking" if achievement_id == "autumn_home_cook" else "thanksgiving_cooking"
+                    target = 10
+                    async with db.execute(
+                        "SELECT progress FROM achievement_progress WHERE user_id = ? AND achievement_id = ?",
+                        (user_id, progress_id),
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    progress = f"Progress: **{min(row[0] if row else 0, target)}/{target}**"
                 elif achievement_id in {v[0] for v in HAUNTED_DISCOVERY_ACHIEVEMENTS.values()}:
                     location_id = next(k for k, v in HAUNTED_DISCOVERY_ACHIEVEMENTS.items() if v[0] == achievement_id)
                     needed = HAUNTED_DISCOVERY_ACHIEVEMENTS[location_id][1]

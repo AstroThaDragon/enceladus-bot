@@ -2,6 +2,10 @@
 
 PET_PASSIVE_MAX_LEVEL = 5
 
+# Seasonal companions are defined alongside their seasonal collections.
+from seasonal_updates.autumn.autumn import AUTUMN_PETS as _AUTUMN_PETS, AUTUMN_PET_POOLS as _AUTUMN_PET_POOLS
+from seasonal_updates.autumn.thanksgiving import THANKSGIVING_PETS as _THANKSGIVING_PETS
+
 
 SPECIAL_PASSIVE_DEFINITIONS = {
     "dragonrider_success": {
@@ -677,7 +681,7 @@ HAUNTED_PETS = {
 }
 
 
-ALL_PETS = {**PETS, **HALLOWEEN_PETS, **GLITCHED_PETS, **HAUNTED_PETS}
+ALL_PETS = {**PETS, **HALLOWEEN_PETS, **GLITCHED_PETS, **HAUNTED_PETS, **_AUTUMN_PETS, **_THANKSGIVING_PETS}
 
 
 EGG_POOLS = {
@@ -690,6 +694,9 @@ EGG_POOLS = {
         pet_id for pet_id, pet in GLITCHED_PETS.items()
         if pet["egg"] == "glitched_egg"
     ],
+    **_AUTUMN_PET_POOLS,
+    "harvest_egg": [pet_id for pet_id, pet in _THANKSGIVING_PETS.items() if pet.get("egg") == "harvest_egg"],
+    "feast_egg": [pet_id for pet_id, pet in _THANKSGIVING_PETS.items() if pet.get("egg") == "feast_egg"],
 }
 
 

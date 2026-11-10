@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from database import ECONOMY_DB_NAME
+from seasonal_updates.autumn.autumn import is_autumn_active
 from inventory import ITEM_REGISTRY, add_inventory_item
 from seasonal_updates.halloween.workshop import WorkshopView
 from seasonal_updates.halloween.ritual_table import RitualView
@@ -854,6 +855,8 @@ class Cauldron(commands.Cog):
     @app_commands.choices(
         season=[
             app_commands.Choice(name="Halloween - Lair of Frights 🎃", value="halloween"),
+            app_commands.Choice(name="Autumn Harvest 🍂", value="autumn"),
+            app_commands.Choice(name="Thanksgiving Feast 🦃", value="thanksgiving"),
         ],
     )
     async def seasonal_crafting(
@@ -861,6 +864,18 @@ class Cauldron(commands.Cog):
         ctx: commands.Context,
         season: str,
     ):
+        if season in {"autumn", "thanksgiving"}:
+            if not is_autumn_active():
+                await ctx.send("🍂 Autumn Seasonal Crafting is dormant right now. Come back during the Autumn event!")
+                return
+            harvest_cog = self.bot.get_cog("HarvestKitchen")
+            if harvest_cog is None:
+                await ctx.send("❌ The Autumn Harvest Kitchen is not loaded. Please report this to staff.")
+                return
+            await ctx.defer()
+            await harvest_cog.open_kitchen(ctx, collection=season)
+            return
+
         if season != "halloween":
             await ctx.send("❌ That seasonal crafting event is not available right now.")
             return

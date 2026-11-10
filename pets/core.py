@@ -292,7 +292,7 @@ def get_pet_passive_message(pet_effects: dict, effect_id: str, **values) -> str:
     return f"{emoji} **{pet_name}** {line}"
 
 
-def get_passive_value(pet: dict, level: int | None = None) -> float:
+def get_passive_value(pet: dict, level: int | None = None) -> float | dict[str, float]:
     passive = pet.get("passive", {})
     values = passive.get("levels", [])
     if not values:
@@ -300,9 +300,24 @@ def get_passive_value(pet: dict, level: int | None = None) -> float:
 
     passive_level = passive_level_for_pet(level if level is not None else 1)
     index = min(len(values), passive_level) - 1
-    base_value = float(values[index])
     fusion_level = max(0, min(5, int(pet.get("fusion_level", pet.get("fusion", 0)) or 0)))
-    return base_value * (1.0 + fusion_level * 0.02)
+    multiplier = 1.0 + fusion_level * 0.02
+    base_value = values[index]
+    if isinstance(base_value, dict):
+        return {key: float(value) * multiplier for key, value in base_value.items()}
+    return float(base_value) * multiplier
+
+
+def format_passive_strength(value: float | dict[str, float]) -> str:
+    """Format scalar or multi-stat passive values for pet profile embeds."""
+    if isinstance(value, dict):
+        parts = []
+        for stat, amount in value.items():
+            label = stat.replace("_", " ").title()
+            formatted = f"{amount * 100:.1f}%" if abs(amount) < 1 else f"{amount:g}"
+            parts.append(f"{label}: {formatted}")
+        return " • ".join(parts) or "No active bonus"
+    return f"{value * 100:.1f}%" if abs(value) < 1 else f"{value:.2f}"
 
 
 async def get_active_pet(db, user_id: int):
@@ -467,6 +482,13 @@ async def get_active_pet_effects(db, user_id: int):
 
     effects["normal_effect_id"] = normal_effect_id or ""
 
+    # Multi-stat seasonal passives expose each configured stat directly to
+    # the activity that consumes it, while retaining the passive ID for UI.
+    if isinstance(normal_value, dict):
+        for stat, amount in normal_value.items():
+            if isinstance(amount, (int, float)):
+                effects[stat] = effects.get(stat, 0) + amount
+
     if normal_effect_id == "stardust_bonus":
         effects["stardust_bonus"] = normal_value
     elif normal_effect_id == "material_bonus":
@@ -563,6 +585,11 @@ async def get_active_pet_effects(db, user_id: int):
         effects["haunted_stage_reduction"] = value
     elif normal_effect_id == "haunted_malo":
         effects["haunted_malo"] = value
+
+    # Seasonal cogs consume their own passive IDs (for example sweet_tooth or
+    # sticky_fingers). Keep these values available without changing legacy keys.
+    if normal_effect_id and normal_effect_id != "seasonal_none":
+        effects[normal_effect_id] = normal_value
 
     effects["haunted_location"] = pet.get("haunted_location")
     return effects

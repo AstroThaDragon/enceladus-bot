@@ -87,6 +87,7 @@ class Enceladus(commands.Bot):
         await self.load_extension("pets.petcollection")
         await self.load_extension("inventory")
         await self.load_extension("crafting")
+        await self.load_extension("seasonal_updates.autumn.harvest_kitchen")
         await self.load_extension("upgrades")
         await self.load_extension("collectibles")
         await self.load_extension("achievements")

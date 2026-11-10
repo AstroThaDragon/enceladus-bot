@@ -196,9 +196,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     async def _egg_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
         choices = []
-        for egg_id in ("normal_egg", "halloween_egg", "glitched_egg"):
-            info = ITEM_REGISTRY.get(egg_id)
-            if not info:
+        for egg_id, info in ITEM_REGISTRY.items():
+            if info.get("type") != "Pet Egg":
                 continue
             if current and current not in f"{info['name']} {egg_id}".lower():
                 continue
@@ -296,15 +295,20 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
 
     async def _treat_autocomplete(self, interaction, current):
         current = (current or "").lower().strip()
-        treat_ids = ["pet_snack", "halloween_pet_candy"]
+        treat_ids = [
+            item_id for item_id, info in ITEM_REGISTRY.items()
+            if info.get("type") == "Pet Treat"
+        ]
+        if not treat_ids:
+            return []
         choices = []
 
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             async with db.execute(
-                """
+                f"""
                 SELECT item_id, quantity
                 FROM inventory
-                WHERE user_id = ? AND item_id IN (?, ?) AND quantity > 0
+                WHERE user_id = ? AND item_id IN ({','.join('?' for _ in treat_ids)}) AND quantity > 0
                 """,
                 (interaction.user.id, *treat_ids),
             ) as cursor:
@@ -354,6 +358,7 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
                 "name": definition["name"],
                 "emoji": definition["emoji"],
                 "description": definition["description"],
+                "egg": definition.get("egg"),
                 "nickname": nickname,
                 "level": level or 1,
                 "xp": xp or 0,
@@ -376,13 +381,20 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         passive_level = passive_level_for_pet(level)
         passive_value = get_passive_value({"passive": passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
         normal_value = get_passive_value({"passive": normal_passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
-        value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
-        normal_value_text = f"{normal_value * 100:.1f}%" if normal_value < 1 else f"{normal_value:.2f}"
+        value_text = format_passive_strength(passive_value)
+        normal_value_text = format_passive_strength(normal_value)
 
+        egg_id = ALL_PETS.get(pet["pet_type"], {}).get("egg")
         if pet["pet_type"] in HAUNTED_PETS:
             source = "Haunted Exploration"
         elif passive.get("id") and pet["pet_type"] in HALLOWEEN_PETS:
             source = "Halloween Egg"
+        elif egg_id in {"golden_egg", "leaf_patterned_egg", "acorn_egg"}:
+            source = "Autumn Egg"
+        elif egg_id in {"harvest_egg", "feast_egg"}:
+            source = "Thanksgiving Egg"
+        elif pet["pet_type"] in {"peppino", "peddito"}:
+            source = "Thanksgiving Event"
         else:
             source = "Normal Egg"
 
@@ -463,8 +475,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
         passive_level = passive_level_for_pet(level)
         passive_value = get_passive_value({"passive": passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
         normal_value = get_passive_value({"passive": normal_passive, "level": level, "fusion_level": pet.get("fusion_level", 0)}, level)
-        value_text = f"{passive_value * 100:.1f}%" if passive_value < 1 else f"{passive_value:.2f}"
-        normal_value_text = f"{normal_value * 100:.1f}%" if normal_value < 1 else f"{normal_value:.2f}"
+        value_text = format_passive_strength(passive_value)
+        normal_value_text = format_passive_strength(normal_value)
         display_name = pet["nickname"] or pet["name"]
         active_text = "⭐ **ACTIVE COMPANION**" if pet["is_active"] else "Not currently equipped"
 
@@ -564,7 +576,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             name="🍪 Treat XP",
             value=(
                 f"🍖 Pet Treat — **+{PET_TREAT_XP} XP**\n"
-                f"🎃 Halloween Pet Candy — **+{HALLOWEEN_PET_CANDY_XP} XP**"
+                f"🎃 Halloween Pet Candy — **+{HALLOWEEN_PET_CANDY_XP} XP**\n"
+                f"🍂 Autumn & Thanksgiving treats — **+{HALLOWEEN_PET_CANDY_XP} XP**"
             ),
             inline=False,
         )
@@ -836,12 +849,17 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
     def _pet_collection_category(self, pet):
         """Return the user-facing /pets category for an owned pet."""
         pet_type = pet.get("pet_type")
+        egg_id = pet.get("egg")
         if pet_type in HAUNTED_PETS:
             return "haunted"
         if pet_type in HALLOWEEN_PETS:
             return "halloween"
         if pet_type in GLITCHED_PETS:
             return "glitched"
+        if egg_id in {"golden_egg", "leaf_patterned_egg", "acorn_egg"}:
+            return "autumn"
+        if egg_id in {"harvest_egg", "feast_egg"} or pet_type in {"peppino", "peddito"}:
+            return "thanksgiving"
         return "normal"
 
 
@@ -912,6 +930,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             ("glitched", "💾 Glitched Eggs"),
             ("halloween", "🎃 Halloween Eggs"),
             ("haunted", "👻 Haunted Pets"),
+            ("autumn", "🍂 Autumn Eggs"),
+            ("thanksgiving", "🦃 Thanksgiving Eggs"),
         )
         lines = [label for _category, label in category_meta]
 
@@ -935,6 +955,8 @@ class Pets(PetManagementMixin, PetFusionMixin, PetIncubatorMixin, commands.Cog):
             "glitched": "💾 Glitched Eggs",
             "halloween": "🎃 Halloween Eggs",
             "haunted": "👻 Haunted Pets",
+            "autumn": "🍂 Autumn Eggs",
+            "thanksgiving": "🦃 Thanksgiving Eggs",
         }
         entries = self._group_owned_pets(pets, category)
         per_page = 20

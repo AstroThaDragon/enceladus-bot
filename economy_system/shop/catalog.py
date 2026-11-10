@@ -113,6 +113,7 @@ class EconomyShopCatalogMixin:
                     }
                     or item_id in SELLABLE_ITEM_IDS
                     or item_id == "astral_essence"
+                    or info.get("event") == "autumn"
                 )
     
             entries = []
@@ -163,6 +164,8 @@ class EconomyShopCatalogMixin:
                 if category == "collectibles" and not normal_collectible:
                     continue
                 if category == "halloween" and not halloween:
+                    continue
+                if category == "seasonal" and info.get("event") != "autumn":
                     continue
                 if category == "materials" and (
                     item_type not in {"Mineral", "Crafting Material", "Incubator Material"}

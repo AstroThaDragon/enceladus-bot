@@ -576,6 +576,72 @@ del _item_id, _name, _emoji, _desc
 # Seasonal Halloween crafting/healing items are registered separately from
 # Space Junk so they can be used normally without becoming collectibles.
 ITEM_REGISTRY.update(halloween_season.HALLOWEEN_ITEMS)
+# Autumn + Thanksgiving seasonal inventory. Pantry staples are intentionally not inventory items.
+from seasonal_updates.autumn.autumn import AUTUMN_ITEMS as _AUTUMN_ITEMS, AUTUMN_RECIPES as _AUTUMN_RECIPES, AUTUMN_SELL_PRICES as _AUTUMN_SELL_PRICES
+from seasonal_updates.autumn.thanksgiving import THANKSGIVING_INGREDIENTS as _THANKSGIVING_INGREDIENTS, THANKSGIVING_PET_TREATS as _THANKSGIVING_PET_TREATS, THANKSGIVING_EGGS as _THANKSGIVING_EGGS, THANKSGIVING_RECIPES as _THANKSGIVING_RECIPES, THANKSGIVING_SELL_PRICES as _THANKSGIVING_SELL_PRICES
+
+for _item_id, _item in _AUTUMN_ITEMS.items():
+    _kind = _item.get("type")
+    _inv_type = {
+    "ingredient": "Autumn Ingredient",
+    "egg": "Pet Egg",
+    "pet_treat": "Pet Treat",
+    "treat": "Autumn Food"
+}.get(str(_kind), "Event Items")
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🍂"), "max_quantity": 50 if _kind == "pet_treat" else (99 if _kind in ("ingredient", "treat") else 10), "type": _inv_type, "desc": _item.get("description", "Autumn seasonal item."), "sell_price": _AUTUMN_SELL_PRICES.get(_item_id, _item.get("sell_price", 0)), "event": "autumn"})
+
+for _item_id, _item in _THANKSGIVING_INGREDIENTS.items():
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🍁"), "max_quantity": 99, "type": "Thanksgiving Ingredient", "desc": "Thanksgiving cooking ingredient.", "sell_price": _THANKSGIVING_SELL_PRICES.get(_item_id, 25), "event": "autumn"})
+for _item_id, _item in _THANKSGIVING_PET_TREATS.items():
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🐾"), "max_quantity": 50, "type": "Pet Treat", "desc": _item.get("description", "A seasonal treat for your pet."), "sell_price": _THANKSGIVING_SELL_PRICES.get(_item_id, 100), "event": "autumn"})
+for _item_id, _item in _THANKSGIVING_EGGS.items():
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🥚"), "max_quantity": 10, "type": "Pet Egg", "desc": "A seasonal egg containing a Thanksgiving companion.", "sell_price": _THANKSGIVING_SELL_PRICES.get(_item_id, 0), "event": "autumn"})
+for _item_id, _item in _AUTUMN_RECIPES.items():
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🍽️"), "max_quantity": 25, "type": "Autumn Food", "desc": "A prepared Autumn dish made in the Harvest Kitchen.", "sell_price": _AUTUMN_SELL_PRICES.get(_item_id, 150), "event": "autumn"})
+for _item_id, _item in _THANKSGIVING_RECIPES.items():
+    ITEM_REGISTRY.setdefault(_item_id, {"name": _item["name"], "emoji": _item.get("emoji", "🍽️"), "max_quantity": 25, "type": "Thanksgiving Food", "desc": "A prepared Thanksgiving dish made in the Harvest Kitchen.", "sell_price": _THANKSGIVING_SELL_PRICES.get(_item_id, 150), "event": "autumn"})
+
+# Apply seasonal stack caps even if a recipe or treat already had a registry entry.
+for _item_id, _item in _AUTUMN_ITEMS.items():
+    if _item.get("type") == "pet_treat" and _item_id in ITEM_REGISTRY:
+        ITEM_REGISTRY[_item_id]["max_quantity"] = 50
+for _item_id in _THANKSGIVING_PET_TREATS:
+    if _item_id in ITEM_REGISTRY:
+        ITEM_REGISTRY[_item_id]["max_quantity"] = 50
+for _item_id in (*_AUTUMN_RECIPES, *_THANKSGIVING_RECIPES):
+    if _item_id in ITEM_REGISTRY:
+        ITEM_REGISTRY[_item_id]["max_quantity"] = 25
+
+# Ensure explicit seasonal sale values are applied even if a previous registry
+# entry was created before the seasonal modules were imported.
+for _item_id, _price in {**_AUTUMN_SELL_PRICES, **_THANKSGIVING_SELL_PRICES}.items():
+    if _item_id in ITEM_REGISTRY:
+        ITEM_REGISTRY[_item_id]["sell_price"] = _price
+
+# Seasonal kitchen foods are usable healing items. Coffee-based drinks also
+# prepare one cooldown boost for each exploration activity.
+SEASONAL_FOOD_HEALING = {
+    "pumpkin_spice_latte": 8, "caramel_apple_cider": 10,
+    "pumpkin_frappuccino": 8, "chai_latte": 10,
+    "pumpkin_pie": 12, "autumn_harvest_bisque": 20,
+    "warm_chili": 20, "pumpkin_bread": 12, "maple_pecan_pie": 14,
+    "cinnamon_roll": 10, "apple_cider_donut": 10, "pumpkin_cookies": 8,
+    "roasted_thanksgiving_turkey": 25, "creamy_mashed_potatoes": 16,
+    "herb_stuffing": 15, "sweet_potato_casserole": 14,
+    "cranberry_sauce": 8, "corn_on_the_cob": 10,
+    "seasoned_roasted_carrots": 10, "pumpkin_cheesecake": 14,
+    "cranberry_spritzer": 8, "pumpkin_spice_hot_chocolate": 10,
+    "maple_cinnamon_latte": 8, "thanksgiving_tower_pizza": 20,
+}
+SEASONAL_COFFEE_DRINKS = {
+    "pumpkin_spice_latte", "pumpkin_frappuccino", "maple_cinnamon_latte",
+}
+SEASONAL_COFFEE_COOLDOWN_BONUS = 0.20
+SEASONAL_COFFEE_EFFECT_KEYS = (
+    "seasonal_coffee_mining_cooldown",
+    "seasonal_coffee_scavenge_cooldown",
+)
+
 
 # ---------------------------------------------------------------------------
 # Haunted Cauldron registry bridge
@@ -737,15 +803,24 @@ INVENTORY_CATEGORY_INFO = {
 
 EVENT_CATEGORY_INFO = {
     "halloween": ("Halloween", "🎃", "Seasonal items and discoveries from the Halloween event."),
+    "autumn": ("Autumn & Thanksgiving", "🍂", "Autumn Harvest and Thanksgiving seasonal collections."),
 }
 
 EVENT_SUBCATEGORY_INFO = {
+    "Autumn Ingredient": ("Autumn Ingredients", "🍁", "Ingredients gathered during Autumn Harvest."),
+    "Autumn Food": ("Autumn Foods & Drinks", "🍂", "Prepared Autumn seasonal foods and drinks."),
+    "Thanksgiving Ingredient": ("Thanksgiving Ingredients", "🦃", "Ingredients gathered during Thanksgiving Gathering."),
+    "Thanksgiving Food": ("Thanksgiving Foods & Drinks", "🥧", "Prepared Thanksgiving recipes."),
     "Halloween Junk": ("Halloween Junk", "🎃", "Seasonal haunted salvage."),
     "Haunted Ingredient": ("Haunted Ingredients", "👻", "Ingredients recovered from haunted locations."),
     "Location-Based Collectible": ("Location-Based Collectibles", "🧸", "Unique collectibles discovered at specific exploration locations."),
 }
 
 EVENT_SUBCATEGORY_TO_EVENT = {
+    "Autumn Ingredient": "autumn",
+    "Autumn Food": "autumn",
+    "Thanksgiving Ingredient": "autumn",
+    "Thanksgiving Food": "autumn",
     "Halloween Junk": "halloween",
     "Haunted Ingredient": "halloween",
     "Location-Based Collectible": "halloween",
@@ -1504,7 +1579,8 @@ class Inventory(commands.Cog):
         # the circular-import fallback.
         _ensure_haunted_cauldron_items()
 
-        # Healing items stay exclusively in /heal. Revival items stay in /revive.
+        # Standard healing items stay in /heal; seasonal kitchen foods are
+        # handled here because they also carry seasonal exploration effects.
         usable_items = {
             "fuel_refill",
             "laser_charge_cell",
@@ -1525,6 +1601,7 @@ class Inventory(commands.Cog):
             "time_crystal",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
             *HAUNTED_CRAFTED_USE_ITEMS.keys(),
+            *SEASONAL_FOOD_HEALING.keys(),
             *[
                 item_id
                 for item_id, info in ITEM_REGISTRY.items()
@@ -1849,6 +1926,7 @@ class Inventory(commands.Cog):
             "quantum_battery",
             *[item_id for item_id, config in HALLOWEEN_SPECIAL_USE_ITEMS.items() if config.get("enabled")],
             *HAUNTED_CRAFTED_USE_ITEMS.keys(),
+            *SEASONAL_FOOD_HEALING.keys(),
             # Cauldron potions are registered dynamically in ITEM_REGISTRY.
             # Include them here so /use can reach the potion handler below.
             *[
@@ -2232,7 +2310,40 @@ class Inventory(commands.Cog):
             max_mining_charges = charge_caps["mining"]
             max_scavenge_charges = charge_caps["scavenging"]
 
-            if item_id == "laser_charge_cell":
+            if item_id in SEASONAL_FOOD_HEALING:
+                if (hp or 0) <= 0:
+                    return await ctx.send(
+                        "Food and drinks cannot revive an unconscious explorer. Use `/revive` first."
+                    )
+
+                coffee_effects = item_id in SEASONAL_COFFEE_DRINKS
+                if coffee_effects and any(effects.get(key) for key in SEASONAL_COFFEE_EFFECT_KEYS):
+                    return await ctx.send(
+                        "You already have a seasonal coffee boost prepared. Use the affected activities first."
+                    )
+
+                old_hp = hp or 0
+                hp = min(max_hp or 100, old_hp + SEASONAL_FOOD_HEALING[item_id])
+                restored = hp - old_hp
+                if not coffee_effects and restored <= 0:
+                    return await ctx.send("Your HP is already full!")
+
+                if coffee_effects:
+                    effects[SEASONAL_COFFEE_EFFECT_KEYS[0]] = SEASONAL_COFFEE_COOLDOWN_BONUS
+                    effects[SEASONAL_COFFEE_EFFECT_KEYS[1]] = SEASONAL_COFFEE_COOLDOWN_BONUS
+                    effects[SEASONAL_COFFEE_EFFECT_KEYS[2]] = True
+
+                await db.execute(
+                    "UPDATE users SET hp = ?, active_effects = ? WHERE user_id = ?",
+                    (hp, json.dumps(effects), user_id),
+                )
+                message = f"**{item_info.get('name', item_id)} used!** Restored **{restored} HP** ({hp}/{max_hp or 100})."
+                if coffee_effects:
+                    message += (
+                        "\n☕ Your next mining and scavenging cooldowns are **20% shorter**."
+                    )
+
+            elif item_id == "laser_charge_cell":
                 if (mining or 0) >= max_mining_charges:
                     return await ctx.send(
                         f"**Your mining laser charges are already full!** ({max_mining_charges}/{max_mining_charges})"
