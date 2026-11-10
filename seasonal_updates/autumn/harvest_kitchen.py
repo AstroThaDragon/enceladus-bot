@@ -194,33 +194,57 @@ class HarvestKitchen(commands.Cog):
         lines=[]
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             for iid,detail in recipe.get("ingredients",{}).items():
-                qty=detail["quantity"]; label=ITEM_REGISTRY.get(iid,{}).get("name",iid.replace('_',' ').title())
-                if detail.get("collection")=="pantry": lines.append(f"• {label} ×{qty} *(pantry staple)*"); continue
+                qty=detail["quantity"]
+                item_info = ITEM_REGISTRY.get(iid, {})
+                label=item_info.get("name",iid.replace('_',' ').title())
+                emoji = item_info.get("emoji", "🥣")
+                if detail.get("collection")=="pantry":
+                    lines.append(f"✅ {emoji} {label} ×{qty} *(pantry staple)*")
+                    continue
                 async with db.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_id=?",(user_id,iid)) as cur: row=await cur.fetchone()
-                have=row[0] if row else 0; lines.append(f"• {label}: **{have}/{qty}**")
-        return discord.Embed(title=f"{recipe.get('emoji','🍽️')} {recipe['name']}",description="\n".join(lines)+"\n\nConfirm to consume ingredients and cook.",color=discord.Color.orange())
+                have=row[0] if row else 0
+                mark = "✅" if have >= qty else "❌"
+                lines.append(f"{mark} {emoji} {label} ×{qty} **(you have {have})**")
+            async with db.execute(
+                "SELECT quantity FROM inventory WHERE user_id=? AND item_id=?",
+                (user_id, recipe_id),
+            ) as cur:
+                output_row = await cur.fetchone()
+        output_owned = output_row[0] if output_row else 0
+        lines.extend((
+            "",
+            f"📦 Currently owned: **{output_owned}x {recipe['name']}**",
+            "",
+            "Confirm to consume ingredients and cook.",
+        ))
+        return discord.Embed(title=f"{recipe.get('emoji','🍽️')} {recipe['name']}",description="\n".join(lines),color=discord.Color.orange())
 
     async def cook(self, interaction, recipe_id):
-        if not self._active(): return await interaction.response.send_message("The Harvest Kitchen is closed.",ephemeral=True)
+        if not self._active():
+            return await interaction.response.edit_message(content="The Harvest Kitchen is closed.", embed=None, view=None)
         recipe=AUTUMN_RECIPES.get(recipe_id) or THANKSGIVING_RECIPES.get(recipe_id) or AUTUMN_PET_TREATS.get(recipe_id) or THANKSGIVING_PET_TREATS.get(recipe_id)
-        if not recipe: return await interaction.response.send_message("That recipe isn't available.",ephemeral=True)
+        if not recipe:
+            return await interaction.response.edit_message(content="That recipe isn't available.", embed=None, view=None)
         if recipe_id in AUTUMN_PET_TREAT_RECIPES:
             recipe = dict(recipe); recipe["ingredients"] = AUTUMN_PET_TREAT_RECIPES[recipe_id]
         ingredients=recipe.get("ingredients",{})
+        await interaction.response.defer()
         async with aiosqlite.connect(ECONOMY_DB_NAME) as db:
             await db.execute("BEGIN IMMEDIATE")
             # Never consume ingredients if the finished item is already at its inventory cap.
             output_cap=ITEM_REGISTRY.get(recipe_id,{}).get("max_quantity",99)
             async with db.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_id=?",(interaction.user.id,recipe_id)) as cur: output_row=await cur.fetchone()
             if output_row and output_row[0] >= output_cap:
-                return await interaction.response.send_message(f"Your inventory is already at the cap for **{recipe['name']}**. Make room before cooking another.",ephemeral=True)
+                await db.rollback()
+                return await interaction.edit_original_response(content=f"Your inventory is already at the cap for **{recipe['name']}**. Make room before cooking another.", embed=None, view=None)
             missing=[]
             for iid,detail in ingredients.items():
                 if detail.get("collection")=="pantry": continue
                 async with db.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_id=?",(interaction.user.id,iid)) as cur: row=await cur.fetchone()
                 if not row or row[0]<detail["quantity"]: missing.append(iid)
             if missing:
-                return await interaction.response.send_message("You're missing: "+", ".join(ITEM_REGISTRY.get(x,{}).get("name",x) for x in missing),ephemeral=True)
+                await db.rollback()
+                return await interaction.edit_original_response(content="You're missing: "+", ".join(ITEM_REGISTRY.get(x,{}).get("name",x) for x in missing), embed=None, view=None)
             for iid,detail in ingredients.items():
                 if detail.get("collection")=="pantry": continue
                 await db.execute("UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?",(detail["quantity"],interaction.user.id,iid))
@@ -280,7 +304,7 @@ class HarvestKitchen(commands.Cog):
         if bonus_ingredient: msg+=f"\n🦊 Sweet Rewards found an extra **{ITEM_REGISTRY.get(bonus_ingredient,{}).get('name',bonus_ingredient)}**!"
         if egg: msg+=f"\n🥚 You discovered a **{ITEM_REGISTRY.get(egg,{}).get('name',egg)}**!"
         if special: msg+=f"\n\n✨ {special}"
-        await interaction.response.send_message(msg,ephemeral=True)
+        await interaction.edit_original_response(content=msg, embed=None, view=None)
 
 class KitchenView(discord.ui.View):
     def __init__(self, cog, owner_id, collection="thanksgiving"):
@@ -312,7 +336,7 @@ class RecipeSelect(discord.ui.Select):
         super().__init__(placeholder="Choose a recipe…",min_values=1,max_values=1,options=options); self.cog=cog; self.owner_id=owner_id
     async def callback(self,interaction):
         recipe_id=self.values[0]; embed=await self.cog.recipe_embed(self.owner_id,recipe_id)
-        await interaction.response.send_message(embed=embed,view=CookConfirmView(self.cog,self.owner_id,recipe_id),ephemeral=True)
+        await interaction.response.edit_message(embed=embed,view=CookConfirmView(self.cog,self.owner_id,recipe_id))
 
 class CookConfirmView(discord.ui.View):
     def __init__(self,cog,owner_id,recipe_id):
