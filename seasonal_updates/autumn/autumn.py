@@ -77,7 +77,7 @@ AUTUMN_ITEMS = {
     "beans": _item("Beans", "🫘", "ingredient", "Hearty beans for a warming pot of autumn chili."),
 
     # Eggs
-    "golden_egg": _item("Golden Egg", "🥚", "egg", "A rare golden egg said to hold an extraordinary companion."),
+    "golden_egg": _item("Golden Egg", "💛", "egg", "A rare golden egg said to hold an extraordinary companion."),
     "leaf_patterned_egg": _item("Leaf-Patterned Egg", "🍂", "egg", "An egg decorated with autumn leaf patterns."),
     "acorn_egg": _item("Acorn Egg", "🌰", "egg", "A woodland egg with an acorn-inspired design."),
 }
