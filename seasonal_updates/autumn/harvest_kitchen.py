@@ -60,8 +60,8 @@ class HarvestKitchen(commands.Cog):
             if not ok:
                 await db.commit()
                 embed = discord.Embed(title=f"{emoji} {name}", description=f"You're out of attempts for this 12-hour cycle. Your next cycle begins in **{remaining//3600}h {(remaining%3600)//60}m**.", color=discord.Color.orange())
-                embed.set_footer(text="Each gathering activity has 20 attempts per 12-hour cycle.")
-                return await interaction.response.send_message(embed=embed)
+                embed.set_footer(text="Attempts left: 0/20 • Each activity resets on its own 12-hour cycle.")
+                return await interaction.response.send_message(content=interaction.user.mention, embed=embed)
             effects=await get_active_pet_effects(db,interaction.user.id)
             pool=self._pool(collection)
             if collection=="thanksgiving":
@@ -129,8 +129,8 @@ class HarvestKitchen(commands.Cog):
             else "You explored the harvest grounds and came back with a bounty for the feast."
         )
         embed=discord.Embed(title=f"{emoji} {name}",description=outing+"\n\n**You gathered:**\n"+"\n".join(rewards),color=discord.Color.orange())
-        embed.set_footer(text="Egg chance: 5% • Pet treat chance: 2% • 20 attempts per 12-hour cycle")
-        await interaction.response.send_message(embed=embed)
+        embed.set_footer(text=f"Attempts left: {remaining}/20 • Egg chance: 5% • Pet treat chance: 2%")
+        await interaction.response.send_message(content=interaction.user.mention, embed=embed)
 
     async def open_kitchen(self, ctx, collection="autumn"):
         """Open this cog's recipe UI from the shared /seasonal crafting command."""

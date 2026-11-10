@@ -2743,20 +2743,41 @@ EXPLORATION_TEXT["common"]["cooldown_finished"].format(user_id=user_id, command=
                 seasonal_findings.append("\n".join(collectible_lines))
 
             # Pet eggs are independent bonus rolls and never replace normal loot.
-            # During Halloween, normal eggs are intentionally reduced to 3%
-            # while the seasonal eggs become more common. After Halloween, the
-            # normal egg automatically returns to its regular NORMAL_EGG_CHANCE.
-            # Seasonal eggs automatically stop dropping when Halloween ends.
+            # Both active events reduce normal-egg odds to 2.5%. Halloween uses
+            # independent Halloween/glitched rolls; Autumn has separate Autumn
+            # and Thanksgiving egg rolls. Outside either event, normal eggs use
+            # their regular NORMAL_EGG_CHANCE.
             egg_rolls = []
+            from seasonal_updates.autumn.autumn import (
+                AUTUMN_PET_POOLS,
+                AUTUMN_SCAVENGE_EGG_CHANCE,
+                AUTUMN_SCAVENGE_NORMAL_EGG_CHANCE,
+                is_autumn_active,
+            )
+            autumn_active = is_autumn_active()
+            normal_egg_chance = NORMAL_EGG_CHANCE
             if halloween_active:
-                if random.random() < 0.025:
-                    egg_rolls.append("normal_egg")
+                normal_egg_chance = 0.025
+            elif autumn_active:
+                normal_egg_chance = AUTUMN_SCAVENGE_NORMAL_EGG_CHANCE
+            if random.random() < normal_egg_chance:
+                egg_rolls.append("normal_egg")
+
+            if halloween_active:
                 if random.random() < 0.12:
                     egg_rolls.append("halloween_egg")
                 if random.random() < 0.09:
                     egg_rolls.append("glitched_egg")
-            elif random.random() < NORMAL_EGG_CHANCE:
-                egg_rolls.append("normal_egg")
+
+            if autumn_active:
+                from seasonal_updates.autumn.thanksgiving import (
+                    THANKSGIVING_SCAVENGE_EGG_CHANCE,
+                    THANKSGIVING_SCAVENGE_EGG_IDS,
+                )
+                if random.random() < AUTUMN_SCAVENGE_EGG_CHANCE:
+                    egg_rolls.append(random.choice(tuple(AUTUMN_PET_POOLS)))
+                if random.random() < THANKSGIVING_SCAVENGE_EGG_CHANCE:
+                    egg_rolls.append(random.choice(THANKSGIVING_SCAVENGE_EGG_IDS))
 
             for egg_id in egg_rolls:
                 egg_info = ITEM_REGISTRY.get(egg_id, {"name": egg_id, "emoji": "🥚"})

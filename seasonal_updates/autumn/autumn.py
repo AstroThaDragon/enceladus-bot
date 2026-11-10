@@ -213,6 +213,11 @@ AUTUMN_PET_POOLS = {
     "acorn_egg": ["chipmunk", "woodland_buck", "tawny_owl", "acorn_spirit"],
 }
 
+# Independent egg rolls during Autumn scavenging, parallel to Halloween's
+# normal-egg reduction and separate seasonal egg drops.
+AUTUMN_SCAVENGE_EGG_CHANCE = 0.12
+AUTUMN_SCAVENGE_NORMAL_EGG_CHANCE = 0.025
+
 
 # Design decisions awaiting connection to the existing drop/reward code:
 # - All three eggs are regular scavenging drops.

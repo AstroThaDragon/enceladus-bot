@@ -413,6 +413,9 @@ THANKSGIVING_EGGS = {
     },
 }
 
+THANKSGIVING_SCAVENGE_EGG_CHANCE = 0.09
+THANKSGIVING_SCAVENGE_EGG_IDS = ("harvest_egg", "feast_egg")
+
 THANKSGIVING_PETS = {
     "little_gobbler": {
         "name": "Little Gobbler",

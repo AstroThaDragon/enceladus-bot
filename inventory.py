@@ -2331,7 +2331,6 @@ class Inventory(commands.Cog):
                 if coffee_effects:
                     effects[SEASONAL_COFFEE_EFFECT_KEYS[0]] = SEASONAL_COFFEE_COOLDOWN_BONUS
                     effects[SEASONAL_COFFEE_EFFECT_KEYS[1]] = SEASONAL_COFFEE_COOLDOWN_BONUS
-                    effects[SEASONAL_COFFEE_EFFECT_KEYS[2]] = True
 
                 await db.execute(
                     "UPDATE users SET hp = ?, active_effects = ? WHERE user_id = ?",
